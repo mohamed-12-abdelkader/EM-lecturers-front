@@ -14,7 +14,7 @@ function getApiBaseURL() {
   if (fromEnv && String(fromEnv).trim()) {
     return String(fromEnv).replace(/\/?$/, "/");
   }
-  return "http://localhost:8000/";
+  return "http://api.em-online.online/";
 }
 
 const baseUrl = axios.create({
