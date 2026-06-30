@@ -3,17 +3,10 @@
  * Used on the main site (no tenant subdomain) for cross-platform discovery.
  */
 
-const defaultOrigin = "http://localhost:8000";
-
-function publicApiOrigin() {
-  if (import.meta.env.DEV) return "";
-  const fromEnv = import.meta.env.VITE_API_BASE_URL;
-  if (fromEnv && String(fromEnv).trim()) return String(fromEnv).replace(/\/$/, "");
-  return defaultOrigin;
-}
+import { getApiOrigin } from "./apiConfig";
 
 async function fetchSeoJson(path) {
-  const base = publicApiOrigin();
+  const base = getApiOrigin();
   const url = base ? `${base}${path}` : path;
   const res = await fetch(url, {
     method: "GET",

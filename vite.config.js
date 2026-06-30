@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
   const proxyTarget = (
     env.VITE_API_PROXY_TARGET ||
     env.VITE_API_BASE_URL ||
-    "http://127.0.0.1:8000"
+    "http://api.em-online.online/"
   ).replace(/\/$/, "");
 
   return {

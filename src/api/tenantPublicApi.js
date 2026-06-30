@@ -1,24 +1,7 @@
-const defaultOrigin = "http://localhost:8000";
-
-/**
- * متغير واحد للـ API في كل المشروع: VITE_API_BASE_URL
- * - لو المتغير موجود نستخدمه مباشرة (في dev/prod).
- * - لو غير موجود وفي dev نستخدم مساراً نسبياً ليمر عبر Vite proxy.
- * - لو غير موجود وفي production نرجع للعنوان الافتراضي.
- */
-function publicApiOrigin() {
-  if (import.meta.env.DEV) {
-    return "";
-  }
-  const fromEnv = import.meta.env.VITE_API_BASE_URL;
-  if (fromEnv && String(fromEnv).trim()) {
-    return String(fromEnv).replace(/\/$/, "");
-  }
-  return defaultOrigin;
-}
+import { getApiOrigin } from "./apiConfig";
 
 async function fetchPublicJson(path, { cacheKey } = {}) {
-  const base = publicApiOrigin();
+  const base = getApiOrigin();
   const url = base ? `${base}${path}` : path;
   const res = await fetch(url, {
     method: "GET",
