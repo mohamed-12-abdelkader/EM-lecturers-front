@@ -1,5 +1,5 @@
 /** عنوان الـ API الافتراضي (HTTP — يعمل محلياً؛ في الإنتاج HTTPS يُستخدم same-origin أو HTTPS للـ API) */
-export const DEFAULT_API_BASE_URL = "http://api.em-online.online";
+export const DEFAULT_API_BASE_URL = "https://api.em-online.online/";
 
 function withTrailingSlash(url) {
   return String(url || "").trim().replace(/\/?$/, "/");

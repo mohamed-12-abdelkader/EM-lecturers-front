@@ -67,6 +67,7 @@ import {
 import { useSearchParams, useLocation } from "react-router-dom";
 import baseUrl from "../../api/baseUrl";
 import { fetchAdminTenantById, patchAdminTenant, patchAdminTenantMultipart } from "../../api/adminTenantsApi";
+import { compressImage, compressTenantMediaFiles, TENANT_MEDIA_COMPRESS } from "../../utils/compressImage";
 import LandingPageBuilder, { BUILDER_THEME_DEFAULTS } from "./LandingPageBuilder";
 
 const SUBDOMAIN_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -470,6 +471,7 @@ const AddTeacher = () => {
 
   const [settingsJson, setSettingsJson] = useState("");
   const [mediaFiles, setMediaFiles] = useState(emptyMediaFiles);
+  const [compressingMedia, setCompressingMedia] = useState(false);
   const [mediaPreview, setMediaPreview] = useState({
     avatar: null,
     favicon: null,
@@ -510,17 +512,36 @@ const AddTeacher = () => {
     });
   }, []);
 
-  const setMediaFile = useCallback((key, file) => {
-    setMediaFiles((prev) => ({ ...prev, [key]: file }));
-    setMediaPreview((prev) => {
-      const old = prev[key];
-      if (old && old.startsWith("blob:")) URL.revokeObjectURL(old);
-      return {
-        ...prev,
-        [key]: file ? URL.createObjectURL(file) : null,
-      };
-    });
-  }, []);
+  const setMediaFile = useCallback(
+    async (key, file) => {
+      if (!file) {
+        setMediaFiles((prev) => ({ ...prev, [key]: null }));
+        setMediaPreview((prev) => {
+          const old = prev[key];
+          if (old && old.startsWith("blob:")) URL.revokeObjectURL(old);
+          return { ...prev, [key]: null };
+        });
+        return;
+      }
+
+      setCompressingMedia(true);
+      try {
+        const compressed = await compressImage(file, TENANT_MEDIA_COMPRESS[key] || {});
+        setMediaFiles((prev) => ({ ...prev, [key]: compressed }));
+        setMediaPreview((prev) => {
+          const old = prev[key];
+          if (old && old.startsWith("blob:")) URL.revokeObjectURL(old);
+          return {
+            ...prev,
+            [key]: URL.createObjectURL(compressed),
+          };
+        });
+      } finally {
+        setCompressingMedia(false);
+      }
+    },
+    [],
+  );
 
   const clearMediaFile = useCallback(
     (key) => {
@@ -945,6 +966,7 @@ const AddTeacher = () => {
 
     setLoading(true);
     try {
+      const uploadFiles = useMultipart ? await compressTenantMediaFiles(mediaFiles) : mediaFiles;
       let response;
       if (isEditMode) {
         if (useMultipart) {
@@ -956,10 +978,10 @@ const AddTeacher = () => {
             settings,
             ownerPatch,
           });
-          if (mediaFiles.avatar) fd.append("avatar", mediaFiles.avatar);
-          if (mediaFiles.favicon) fd.append("favicon", mediaFiles.favicon);
-          if (mediaFiles.og_image) fd.append("og_image", mediaFiles.og_image);
-          if (mediaFiles.hero_image) fd.append("hero_image", mediaFiles.hero_image);
+          if (uploadFiles.avatar) fd.append("avatar", uploadFiles.avatar);
+          if (uploadFiles.favicon) fd.append("favicon", uploadFiles.favicon);
+          if (uploadFiles.og_image) fd.append("og_image", uploadFiles.og_image);
+          if (uploadFiles.hero_image) fd.append("hero_image", uploadFiles.hero_image);
           response = await patchAdminTenantMultipart(tenantId, fd, token);
         } else {
           const body = buildAdminTenantEditJson({
@@ -988,10 +1010,10 @@ const AddTeacher = () => {
           fd.append("is_active", tenant.is_active ? "true" : "false");
         }
 
-        if (mediaFiles.avatar) fd.append("avatar", mediaFiles.avatar);
-        if (mediaFiles.favicon) fd.append("favicon", mediaFiles.favicon);
-        if (mediaFiles.og_image) fd.append("og_image", mediaFiles.og_image);
-        if (mediaFiles.hero_image) fd.append("hero_image", mediaFiles.hero_image);
+        if (mediaFiles.avatar) fd.append("avatar", uploadFiles.avatar);
+        if (mediaFiles.favicon) fd.append("favicon", uploadFiles.favicon);
+        if (mediaFiles.og_image) fd.append("og_image", uploadFiles.og_image);
+        if (mediaFiles.hero_image) fd.append("hero_image", uploadFiles.hero_image);
 
         fd.append("landing", JSON.stringify(landingPayload));
         if (settings !== undefined) fd.append("settings", JSON.stringify(settings));
@@ -1068,7 +1090,9 @@ const AddTeacher = () => {
       const msg =
         error.response?.data?.message ||
         error.response?.data?.error ||
-        (error.response?.status === 409
+        (error.response?.status === 413
+          ? "حجم الطلب كبير جداً (الصور أو البيانات). جرّب صوراً أصغر أو قلّل محتوى صفحة الهبوط."
+          : error.response?.status === 409
           ? "النطاق الفرعي مستخدم مسبقاً."
           : error.response?.status === 403
             ? "تحقق من صلاحية المسؤول وأن الطلب يمر عبر المستأجر الافتراضي للنظام."
@@ -1331,7 +1355,7 @@ const AddTeacher = () => {
                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={5}>
                   <FileDropSlot
                     label="رفع الصورة الرئيسية"
-                    hint="صورة المدرس أو المنصة؛ تُرفع إلى التخزين السحابي وتُحوَّل إلى رابط."
+                    hint="صورة المدرس أو المنصة — تُضغَّط تلقائياً قبل الرفع."
                     fieldKey="avatar"
                     previewUrl={mediaPreview.avatar}
                     onFile={(f) => setMediaFile("avatar", f)}
@@ -1342,7 +1366,7 @@ const AddTeacher = () => {
                   />
                   <FileDropSlot
                     label="رفع أيقونة الموقع"
-                    hint="ملف صورة صغيرة تظهر في تبويب المتصفح."
+                    hint="أيقونة صغيرة — تُضغَّط تلقائياً (يفضّل أقل من 200KB)."
                     fieldKey="favicon"
                     previewUrl={mediaPreview.favicon}
                     onFile={(f) => setMediaFile("favicon", f)}
@@ -1353,7 +1377,7 @@ const AddTeacher = () => {
                   />
                   <FileDropSlot
                     label="ملف og_image → og_image_url"
-                    hint="صورة Open Graph."
+                    hint="صورة Open Graph — تُضغَّط تلقائياً قبل الرفع."
                     fieldKey="og_image"
                     previewUrl={mediaPreview.og_image}
                     onFile={(f) => setMediaFile("og_image", f)}
@@ -1364,7 +1388,7 @@ const AddTeacher = () => {
                   />
                   <FileDropSlot
                     label="رفع صورة الواجهة البارزة"
-                    hint="تُدمج في صفحة الهبوط كصورة الواجهة الرئيسية."
+                    hint="صورة الواجهة الرئيسية — تُضغَّط تلقائياً قبل الرفع."
                     fieldKey="hero_image"
                     previewUrl={mediaPreview.hero_image}
                     onFile={(f) => setMediaFile("hero_image", f)}
@@ -1897,8 +1921,15 @@ const AddTeacher = () => {
                     fontSize="md"
                     fontWeight="bold"
                     leftIcon={loading ? <Spinner size="sm" /> : <FaSave />}
-                    isLoading={loading}
-                    loadingText={formMode === "edit" ? "جاري التحديث..." : "جاري الإنشاء..."}
+                    isLoading={loading || compressingMedia}
+                    isDisabled={compressingMedia}
+                    loadingText={
+                      compressingMedia
+                        ? "جاري ضغط الصور..."
+                        : formMode === "edit"
+                          ? "جاري التحديث..."
+                          : "جاري الإنشاء..."
+                    }
                     boxShadow="lg"
                     _hover={{ transform: "translateY(-1px)", boxShadow: "xl" }}
                     transition="all 0.2s"
