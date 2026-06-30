@@ -519,6 +519,17 @@ export default function TenantPublicLanding({ subdomain }) {
     return Array.isArray(list) ? list : [];
   }, [coursesResponse]);
 
+  const heroBgImageRaw = useMemo(() => {
+    const hero = landing?.hero || {};
+    const placeholderPhoto =
+      "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=3840&q=100&auto=format";
+    const courseFallbackImage = hero.image_url || tenant?.avatar_url || placeholderPhoto;
+    return hero.image_url || tenant?.og_image_url || courseFallbackImage;
+  }, [landing, tenant]);
+
+  const heroBgImage = useMemo(() => getHeroImageUrl(heroBgImageRaw), [heroBgImageRaw]);
+  const heroBgSrcSet = useMemo(() => getHeroImageSrcSet(heroBgImageRaw), [heroBgImageRaw]);
+
   const fontFamily = TENANT_FONT_BODY;
   const teacher = payload?.teacher;
 
@@ -652,9 +663,6 @@ export default function TenantPublicLanding({ subdomain }) {
   const placeholderPhoto =
     "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=3840&q=100&auto=format";
   const courseFallbackImage = hero.image_url || tenant.avatar_url || placeholderPhoto;
-  const heroBgImageRaw = hero.image_url || tenant.og_image_url || courseFallbackImage;
-  const heroBgImage = useMemo(() => getHeroImageUrl(heroBgImageRaw), [heroBgImageRaw]);
-  const heroBgSrcSet = useMemo(() => getHeroImageSrcSet(heroBgImageRaw), [heroBgImageRaw]);
 
   const statBarItems = [
     stats.courses_count != null && {
