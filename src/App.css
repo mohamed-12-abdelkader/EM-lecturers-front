@@ -1,0 +1,463 @@
+body {
+  direction: rtl;
+}
+/* optional: تحسين شكل ظل الكتاب */
+.book-shadow canvas {
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+.cardddd {
+  width: 100 !important;
+}
+.header2 {
+  background-image: url(../public/hero-bg.png);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+.book {
+  background-image: url(../public/banner-item-01.jpg);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  border-radius: 10px;
+}
+.code {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden; /* لإخفاء أي شيء خارج الحدود */
+
+  /* الخلفية */
+  &::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 70%;
+    height: 70%;
+    background-image: url(../public/next\ logo.png);
+    background-position: center;
+    background-size: contain; /* لضمان تناسب الخلفية مع حجم العنصر */
+    background-repeat: no-repeat;
+    background-color: rgba(255, 255, 255, 0.3); /* زيادة الشفافية */
+    z-index: 0;
+  }
+
+  /* منع التأثير على المحتوى داخل العنصر */
+  & > * {
+    position: relative;
+    z-index: 2; /* رفع النصوص والعناصر فوق الخلفية */
+  }
+}
+
+/* المحتوى */
+
+.month-content {
+  background-image: url(../public/start3.png);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+.hover-effect {
+  transition: transform 0.3s ease-in-out;
+}
+
+.hover-effect:hover {
+  transform: translateY(-10px); /* Adjust the value as needed */
+}
+
+/* HTML: <div class="ribbon">Your text content</div> */
+.ribbon {
+  color: white;
+}
+.ribbon {
+  --s: 1.8em; /* the ribbon size */
+  --d: 0.8em; /* the depth */
+  --c: 0.8em; /* the cutout part */
+
+  padding: 0 calc(var(--s) + 0.5em) var(--d);
+  line-height: 1.8;
+  background: conic-gradient(
+        at left var(--s) bottom var(--d),
+        #0000 25%,
+        #0008 0 37.5%,
+        #0004 0
+      )
+      0 /50% 100% no-repeat,
+    conic-gradient(
+        at right var(--s) bottom var(--d),
+        #0004 62.5%,
+        #0008 0 75%,
+        #0000 0
+      )
+      100%/50% 100% no-repeat;
+  clip-path: polygon(
+    0 var(--d),
+    var(--s) var(--d),
+    var(--s) 0,
+    calc(100% - var(--s)) 0,
+    calc(100% - var(--s)) var(--d),
+    100% var(--d),
+    calc(100% - var(--c)) calc(50% + var(--d) / 2),
+    100% 100%,
+    calc(100% - var(--s) - var(--d)) 100%,
+    calc(100% - var(--s) - var(--d)) calc(100% - var(--d)),
+    calc(var(--s) + var(--d)) calc(100% - var(--d)),
+    calc(var(--s) + var(--d)) 100%,
+    0 100%,
+    var(--c) calc(50% + var(--d) / 2)
+  );
+  background-color: #00204a; /* the main color */
+  width: fit-content;
+}
+
+.links-container {
+}
+.links-container div {
+  height: auto;
+  width: 200px;
+  background-color: #fff;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  margin: 10px;
+  height: 40px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: 0.3s;
+  display: flex;
+  align-items: end;
+  text-decoration: none;
+}
+
+.links-container div:hover {
+  transform: scale(1.1);
+  color: #3b82f6;
+  border: solid 2px #3b82f6;
+}
+
+.links-container div h5 {
+  font: size 25px;
+  margin-right: 15px;
+  text-decoration: none !important;
+}
+.links-container a {
+  text-decoration: none !important;
+}
+.conatainer-profile {
+  background-color: white;
+
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+
+  border-radius: 20px;
+}
+.conatainer-profile .row {
+  width: 100% !important;
+  height: auto;
+  background-color: #fff;
+}
+
+.icone {
+  color: #3b82f6;
+  margin-left: 5px;
+}
+
+.container-aitem {
+  direction: rtl;
+  display: grid;
+  grid-template-columns: 1fr 3fr; /* تحديد عرض العناصر بنسبة 1:2 */
+  height: auto;
+  margin: 50px auto;
+}
+
+.aitem-1 {
+  padding: 20px;
+}
+
+.aitem-2 {
+  padding: 20px;
+}
+
+.active-link {
+  background-color: #3b82f6 !important;
+  color: white !important;
+  border-radius: 8px; /* إضافة حواف مستديرة */
+  padding: 8px; /* إضافة تباعد داخلي */
+  cursor: pointer;
+}
+
+/* HTML: <div class="ribbon">Your text content</div> */
+
+.ribbon2 {
+  --r: 0.8em; /* control the cutout */
+
+  border-block: 0.5em solid #0000;
+  padding-inline: calc(var(--r) + 0.25em) 0.5em;
+  line-height: 1.8;
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% 100%,
+    0 100%,
+    0 calc(100% - 0.25em),
+    var(--r) 50%,
+    0 0.25em
+  );
+  background: radial-gradient(0.2em 50% at right, #000a, #0000) border-box,
+    #3b82f6 padding-box;
+  width: fit-content;
+}
+
+@media screen and (max-width: 450px) {
+  .teacher {
+    width: 305px !important;
+  }
+  .footer {
+    display: block !important;
+  }
+  .container-aitem {
+    display: block;
+  }
+  .div-link {
+    width: 180px !important;
+  }
+  .font {
+    font-size: 15px !important;
+  }
+  .teacher-card-content {
+    display: block !important;
+  }
+  .teacher-card {
+    width: 100% !important;
+  }
+  .manth-content {
+    display: block !important;
+  }
+  .chakra-card {
+    width: 90% !important;
+  }
+  .stu-course {
+    width: 100% !important;
+  }
+}
+
+@media screen and (min-width: 451px) and (max-width: 850px) {
+  .card-content {
+    justify-content: start !important;
+  }
+  .chakra-card {
+    margin: 10px 5px !important;
+    width: 270px !important;
+  }
+  .teacher-card {
+    width: 250px !important;
+  }
+  .teacher-card-content {
+    display: flex;
+    justify-content: space-between;
+  }
+  .manth-card {
+    width: 290px !important;
+  }
+  .container-aitem {
+    display: block;
+  }
+  .caard {
+    width: 280px !important;
+  }
+  .links-container {
+    width: 250px !important;
+    margin: auto !important;
+  }
+  .lecture_details {
+    display: block !important;
+  }
+  .lecture_content {
+    width: 100% !important;
+  }
+  .content-item {
+    width: 90% !important;
+  }
+  .Welcome-Section {
+    width: 100% !important;
+    margin-right: 30px !important;
+  }
+  .link-div {
+    width: 100% !important;
+    margin-right: 10px !important;
+  }
+  .teacher-course,
+  .teacher-card {
+    width: 330px !important;
+    margin-right: 15px !important;
+  }
+  .stu-course {
+    width: 320px !important;
+  }
+  .home-page {
+    margin-right: 25px !important;
+  }
+  .lecture_container {
+    margin-right: 10px !important;
+  }
+}
+
+.fixed-button {
+  position: fixed;
+  bottom: 50px;
+  right: -20px;
+
+  color: #fff;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  z-index: 1000;
+}
+
+.login {
+  opacity: 1 !important;
+}
+
+@media screen and (max-width: 740px) {
+  .teacher-card {
+    width: 45% !important;
+  }
+
+  .manth-card {
+    width: 45% !important;
+  }
+}
+
+.screen-recording-active {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: black;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  color: white;
+  font-size: 24px;
+}
+
+.input-vedio {
+  display: none;
+}
+
+.screen-recording-active .input-vedio {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+}
+
+.dotted-background {
+  background-image: radial-gradient(white 15%, transparent 20%);
+  background-size: 20px 20px;
+}
+
+.section-one {
+  background-image: url(../public/cb538a60-0865-4d86-8f2a-f7884951d90e.jpeg);
+}
+
+div::-webkit-scrollbar {
+  width: 8px;
+}
+
+div::-webkit-scrollbar-thumb {
+  background-color: #cbd5e0;
+  border-radius: 4px;
+}
+
+div::-webkit-scrollbar-thumb:hover {
+  background-color: #a0aec0;
+}
+
+.slider-container {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory; /* تفعيل خاصية scroll snapping */
+  scrollbar-width: none; /* إخفاء شريط التمرير */
+  -ms-overflow-style: none; /* إخفاء شريط التمرير في IE */
+}
+
+.slider-container::-webkit-scrollbar {
+  display: none; /* إخفاء شريط التمرير في Webkit */
+}
+
+.slider-container > * {
+  scroll-snap-align: center; /* محاذاة الكارد في المركز */
+  flex: 0 0 auto; /* منع الكارد من التمدد */
+  width: 90%; /* تعيين العرض المناسب */
+  margin: 0 auto; /* توسيط الكارد */
+  background-color: #f8f8f8;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 0px;
+}
+
+.slider-container::-webkit-scrollbar {
+  display: none; /* Hide scrollbar in WebKit browsers */
+}
+
+.slider-container.active {
+  cursor: grabbing;
+}
+
+.slider {
+  position: relative;
+  padding: 0 0px; /* Add padding to the slider for button spacing */
+}
+
+.slide-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.prev {
+  left: 8px;
+}
+
+.next {
+  right: 8px;
+}
+a {
+  text-decoration: none !important;
+}
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-container,
+  .print-container * {
+    visibility: visible;
+  }
+  .print-container {
+    margin: 0 auto;
+    width: 100%;
+  }
+  .print-item {
+    page-break-inside: avoid;
+  }
+}
+.print-container {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: 150px;
+  gap: 1rem;
+}
+
+iframe {
+  pointer-events: none;
+}

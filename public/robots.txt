@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# خريطة مواقع منصات المدرسين (subdomains)
+Sitemap: https://next-edu.online/api/tenants/public/sitemap.xml

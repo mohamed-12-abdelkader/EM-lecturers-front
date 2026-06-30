@@ -1,0 +1,292 @@
+import { useEffect, useRef, useMemo } from "react";
+import { Box } from "@chakra-ui/react";
+import Plyr from "plyr";
+import Hls from "hls.js";
+import "plyr/dist/plyr.css";
+
+const PLYR_I18N = {
+  restart: "إعادة التشغيل",
+  rewind: "تأخير 10 ثواني",
+  play: "تشغيل",
+  pause: "إيقاف مؤقت",
+  fastForward: "تقديم 10 ثواني",
+  seek: "بحث",
+  seekLabel: "{currentTime} من {duration}",
+  played: "تم التشغيل",
+  buffered: "تم التحميل",
+  currentTime: "الوقت الحالي",
+  duration: "المدة الإجمالية",
+  volume: "مستوى الصوت",
+  mute: "كتم الصوت",
+  unmute: "إلغاء كتم الصوت",
+  enterFullscreen: "ملء الشاشة",
+  exitFullscreen: "الخروج من ملء الشاشة",
+  settings: "الإعدادات",
+  speed: "سرعة التشغيل",
+  normal: "عادي",
+  quality: "الجودة",
+};
+
+function getYoutubeId(url) {
+  if (!url) return null;
+  if (url.includes("youtube.com/watch?v=")) {
+    return url.split("v=")[1].split("&")[0];
+  }
+  if (url.includes("youtu.be/")) {
+    return url.split("youtu.be/")[1].split("?")[0];
+  }
+  return null;
+}
+
+function getBunnyEmbed(url) {
+  const match = url?.match(/embed\/([^/]+)\/([^/?]+)/);
+  if (!match) return null;
+  return `https://iframe.mediadelivery.net/embed/${match[1]}/${match[2]}?autoplay=false&preload=true`;
+}
+
+function buildPlyrOptions() {
+  return {
+    disableContextMenu: true,
+    controls: [
+      "play-large",
+      "rewind",
+      "play",
+      "fast-forward",
+      "progress",
+      "current-time",
+      "duration",
+      "mute",
+      "volume",
+      "settings",
+      "fullscreen",
+    ],
+    settings: ["quality", "speed"],
+    speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5] },
+    seekTime: 10,
+    i18n: PLYR_I18N,
+    ratio: "16:9",
+  };
+}
+
+function SecureHlsPlayer({
+  manifestUrl,
+  authToken,
+  sessionId,
+  segmentToken,
+  resumePosition,
+  onPlayerReady,
+  onEvent,
+}) {
+  const containerRef = useRef(null);
+  const playerId = useMemo(() => `secure-hls-${Math.random().toString(36).slice(2)}`, []);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !manifestUrl) return undefined;
+
+    const video = document.createElement("video");
+    video.id = playerId;
+    video.playsInline = true;
+    video.controlsList = "nodownload noremoteplayback";
+    video.disablePictureInPicture = true;
+    video.className = "w-full h-full";
+    container.appendChild(video);
+
+    let player;
+    let hls;
+    const plyrOpts = buildPlyrOptions();
+
+    if (Hls.isSupported()) {
+      hls = new Hls({
+        enableWorker: true,
+        xhrSetup(xhr) {
+          if (authToken) xhr.setRequestHeader("Authorization", `Bearer ${authToken}`);
+          if (sessionId) xhr.setRequestHeader("X-Playback-Session", sessionId);
+          if (segmentToken) xhr.setRequestHeader("X-Playback-Token", segmentToken);
+        },
+      });
+      hls.loadSource(manifestUrl);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        if (hls.levels?.length) {
+          const heights = hls.levels.map((l) => l.height).filter(Boolean);
+          if (heights.length) {
+            plyrOpts.quality = {
+              default: heights[0],
+              options: heights,
+              forced: true,
+              onChange: (q) => {
+                hls.levels.forEach((level, i) => {
+                  if (level.height === q) hls.currentLevel = i;
+                });
+                onEvent?.("quality_change", { quality: q });
+              },
+            };
+          }
+        }
+        player = new Plyr(video, plyrOpts);
+        onPlayerReady?.(player, video);
+        if (resumePosition > 0) video.currentTime = resumePosition;
+      });
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        if (data?.fatal) onEvent?.("stream_error", { details: data.details });
+      });
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      video.src = manifestUrl;
+      player = new Plyr(video, plyrOpts);
+      onPlayerReady?.(player, video);
+    }
+
+    video.addEventListener("play", () => onEvent?.("play", {}));
+    video.addEventListener("pause", () => onEvent?.("pause", {}));
+    video.addEventListener("seeking", () => onEvent?.("seek", { time: video.currentTime }));
+    video.addEventListener("ratechange", () =>
+      onEvent?.("speed_change", { rate: video.playbackRate }),
+    );
+
+    return () => {
+      try {
+        player?.destroy();
+      } catch {
+        /* ignore */
+      }
+      hls?.destroy();
+      if (container.contains(video)) container.removeChild(video);
+    };
+  }, [manifestUrl, authToken, sessionId, segmentToken, resumePosition, playerId, onPlayerReady, onEvent]);
+
+  return (
+    <Box
+      ref={containerRef}
+      w="full"
+      sx={{
+        ".plyr": { fontFamily: "'Cairo', 'Tajawal', sans-serif" },
+        ".plyr__control--overlaid": { bg: "blue.500" },
+        video: { maxHeight: "70vh" },
+      }}
+    />
+  );
+}
+
+function SecureYoutubePlayer({ youtubeUrl, onPlayerReady }) {
+  const youtubeId = getYoutubeId(youtubeUrl);
+  const playerId = useMemo(() => `secure-yt-${youtubeId}`, [youtubeId]);
+
+  useEffect(() => {
+    if (!youtubeId) return undefined;
+    const player = new Plyr(`#${playerId}`, {
+      ...buildPlyrOptions(),
+      youtube: { noCookie: true, rel: 0, iv_load_policy: 3, modestbranding: 1 },
+    });
+    onPlayerReady?.(player);
+    return () => {
+      try {
+        player.destroy();
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [youtubeId, playerId, onPlayerReady]);
+
+  if (!youtubeId) return null;
+
+  return (
+    <Box sx={{ ".plyr": { fontFamily: "'Cairo', 'Tajawal', sans-serif" } }}>
+      <div id={playerId} data-plyr-provider="youtube" data-plyr-embed-id={youtubeId} />
+    </Box>
+  );
+}
+
+function SecureBunnyPlayer({ embedUrl }) {
+  const src = getBunnyEmbed(embedUrl) || embedUrl;
+  return (
+    <Box className="aspect-video w-full overflow-hidden rounded-xl bg-black">
+      <iframe
+        src={src}
+        title="محتوى محمي"
+        className="h-full w-full border-0"
+        allow="accelerometer; autoplay; encrypted-media; gyroscope; fullscreen"
+        allowFullScreen
+        referrerPolicy="strict-origin-when-cross-origin"
+      />
+    </Box>
+  );
+}
+
+function SecureProgressivePlayer({ url, authToken, sessionId, onPlayerReady, onEvent }) {
+  const containerRef = useRef(null);
+  const playerId = useMemo(() => `secure-mp4-${Math.random().toString(36).slice(2)}`, []);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !url) return undefined;
+
+    const video = document.createElement("video");
+    video.id = playerId;
+    video.playsInline = true;
+    video.controlsList = "nodownload noremoteplayback";
+    video.disablePictureInPicture = true;
+    container.appendChild(video);
+
+    video.src = url;
+    const player = new Plyr(video, buildPlyrOptions());
+    onPlayerReady?.(player, video);
+
+    video.addEventListener("play", () => onEvent?.("play", {}));
+    video.addEventListener("pause", () => onEvent?.("pause", {}));
+
+    return () => {
+      try {
+        player.destroy();
+      } catch {
+        /* ignore */
+      }
+      if (container.contains(video)) container.removeChild(video);
+    };
+  }, [url, authToken, sessionId, playerId, onPlayerReady, onEvent]);
+
+  return <Box ref={containerRef} w="full" />;
+}
+
+export default function SecureVideoPlayer({ playback, authToken, onPlayerReady, onEvent }) {
+  if (!playback) return null;
+
+  switch (playback.streamType) {
+    case "hls":
+      return (
+        <SecureHlsPlayer
+          manifestUrl={playback.manifestUrl}
+          authToken={authToken}
+          sessionId={playback.sessionId}
+          segmentToken={playback.segmentToken}
+          resumePosition={playback.resumePosition}
+          onPlayerReady={onPlayerReady}
+          onEvent={onEvent}
+        />
+      );
+    case "youtube":
+      return <SecureYoutubePlayer youtubeUrl={playback.youtubeUrl} onPlayerReady={onPlayerReady} />;
+    case "bunny":
+      return <SecureBunnyPlayer embedUrl={playback.embedUrl} />;
+    case "progressive":
+      return (
+        <SecureProgressivePlayer
+          url={playback.progressiveUrl}
+          authToken={authToken}
+          sessionId={playback.sessionId}
+          onPlayerReady={onPlayerReady}
+          onEvent={onEvent}
+        />
+      );
+    default:
+      return (
+        <SecureProgressivePlayer
+          url={playback.manifestUrl || playback.progressiveUrl}
+          authToken={authToken}
+          sessionId={playback.sessionId}
+          onPlayerReady={onPlayerReady}
+          onEvent={onEvent}
+        />
+      );
+  }
+}
