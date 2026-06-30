@@ -77,7 +77,7 @@ export const TENANT_MEDIA_COMPRESS = {
   avatar: { maxWidth: 480, quality: 0.8, maxBytes: 250 * 1024 },
   favicon: { maxWidth: 128, quality: 0.82, maxBytes: 80 * 1024, preferPng: true },
   og_image: { maxWidth: 1000, quality: 0.75, maxBytes: 300 * 1024 },
-  hero_image: { maxWidth: 1280, quality: 0.7, maxBytes: 350 * 1024 },
+  hero_image: { maxWidth: 2560, quality: 0.92, maxBytes: 1200 * 1024 },
 };
 
 export async function compressTenantMediaFiles(files) {

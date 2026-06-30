@@ -138,21 +138,32 @@ export function StaggerItem({ children, className = "" }) {
   );
 }
 
-export function HeroKenBurns({ src, alt = "", className }) {
+export function HeroKenBurns({ src, srcSet, sizes = "100vw", alt = "", className }) {
   const reduceMotion = useReducedMotion();
   return (
     <motion.img
       src={src}
+      srcSet={srcSet}
+      sizes={sizes}
       alt={alt}
       aria-hidden={alt === "" ? true : undefined}
-      className={className}
+      className={`hero-ken-burns-img ${className || ""}`}
+      loading="eager"
+      decoding="async"
+      fetchPriority="high"
+      draggable={false}
       initial={{ scale: 1 }}
-      animate={{ scale: reduceMotion ? 1 : [1.02, 1.06, 1.02] }}
+      animate={{ scale: reduceMotion ? 1 : [1, 1.012, 1] }}
       transition={
         reduceMotion
           ? { duration: 0 }
-          : { duration: 22, repeat: Infinity, ease: "easeInOut" }
+          : { duration: 28, repeat: Infinity, ease: "easeInOut" }
       }
+      style={{
+        imageRendering: "auto",
+        WebkitBackfaceVisibility: "hidden",
+        backfaceVisibility: "hidden",
+      }}
     />
   );
 }

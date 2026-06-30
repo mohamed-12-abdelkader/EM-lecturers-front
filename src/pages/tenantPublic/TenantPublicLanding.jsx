@@ -40,6 +40,7 @@ import {
   staggerItem,
 } from "./tenantLandingMotion";
 import { useTenantPageMetadata } from "../../Hooks/tenantPublic/useTenantPageMetadata";
+import { getHeroImageSrcSet, getHeroImageUrl } from "../../utils/highQualityImageUrl";
 
 const TENANT_FONT_LINK_ID = "tenant-public-arabic-fonts";
 const TENANT_FONT_BODY = "'Tajawal', 'Segoe UI', Tahoma, sans-serif";
@@ -649,9 +650,11 @@ export default function TenantPublicLanding({ subdomain }) {
   const heroImage = hero.image_url || tenant.avatar_url;
 
   const placeholderPhoto =
-    "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=1200&q=85";
+    "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=3840&q=100&auto=format";
   const courseFallbackImage = hero.image_url || tenant.avatar_url || placeholderPhoto;
-  const heroBgImage = hero.image_url || tenant.og_image_url || courseFallbackImage;
+  const heroBgImageRaw = hero.image_url || tenant.og_image_url || courseFallbackImage;
+  const heroBgImage = useMemo(() => getHeroImageUrl(heroBgImageRaw), [heroBgImageRaw]);
+  const heroBgSrcSet = useMemo(() => getHeroImageSrcSet(heroBgImageRaw), [heroBgImageRaw]);
 
   const statBarItems = [
     stats.courses_count != null && {
@@ -831,6 +834,10 @@ export default function TenantPublicLanding({ subdomain }) {
         .tenant-public-page .hero-text-layer span {
           text-shadow: 0 1px 3px rgba(2,6,23,0.45);
         }
+        .tenant-public-page .hero-ken-burns-img {
+          transform: translateZ(0);
+          will-change: transform;
+        }
         html { scroll-behavior: smooth; }
         body:has(.tenant-public-page) { overflow-x: hidden; }
         @media (prefers-reduced-motion: reduce) {
@@ -863,6 +870,8 @@ export default function TenantPublicLanding({ subdomain }) {
           <div className="absolute inset-0 overflow-hidden" aria-hidden>
             <HeroKenBurns
               src={heroBgImage}
+              srcSet={heroBgSrcSet}
+              sizes="100vw"
               alt=""
               className="h-full w-full object-cover object-[88%_18%] max-[749px]:object-[88%_18%] min-[750px]:max-[900px]:object-[100%_28%] min-[901px]:object-[right_center]"
             />
