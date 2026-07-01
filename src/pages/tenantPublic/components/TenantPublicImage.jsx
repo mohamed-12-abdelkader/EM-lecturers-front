@@ -48,7 +48,7 @@ export default function TenantPublicImage({
         alt={alt}
         loading={priority ? "eager" : "lazy"}
         decoding="async"
-        fetchPriority={priority ? "high" : "auto"}
+        fetchpriority={priority ? "high" : "auto"}
         onLoad={() => setLoaded(true)}
         onError={() => setError(true)}
         className={`h-full w-full transition-opacity duration-300 ${

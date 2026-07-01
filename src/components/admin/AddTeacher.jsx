@@ -67,7 +67,7 @@ import {
 import { useSearchParams, useLocation } from "react-router-dom";
 import baseUrl from "../../api/baseUrl";
 import { fetchAdminTenantById, patchAdminTenant, patchAdminTenantMultipart } from "../../api/adminTenantsApi";
-import { compressImage, compressTenantMediaFiles, TENANT_MEDIA_COMPRESS } from "../../utils/compressImage";
+import { compressImage, TENANT_MEDIA_COMPRESS } from "../../utils/compressImage";
 import LandingPageBuilder, { BUILDER_THEME_DEFAULTS } from "./LandingPageBuilder";
 
 const SUBDOMAIN_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -398,16 +398,22 @@ function FileDropSlot({
           </Text>
           {previewUrl ? (
             <HStack w="full" justify="center" flexWrap="wrap">
-              <Image
-                src={previewUrl}
-                alt="معاينة الصورة"
-                maxH="100px"
-                maxW="100%"
-                objectFit="contain"
+              <Box
                 borderRadius="lg"
                 borderWidth="1px"
                 borderColor={borderColor}
-              />
+                p={2}
+                bg="repeating-conic-gradient(#e2e8f0 0% 25%, #fff 0% 50%) 50% / 16px 16px"
+              >
+                <Image
+                  src={previewUrl}
+                  alt="معاينة الصورة"
+                  maxH="120px"
+                  maxW="100%"
+                  objectFit="contain"
+                  bg="transparent"
+                />
+              </Box>
               <IconButton
                 aria-label="إزالة الملف"
                 icon={<FaTrash />}
@@ -966,7 +972,7 @@ const AddTeacher = () => {
 
     setLoading(true);
     try {
-      const uploadFiles = useMultipart ? await compressTenantMediaFiles(mediaFiles) : mediaFiles;
+      const uploadFiles = mediaFiles;
       let response;
       if (isEditMode) {
         if (useMultipart) {
@@ -1355,7 +1361,7 @@ const AddTeacher = () => {
                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={5}>
                   <FileDropSlot
                     label="رفع الصورة الرئيسية"
-                    hint="صورة المدرس أو المنصة — تُضغَّط تلقائياً قبل الرفع."
+                    hint="PNG شفاف مدعوم — تُرفع بجودتها الأصلية إن كان الحجم مناسباً."
                     fieldKey="avatar"
                     previewUrl={mediaPreview.avatar}
                     onFile={(f) => setMediaFile("avatar", f)}
@@ -1366,7 +1372,7 @@ const AddTeacher = () => {
                   />
                   <FileDropSlot
                     label="رفع أيقونة الموقع"
-                    hint="أيقونة صغيرة — تُضغَّط تلقائياً (يفضّل أقل من 200KB)."
+                    hint="يفضّل PNG صغير. الشفافية تُحفظ."
                     fieldKey="favicon"
                     previewUrl={mediaPreview.favicon}
                     onFile={(f) => setMediaFile("favicon", f)}
@@ -1377,7 +1383,7 @@ const AddTeacher = () => {
                   />
                   <FileDropSlot
                     label="ملف og_image → og_image_url"
-                    hint="صورة Open Graph — تُضغَّط تلقائياً قبل الرفع."
+                    hint="PNG أو JPG — جودة عالية، الشفافية محفوظة."
                     fieldKey="og_image"
                     previewUrl={mediaPreview.og_image}
                     onFile={(f) => setMediaFile("og_image", f)}
@@ -1388,7 +1394,7 @@ const AddTeacher = () => {
                   />
                   <FileDropSlot
                     label="رفع صورة الواجهة البارزة"
-                    hint="صورة الواجهة الرئيسية — تُضغَّط تلقائياً قبل الرفع."
+                    hint="صورة الهيرو — PNG شفاف حتى 4MB بجودة عالية."
                     fieldKey="hero_image"
                     previewUrl={mediaPreview.hero_image}
                     onFile={(f) => setMediaFile("hero_image", f)}

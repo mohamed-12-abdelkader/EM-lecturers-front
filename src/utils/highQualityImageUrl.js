@@ -13,20 +13,30 @@ function stripCloudinaryTransforms(path) {
     .join("/");
 }
 
-/**
- * يُرجع رابط صورة بجودة عالية — مفيد لصور الهيرو والخلفيات الكبيرة.
- */
+function isTransparentImageUrl(url) {
+  return /\.(png|webp)(\?|$)/i.test(url);
+}
+
+function getCloudinaryOriginal(url) {
+  const cloudinary = url.match(CLOUDINARY_UPLOAD);
+  if (!cloudinary) return url;
+  const [, head, path] = cloudinary;
+  return `${head}${stripCloudinaryTransforms(path)}`;
+}
+
 export function getHighQualityImageUrl(
   url,
-  { width = 2560, quality = 100, dpr = 2 } = {},
+  { width = 2560, quality = 100, dpr = 2, preserveTransparency = false } = {},
 ) {
   if (!url || typeof url !== "string") return url;
 
   const cloudinary = url.match(CLOUDINARY_UPLOAD);
   if (cloudinary) {
     const [, head, path] = cloudinary;
-    const transform = `q_${quality},f_auto,w_${width},c_limit,dpr_${dpr}`;
     const cleanPath = stripCloudinaryTransforms(path);
+    const keepAlpha = preserveTransparency || isTransparentImageUrl(url);
+    const format = keepAlpha ? "f_png,fl_preserve_transparency" : "f_auto";
+    const transform = `q_${quality},${format},w_${width},c_limit,dpr_${dpr}`;
     return `${head}${transform}/${cleanPath}`;
   }
 
@@ -45,7 +55,19 @@ export function getHighQualityImageUrl(
   return url;
 }
 
-/** srcSet للهيرو — شاشات مختلفة بدقة عالية */
+/** صورة المدرس — الرابط الأصلي بدون تحويلات تُفسد الشفافية */
+export function getPortraitImageUrl(url) {
+  if (!url) return url;
+  if (isTransparentImageUrl(url)) {
+    return getCloudinaryOriginal(url);
+  }
+  return getHighQualityImageUrl(url, { width: 1200, quality: 90, dpr: 2 });
+}
+
+export function getPortraitImageSrcSet() {
+  return undefined;
+}
+
 export function getHeroImageSrcSet(url) {
   if (!url) return undefined;
   const widths = [1600, 2200, 2800, 3840];

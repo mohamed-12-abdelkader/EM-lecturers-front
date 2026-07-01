@@ -60,10 +60,9 @@ import {
   FaSave,
 } from "react-icons/fa";
 import baseUrl from "../../api/baseUrl";
+import { getApiOrigin } from "../../api/apiConfig";
 
-const API_ORIGIN = (
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
-).replace(/\/$/, "");
+const API_ORIGIN = getApiOrigin();
 
 const PACKAGE_OPTIONS = [
   { value: "bronze", label: "Bronze" },

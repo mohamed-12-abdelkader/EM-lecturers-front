@@ -5,10 +5,11 @@ import tenantSeoPlugin from "./vite-plugin-tenant-seo.mjs";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
+  const isProd = mode === "production";
   const proxyTarget = (
     env.VITE_API_PROXY_TARGET ||
     env.VITE_API_BASE_URL ||
-    "http://api.em-online.online/"
+    (isProd ? "https://api.em-online.online/" : "http://localhost:8000")
   ).replace(/\/$/, "");
 
   return {

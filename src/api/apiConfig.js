@@ -1,66 +1,86 @@
-/** عنوان الـ API الافتراضي (HTTP — يعمل محلياً؛ في الإنتاج HTTPS يُستخدم same-origin أو HTTPS للـ API) */
-export const DEFAULT_API_BASE_URL = "https://api.em-online.online/";
+/** عناوين الـ API الافتراضية */
+export const DEV_API_BASE_URL = "http://localhost:8000";
+export const PROD_API_BASE_URL = "https://api.em-online.online/";
+
+function trimUrl(url) {
+  return String(url || "").trim();
+}
 
 function withTrailingSlash(url) {
-  return String(url || "").trim().replace(/\/?$/, "/");
+  return trimUrl(url).replace(/\/?$/, "/");
+}
+
+function withoutTrailingSlash(url) {
+  return trimUrl(url).replace(/\/$/, "");
+}
+
+function readEnvUrl() {
+  return trimUrl(import.meta.env.VITE_API_BASE_URL);
+}
+
+function isProductionBuild() {
+  return import.meta.env.PROD === true;
 }
 
 /**
- * في الإنتاج: الصفحة HTTPS + API على HTTP = المتصفح يحجب الطلب (Mixed Content).
- * الحل: إما SSL على api.em-online.online أو proxy لـ /api على دومين الواجهة.
+ * في التطوير فقط: Vite proxy (/) → localhost:8000
+ * يتجنب مشاكل CORS مع نطاقات مثل omar-mohamed.localhost:3000
  */
-function shouldUseSameOriginInProduction() {
-  if (!import.meta.env.PROD || typeof window === "undefined") {
-    return false;
-  }
-  if (window.location.protocol !== "https:") {
-    return false;
+export function useDevViteProxy() {
+  if (isProductionBuild()) return false;
+  if (!import.meta.env.DEV) return false;
+  return import.meta.env.VITE_USE_VITE_PROXY !== "false";
+}
+
+/** عنوان الـ API الفعلي الذي يستقبل الطلبات */
+export function getResolvedApiTarget() {
+  if (isProductionBuild()) {
+    return withoutTrailingSlash(readEnvUrl() || PROD_API_BASE_URL);
   }
 
-  const flag = import.meta.env.VITE_API_SAME_ORIGIN;
-  if (flag === "true") return true;
-  if (flag === "false") return false;
+  if (useDevViteProxy()) {
+    return withoutTrailingSlash(
+      import.meta.env.VITE_API_PROXY_TARGET || readEnvUrl() || DEV_API_BASE_URL,
+    );
+  }
 
-  const fromEnv = import.meta.env.VITE_API_BASE_URL;
-  const apiUrl = (fromEnv && String(fromEnv).trim()) || DEFAULT_API_BASE_URL;
-  return apiUrl.startsWith("http://");
+  const fromEnv = readEnvUrl();
+  if (fromEnv) return withoutTrailingSlash(fromEnv);
+
+  return withoutTrailingSlash(DEV_API_BASE_URL);
 }
 
 /**
- * @returns {string} Base URL مع شرطة مائلة في النهاية (مناسب لـ axios)
+ * @returns {string} Base URL لـ axios — "/" في dev مع proxy، أو عنوان API مباشر
  */
 export function getApiBaseURL() {
-  if (import.meta.env.DEV && import.meta.env.VITE_USE_VITE_PROXY === "true") {
+  if (isProductionBuild()) {
+    return withTrailingSlash(readEnvUrl() || PROD_API_BASE_URL);
+  }
+
+  if (useDevViteProxy()) {
     return "/";
   }
 
-  if (shouldUseSameOriginInProduction()) {
-    return "/";
+  const fromEnv = readEnvUrl();
+  if (fromEnv) {
+    return withTrailingSlash(fromEnv);
   }
 
-  const fromEnv = import.meta.env.VITE_API_BASE_URL;
-  if (fromEnv && String(fromEnv).trim()) {
-    let url = withTrailingSlash(fromEnv);
-    if (
-      typeof window !== "undefined" &&
-      window.location.protocol === "https:" &&
-      url.startsWith("http://")
-    ) {
-      url = url.replace(/^http:\/\//, "https://");
-    }
-    return url;
-  }
-
-  return withTrailingSlash(DEFAULT_API_BASE_URL);
+  return withTrailingSlash(DEV_API_BASE_URL);
 }
 
 /**
- * @returns {string} أصل الـ API بدون شرطة مائلة (مناسب لـ fetch / Socket.IO)
+ * @returns {string} أصل الـ API لـ fetch — فارغ مع proxy (مسارات نسبية /api/...)
  */
 export function getApiOrigin() {
-  const base = getApiBaseURL();
-  if (base === "/" || base === "") {
+  if (useDevViteProxy()) {
     return "";
   }
-  return base.replace(/\/$/, "");
+  return getApiBaseURL().replace(/\/$/, "");
+}
+
+if (import.meta.env.DEV && typeof console !== "undefined") {
+  const mode = useDevViteProxy() ? "Vite proxy →" : "مباشر →";
+  console.info(`[API] ${mode} ${getResolvedApiTarget()}`);
 }

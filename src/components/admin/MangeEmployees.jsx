@@ -58,6 +58,7 @@ import {
   FaUserPlus,
 } from 'react-icons/fa';
 import baseUrl from '../../api/baseUrl';
+import { getApiOrigin } from '../../api/apiConfig';
 
 export const MangeEmployees = () => {
   const [employees, setEmployees] = useState([]);
@@ -361,7 +362,7 @@ export const MangeEmployees = () => {
         <HStack justify="space-between" align="start" mb={4}>
           <Avatar
             size="lg"
-            src={employee.avatar ? (employee.avatar.startsWith('http') ? employee.avatar : `http://localhost:8000${employee.avatar}`) : undefined}
+            src={employee.avatar ? (employee.avatar.startsWith('http') ? employee.avatar : `${getApiOrigin()}${employee.avatar}`) : undefined}
             name={employee.name}
             bg="blue.500"
             border="3px solid"

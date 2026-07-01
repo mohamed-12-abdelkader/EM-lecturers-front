@@ -21,6 +21,7 @@ import {
   fetchPlatformPublicCourses,
 } from "../../api/tenantPublicApi";
 import FreeLecturePlayerModal from "./components/FreeLecturePlayerModal";
+import TenantHeroSection from "./components/TenantHeroSection";
 import {
   TenantPublicNavbar,
   TENANT_NAV_LINKS,
@@ -32,15 +33,14 @@ import {
   Reveal,
   StaggerGrid,
   StaggerItem,
-  HeroKenBurns,
-  HeroGlowOrb,
   MotionCard,
-  fadeUp,
-  staggerContainer,
-  staggerItem,
+  AnimatedSection,
+  ScrollProgress,
+  ShimmerCTA,
+  AnimatedUnderline,
 } from "./tenantLandingMotion";
 import { useTenantPageMetadata } from "../../Hooks/tenantPublic/useTenantPageMetadata";
-import { getHeroImageSrcSet, getHeroImageUrl } from "../../utils/highQualityImageUrl";
+import { getPortraitImageUrl } from "../../utils/highQualityImageUrl";
 
 const TENANT_FONT_LINK_ID = "tenant-public-arabic-fonts";
 const TENANT_FONT_BODY = "'Tajawal', 'Segoe UI', Tahoma, sans-serif";
@@ -96,15 +96,18 @@ function ServiceFeatureCard({ service, index, className = "" }) {
     service.description?.trim() || SERVICE_DESC_FALLBACK[index % SERVICE_DESC_FALLBACK.length];
 
   return (
-    <MotionCard>
+    <MotionCard lift>
       <motion.article
-        whileHover={{ borderColor: "rgba(59, 130, 246, 0.35)" }}
-        className={`rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-600/40 ${className}`}
+        whileHover={{
+          borderColor: "rgba(59, 130, 246, 0.35)",
+          boxShadow: "0 20px 40px rgba(15, 23, 42, 0.08)",
+        }}
+        className={`rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-600/40 ${className}`}
       >
         <motion.div
           className={`mb-4 inline-flex h-11 w-11 items-center justify-center rounded-lg ${accent.iconBg}`}
-          whileHover={{ rotate: [0, -6, 6, 0], scale: 1.05 }}
-          transition={{ duration: 0.45 }}
+          whileHover={{ rotate: [0, -8, 8, 0], scale: 1.08 }}
+          transition={{ duration: 0.5 }}
         >
           <Icon className="text-lg" />
         </motion.div>
@@ -226,250 +229,52 @@ function CourseCard({ course, courseFallbackImage, loginHref }) {
 
 function SectionHeading({ eyebrow, title, subtitle, align = "center" }) {
   const wrap = align === "center" ? "mx-auto max-w-2xl text-center" : "max-w-2xl text-right";
+  const lineAlign = align === "center" ? "mx-auto" : "ms-auto";
+
   return (
-    <Reveal className={wrap} variant="fadeUp">
+    <StaggerGrid className={wrap}>
       {eyebrow ? (
-        <motion.p
-          initial={{ opacity: 0, letterSpacing: "0.2em" }}
-          whileInView={{ opacity: 1, letterSpacing: "0.05em" }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-          className="text-xs font-semibold uppercase text-blue-600 dark:text-blue-400"
-        >
-          {eyebrow}
-        </motion.p>
+        <StaggerItem variant="blur">
+          <motion.p
+            className="text-xs font-semibold uppercase tracking-widest text-blue-600 dark:text-blue-400"
+            whileInView={{ letterSpacing: "0.12em" }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            {eyebrow}
+          </motion.p>
+        </StaggerItem>
       ) : null}
-      <h2 className="font-heading mt-2 text-xl font-bold text-slate-900 dark:text-slate-100 md:text-2xl">
-        {title}
-      </h2>
+      <StaggerItem variant="blur">
+        <h2 className="font-heading mt-2 text-xl font-bold text-slate-900 dark:text-slate-100 md:text-2xl">
+          {title}
+        </h2>
+        <AnimatedUnderline className={`mt-3 w-16 ${lineAlign}`} />
+      </StaggerItem>
       {subtitle ? (
-        <p className="mt-3 text-sm leading-8 text-slate-600 dark:text-slate-400 md:text-base">{subtitle}</p>
+        <StaggerItem variant="blur">
+          <p className="mt-4 text-sm leading-8 text-slate-600 dark:text-slate-400 md:text-base">{subtitle}</p>
+        </StaggerItem>
       ) : null}
-    </Reveal>
+    </StaggerGrid>
   );
 }
 
 function SocialLink({ href, label, children }) {
   if (!href) return null;
   return (
-    <a
+    <motion.a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
       aria-label={label}
-      className="flex h-9 w-9 items-center justify-center rounded-lg border border-blue-100 bg-blue-50 text-blue-500 transition hover:border-blue-200 hover:bg-blue-100 hover:text-blue-600 dark:border-slate-700 dark:bg-slate-800 dark:text-blue-300"
+      className="flex h-9 w-9 items-center justify-center rounded-lg border border-blue-100 bg-blue-50 text-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-blue-300"
+      whileHover={{ y: -4, scale: 1.08, backgroundColor: "rgba(59,130,246,0.15)" }}
+      whileTap={{ scale: 0.95 }}
+      transition={{ duration: 0.22 }}
     >
       {children}
-    </a>
-  );
-}
-
-/** طبقات ظل وتدرج تفصل صورة الخلفية عن منطقة النص */
-function HeroImageShadowLayers() {
-  return (
-    <>
-      {/* فينيت خفيف على كامل الصورة */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_92%_85%_at_58%_32%,transparent_42%,rgba(2,6,23,0.38)_100%)]"
-      />
-
-      {/* موبايل: ظل سفلي يفصل النص عن الصورة */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 hidden max-[749px]:block shadow-[inset_0_90px_110px_-25px_rgba(2,6,23,0.55)]"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-[68%] max-[749px]:block bg-gradient-to-t from-[#020617]/95 via-[#020617]/60 to-transparent"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-[38%] hidden h-24 max-[749px]:block bg-gradient-to-t from-[#020617]/25 to-transparent blur-md"
-      />
-
-      {/* تابلت */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 hidden min-[750px]:max-[900px]:block shadow-[inset_110px_0_90px_-18px_rgba(2,6,23,0.62),inset_0_-70px_90px_-22px_rgba(2,6,23,0.48)]"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-y-0 left-0 hidden w-[54%] min-[750px]:max-[900px]:block bg-gradient-to-r from-[#020617]/90 via-[#020617]/50 to-transparent"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 hidden h-[52%] min-[750px]:max-[900px]:block bg-gradient-to-t from-[#020617]/88 via-[#020617]/35 to-transparent"
-      />
-
-      {/* ديسكتوب */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 hidden min-[901px]:block shadow-[inset_150px_0_110px_-22px_rgba(2,6,23,0.7)]"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-y-0 left-0 hidden w-[56%] max-w-[620px] min-[901px]:block bg-gradient-to-r from-[#020617]/88 via-[#020617]/42 to-transparent"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-y-0 left-[48%] hidden w-28 min-[901px]:block bg-gradient-to-r from-[#020617]/20 to-transparent blur-xl"
-      />
-    </>
-  );
-}
-
-function HeroContent({
-  specialty,
-  teacherName,
-  heroTitle,
-  bioText,
-  about,
-  signupHref,
-  loginHref,
-  heroStats,
-  mode,
-}) {
-  const isMobile = mode === "mobile";
-  const isTablet = mode === "tablet";
-  const isDesktop = mode === "desktop";
-
-  const wrapClass = isDesktop
-    ? "hero-text-layer w-full max-w-xl text-right min-[901px]:ms-auto min-[901px]:me-0"
-    : "hero-text-layer w-full text-right";
-
-  const titleClass = isMobile
-    ? "font-heading mt-2 text-balance text-2xl font-bold leading-snug text-white sm:text-3xl"
-    : isTablet
-      ? "font-heading mt-2 text-balance text-[1.5rem] font-bold leading-snug text-white"
-      : "font-heading mt-2 text-balance text-3xl font-bold leading-snug text-white xl:text-4xl";
-
-  const bioClass = isMobile
-    ? "mt-3 line-clamp-2 text-sm leading-7 text-white/90"
-    : isTablet
-      ? "mt-3 line-clamp-3 text-sm leading-7 text-white/90"
-      : "mt-4 text-base leading-8 text-white/90";
-
-  const btnWrapClass = isMobile
-    ? "mt-5 flex flex-col gap-2.5"
-    : isTablet
-      ? "mt-5 flex flex-row flex-wrap gap-2"
-      : "mt-6 flex flex-row flex-wrap items-center gap-3";
-
-  const signupBtnClass = isMobile
-    ? "inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-7 text-sm font-semibold text-white transition hover:bg-orange-600"
-    : isTablet
-      ? "inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 text-xs font-semibold text-white transition hover:bg-orange-600"
-      : "inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-orange-500 px-7 text-sm font-semibold text-white transition hover:bg-orange-600";
-
-  const loginBtnClass = isMobile
-    ? "inline-flex h-11 w-full items-center justify-center rounded-lg border border-white/35 bg-white/10 px-7 text-sm font-medium text-white transition hover:bg-white/15"
-    : isTablet
-      ? "inline-flex h-10 flex-1 items-center justify-center rounded-lg border border-white/35 bg-white/10 px-4 text-xs font-medium text-white transition hover:bg-white/15"
-      : "inline-flex h-11 items-center justify-center rounded-lg border border-white/35 bg-white/10 px-7 text-sm font-medium text-white transition hover:bg-white/15";
-
-  return (
-    <motion.div
-      className={wrapClass}
-      initial="hidden"
-      animate="visible"
-      variants={staggerContainer}
-    >
-      {specialty ? (
-        <motion.span
-          variants={staggerItem}
-          className="inline-flex items-center rounded-md border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm"
-        >
-          {specialty}
-        </motion.span>
-      ) : null}
-
-      <motion.p variants={staggerItem} className="mt-3 text-sm text-orange-200">
-        مع {teacherName}
-      </motion.p>
-
-      <motion.h1 variants={staggerItem} className={titleClass}>
-        {heroTitle}
-      </motion.h1>
-
-      <motion.p variants={staggerItem} className={bioClass}>
-        {bioText}
-      </motion.p>
-
-      {isDesktop && (about.experience || about.qualifications) && (
-        <motion.div variants={staggerItem} className="mt-4 flex flex-wrap gap-2">
-          {about.experience ? (
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/10 px-3 py-1.5 text-xs text-white/90">
-              <FaAward className="text-orange-300" />
-              {about.experience}
-            </span>
-          ) : null}
-          {about.qualifications ? (
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/10 px-3 py-1.5 text-xs text-white/90">
-              <FaGraduationCap className="text-blue-200" />
-              {about.qualifications}
-            </span>
-          ) : null}
-        </motion.div>
-      )}
-
-      <motion.div variants={staggerItem} className={btnWrapClass}>
-        <motion.a
-          href={signupHref}
-          className={signupBtnClass}
-          whileHover={{ scale: 1.03, boxShadow: "0 12px 28px rgba(249,115,22,0.35)" }}
-          whileTap={{ scale: 0.98 }}
-        >
-          إنشاء حساب
-          <FaArrowLeft className="text-xs opacity-90" />
-        </motion.a>
-        <motion.a
-          href={loginHref}
-          className={loginBtnClass}
-          whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,0.18)" }}
-          whileTap={{ scale: 0.98 }}
-        >
-          تسجيل الدخول
-        </motion.a>
-      </motion.div>
-
-      <motion.div
-        variants={staggerItem}
-        className={`mt-5 grid grid-cols-3 gap-2 ${isDesktop ? "mt-8" : ""}`}
-      >
-        {heroStats.map((item, i) => {
-          const Icon = item.icon;
-          return (
-            <motion.div
-              key={item.label}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.45 + i * 0.08, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-              whileHover={{ y: -3, backgroundColor: "rgba(255,255,255,0.16)" }}
-              className={`hero-stat-card rounded-lg border border-white/15 bg-white/10 px-2 py-2.5 text-center backdrop-blur-sm shadow-[0_4px_20px_rgba(2,6,23,0.28)] ${
-                isDesktop ? "px-3 py-3 text-right" : ""
-              }`}
-            >
-              <Icon
-                className={`mx-auto mb-1 text-orange-300 ${
-                  isDesktop ? "ms-0 me-auto text-sm" : "text-xs"
-                }`}
-              />
-              <p
-                className={`font-bold tabular-nums text-white ${
-                  isDesktop ? "text-lg" : isTablet ? "text-sm" : "text-xs"
-                }`}
-              >
-                {item.value}
-              </p>
-              <p className={`mt-0.5 text-white/70 ${isDesktop ? "text-xs" : "text-[0.65rem]"}`}>
-                {item.label}
-              </p>
-            </motion.div>
-          );
-        })}
-      </motion.div>
-    </motion.div>
+    </motion.a>
   );
 }
 
@@ -521,14 +326,13 @@ export default function TenantPublicLanding({ subdomain }) {
 
   const heroBgImageRaw = useMemo(() => {
     const hero = landing?.hero || {};
-    const placeholderPhoto =
-      "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=3840&q=100&auto=format";
-    const courseFallbackImage = hero.image_url || tenant?.avatar_url || placeholderPhoto;
-    return hero.image_url || tenant?.og_image_url || courseFallbackImage;
+    return hero.image_url || tenant?.avatar_url || null;
   }, [landing, tenant]);
 
-  const heroBgImage = useMemo(() => getHeroImageUrl(heroBgImageRaw), [heroBgImageRaw]);
-  const heroBgSrcSet = useMemo(() => getHeroImageSrcSet(heroBgImageRaw), [heroBgImageRaw]);
+  const teacherPortraitUrl = useMemo(() => {
+    if (!heroBgImageRaw) return null;
+    return getPortraitImageUrl(heroBgImageRaw);
+  }, [heroBgImageRaw]);
 
   const fontFamily = TENANT_FONT_BODY;
   const teacher = payload?.teacher;
@@ -658,12 +462,11 @@ export default function TenantPublicLanding({ subdomain }) {
   const heroTitle =
     (hero.title && hero.title.trim()) ||
     (specialty ? `احترف ${specialty} مع ${teacherName}` : `تعلّم مع ${teacherName}`);
-  const heroImage = hero.image_url || tenant.avatar_url;
 
   const placeholderPhoto =
     "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=3840&q=100&auto=format";
   const courseFallbackImage = hero.image_url || tenant.avatar_url || placeholderPhoto;
-
+ 
   const statBarItems = [
     stats.courses_count != null && {
       value: `${Number(stats.courses_count).toLocaleString("ar-EG")}+`,
@@ -763,7 +566,10 @@ export default function TenantPublicLanding({ subdomain }) {
   ];
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
       dir="rtl"
       data-theme={isDarkMode ? "dark" : "light"}
       className={`tenant-public-page ${isDarkMode ? "dark tenant-dark" : "tenant-light"} min-h-screen overflow-x-hidden bg-white text-[var(--t-text)] antialiased selection:bg-blue-500/20 selection:text-slate-900 dark:selection:bg-orange-500/20 dark:selection:text-slate-100`}
@@ -835,23 +641,14 @@ export default function TenantPublicLanding({ subdomain }) {
           background: linear-gradient(180deg, #020617 0%, #0f172a 45%, #020617 100%) !important;
         }
         .tenant-public-page.tenant-dark .border-dashed { border-color: #475569 !important; }
-        .tenant-public-page .hero-text-layer h1 {
-          text-shadow: 0 1px 2px rgba(0,0,0,0.25), 0 6px 24px rgba(2,6,23,0.55);
-        }
-        .tenant-public-page .hero-text-layer p,
-        .tenant-public-page .hero-text-layer span {
-          text-shadow: 0 1px 3px rgba(2,6,23,0.45);
-        }
-        .tenant-public-page .hero-ken-burns-img {
-          transform: translateZ(0);
-          will-change: transform;
-        }
         html { scroll-behavior: smooth; }
         body:has(.tenant-public-page) { overflow-x: hidden; }
         @media (prefers-reduced-motion: reduce) {
           html { scroll-behavior: auto; }
         }
       `}</style>
+
+      <ScrollProgress />
 
       {/* Navbar */}
       <TenantPublicNavbar
@@ -865,105 +662,28 @@ export default function TenantPublicLanding({ subdomain }) {
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         navScrolled={navScrolled}
+        alwaysSolid
         brandHref="#home"
         navLinks={TENANT_NAV_LINKS}
       />
 
       <main className="bg-white transition-colors duration-300 dark:bg-slate-950">
-        {/* Hero */}
-        <section
-          id="home"
-          className="relative isolate min-h-[100svh] overflow-x-hidden min-[901px]:h-[100svh] min-[901px]:overflow-hidden"
-        >
-          <div className="absolute inset-0 overflow-hidden" aria-hidden>
-            <HeroKenBurns
-              src={heroBgImage}
-              srcSet={heroBgSrcSet}
-              sizes="100vw"
-              alt=""
-              className="h-full w-full object-cover object-[88%_18%] max-[749px]:object-[88%_18%] min-[750px]:max-[900px]:object-[100%_28%] min-[901px]:object-[right_center]"
-            />
-          </div>
-
-          <HeroGlowOrb
-            className="pointer-events-none absolute left-0 top-1/4 h-64 w-64 -translate-x-1/4 rounded-full bg-blue-500/20 blur-3xl"
-            delay={0}
-          />
-          <HeroGlowOrb
-            className="pointer-events-none absolute bottom-20 right-10 h-48 w-48 rounded-full bg-orange-500/15 blur-3xl"
-            delay={2}
-          />
-
-          <HeroImageShadowLayers />
-
-          <div className="relative mx-auto min-h-[100svh] max-w-[var(--t-max)] px-4 min-[901px]:flex min-[901px]:h-full min-[901px]:min-h-0 min-[901px]:flex-col md:px-6 lg:px-8">
-            {/* ── موبايل (<750) ── */}
-            <div className="flex min-h-[100svh] flex-col pb-6 pt-[4.75rem] max-[749px]:flex min-[750px]:hidden">
-              <div className="h-[28vh] min-h-[7rem] max-h-[14rem] shrink-0" aria-hidden />
-              <div className="flex flex-col justify-end">
-                <HeroContent
-                  specialty={specialty}
-                  teacherName={teacherName}
-                  heroTitle={heroTitle}
-                  bioText={
-                    about.bio ||
-                    tenant.bio ||
-                    payload?.teacher?.description ||
-                    "شرح منظم، متابعة مستمرة، وتدريب مكثف يساعدك تحقق أفضل النتائج."
-                  }
-                  about={about}
-                  signupHref={signupHref}
-                  loginHref={loginHref}
-                  heroStats={heroStats}
-                  mode="mobile"
-                />
-              </div>
-            </div>
-
-            {/* ── تابلت (750–900): عمودين — نص يسار / صورة يمين ── */}
-            <div className="hidden min-h-[100svh] min-[750px]:max-[900px]:grid min-[750px]:max-[900px]:grid-cols-2 min-[750px]:max-[900px]:items-end min-[750px]:max-[900px]:pb-10 min-[750px]:max-[900px]:pt-[4.75rem]">
-              <div className="col-start-2 pb-2">
-                <HeroContent
-                  specialty={specialty}
-                  teacherName={teacherName}
-                  heroTitle={heroTitle}
-                  bioText={
-                    about.bio ||
-                    tenant.bio ||
-                    payload?.teacher?.description ||
-                    "شرح منظم، متابعة مستمرة، وتدريب مكثف يساعدك تحقق أفضل النتائج."
-                  }
-                  about={about}
-                  signupHref={signupHref}
-                  loginHref={loginHref}
-                  heroStats={heroStats}
-                  mode="tablet"
-                />
-              </div>
-            </div>
-
-            {/* ── ديسكتوب (901+) ── */}
-            <div className="hidden min-[901px]:flex min-[901px]:flex-1 min-[901px]:flex-col min-[901px]:justify-center min-[901px]:py-16 min-[901px]:pt-[4.75rem]">
-              <HeroContent
-                specialty={specialty}
-                teacherName={teacherName}
-                heroTitle={heroTitle}
-                bioText={
-                  about.bio ||
-                  tenant.bio ||
-                  payload?.teacher?.description ||
-                  "شرح منظم، متابعة مستمرة، وتدريب مكثف يساعدك تحقق أفضل النتائج."
-                }
-                about={about}
-                signupHref={signupHref}
-                loginHref={loginHref}
-                heroStats={heroStats}
-                mode="desktop"
-              />
-            </div>
- 
-          </div>
-        </section>
+        <TenantHeroSection
+          specialty={specialty}
+          teacherName={teacherName}
+          heroTitle={heroTitle}
+          bioText={
+            about.bio ||
+            tenant.bio ||
+            payload?.teacher?.description ||
+            "شرح منظم، متابعة مستمرة، وتدريب مكثف يساعدك تحقق أفضل النتائج."
+          }
+          about={about}
+          signupHref={signupHref}
+          loginHref={loginHref}
+          heroStats={heroStats}
+          teacherImageUrl={teacherPortraitUrl}
+        />
 
         {/* About — مخفي حالياً */}
         <section id="about" className="hidden" aria-hidden />
@@ -979,7 +699,7 @@ export default function TenantPublicLanding({ subdomain }) {
 
         {/* Features / Why Us */}
         {displayServices.length > 0 && (
-          <section id="services" className="scroll-mt-20 border-t border-slate-200 bg-slate-50 py-14 md:py-20 dark:border-slate-800 dark:bg-slate-900/40" dir="rtl">
+          <AnimatedSection id="services" className="scroll-mt-20 border-t border-slate-200 bg-slate-50 py-14 md:py-20 dark:border-slate-800 dark:bg-slate-900/40" dir="rtl">
             <div className="mx-auto max-w-[var(--t-max)] px-4 md:px-6 lg:px-8">
               <SectionHeading
                 eyebrow="لماذا نحن"
@@ -990,7 +710,7 @@ export default function TenantPublicLanding({ subdomain }) {
               {statBarItems.length > 0 && (
                 <StaggerGrid className="mt-8 flex flex-wrap items-center justify-center gap-3">
                   {statBarItems.map((item) => (
-                    <StaggerItem key={item.label}>
+                    <StaggerItem key={item.label} variant="blur">
                       <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-900">
                         <span className="font-bold text-blue-600 dark:text-blue-400">{item.value}</span>
                         <span className="text-slate-600 dark:text-slate-400">{item.label}</span>
@@ -1002,7 +722,7 @@ export default function TenantPublicLanding({ subdomain }) {
 
               <StaggerGrid className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
                 {displayServices.map((s, i) => (
-                  <StaggerItem key={`${s.title}-${i}`}>
+                  <StaggerItem key={`${s.title}-${i}`} variant="blur">
                     <ServiceFeatureCard service={s} index={i} />
                   </StaggerItem>
                 ))}
@@ -1036,12 +756,12 @@ export default function TenantPublicLanding({ subdomain }) {
               </div>
               </Reveal>
             </div>
-          </section>
+          </AnimatedSection>
         )}
 
 
         {/* Free Lectures */}
-        <section id="videos" className="scroll-mt-20 border-t border-slate-200 bg-white py-14 md:py-20 dark:border-slate-800" dir="rtl">
+        <AnimatedSection id="videos" className="scroll-mt-20 border-t border-slate-200 bg-white py-14 md:py-20 dark:border-slate-800" dir="rtl">
           <div className="mx-auto max-w-[var(--t-max)] px-4 md:px-6 lg:px-8">
             <SectionHeading
               eyebrow="محاضرات مجانية"
@@ -1061,13 +781,13 @@ export default function TenantPublicLanding({ subdomain }) {
             ) : freeLectures.length > 0 ? (
               <StaggerGrid className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {freeLectures.map((lecture) => (
-                  <StaggerItem key={lecture.id}>
+                  <StaggerItem key={lecture.id} variant="blur">
                   <motion.button
                     type="button"
                     onClick={() => setActiveFreeLecture(lecture)}
                     className="group block w-full text-right"
-                    whileHover={{ y: -4 }}
-                    whileTap={{ scale: 0.99 }}
+                    whileHover={{ y: -6, transition: { duration: 0.25 } }}
+                    whileTap={{ scale: 0.98 }}
                   >
                     <div className="relative overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
                       <motion.img
@@ -1081,7 +801,9 @@ export default function TenantPublicLanding({ subdomain }) {
                       <div className="absolute inset-0 flex items-center justify-center bg-slate-900/45 transition group-hover:bg-slate-900/55">
                         <motion.span
                           className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-blue-600 shadow-md"
-                          whileHover={{ scale: 1.1 }}
+                          whileHover={{ scale: 1.15 }}
+                          animate={{ scale: [1, 1.06, 1] }}
+                          transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
                         >
                           <FaPlay className="mr-[-2px]" />
                         </motion.span>
@@ -1095,18 +817,20 @@ export default function TenantPublicLanding({ subdomain }) {
                 ))}
               </StaggerGrid>
             ) : (
-              <div className="mt-10 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center dark:border-slate-600 dark:bg-slate-900/50">
-                <p className="text-base font-semibold text-slate-800 dark:text-slate-100">
-                  لا توجد محاضرات مجانية حالياً
-                </p>
-                <p className="mt-2 text-sm text-slate-500">تابعنا — سيتم إضافة محاضرات قريباً</p>
-              </div>
+              <Reveal variant="springPop" className="mt-10">
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center dark:border-slate-600 dark:bg-slate-900/50">
+                  <p className="text-base font-semibold text-slate-800 dark:text-slate-100">
+                    لا توجد محاضرات مجانية حالياً
+                  </p>
+                  <p className="mt-2 text-sm text-slate-500">تابعنا — سيتم إضافة محاضرات قريباً</p>
+                </div>
+              </Reveal>
             )}
           </div>
-        </section>
+        </AnimatedSection>
 
         {/* Courses */}
-        <section id="courses" className="scroll-mt-20 border-t border-slate-200 bg-slate-50 py-14 md:py-20 dark:border-slate-800 dark:bg-slate-900/40" dir="rtl">
+        <AnimatedSection id="courses" className="scroll-mt-20 border-t border-slate-200 bg-slate-50 py-14 md:py-20 dark:border-slate-800 dark:bg-slate-900/40" dir="rtl">
           <div className="mx-auto max-w-[var(--t-max)] px-4 md:px-6 lg:px-8">
             <SectionHeading
               eyebrow="الكورسات"
@@ -1125,16 +849,16 @@ export default function TenantPublicLanding({ subdomain }) {
               </div>
             ) : courses.length > 0 ? (
               <>
-                <p className="mt-6 text-center text-sm text-slate-600 dark:text-slate-400">
+                <Reveal variant="blurUp" className="mt-6 text-center text-sm text-slate-600 dark:text-slate-400">
                   <span className="font-bold text-blue-600 dark:text-blue-400">
                     {courses.length.toLocaleString("ar-EG")}
                   </span>{" "}
                   كورس متاح للاشتراك
-                </p>
+                </Reveal>
 
                 <StaggerGrid className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                   {courses.map((c, i) => (
-                    <StaggerItem key={c.id ?? `course-${i}`}>
+                    <StaggerItem key={c.id ?? `course-${i}`} variant="blur">
                       <CourseCard
                         course={c}
                         courseFallbackImage={courseFallbackImage}
@@ -1145,31 +869,40 @@ export default function TenantPublicLanding({ subdomain }) {
                 </StaggerGrid>
               </>
             ) : (
-              <div className="mt-10 rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center dark:border-slate-600 dark:bg-slate-900">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-blue-50 text-xl text-blue-600 dark:bg-blue-900/30">
-                  <FaBookOpen />
+              <Reveal variant="springPop" className="mt-10">
+                <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center dark:border-slate-600 dark:bg-slate-900">
+                  <motion.div
+                    className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-blue-50 text-xl text-blue-600 dark:bg-blue-900/30"
+                    animate={{ y: [0, -4, 0] }}
+                    transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+                  >
+                    <FaBookOpen />
+                  </motion.div>
+                  <p className="text-base font-semibold text-slate-800 dark:text-slate-100">لا توجد كورسات متاحة حالياً</p>
+                  <p className="mt-2 text-sm text-slate-500">سيتم عرض الكورسات هنا فور إضافتها</p>
+                  <motion.a
+                    href={signupHref}
+                    className="mt-5 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white"
+                    whileHover={{ scale: 1.04, boxShadow: "0 12px 28px rgba(37,99,235,0.35)" }}
+                    whileTap={{ scale: 0.97 }}
+                  >
+                    أنشئ حسابك
+                    <FaArrowLeft className="text-xs" />
+                  </motion.a>
                 </div>
-                <p className="text-base font-semibold text-slate-800 dark:text-slate-100">لا توجد كورسات متاحة حالياً</p>
-                <p className="mt-2 text-sm text-slate-500">سيتم عرض الكورسات هنا فور إضافتها</p>
-                <a
-                  href={signupHref}
-                  className="mt-5 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
-                >
-                  أنشئ حسابك
-                  <FaArrowLeft className="text-xs" />
-                </a>
-              </div>
+              </Reveal>
             )}
           </div>
-        </section>
+        </AnimatedSection>
 
         {/* CTA */}
-        <section id="cta" className="border-t border-slate-200 bg-white px-4 py-14 dark:border-slate-800 dark:bg-slate-950 md:px-6 lg:px-8">
+        <AnimatedSection id="cta" className="border-t border-slate-200 bg-white px-4 py-14 dark:border-slate-800 dark:bg-slate-950 md:px-6 lg:px-8">
           <Reveal variant="scaleIn" className="mx-auto max-w-3xl">
+          <ShimmerCTA>
           <motion.div
             className="rounded-xl bg-blue-600 px-6 py-10 text-center text-white md:px-10 md:py-12"
-            whileHover={{ boxShadow: "0 24px 48px rgba(37, 99, 235, 0.25)" }}
-            transition={{ duration: 0.3 }}
+            whileHover={{ boxShadow: "0 28px 56px rgba(37, 99, 235, 0.3)", y: -4 }}
+            transition={{ duration: 0.35 }}
           >
             <h2 className="font-heading text-2xl font-bold md:text-3xl">ابدأ رحلة التعلم اليوم</h2>
             <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-blue-100 md:text-base">
@@ -1194,12 +927,13 @@ export default function TenantPublicLanding({ subdomain }) {
               </motion.a>
             </div>
           </motion.div>
+          </ShimmerCTA>
           </Reveal>
-        </section>
+        </AnimatedSection>
       </main>
 
       {/* Footer */}
-      <footer id="contact" className="border-t border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+      <AnimatedSection as="footer" id="contact" className="border-t border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
         <div className="mx-auto max-w-[var(--t-max)] px-4 py-12 md:px-6 lg:px-8">
           <StaggerGrid className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             <StaggerItem className="sm:col-span-2 lg:col-span-1">
@@ -1283,12 +1017,12 @@ export default function TenantPublicLanding({ subdomain }) {
           </div>
           </Reveal>
         </div>
-      </footer>
+      </AnimatedSection>
 
       <FreeLecturePlayerModal
         lecture={activeFreeLecture}
         onClose={() => setActiveFreeLecture(null)}
       />
-    </div>
+    </motion.div>
   );
 }
