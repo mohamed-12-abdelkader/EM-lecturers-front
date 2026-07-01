@@ -314,12 +314,13 @@ export function HeroKenBurns({ src, srcSet, sizes = "100vw", alt = "", className
   );
 }
 
-export function HeroGlowOrb({ className, delay = 0 }) {
+export function HeroGlowOrb({ className, delay = 0, style }) {
   const reduceMotion = useReducedMotion();
   return (
     <motion.div
       aria-hidden
       className={className}
+      style={style}
       animate={
         reduceMotion
           ? { opacity: 0.35 }
@@ -339,12 +340,13 @@ export function HeroGlowOrb({ className, delay = 0 }) {
   );
 }
 
-export function FloatingShape({ className, delay = 0, duration = 6 }) {
+export function FloatingShape({ className, delay = 0, duration = 6, style }) {
   const reduceMotion = useReducedMotion();
   return (
     <motion.div
       aria-hidden
       className={className}
+      style={style}
       animate={
         reduceMotion
           ? {}
