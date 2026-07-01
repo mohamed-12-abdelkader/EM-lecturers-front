@@ -17,66 +17,80 @@ const EASE = [0.22, 1, 0.36, 1];
 function TeacherPortrait({ src, alt }) {
   if (!src) {
     return (
-      <div className="flex h-[400px] w-full items-center justify-center">
+      <div className="flex min-h-[320px] w-full items-center justify-center">
         <span className="text-6xl opacity-20">👨‍🏫</span>
       </div>
     );
   }
 
   return (
-    <div className="relative mx-auto flex w-full max-w-[360px] items-end justify-center px-2 sm:max-w-[380px]" dir="ltr">
-      {/* توهج ناعم خلف الشخص — بدون إطار */}
+    <motion.div
+      className="relative mx-auto w-fit max-w-full"
+      dir="ltr"
+      initial={{ opacity: 0, y: 22 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, ease: EASE }}
+    >
+      {/* هالة خلف البطاقة */}
       <div
-        className="pointer-events-none absolute bottom-6 left-1/2 h-28 w-[72%] -translate-x-1/2 rounded-full blur-3xl"
-        style={{ backgroundColor: `${BLUE}30` }}
+        className="pointer-events-none absolute -inset-4 rounded-3xl opacity-70 blur-2xl"
+        style={{ background: `linear-gradient(145deg, ${BLUE}30, ${ORANGE}18)` }}
+        aria-hidden
       />
 
-      {/* شريحة لونية خلفية مائلة */}
-      <div
-        className="pointer-events-none absolute bottom-10 left-1/2 z-0 h-[62%] w-[78%] -translate-x-1/2 -rotate-2 rounded-3xl"
-        style={{
-          background: `linear-gradient(145deg, ${BLUE}18 0%, ${BLUE}08 100%)`,
-        }}
-      />
-
-      {/* خط برتقالي زخرفي */}
-      <div
-        className="pointer-events-none absolute bottom-[32%] right-[6%] z-0 hidden h-14 w-1 rounded-full sm:block"
-        style={{ backgroundColor: ORANGE }}
-      />
-
-      {/* الصورة — العنصر الأساسي */}
-      <motion.img
-        src={src}
-        alt={alt}
-        loading="eager"
-        fetchpriority="high"
-        decoding="async"
-        draggable={false}
-        className="relative z-10 w-auto max-w-full object-contain object-bottom"
-        style={{
-          height: "clamp(380px, 52vh, 500px)",
-          filter: `drop-shadow(0 22px 34px ${BLUE}40)`,
-        }}
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: [0, -7, 0] }}
-        transition={{
-          opacity: { duration: 0.65, ease: EASE, delay: 0.2 },
-          y: { duration: 5.5, repeat: Infinity, ease: "easeInOut", delay: 0.8 },
-        }}
-      />
-
-      {/* قاعدة بسيطة تحت الصورة */}
-      <div className="pointer-events-none absolute bottom-3 left-1/2 z-[5] flex w-[64%] -translate-x-1/2 flex-col items-center gap-1.5">
-        <div className="h-0.5 w-full rounded-full" style={{ backgroundColor: BLUE }} />
+      <motion.div
+        className="relative overflow-hidden rounded-2xl border-[3px] bg-white shadow-[0_22px_44px_rgba(49,130,206,0.22)] dark:bg-slate-900"
+        style={{ borderColor: BLUE }}
+        animate={{ y: [0, -5, 0] }}
+        transition={{ y: { duration: 5.5, repeat: Infinity, ease: "easeInOut", delay: 0.5 } }}
+      >
+        {/* شريط علوي — بطاقة عرض */}
         <div
-          className="h-2.5 w-full rounded-[100%]"
+          className="flex items-center justify-between gap-3 border-b px-4 py-2.5 dark:border-slate-700"
           style={{
-            background: `radial-gradient(ellipse at center, ${BLUE}50 0%, transparent 72%)`,
+            borderColor: `${BLUE}25`,
+            background: `linear-gradient(90deg, ${BLUE}16 0%, transparent 100%)`,
           }}
-        />
-      </div>
-    </div>
+        >
+          <div className="flex items-center gap-1.5" aria-hidden>
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: ORANGE }} />
+            <span className="h-2 w-2 rounded-full opacity-50" style={{ backgroundColor: BLUE }} />
+            <span className="h-2 w-2 rounded-full opacity-30" style={{ backgroundColor: BLUE }} />
+          </div>
+          <div className="h-1 w-14 rounded-full" style={{ backgroundColor: BLUE }} aria-hidden />
+        </div>
+
+        {/* الصورة داخل البطاقة — العرض يتبع الصورة */}
+        <div className="flex items-end justify-center bg-gradient-to-b from-blue-100/50 to-white px-3 pb-0 pt-2 sm:px-4 dark:from-blue-950/45 dark:to-slate-900">
+          <motion.img
+            src={src}
+            alt={alt}
+            loading="eager"
+            fetchpriority="high"
+            decoding="async"
+            draggable={false}
+            className="block h-auto max-h-[min(420px,48vh)] w-auto max-w-[248px] object-contain object-bottom sm:max-w-[268px] md:max-w-[288px]"
+            style={{ filter: "drop-shadow(0 10px 18px rgba(15, 23, 42, 0.12))" }}
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.55, ease: EASE, delay: 0.15 }}
+          />
+        </div>
+
+        {/* شريط علامة تجارية */}
+        <div className="flex h-2" aria-hidden>
+          <div className="flex-[3]" style={{ backgroundColor: BLUE }} />
+          <div className="flex-1" style={{ backgroundColor: ORANGE }} />
+        </div>
+      </motion.div>
+
+      {/* ظل أرضي */}
+      <div
+        className="mx-auto mt-3 h-3 w-[90%] rounded-[100%]"
+        style={{ background: `radial-gradient(ellipse at center, ${BLUE}45 0%, transparent 72%)` }}
+        aria-hidden
+      />
+    </motion.div>
   );
 }
 
