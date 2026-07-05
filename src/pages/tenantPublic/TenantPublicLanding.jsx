@@ -14,6 +14,8 @@ import {
   FaUsers,
   FaGraduationCap,
   FaAward,
+  FaStar,
+  FaCheck,
 } from "react-icons/fa";
 import {
   fetchTenantPublic,
@@ -21,7 +23,16 @@ import {
   fetchPlatformPublicCourses,
 } from "../../api/tenantPublicApi";
 import FreeLecturePlayerModal from "./components/FreeLecturePlayerModal";
-import TenantHeroSection from "./components/TenantHeroSection";
+import TenantHeroSection, { TeacherPortrait } from "./components/TenantHeroSection";
+import {
+  tlCard,
+  tlCardHover,
+  tlSectionMuted,
+  tlSectionWhite,
+  tlBtnPrimary,
+  tlEyebrow,
+  tlHeading,
+} from "./tenantLandingTheme";
 import {
   TenantPublicNavbar,
   TENANT_NAV_LINKS,
@@ -36,8 +47,6 @@ import {
   MotionCard,
   AnimatedSection,
   ScrollProgress,
-  ShimmerCTA,
-  AnimatedUnderline,
 } from "./tenantLandingMotion";
 import { useTenantPageMetadata } from "../../Hooks/tenantPublic/useTenantPageMetadata";
 import { getPortraitImageUrl } from "../../utils/highQualityImageUrl";
@@ -97,25 +106,17 @@ function ServiceFeatureCard({ service, index, className = "" }) {
 
   return (
     <MotionCard lift>
-      <motion.article
-        whileHover={{
-          borderColor: "rgba(59, 130, 246, 0.35)",
-          boxShadow: "0 20px 40px rgba(15, 23, 42, 0.08)",
-        }}
-        className={`rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-600/40 ${className}`}
-      >
-        <motion.div
-          className={`mb-4 inline-flex h-11 w-11 items-center justify-center rounded-lg ${accent.iconBg}`}
-          whileHover={{ rotate: [0, -8, 8, 0], scale: 1.08 }}
-          transition={{ duration: 0.5 }}
+      <article className={`${tlCard} ${tlCardHover} p-6 ${className}`}>
+        <div
+          className={`mb-5 inline-flex h-12 w-12 items-center justify-center rounded-2xl ${accent.iconBg}`}
         >
-          <Icon className="text-lg" />
-        </motion.div>
-        <h3 className="font-heading text-base font-bold text-slate-900 dark:text-slate-100 md:text-lg">
+          <Icon className="text-xl" />
+        </div>
+        <h3 className="font-heading text-lg font-bold text-slate-900 dark:text-slate-100">
           {service.title}
         </h3>
         <p className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-400">{description}</p>
-      </motion.article>
+      </article>
     </MotionCard>
   );
 }
@@ -150,11 +151,8 @@ function CourseCard({ course, courseFallbackImage, loginHref }) {
 
   return (
     <MotionCard>
-      <motion.article
-        layout
-        className="flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900"
-      >
-      <div className="relative aspect-[16/10] overflow-hidden bg-slate-100 dark:bg-slate-800">
+      <motion.article layout className={`flex flex-col overflow-hidden ${tlCard} ${tlCardHover}`}>
+      <div className="relative aspect-[16/10] overflow-hidden rounded-t-2xl bg-slate-100 dark:bg-slate-800">
         <motion.img
           src={courseImg}
           alt={courseTitle}
@@ -213,10 +211,7 @@ function CourseCard({ course, courseFallbackImage, loginHref }) {
           ) : null}
         </div>
 
-        <a
-          href={loginHref}
-          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
-        >
+        <a href={loginHref} className={`mt-4 w-full gap-2 ${tlBtnPrimary}`}>
           اشترك الآن
           <FaArrowLeft className="text-xs" />
         </a>
@@ -229,27 +224,16 @@ function CourseCard({ course, courseFallbackImage, loginHref }) {
 
 function SectionHeading({ eyebrow, title, subtitle, align = "center" }) {
   const wrap = align === "center" ? "mx-auto max-w-2xl text-center" : "max-w-2xl text-right";
-  const lineAlign = align === "center" ? "mx-auto" : "ms-auto";
 
   return (
     <StaggerGrid className={wrap}>
       {eyebrow ? (
         <StaggerItem variant="blur">
-          <motion.p
-            className="text-xs font-semibold uppercase tracking-widest text-blue-600 dark:text-blue-400"
-            whileInView={{ letterSpacing: "0.12em" }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
-            {eyebrow}
-          </motion.p>
+          <p className={tlEyebrow}>{eyebrow}</p>
         </StaggerItem>
       ) : null}
       <StaggerItem variant="blur">
-        <h2 className="font-heading mt-2 text-xl font-bold text-slate-900 dark:text-slate-100 md:text-2xl">
-          {title}
-        </h2>
-        <AnimatedUnderline className={`mt-3 w-16 ${lineAlign}`} />
+        <h2 className={`${tlHeading} mt-2`}>{title}</h2>
       </StaggerItem>
       {subtitle ? (
         <StaggerItem variant="blur">
@@ -257,6 +241,29 @@ function SectionHeading({ eyebrow, title, subtitle, align = "center" }) {
         </StaggerItem>
       ) : null}
     </StaggerGrid>
+  );
+}
+
+function TestimonialCard({ item }) {
+  const rating = Number(item.rating) || 5;
+  return (
+    <article className={`${tlCard} ${tlCardHover} p-6 text-right`}>
+      <div className="mb-3 flex justify-end gap-0.5 text-amber-400">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <FaStar key={i} className={i < rating ? "opacity-100" : "opacity-25"} />
+        ))}
+      </div>
+      <p className="text-sm leading-8 text-slate-600 dark:text-slate-300">"{item.text}"</p>
+      <div className="mt-4 flex items-center justify-end gap-3">
+        <div>
+          <p className="text-sm font-bold text-slate-900 dark:text-white">{item.name}</p>
+          <p className="text-xs text-slate-500">طالب</p>
+        </div>
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
+          {(item.name || "ط").slice(0, 1)}
+        </span>
+      </div>
+    </article>
   );
 }
 
@@ -685,21 +692,47 @@ export default function TenantPublicLanding({ subdomain }) {
           teacherImageUrl={teacherPortraitUrl}
         />
 
-        {/* About — مخفي حالياً */}
-        <section id="about" className="hidden" aria-hidden />
-
-        {/* Stats — مخفي */}
-        {false && statBarItems.length > 0 && null}
-
-        {/* Grades — مخفي */}
-        {false && teacherGrades.length > 0 && null}
-
-        {/* FAQ — مخفي */}
-        {false && faq.length > 0 && null}
+        {/* About */}
+        <AnimatedSection id="about" className={`scroll-mt-20 py-16 md:py-20 ${tlSectionWhite}`} dir="rtl">
+          <div className="mx-auto max-w-6xl px-4 md:px-6 lg:px-8">
+            <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16" dir="ltr">
+              <div className="order-1 flex justify-center lg:order-none">
+                <TeacherPortrait src={teacherPortraitUrl} alt={teacherName} variant="about" />
+              </div>
+              <div className="order-2 text-right lg:order-none" dir="rtl">
+                <Reveal variant="blurUp">
+                  <p className={tlEyebrow}>تعرّف علينا</p>
+                  <h2 className={`${tlHeading} mt-2`}>لماذا {teacherName}؟</h2>
+                  <p className="mt-5 text-sm leading-8 text-slate-600 dark:text-slate-300 sm:text-base">
+                    {about.bio ||
+                      tenant.bio ||
+                      payload?.teacher?.description ||
+                      "شرح منظم، متابعة مستمرة، وتدريب مكثف يساعدك تحقق أفضل النتائج."}
+                  </p>
+                  <ul className="mt-6 space-y-3" dir="rtl">
+                    {benefitItems.slice(0, 4).map((item) => (
+                      <li
+                        key={item.title}
+                        className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-200"
+                      >
+                        <FaCheck className="mt-0.5 shrink-0 text-blue-500" />
+                        <span>{item.title}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <a href={signupHref} className={`mt-8 gap-2 ${tlBtnPrimary}`}>
+                    ابدأ الآن
+                    <FaArrowLeft className="text-xs" />
+                  </a>
+                </Reveal>
+              </div>
+            </div>
+          </div>
+        </AnimatedSection>
 
         {/* Features / Why Us */}
         {displayServices.length > 0 && (
-          <AnimatedSection id="services" className="scroll-mt-20 border-t border-slate-200 bg-slate-50 py-14 md:py-20 dark:border-slate-800 dark:bg-slate-900/40" dir="rtl">
+          <AnimatedSection id="services" className={`scroll-mt-20 py-16 md:py-20 ${tlSectionMuted}`} dir="rtl">
             <div className="mx-auto max-w-[var(--t-max)] px-4 md:px-6 lg:px-8">
               <SectionHeading
                 eyebrow="لماذا نحن"
@@ -729,7 +762,7 @@ export default function TenantPublicLanding({ subdomain }) {
               </StaggerGrid>
 
               <Reveal className="mt-10" variant="scaleIn" delay={0.1}>
-              <div className="flex flex-col items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row dark:border-slate-700 dark:bg-slate-900">
+              <div className={`flex flex-col items-center justify-between gap-4 p-6 sm:flex-row ${tlCard}`}>
                 <div className="flex items-center gap-3 text-right">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-white">
                     <FaGraduationCap />
@@ -746,10 +779,7 @@ export default function TenantPublicLanding({ subdomain }) {
                   >
                     تسجيل الدخول
                   </a>
-                  <a
-                    href={signupHref}
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-                  >
+                  <a href={signupHref} className={tlBtnPrimary}>
                     إنشاء حساب
                   </a>
                 </div>
@@ -761,7 +791,7 @@ export default function TenantPublicLanding({ subdomain }) {
 
 
         {/* Free Lectures */}
-        <AnimatedSection id="videos" className="scroll-mt-20 border-t border-slate-200 bg-white py-14 md:py-20 dark:border-slate-800" dir="rtl">
+        <AnimatedSection id="videos" className={`scroll-mt-20 py-16 md:py-20 ${tlSectionWhite}`} dir="rtl">
           <div className="mx-auto max-w-[var(--t-max)] px-4 md:px-6 lg:px-8">
             <SectionHeading
               eyebrow="محاضرات مجانية"
@@ -789,7 +819,7 @@ export default function TenantPublicLanding({ subdomain }) {
                     whileHover={{ y: -6, transition: { duration: 0.25 } }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    <div className="relative overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+                    <div className={`relative overflow-hidden rounded-2xl ${tlCard}`}>
                       <motion.img
                         src={lecture.image_url || courseFallbackImage}
                         alt={lecture.title}
@@ -830,7 +860,7 @@ export default function TenantPublicLanding({ subdomain }) {
         </AnimatedSection>
 
         {/* Courses */}
-        <AnimatedSection id="courses" className="scroll-mt-20 border-t border-slate-200 bg-slate-50 py-14 md:py-20 dark:border-slate-800 dark:bg-slate-900/40" dir="rtl">
+        <AnimatedSection id="courses" className={`scroll-mt-20 py-16 md:py-20 ${tlSectionMuted}`} dir="rtl">
           <div className="mx-auto max-w-[var(--t-max)] px-4 md:px-6 lg:px-8">
             <SectionHeading
               eyebrow="الكورسات"
@@ -895,23 +925,42 @@ export default function TenantPublicLanding({ subdomain }) {
           </div>
         </AnimatedSection>
 
+        {/* Testimonials */}
+        {displayTestimonials.length > 0 && (
+          <AnimatedSection className={`py-16 md:py-20 ${tlSectionWhite}`} dir="rtl">
+            <div className="mx-auto max-w-[var(--t-max)] px-4 md:px-6 lg:px-8">
+              <SectionHeading
+                eyebrow="آراء الطلاب"
+                title="ماذا يقول طلابنا؟"
+                subtitle="تجارب حقيقية من طلاب تعلّموا على المنصة."
+              />
+              <StaggerGrid className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {displayTestimonials.map((item, i) => (
+                  <StaggerItem key={`${item.name}-${i}`} variant="blur">
+                    <TestimonialCard item={item} />
+                  </StaggerItem>
+                ))}
+              </StaggerGrid>
+            </div>
+          </AnimatedSection>
+        )}
+
         {/* CTA */}
-        <AnimatedSection id="cta" className="border-t border-slate-200 bg-white px-4 py-14 dark:border-slate-800 dark:bg-slate-950 md:px-6 lg:px-8">
-          <Reveal variant="scaleIn" className="mx-auto max-w-3xl">
-          <ShimmerCTA>
+        <AnimatedSection id="cta" className={`px-4 py-16 md:px-6 lg:px-8 ${tlSectionMuted}`}>
+          <Reveal variant="scaleIn" className="mx-auto max-w-5xl">
           <motion.div
-            className="rounded-xl bg-blue-600 px-6 py-10 text-center text-white md:px-10 md:py-12"
-            whileHover={{ boxShadow: "0 28px 56px rgba(37, 99, 235, 0.3)", y: -4 }}
-            transition={{ duration: 0.35 }}
+            className="rounded-3xl bg-[#3182CE] px-6 py-12 text-center text-white shadow-[0_20px_50px_rgba(49,130,206,0.35)] md:px-12 md:py-14"
+            whileHover={{ y: -3 }}
+            transition={{ duration: 0.3 }}
           >
             <h2 className="font-heading text-2xl font-bold md:text-3xl">ابدأ رحلة التعلم اليوم</h2>
             <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-blue-100 md:text-base">
               انضم الآن واستفد من الشرح المنظم والمتابعة المستمرة.
             </p>
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
               <motion.a
                 href={signupHref}
-                className="inline-flex min-w-[140px] items-center justify-center rounded-lg bg-orange-500 px-6 py-2.5 text-sm font-semibold text-white hover:bg-orange-600"
+                className="inline-flex min-w-[150px] items-center justify-center rounded-full bg-white px-7 py-3 text-sm font-bold text-[#3182CE] shadow-md"
                 whileHover={{ scale: 1.04 }}
                 whileTap={{ scale: 0.97 }}
               >
@@ -919,7 +968,7 @@ export default function TenantPublicLanding({ subdomain }) {
               </motion.a>
               <motion.a
                 href={loginHref}
-                className="inline-flex min-w-[140px] items-center justify-center rounded-lg border border-white/40 px-6 py-2.5 text-sm font-medium text-white hover:bg-white/10"
+                className="inline-flex min-w-[150px] items-center justify-center rounded-full border-2 border-white/50 px-7 py-3 text-sm font-medium text-white hover:bg-white/10"
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.97 }}
               >
@@ -927,13 +976,12 @@ export default function TenantPublicLanding({ subdomain }) {
               </motion.a>
             </div>
           </motion.div>
-          </ShimmerCTA>
           </Reveal>
         </AnimatedSection>
       </main>
 
       {/* Footer */}
-      <AnimatedSection as="footer" id="contact" className="border-t border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
+      <AnimatedSection as="footer" id="contact" className="border-t border-slate-200 bg-white py-14 text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
         <div className="mx-auto max-w-[var(--t-max)] px-4 py-12 md:px-6 lg:px-8">
           <StaggerGrid className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             <StaggerItem className="sm:col-span-2 lg:col-span-1">
@@ -1009,7 +1057,12 @@ export default function TenantPublicLanding({ subdomain }) {
           </StaggerGrid>
           <Reveal variant="fadeIn" delay={0.15}>
           <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-slate-200 pt-6 text-xs text-slate-400 dark:border-slate-800 sm:flex-row">
-            <p>© {new Date().getFullYear()} {brandName}. جميع الحقوق محفوظة.</p>
+            <div className="text-center sm:text-start">
+              <p>© {new Date().getFullYear()} EM Lectures. جميع الحقوق محفوظة.</p>
+              <p className="mt-1 text-slate-500 dark:text-slate-500">
+                هذه المنصة تابعة لشركة EM Lectures.
+              </p>
+            </div>
             <div className="flex gap-4">
               <a href="#" className="hover:text-blue-500 dark:hover:text-orange-400">سياسة الخصوصية</a>
               <a href="#" className="hover:text-blue-500 dark:hover:text-orange-400">الشروط والأحكام</a>

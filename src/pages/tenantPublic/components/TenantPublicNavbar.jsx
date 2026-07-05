@@ -15,9 +15,7 @@ export const TENANT_NAV_LINKS = [
   ["/", "الرئيسية"],
   ["/teacher", "المدرس"],
   ["/courses", "الكورسات"],
-  ["/subjects", "المواد"],
   ["/#videos", "محاضرات مجانية"],
-  ["/search", "بحث"],
 ];
 
 export const TENANT_SITE_NAV_LINKS = TENANT_NAV_LINKS.map(([href, label]) => [
@@ -250,13 +248,6 @@ export function TenantPublicNavbar({
                   {label}
                 </a>
               ))}
-              <a
-                href="/search"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="rounded-lg px-3 py-2.5 text-sm font-medium text-blue-600 dark:text-blue-400"
-              >
-                بحث متقدم
-              </a>
             </nav>
             <div className="mt-4 grid grid-cols-2 gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
               <a

@@ -25,8 +25,6 @@ import {
   Text,
   Textarea,
   VStack,
-  Wrap,
-  WrapItem,
   useColorModeValue,
   useToast,
   Drawer,
@@ -47,7 +45,7 @@ import {
   FaTimes,
   FaWhatsapp,
 } from "react-icons/fa";
-import { FiChevronDown, FiClock, FiMenu, FiMessageSquare, FiPlus, FiRefreshCw, FiSend, FiSettings, FiUser } from "react-icons/fi";
+import { FiChevronDown, FiClock, FiMenu, FiMessageSquare, FiPlus, FiRefreshCw, FiSend, FiSettings } from "react-icons/fi";
 import { SiTiktok } from "react-icons/si";
 import { motion } from "framer-motion";
 import baseUrl from "../../api/baseUrl";
@@ -524,12 +522,13 @@ const Social = () => {
         </Box>
 
         {/* Main chat */}
-        <Flex flex={1} direction="column" minW={0} minH={0} bg={pageBg}>
+        <Flex flex={1} direction="column" minW={0} minH={0} bg={composerShellBg}>
           <Flex
             align="center"
             justify="space-between"
             px={{ base: 3, md: 4 }}
-            py={3}
+            py={2}
+            minH="52px"
             borderBottomWidth="1px"
             borderColor={borderColor}
             bg={composerShellBg}
@@ -576,11 +575,17 @@ const Social = () => {
             </HStack>
           </Flex>
 
-          <Box flex={1} minH={0} overflowY="auto" overflowX="hidden">
-            <VStack align="stretch" spacing={0} maxW="768px" mx="auto" w="full">
-              {showWelcome && (
-                <AssistantWelcome muted={muted} ink={ink} />
-              )}
+          <Box
+            flex={1}
+            minH={0}
+            overflowY="auto"
+            overflowX="hidden"
+            display="flex"
+            flexDirection="column"
+            sx={{ overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}
+          >
+            <Box flex={1} w="full" maxW="48rem" mx="auto">
+              {showWelcome && <AssistantWelcome muted={muted} ink={ink} />}
 
               {lastRequest && (
                 <UserMessage
@@ -613,8 +618,8 @@ const Social = () => {
                 />
               )}
 
-              <Box ref={chatEndRef} h={1} />
-            </VStack>
+              <Box ref={chatEndRef} h={4} />
+            </Box>
           </Box>
 
           <ChatComposer
@@ -827,130 +832,92 @@ const HistoryList = ({
   );
 };
 
-const MessageRow = ({ role, children }) => {
-  const isUser = role === "user";
-  const avatarBg = useColorModeValue(isUser ? "gray.200" : "green.100", isUser ? "gray.600" : "green.900");
-  const avatarColor = useColorModeValue(isUser ? "gray.700" : "green.700", isUser ? "gray.200" : "green.200");
-  const rowBg = useColorModeValue(isUser ? "transparent" : "white", isUser ? "transparent" : "gray.800");
-  const rowBorder = useColorModeValue("gray.100", "gray.700");
-  const muted = useColorModeValue("gray.500", "gray.400");
+const AssistantWelcome = ({ muted, ink }) => {
+  const iconBg = useColorModeValue("green.50", "green.900");
 
   return (
-    <Flex
-      gap={{ base: 3, md: 4 }}
-      px={{ base: 4, md: 6 }}
-      py={{ base: 4, md: 5 }}
-      bg={rowBg}
-      borderBottomWidth="1px"
-      borderColor={rowBorder}
-      w="full"
-    >
-      <Flex
-        w={{ base: 7, md: 8 }}
-        h={{ base: 7, md: 8 }}
-        borderRadius="sm"
-        bg={avatarBg}
-        color={avatarColor}
-        align="center"
-        justify="center"
-        flexShrink={0}
-        mt={0.5}
-      >
-        <Icon as={isUser ? FiUser : FiMessageSquare} boxSize={4} />
-      </Flex>
-      <Box flex={1} minW={0} pt={0.5}>
-        <Text fontSize="xs" fontWeight="semibold" color={muted} mb={1.5}>
-          {isUser ? "أنت" : "المساعد"}
-        </Text>
-        {children}
+    <Flex flex={1} align="center" justify="center" minH="full" px={3} py={8} textAlign="center" w="full">
+      <VStack spacing={4} maxW="420px">
+        <Flex w={14} h={14} borderRadius="2xl" bg={iconBg} color="green.500" align="center" justify="center">
+          <Icon as={FiMessageSquare} boxSize={6} />
+        </Flex>
+        <Box>
+          <Text fontSize="lg" fontWeight="semibold" color={ink} lineHeight="1.4" mb={1.5}>
+            ماذا تريد أن تنشر اليوم؟
+          </Text>
+          <Text color={muted} fontSize="sm" lineHeight="1.75">
+            اكتب طلبك في الأسفل واختر المنصة — نص جاهز أو تصميم صورة.
+          </Text>
+        </Box>
+      </VStack>
+    </Flex>
+  );
+};
+
+const UserMessage = ({ request, platformLabel, toneLabel, aspectLabel, languageLabel }) => {
+  const bubbleBg = useColorModeValue("gray.100", "whiteAlpha.100");
+  const textColor = useColorModeValue("gray.800", "gray.100");
+
+  return (
+    <Flex justify="flex-end" px={{ base: 3, md: 4 }} py={3} w="full">
+      <Box maxW={{ base: "100%", md: "82%" }} w="full">
+        <Box bg={bubbleBg} borderRadius="2xl" px={4} py={3}>
+          <Text whiteSpace="pre-wrap" lineHeight="1.75" fontSize="sm" color={textColor} wordBreak="break-word">
+            {request.prompt}
+          </Text>
+          <HStack mt={2.5} spacing={1.5} wrap="wrap">
+            <Badge size="sm" variant="subtle" colorScheme="gray" borderRadius="md" fontSize="10px">
+              {request.mode === "post" ? "نص" : "صورة"}
+            </Badge>
+            <Badge size="sm" variant="subtle" colorScheme="gray" borderRadius="md" fontSize="10px">
+              {platformLabel}
+            </Badge>
+            <Badge size="sm" variant="subtle" colorScheme="gray" borderRadius="md" fontSize="10px">
+              {request.mode === "post" ? toneLabel : aspectLabel}
+            </Badge>
+            {request.mode === "image" && (
+              <Badge size="sm" variant="subtle" colorScheme="gray" borderRadius="md" fontSize="10px">
+                {languageLabel}
+              </Badge>
+            )}
+          </HStack>
+          {request.referencePreviews?.length > 0 && (
+            <SimpleGrid columns={{ base: 3, sm: 4 }} spacing={2} mt={3}>
+              {request.referencePreviews.map((src, index) => (
+                <Image
+                  key={`${src}-${index}`}
+                  src={src}
+                  alt={`ref-${index + 1}`}
+                  h="52px"
+                  borderRadius="md"
+                  objectFit="cover"
+                />
+              ))}
+            </SimpleGrid>
+          )}
+        </Box>
       </Box>
     </Flex>
   );
 };
 
-const AssistantWelcome = ({ muted, ink }) => (
-  <Center flexDirection="column" px={4} py={{ base: 6, md: 10 }} textAlign="center" w="full">
-    <Flex
-      w={10}
-      h={10}
-      borderRadius="lg"
-      bg={useColorModeValue("green.100", "green.900")}
-      color={useColorModeValue("green.700", "green.200")}
-      align="center"
-      justify="center"
-      mb={3}
-    >
-      <Icon as={FiMessageSquare} boxSize={5} />
-    </Flex>
-    <Text fontSize={{ base: "lg", md: "xl" }} fontWeight="semibold" color={ink} lineHeight="1.4" mb={1}>
-      ماذا تريد أن تنشر اليوم؟
-    </Text>
-    <Text color={muted} fontSize="sm" lineHeight="1.7" maxW="380px">
-      اكتب طلبك في الأسفل واختر المنصة — نص جاهز أو تصميم صورة.
-    </Text>
-  </Center>
-);
+const AssistantLoading = ({ mode, muted, borderColor, panelBg }) => {
+  const assistantIconBg = useColorModeValue("green.500", "green.400");
 
-const UserMessage = ({ request, platformLabel, toneLabel, aspectLabel, languageLabel }) => (
-  <MessageRow role="user">
-    <Text whiteSpace="pre-wrap" lineHeight="1.85" fontSize={{ base: "sm", md: "md" }} color={useColorModeValue("gray.800", "gray.100")}>
-      {request.prompt}
-    </Text>
-    <HStack mt={3} spacing={1.5} wrap="wrap">
-      <Badge size="sm" variant="subtle" colorScheme="gray" borderRadius="md" fontSize="10px">
-        {request.mode === "post" ? "نص" : "صورة"}
-      </Badge>
-      <Badge size="sm" variant="subtle" colorScheme="gray" borderRadius="md" fontSize="10px">
-        {platformLabel}
-      </Badge>
-      <Badge size="sm" variant="subtle" colorScheme="gray" borderRadius="md" fontSize="10px">
-        {request.mode === "post" ? toneLabel : aspectLabel}
-      </Badge>
-      {request.mode === "image" && (
-        <Badge size="sm" variant="subtle" colorScheme="gray" borderRadius="md" fontSize="10px">
-          {languageLabel}
-        </Badge>
-      )}
-    </HStack>
-    {request.referencePreviews?.length > 0 && (
-      <SimpleGrid columns={{ base: 3, sm: 4 }} spacing={2} mt={3}>
-        {request.referencePreviews.map((src, index) => (
-          <Image
-            key={`${src}-${index}`}
-            src={src}
-            alt={`ref-${index + 1}`}
-            h="60px"
-            borderRadius="md"
-            objectFit="cover"
-          />
-        ))}
-      </SimpleGrid>
-    )}
-  </MessageRow>
-);
-
-const AssistantLoading = ({ mode, muted, borderColor, panelBg }) => (
-  <MessageRow role="assistant">
-    {mode === "image" ? (
-      <VStack align="stretch" spacing={3} w="full">
-        <HStack spacing={2}>
-          <Spinner size="sm" color="green.500" />
-          <Text fontSize="sm" color={muted}>
-            يتم إنشاء التصميم...
-          </Text>
-        </HStack>
-        <ImageGenerationPreview borderColor={borderColor} panelBg={panelBg} />
-      </VStack>
-    ) : (
-      <HStack spacing={2}>
-        <Spinner size="sm" color="green.500" />
-        <Text fontSize="sm" color={muted}>
-          يتم صياغة المنشور...
+  return (
+    <Box px={{ base: 3, md: 4 }} py={4} w="full">
+      <HStack spacing={3} align="start" mb={mode === "image" ? 3 : 0}>
+        <Flex boxSize={8} borderRadius="full" bg={assistantIconBg} align="center" justify="center" flexShrink={0}>
+          <Spinner size="sm" color="white" thickness="2px" />
+        </Flex>
+        <Text fontSize="sm" color={muted} pt={1.5}>
+          {mode === "image" ? "يتم إنشاء التصميم..." : "يتم صياغة المنشور..."}
         </Text>
       </HStack>
-    )}
-  </MessageRow>
-);
+      {mode === "image" && <ImageGenerationPreview borderColor={borderColor} panelBg={panelBg} />}
+    </Box>
+  );
+};
 
 const ImageGenerationPreview = ({ borderColor, panelBg }) => (
   <Box
@@ -985,62 +952,77 @@ const AssistantResult = ({
   toneLabel,
   aspectLabel,
   languageLabel,
-}) => (
-  <MessageRow role="assistant">
-    <VStack align="stretch" spacing={4} w="full">
-      <HStack spacing={2} wrap="wrap">
-        <Badge variant="subtle" colorScheme="gray" borderRadius="md" fontSize="10px">
-          {platformLabel}
-        </Badge>
-        <Badge variant="subtle" colorScheme="gray" borderRadius="md" fontSize="10px">
-          {result.type === "post" ? toneLabel : `${aspectLabel} · ${languageLabel}`}
-        </Badge>
+}) => {
+  const assistantIconBg = useColorModeValue("green.500", "green.400");
+  const textColor = useColorModeValue("gray.800", "gray.100");
+  const titleColor = useColorModeValue("gray.800", "gray.100");
+
+  return (
+    <Box px={{ base: 3, md: 4 }} py={4} w="full">
+      <HStack spacing={3} align="start" mb={3}>
+        <Flex boxSize={8} borderRadius="full" bg={assistantIconBg} align="center" justify="center" flexShrink={0}>
+          <Icon as={FiMessageSquare} boxSize={3.5} color="white" />
+        </Flex>
+        <Box flex={1} minW={0}>
+          <Text fontSize="sm" fontWeight="semibold" color={titleColor}>
+            المساعد
+          </Text>
+          <HStack spacing={2} wrap="wrap" mt={1}>
+            <Badge variant="subtle" colorScheme="gray" borderRadius="md" fontSize="10px">
+              {platformLabel}
+            </Badge>
+            <Badge variant="subtle" colorScheme="gray" borderRadius="md" fontSize="10px">
+              {result.type === "post" ? toneLabel : `${aspectLabel} · ${languageLabel}`}
+            </Badge>
+          </HStack>
+        </Box>
       </HStack>
 
-      {imageUrl && (
-        <Box borderRadius="lg" borderWidth="1px" borderColor={borderColor} overflow="hidden" bg={panelBg}>
-          <Image
-            src={imageUrl}
-            alt="تصميم"
-            w="full"
-            maxH={{ base: "320px", md: "480px" }}
-            objectFit="contain"
-          />
-        </Box>
-      )}
+      <Box pr={{ base: 0, md: 2 }}>
+        {imageUrl && (
+          <Box borderRadius="lg" borderWidth="1px" borderColor={borderColor} overflow="hidden" bg={panelBg} mb={4}>
+            <Image
+              src={imageUrl}
+              alt="تصميم"
+              w="full"
+              maxH={{ base: "280px", md: "420px" }}
+              objectFit="contain"
+            />
+          </Box>
+        )}
 
-      {text && (
-        <Text whiteSpace="pre-wrap" lineHeight="1.9" fontSize={{ base: "sm", md: "md" }} color={useColorModeValue("gray.800", "gray.100")}>
-          {text}
-        </Text>
-      )}
+        {text && (
+          <Text whiteSpace="pre-wrap" lineHeight="1.85" fontSize="sm" color={textColor} mb={4}>
+            {text}
+          </Text>
+        )}
 
-      <Flex
-        align={{ base: "stretch", sm: "center" }}
-        justify="space-between"
-        direction={{ base: "column", sm: "row" }}
-        gap={3}
-        pt={1}
-      >
-        <Text color={muted} fontSize="xs">
-          #{result?.generation?.id || "—"}
-        </Text>
-        <HStack spacing={2}>
-          {text && (
-            <Button size="sm" leftIcon={<FaCopy />} variant="outline" borderRadius="lg" onClick={() => onCopy(text)} flex={{ base: 1, sm: "initial" }}>
-              نسخ
-            </Button>
-          )}
-          {imageUrl && (
-            <Button size="sm" leftIcon={<FaDownload />} colorScheme="green" borderRadius="lg" onClick={() => onDownload(imageUrl)} flex={{ base: 1, sm: "initial" }}>
-              تحميل
-            </Button>
-          )}
-        </HStack>
-      </Flex>
-    </VStack>
-  </MessageRow>
-);
+        <Flex
+          align={{ base: "stretch", sm: "center" }}
+          justify="space-between"
+          direction={{ base: "column", sm: "row" }}
+          gap={2}
+        >
+          <Text color={muted} fontSize="xs">
+            #{result?.generation?.id || "—"}
+          </Text>
+          <HStack spacing={2}>
+            {text && (
+              <Button size="sm" leftIcon={<FaCopy />} variant="outline" borderRadius="lg" onClick={() => onCopy(text)} flex={{ base: 1, sm: "initial" }}>
+                نسخ
+              </Button>
+            )}
+            {imageUrl && (
+              <Button size="sm" leftIcon={<FaDownload />} colorScheme="green" borderRadius="lg" onClick={() => onDownload(imageUrl)} flex={{ base: 1, sm: "initial" }}>
+                تحميل
+              </Button>
+            )}
+          </HStack>
+        </Flex>
+      </Box>
+    </Box>
+  );
+};
 
 const ChatComposer = ({
   mode,
@@ -1083,15 +1065,12 @@ const ChatComposer = ({
   getItemLabel,
 }) => {
   const composerShadow = useColorModeValue(
-    "0 0 0 1px rgba(0,0,0,.05), 0 4px 24px rgba(0,0,0,.08)",
-    "0 0 0 1px rgba(255,255,255,.08), 0 4px 24px rgba(0,0,0,.4)",
+    "0 2px 12px rgba(15, 23, 42, 0.06)",
+    "0 2px 12px rgba(0, 0, 0, 0.25)",
   );
-  const sendActiveBg = useColorModeValue("gray.900", "white");
-  const sendActiveColor = useColorModeValue("white", "gray.900");
-  const sendInactiveBg = useColorModeValue("gray.100", "gray.700");
-  const chipActiveBg = useColorModeValue("white", "gray.600");
   const chipHover = useColorModeValue("gray.50", "gray.700");
   const ink = useColorModeValue("gray.800", "gray.100");
+  const chipActiveBg = useColorModeValue("white", "gray.600");
 
   const platformLabel = getItemLabel(options.platforms, platform);
   const toneLabel = getItemLabel(options.tones, tone);
@@ -1100,47 +1079,59 @@ const ChatComposer = ({
 
   return (
     <Box
-      px={{ base: 3, md: 4 }}
-      py={3}
-      pb={{ base: "max(10px, env(safe-area-inset-bottom))", md: 3 }}
+      px={{ base: 2, md: 3 }}
+      pt={2}
+      pb={2}
       borderTopWidth="1px"
       borderColor={borderColor}
       bg={composerShellBg}
       flexShrink={0}
+      sx={{ pb: "max(8px, env(safe-area-inset-bottom, 8px))" }}
     >
-      <Box maxW="768px" mx="auto" w="full">
+      <Box maxW="48rem" mx="auto" w="full">
         {showWelcome && (
-          <Wrap spacing={2} mb={3} justify="center">
+          <Flex
+            gap={1.5}
+            mb={2}
+            overflowX="auto"
+            pb={0.5}
+            sx={{
+              "&::-webkit-scrollbar": { height: "3px" },
+              WebkitOverflowScrolling: "touch",
+            }}
+          >
             {examples.map((item) => (
-              <WrapItem key={item.label}>
-                <Button
-                  size="xs"
-                  variant="outline"
-                  borderRadius="full"
-                  borderColor={borderColor}
-                  bg={inputBg}
-                  fontWeight="normal"
-                  fontSize="11px"
-                  px={3}
-                  h={7}
-                  onClick={() => onUsePrompt(item.text)}
-                  _hover={{ borderColor: "green.400", color: "green.500" }}
-                >
-                  {item.label}
-                </Button>
-              </WrapItem>
+              <Button
+                key={item.label}
+                size="xs"
+                variant="outline"
+                borderRadius="full"
+                borderColor={borderColor}
+                bg={inputBg}
+                fontWeight="normal"
+                fontSize="11px"
+                px={2.5}
+                h="26px"
+                minH="26px"
+                flexShrink={0}
+                whiteSpace="nowrap"
+                onClick={() => onUsePrompt(item.text)}
+                _hover={{ borderColor: "green.400", color: "green.500" }}
+              >
+                {item.label}
+              </Button>
             ))}
-          </Wrap>
+          </Flex>
         )}
 
         <Collapse in={mode === "image" && references.length > 0} animateOpacity>
-          <HStack spacing={2} mb={2} overflowX="auto" pb={1}>
+          <HStack spacing={2} mb={2} overflowX="auto" pb={0.5}>
             {references.map((item, index) => (
               <Box key={`${item.file.name}-${index}`} position="relative" flexShrink={0}>
                 <Image
                   src={item.previewUrl}
                   alt={item.file.name}
-                  boxSize="40px"
+                  boxSize="36px"
                   objectFit="cover"
                   borderRadius="md"
                   borderWidth="1px"
@@ -1169,68 +1160,68 @@ const ChatComposer = ({
 
         <Input ref={fileInputRef} type="file" accept="image/*" multiple display="none" onChange={handleReferenceChange} />
 
-        <Flex
-          align="flex-end"
-          gap={2}
-          px={3}
-          py={2}
-          borderRadius="2xl"
+        <Box
+          borderRadius="xl"
           borderWidth="1px"
           borderColor={promptLength > 3000 ? "red.300" : composerBorder}
           bg={inputBg}
           boxShadow={composerShadow}
+          overflow="hidden"
+          _focusWithin={{
+            borderColor: "green.400",
+            boxShadow: "0 0 0 1px rgba(34, 197, 94, 0.12)",
+          }}
         >
-          <Textarea
-            value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
-            placeholder={
-              mode === "post"
-                ? "اكتب طلب المنشور... مثال: إعلان عن بداية كورس فيزياء"
-                : "صف التصميم المطلوب... النص داخل الصورة يكون قصيراً"
-            }
-            border="0"
-            _focus={{ boxShadow: "none" }}
-            resize="none"
-            minH="48px"
-            maxH="120px"
-            rows={1}
-            bg="transparent"
-            fontSize="sm"
-            lineHeight="1.6"
-            flex={1}
-            py={1.5}
-            px={0}
-            color={ink}
-            _placeholder={{ color: muted }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                if (canSubmit) handleGenerate();
+          <Flex align="center" gap={1.5} py={1} px={1.5} pl={2}>
+            <Textarea
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder={
+                mode === "post"
+                  ? "اكتب طلب المنشور..."
+                  : "صف التصميم المطلوب..."
               }
-            }}
-          />
-          <IconButton
-            aria-label="إرسال"
-            icon={<FiSend />}
-            size="md"
-            borderRadius="xl"
-            bg={canSubmit ? sendActiveBg : sendInactiveBg}
-            color={canSubmit ? sendActiveColor : muted}
-            onClick={handleGenerate}
-            isLoading={submitting}
-            isDisabled={!canSubmit}
-            flexShrink={0}
-            mb={0.5}
-            _hover={canSubmit ? { opacity: 0.85 } : undefined}
-          />
-        </Flex>
+              border="0"
+              _focus={{ boxShadow: "none" }}
+              resize="none"
+              minH="36px"
+              maxH="120px"
+              rows={1}
+              bg="transparent"
+              fontSize="sm"
+              lineHeight="1.5"
+              flex={1}
+              py={1.5}
+              px={1}
+              color={ink}
+              _placeholder={{ color: muted }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  if (canSubmit) handleGenerate();
+                }
+              }}
+            />
+            <IconButton
+              aria-label="إرسال"
+              icon={<FiSend />}
+              size="sm"
+              borderRadius="full"
+              colorScheme="green"
+              onClick={handleGenerate}
+              isLoading={submitting}
+              isDisabled={!canSubmit}
+              flexShrink={0}
+            />
+          </Flex>
+        </Box>
 
-        <Flex mt={2} align="center" gap={1.5} flexWrap="wrap">
+        <Flex mt={1.5} align="center" gap={1.5} flexWrap="wrap">
           <HStack spacing={0} bg={chipBg} borderRadius="full" p={0.5} flexShrink={0}>
             <Button
               size="xs"
-              h={7}
-              px={3}
+              h="26px"
+              px={2.5}
               borderRadius="full"
               fontSize="11px"
               fontWeight="medium"
@@ -1245,8 +1236,8 @@ const ChatComposer = ({
             </Button>
             <Button
               size="xs"
-              h={7}
-              px={3}
+              h="26px"
+              px={2.5}
               borderRadius="full"
               fontSize="11px"
               fontWeight="medium"
@@ -1323,9 +1314,9 @@ const ChatComposer = ({
                     variant="outline"
                     borderRadius="full"
                     borderColor={borderColor}
-                    h={7}
-                    w={7}
-                    minW={7}
+                    h="26px"
+                    w="26px"
+                    minW="26px"
                   />
                 </PopoverTrigger>
                 <PopoverContent w="220px" borderColor={borderColor} shadow="lg">
@@ -1365,8 +1356,8 @@ const ChatComposer = ({
           </Text>
         </Flex>
 
-        <Text fontSize="10px" color={muted} mt={1.5} px={1} display={{ base: "block", sm: "none" }}>
-          Enter للإرسال · Shift+Enter سطر جديد
+        <Text fontSize="10px" color={muted} mt={1} display={{ base: "none", md: "block" }}>
+          Enter إرسال · Shift+Enter سطر
         </Text>
       </Box>
     </Box>
@@ -1380,14 +1371,14 @@ const ComposerMenuChip = ({ label, borderColor, chipHover, children }) => (
       size="xs"
       variant="outline"
       borderRadius="full"
-      h={7}
+      h="26px"
       px={2.5}
       fontSize="11px"
       fontWeight="medium"
       borderColor={borderColor}
       rightIcon={<FiChevronDown size={12} />}
       _hover={{ bg: chipHover }}
-      maxW={{ base: "110px", sm: "140px" }}
+      maxW={{ base: "100px", sm: "130px" }}
     >
       <Text noOfLines={1}>{label}</Text>
     </MenuButton>

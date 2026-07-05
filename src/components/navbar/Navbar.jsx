@@ -15,6 +15,7 @@ import {
   useDisclosure,
   HStack,
   Icon,
+  Portal,
 } from "@chakra-ui/react";
 import { motion, useScroll, useTransform } from "framer-motion";
 
@@ -23,6 +24,7 @@ import { Link } from "react-router-dom";
 import NotificationDropdown from "../notifications/NotificationDropdown";
 
 import Links from "../links/Links";
+import logoImg from "../../img/2 (5).png";
 
 export default function Nav() {
   const user = JSON.parse(localStorage.getItem("user"));
@@ -41,22 +43,34 @@ export default function Nav() {
 
   const navBg = useColorModeValue("white", "gray.800");
   const navBorder = useColorModeValue("blue.100", "gray.700");
+  const navShadow = useColorModeValue(
+    "0 2px 12px rgba(66, 153, 225, 0.08)",
+    "0 2px 12px rgba(0,0,0,0.25)",
+  );
 
   return (
-    <>
+    <Portal>
       <Box
+        as="header"
         bg={navBg}
         px={4}
         position="fixed"
         top={0}
         left={0}
+        right={0}
         width="100%"
         height="72px"
-        zIndex={1000}
+        zIndex={1400}
         style={{ direction: "ltr" }}
         borderBottomWidth="2px"
         borderBottomColor={navBorder}
-        boxShadow={useColorModeValue("0 2px 12px rgba(66, 153, 225, 0.08)", "0 2px 12px rgba(0,0,0,0.2)")}
+        boxShadow={navShadow}
+        sx={{
+          WebkitBackfaceVisibility: "hidden",
+          backfaceVisibility: "hidden",
+          transform: "translateZ(0)",
+          willChange: "transform",
+        }}
       >
         <Box h="1" w="full" position="absolute" top={0} left={0} right={0} bgGradient="linear(to-r, blue.500, orange.500)" />
         <Flex
@@ -67,10 +81,16 @@ export default function Nav() {
           maxW={{ base: "100%", lg: "container.xl" }}
           mx={{ base: 0, lg: "auto" }}
           gap={3}
+          position="relative"
+          zIndex={1}
         >
           <Link to={user ? `/home` : "/"}>
             <Box display="flex" alignItems="center" _hover={{ opacity: 0.9 }}>
-              <img src={"2 (5).png"} alt="Next Edu School" style={{ height: "160px", width: "auto" }} />
+              <img
+                src={logoImg}
+                alt="Edu Platform"
+                style={{ height: "48px", width: "auto", objectFit: "contain" }}
+              />
             </Box>
           </Link>
 
@@ -136,21 +156,23 @@ export default function Nav() {
             </Stack>
           </Flex>
         </Flex>
+
+        {/* شريط تقدم التمرير — داخل النافبار لتجنب طبقات fixed متعددة */}
+        <motion.div
+          style={{
+            scaleX,
+            position: "absolute",
+            left: 0,
+            bottom: 0,
+            height: 3,
+            width: "100%",
+            background: "linear-gradient(to right, #3182CE, #ED8936)",
+            transformOrigin: "left",
+            pointerEvents: "none",
+            zIndex: 2,
+          }}
+        />
       </Box>
-      {/* شريط تقدم التمرير */}
-      <motion.div
-        style={{
-          scaleX,
-          position: "fixed",
-          left: 0,
-          top: 72,
-          height: 4,
-          width: "100%",
-          background: "linear-gradient(to right, #3182CE, #ED8936)",
-          transformOrigin: "left",
-          zIndex: 999,
-        }}
-      />
-    </>
+    </Portal>
   );
 }

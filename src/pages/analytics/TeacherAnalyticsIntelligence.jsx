@@ -14,8 +14,6 @@ import {
   Icon,
   Textarea,
   Heading,
-  Container,
-  Divider,
   Drawer,
   DrawerBody,
   DrawerHeader,
@@ -23,15 +21,16 @@ import {
   DrawerContent,
   DrawerCloseButton,
   useDisclosure,
+  IconButton,
 } from "@chakra-ui/react";
 import {
   FaPaperPlane,
   FaChartLine,
   FaArrowUp,
   FaSync,
-  FaUser,
   FaBook,
   FaListUl,
+  FaInfoCircle,
 } from "react-icons/fa";
 import baseUrl from "../../api/baseUrl";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
@@ -73,115 +72,224 @@ function ReportTypeBadge({ reportType }) {
 }
 
 function UserRequestBlock({ message }) {
-  const borderColor = useColorModeValue("gray.200", "gray.600");
-  const labelColor = useColorModeValue("gray.500", "gray.400");
+  const bubbleBg = useColorModeValue("gray.100", "whiteAlpha.100");
   const textColor = useColorModeValue("gray.800", "gray.100");
-  const avatarBg = useColorModeValue("gray.100", "gray.700");
+  const muted = useColorModeValue("gray.500", "gray.400");
 
   return (
-    <Box py={4}>
-      <Flex gap={3} align="start">
-        <Flex boxSize={9} borderRadius="full" bg={avatarBg} align="center" justify="center" flexShrink={0}>
-          <Icon as={FaUser} boxSize={3.5} color="gray.500" />
-        </Flex>
-        <Box flex={1} minW={0}>
-          <HStack spacing={2} mb={1.5}>
-            <Text fontSize="xs" fontWeight="semibold" color={textColor}>
-              أنت
-            </Text>
-            {message.created_at && (
-              <Text fontSize="xs" color={labelColor}>
-                {formatTime(message.created_at)}
-              </Text>
-            )}
-          </HStack>
-          <Text fontSize="sm" lineHeight="1.8" color={textColor} whiteSpace="pre-wrap">
+    <Flex justify="flex-end" py={3} w="full">
+      <Box maxW={{ base: "100%", md: "82%" }} w="full">
+        {message.created_at && (
+          <Text fontSize="10px" color={muted} textAlign="left" mb={1.5} px={1}>
+            {formatTime(message.created_at)}
+          </Text>
+        )}
+        <Box bg={bubbleBg} borderRadius="2xl" px={4} py={3}>
+          <Text
+            fontSize="sm"
+            lineHeight="1.75"
+            color={textColor}
+            whiteSpace="pre-wrap"
+            wordBreak="break-word"
+          >
             {message.message}
           </Text>
         </Box>
-      </Flex>
-      <Divider mt={4} borderColor={borderColor} />
-    </Box>
+      </Box>
+    </Flex>
   );
 }
 
 function ReportBlock({ message }) {
-  const shellBorder = useColorModeValue("gray.200", "gray.600");
-  const headerBg = useColorModeValue("gray.50", "gray.900");
-  const bodyBg = useColorModeValue("white", "gray.800");
   const titleColor = useColorModeValue("gray.800", "gray.100");
   const muted = useColorModeValue("gray.500", "gray.400");
-  const iconShellBg = useColorModeValue("white", "gray.700");
+  const assistantIconBg = useColorModeValue("blue.500", "blue.400");
 
   return (
-    <Box mb={6}>
-      <Box
-        borderWidth="1px"
-        borderColor={shellBorder}
-        borderRadius="lg"
-        overflow="hidden"
-        bg={bodyBg}
-      >
+    <Box py={{ base: 4, md: 5 }} w="full">
+      <HStack spacing={3} align="start" mb={3}>
         <Flex
-          px={4}
-          py={3}
-          bg={headerBg}
-          borderBottomWidth="1px"
-          borderColor={shellBorder}
+          boxSize={8}
+          borderRadius="full"
+          bg={assistantIconBg}
           align="center"
-          justify="space-between"
-          gap={3}
-          flexWrap="wrap"
+          justify="center"
+          flexShrink={0}
         >
-          <HStack spacing={2} minW={0}>
-            <Flex boxSize={8} borderRadius="md" bg={iconShellBg} borderWidth="1px" borderColor={shellBorder} align="center" justify="center">
-              <Icon as={FaChartLine} boxSize={3.5} color="blue.500" />
-            </Flex>
-            <Box minW={0}>
-              <Text fontSize="sm" fontWeight="semibold" color={titleColor}>
-                نتيجة التحليل
-              </Text>
-              <HStack spacing={2} mt={0.5}>
-                <ReportTypeBadge reportType={message.report_type} />
-              </HStack>
-            </Box>
+          <Icon as={FaChartLine} boxSize={3.5} color="white" />
+        </Flex>
+        <Box flex={1} minW={0}>
+          <HStack spacing={2} flexWrap="wrap">
+            <Text fontSize="sm" fontWeight="semibold" color={titleColor}>
+              محلل البيانات
+            </Text>
+            <ReportTypeBadge reportType={message.report_type} />
           </HStack>
           {message.created_at && (
-            <Text fontSize="xs" color={muted} flexShrink={0}>
+            <Text fontSize="10px" color={muted} mt={0.5}>
               {formatTime(message.created_at)}
             </Text>
           )}
-        </Flex>
-        <Box px={{ base: 4, md: 5 }} py={4}>
-          <ReportMarkdownContent content={message.message} />
         </Box>
+      </HStack>
+      <Box pr={{ base: 0, md: 2 }} overflowX="auto">
+        <ReportMarkdownContent content={message.message} />
       </Box>
     </Box>
   );
 }
 
 function GeneratingBlock() {
-  const shellBorder = useColorModeValue("gray.200", "gray.600");
-  const headerBg = useColorModeValue("gray.50", "gray.900");
   const muted = useColorModeValue("gray.600", "gray.400");
   const skeletonBg = useColorModeValue("gray.100", "gray.700");
+  const assistantIconBg = useColorModeValue("blue.500", "blue.400");
 
   return (
-    <Box mb={6}>
-      <Box borderWidth="1px" borderColor={shellBorder} borderRadius="lg" overflow="hidden">
-        <Flex px={4} py={3} bg={headerBg} borderBottomWidth="1px" borderColor={shellBorder} align="center" gap={2}>
-          <Spinner size="sm" color="blue.500" />
-          <Text fontSize="sm" color={muted}>
-            جاري تحليل البيانات وإعداد التقرير...
-          </Text>
+    <Box py={5} w="full">
+      <HStack spacing={3} mb={4}>
+        <Flex boxSize={8} borderRadius="full" bg={assistantIconBg} align="center" justify="center">
+          <Spinner size="sm" color="white" thickness="2px" />
         </Flex>
-        <Box px={4} py={8}>
-          <VStack spacing={2}>
-            <Box w="full" h="2" bg={skeletonBg} borderRadius="full" />
-            <Box w="80%" h="2" bg={skeletonBg} borderRadius="full" alignSelf="flex-start" />
-            <Box w="60%" h="2" bg={skeletonBg} borderRadius="full" alignSelf="flex-start" />
-          </VStack>
+        <Text fontSize="sm" color={muted}>
+          جاري تحليل البيانات وإعداد التقرير...
+        </Text>
+      </HStack>
+      <VStack spacing={2} align="stretch" maxW="md">
+        <Box w="full" h="2" bg={skeletonBg} borderRadius="full" />
+        <Box w="85%" h="2" bg={skeletonBg} borderRadius="full" alignSelf="flex-start" />
+        <Box w="65%" h="2" bg={skeletonBg} borderRadius="full" alignSelf="flex-start" />
+      </VStack>
+    </Box>
+  );
+}
+
+function ChatComposer({
+  messageText,
+  setMessageText,
+  onSubmit,
+  sending,
+  inputRef,
+  quickCommands,
+  onQuickCommand,
+  muted,
+  borderColor,
+  shellBg,
+}) {
+  const inputShellBg = useColorModeValue("white", "gray.800");
+  const composerShadow = useColorModeValue(
+    "0 2px 12px rgba(15, 23, 42, 0.06)",
+    "0 2px 12px rgba(0, 0, 0, 0.25)",
+  );
+  const chipBg = useColorModeValue("white", "gray.800");
+  const chipHover = useColorModeValue("gray.50", "gray.700");
+
+  return (
+    <Box
+      flexShrink={0}
+      px={{ base: 2, md: 3 }}
+      pt={2}
+      pb={2}
+      bg={shellBg}
+      borderTopWidth="1px"
+      borderColor={borderColor}
+      sx={{ pb: "max(8px, env(safe-area-inset-bottom, 8px))" }}
+    >
+      <Box maxW="48rem" mx="auto" w="full">
+        {quickCommands.length > 0 && (
+          <Flex
+            gap={1.5}
+            mb={2}
+            overflowX="auto"
+            pb={0.5}
+            sx={{
+              "&::-webkit-scrollbar": { height: "3px" },
+              WebkitOverflowScrolling: "touch",
+            }}
+          >
+            {quickCommands.map((cmd, index) => (
+              <Button
+                key={`${cmd.label}-${index}`}
+                size="xs"
+                variant="outline"
+                borderColor={borderColor}
+                bg={chipBg}
+                borderRadius="full"
+                fontWeight="normal"
+                fontSize="11px"
+                flexShrink={0}
+                whiteSpace="nowrap"
+                h="26px"
+                minH="26px"
+                px={2.5}
+                onClick={() => onQuickCommand(cmd)}
+                isDisabled={sending}
+                _hover={{ bg: chipHover, borderColor: "blue.300", color: "blue.600" }}
+              >
+                {cmd.label}
+              </Button>
+            ))}
+          </Flex>
+        )}
+
+        <Box
+          as="form"
+          onSubmit={onSubmit}
+          borderRadius="xl"
+          borderWidth="1px"
+          borderColor={borderColor}
+          bg={inputShellBg}
+          boxShadow={composerShadow}
+          overflow="hidden"
+          _focusWithin={{
+            borderColor: "blue.400",
+            boxShadow: "0 0 0 1px rgba(49, 130, 206, 0.12)",
+          }}
+        >
+          <Flex align="center" gap={1.5} py={1} px={1.5} pl={2}>
+            <Textarea
+              ref={inputRef}
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              placeholder="اكتب طلب التقرير..."
+              rows={1}
+              minH="36px"
+              maxH="120px"
+              resize="none"
+              maxLength={MESSAGE_LIMIT}
+              isDisabled={sending}
+              border="none"
+              bg="transparent"
+              _focus={{ boxShadow: "none" }}
+              fontSize="sm"
+              lineHeight="1.5"
+              flex={1}
+              py={1.5}
+              px={1}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  onSubmit(e);
+                }
+              }}
+            />
+            <IconButton
+              type="submit"
+              aria-label="إرسال"
+              icon={<FaPaperPlane boxSize={3} />}
+              colorScheme="blue"
+              borderRadius="full"
+              size="sm"
+              flexShrink={0}
+              isLoading={sending}
+              isDisabled={!messageText.trim() || sending}
+            />
+          </Flex>
         </Box>
+
+        <Flex justify="flex-end" align="center" mt={1} fontSize="10px" color={muted} gap={2}>
+          <Text display={{ base: "none", md: "block" }}>Enter إرسال · Shift+Enter سطر</Text>
+          <Text>{messageText.length}/{MESSAGE_LIMIT}</Text>
+        </Flex>
       </Box>
     </Box>
   );
@@ -282,35 +390,35 @@ function EmptyState({ welcomeMessage, onExampleClick, examples, sending }) {
   const borderColor = useColorModeValue("gray.200", "gray.700");
   const muted = useColorModeValue("gray.600", "gray.400");
   const titleColor = useColorModeValue("gray.800", "white");
-  const iconBg = useColorModeValue("gray.100", "gray.700");
+  const iconBg = useColorModeValue("blue.50", "blue.900");
 
   return (
-    <Center py={{ base: 8, md: 12 }} px={4}>
-      <VStack spacing={5} maxW="480px" textAlign="center">
-        <Flex boxSize={14} borderRadius="xl" bg={iconBg} align="center" justify="center">
-          <Icon as={FaChartLine} boxSize={6} color="blue.500" />
+    <Flex flex={1} align="center" justify="center" minH="full" px={2} py={8}>
+      <VStack spacing={5} maxW="520px" textAlign="center" w="full">
+        <Flex boxSize={16} borderRadius="2xl" bg={iconBg} align="center" justify="center">
+          <Icon as={FaChartLine} boxSize={7} color="blue.500" />
         </Flex>
         <Box>
-          <Heading size="sm" color={titleColor} mb={2}>
-            ابدأ بطلب تقرير
+          <Heading size="md" color={titleColor} mb={2} fontWeight="semibold">
+            كيف يمكنني مساعدتك؟
           </Heading>
-          <Text fontSize="sm" color={muted} lineHeight="1.8">
+          <Text fontSize="sm" color={muted} lineHeight="1.85">
             {welcomeMessage || "اطلب تقريراً عن طالب أو كورس أو نظرة عامة على منصتك."}
           </Text>
         </Box>
         {examples?.length > 0 && (
           <VStack w="full" spacing={2} align="stretch">
-            {examples.slice(0, 3).map((example) => (
+            {examples.slice(0, 4).map((example) => (
               <Button
                 key={example}
                 size="sm"
                 variant="outline"
                 borderColor={borderColor}
-                borderRadius="md"
+                borderRadius="xl"
                 fontWeight="normal"
-                fontSize="xs"
+                fontSize="sm"
                 h="auto"
-                py={2.5}
+                py={3}
                 whiteSpace="normal"
                 onClick={() => onExampleClick(example)}
                 isDisabled={sending}
@@ -322,7 +430,7 @@ function EmptyState({ welcomeMessage, onExampleClick, examples, sending }) {
           </VStack>
         )}
       </VStack>
-    </Center>
+    </Flex>
   );
 }
 
@@ -344,12 +452,17 @@ const TeacherAnalyticsIntelligence = () => {
   const [hasOlderMessages, setHasOlderMessages] = useState(false);
   const [messageText, setMessageText] = useState("");
 
-  const pageBg = useColorModeValue("gray.100", "gray.900");
+  const pageBg = useColorModeValue("gray.50", "gray.900");
   const shellBg = useColorModeValue("white", "gray.800");
+  const chatBg = useColorModeValue("white", "gray.800");
   const borderColor = useColorModeValue("gray.200", "gray.700");
   const muted = useColorModeValue("gray.600", "gray.400");
-  const toolbarBg = useColorModeValue("gray.50", "gray.900");
-  const inputBg = useColorModeValue("white", "gray.800");
+  const toolbarBg = useColorModeValue("white", "gray.900");
+  const headerAccent = useColorModeValue("blue.500", "blue.300");
+  const headerIconBg = useColorModeValue("blue.50", "blue.900");
+  const guidePanelBg = useColorModeValue("gray.50", "gray.900");
+
+  const shellHeight = "calc(100dvh - 72px)";
 
   const authHeaders = useMemo(() => {
     const token = localStorage.getItem("token");
@@ -560,129 +673,148 @@ const TeacherAnalyticsIntelligence = () => {
   if (loading) return <BrandLoadingScreen />;
 
   return (
-    <Box minH="100vh" bg={pageBg} pt={{ base: "72px", md: "88px" }} pb={6} dir="rtl">
-      <Container maxW="container.xl" h={{ base: "auto", lg: "calc(100vh - 120px)" }}>
+    <Box
+      dir="rtl"
+      mx={{ base: -3, sm: -4, md: -6 }}
+      my={{ base: -2.5, sm: -3, md: -4 }}
+      h={shellHeight}
+      minH={shellHeight}
+      display="flex"
+      flexDirection="column"
+      bg={pageBg}
+    >
+      <Flex
+        direction="column"
+        flex={1}
+        minH={0}
+        w="full"
+        mx="auto"
+        bg={shellBg}
+        borderWidth={{ base: 0, md: "1px" }}
+        borderColor={borderColor}
+        borderRadius={{ base: 0, md: "xl" }}
+        overflow="hidden"
+        boxShadow={{ base: "none", md: "sm" }}
+      >
+        {/* شريط علوي مضغوط */}
         <Flex
-          direction="column"
-          bg={shellBg}
-          borderWidth="1px"
+          px={{ base: 3, md: 5 }}
+          py={2}
+          minH="52px"
+          align="center"
+          justify="space-between"
+          gap={2}
+          borderBottomWidth="1px"
           borderColor={borderColor}
-          borderRadius="xl"
-          overflow="hidden"
-          h={{ base: "calc(100dvh - 100px)", lg: "full" }}
-          boxShadow="sm"
+          flexShrink={0}
+          bg={toolbarBg}
         >
-          {/* شريط علوي */}
-          <Flex
-            px={{ base: 4, md: 6 }}
-            py={4}
-            align="center"
-            justify="space-between"
-            gap={3}
-            borderBottomWidth="1px"
-            borderColor={borderColor}
-            flexShrink={0}
-          >
-            <HStack spacing={3} minW={0}>
-              <Flex boxSize={10} borderRadius="lg" bg={toolbarBg} borderWidth="1px" borderColor={borderColor} align="center" justify="center" flexShrink={0}>
-                <Icon as={FaChartLine} color="blue.500" boxSize={4} />
-              </Flex>
-              <Box minW={0}>
-                <Heading size="sm" fontWeight="semibold" noOfLines={1}>
-                  {botInfo?.name || "محلل البيانات"}
-                </Heading>
-                <Text fontSize="xs" color={muted} noOfLines={1}>
-                  تقارير وإحصائيات من بيانات المنصة
-                </Text>
-              </Box>
-            </HStack>
-            <HStack spacing={2} flexShrink={0}>
-              <Button
-                size="sm"
-                variant="outline"
-                borderColor={borderColor}
-                display={{ base: "inline-flex", lg: "none" }}
-                onClick={openGuide}
-              >
-                الدليل
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                borderColor={borderColor}
-                leftIcon={<FaSync />}
-                onClick={refreshChat}
-                isLoading={messagesLoading}
-              >
-                تحديث
-              </Button>
-            </HStack>
-          </Flex>
+          <HStack spacing={2} minW={0} flex={1}>
+            <Flex
+              boxSize={9}
+              borderRadius="full"
+              bg={headerIconBg}
+              align="center"
+              justify="center"
+              flexShrink={0}
+            >
+              <Icon as={FaChartLine} color={headerAccent} boxSize={4} />
+            </Flex>
+            <Box minW={0}>
+              <Heading size="sm" fontWeight="semibold" noOfLines={1}>
+                {botInfo?.name || "محلل البيانات"}
+              </Heading>
+            </Box>
+          </HStack>
+          <HStack spacing={1.5} flexShrink={0}>
+            <IconButton
+              aria-label="دليل الاستخدام"
+              icon={<FaInfoCircle />}
+              size="sm"
+              variant="ghost"
+              display={{ base: "inline-flex", lg: "none" }}
+              onClick={openGuide}
+            />
+            <IconButton
+              aria-label="تحديث المحادثة"
+              icon={<FaSync />}
+              size="sm"
+              variant="ghost"
+              display={{ base: "inline-flex", sm: "none" }}
+              onClick={refreshChat}
+              isLoading={messagesLoading}
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              leftIcon={<FaInfoCircle />}
+              display={{ base: "none", lg: "inline-flex" }}
+              onClick={openGuide}
+            >
+              الدليل
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              leftIcon={<FaSync />}
+              display={{ base: "none", sm: "inline-flex" }}
+              onClick={refreshChat}
+              isLoading={messagesLoading}
+            >
+              تحديث
+            </Button>
+          </HStack>
+        </Flex>
 
-          <Flex flex={1} minH={0}>
-            {/* المحتوى الرئيسي */}
-            <Flex direction="column" flex={1} minW={0}>
-              {quickCommands.length > 0 && (
-                <Box px={{ base: 4, md: 6 }} py={3} bg={toolbarBg} borderBottomWidth="1px" borderColor={borderColor} flexShrink={0}>
-                  <Text fontSize="xs" color={muted} mb={2} fontWeight="medium">
-                    طلبات سريعة
-                  </Text>
-                  <Flex gap={2} overflowX="auto" pb={1} sx={{ "&::-webkit-scrollbar": { height: "4px" } }}>
-                    {quickCommands.map((cmd, index) => (
-                      <Button
-                        key={`${cmd.label}-${index}`}
-                        size="xs"
-                        variant="outline"
-                        borderColor={borderColor}
-                        bg={shellBg}
-                        borderRadius="md"
-                        fontWeight="normal"
-                        flexShrink={0}
-                        onClick={() => handleQuickCommand(cmd)}
-                        isDisabled={sending}
-                        _hover={{ borderColor: "blue.300", color: "blue.600" }}
-                      >
-                        {cmd.label}
-                      </Button>
-                    ))}
-                  </Flex>
-                </Box>
+        <Flex flex={1} minH={0} overflow="hidden">
+          {/* منطقة الشات — ChatGPT style */}
+          <Flex direction="column" flex={1} minW={0} minH={0} bg={chatBg}>
+            <Box
+              flex={1}
+              minH={0}
+              overflowY="auto"
+              overflowX="hidden"
+              display="flex"
+              flexDirection="column"
+              sx={{
+                WebkitOverflowScrolling: "touch",
+                overscrollBehavior: "contain",
+              }}
+            >
+              {hasOlderMessages && (
+                <Center py={3} flexShrink={0}>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    colorScheme="blue"
+                    leftIcon={<FaArrowUp />}
+                    onClick={loadOlderMessages}
+                    isLoading={loadingOlder}
+                  >
+                    تحميل رسائل أقدم
+                  </Button>
+                </Center>
               )}
 
-              <Box flex={1} overflowY="auto" px={{ base: 4, md: 6 }}>
-                {hasOlderMessages && (
-                  <Center py={4}>
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      colorScheme="blue"
-                      leftIcon={<FaArrowUp />}
-                      onClick={loadOlderMessages}
-                      isLoading={loadingOlder}
-                    >
-                      تحميل رسائل أقدم
-                    </Button>
-                  </Center>
-                )}
-
-                {messagesLoading ? (
-                  <Center minH="280px">
-                    <VStack spacing={3}>
-                      <Spinner color="blue.500" />
-                      <Text fontSize="sm" color={muted}>
-                        جاري تحميل السجل...
-                      </Text>
-                    </VStack>
-                  </Center>
-                ) : showEmpty ? (
-                  <EmptyState
-                    welcomeMessage={botInfo?.welcome_message}
-                    examples={botInfo?.examples}
-                    onExampleClick={sendMessage}
-                    sending={sending}
-                  />
-                ) : (
-                  <Box maxW="820px" mx="auto" w="full" py={2}>
+              {messagesLoading ? (
+                <Flex flex={1} align="center" justify="center" minH="240px">
+                  <VStack spacing={3}>
+                    <Spinner color="blue.500" size="lg" />
+                    <Text fontSize="sm" color={muted}>
+                      جاري تحميل السجل...
+                    </Text>
+                  </VStack>
+                </Flex>
+              ) : showEmpty ? (
+                <EmptyState
+                  welcomeMessage={botInfo?.welcome_message}
+                  examples={botInfo?.examples}
+                  onExampleClick={sendMessage}
+                  sending={sending}
+                />
+              ) : (
+                <Box flex={1} w="full">
+                  <Box maxW="48rem" mx="auto" w="full" px={{ base: 3, md: 4 }} py={{ base: 4, md: 6 }}>
                     {messages.map((msg) =>
                       msg.role === "teacher" ? (
                         <UserRequestBlock key={msg.id} message={msg} />
@@ -691,100 +823,60 @@ const TeacherAnalyticsIntelligence = () => {
                       ),
                     )}
                     {sending && <GeneratingBlock />}
-                    <Box ref={messagesEndRef} h={1} />
+                    <Box ref={messagesEndRef} h={4} />
                   </Box>
-                )}
-              </Box>
-
-              <Box
-                as="form"
-                onSubmit={handleSubmit}
-                px={{ base: 4, md: 6 }}
-                py={4}
-                borderTopWidth="1px"
-                borderColor={borderColor}
-                bg={toolbarBg}
-                flexShrink={0}
-              >
-                <Box maxW="820px" mx="auto" w="full">
-                  <Flex
-                    bg={inputBg}
-                    borderWidth="1px"
-                    borderColor={borderColor}
-                    borderRadius="lg"
-                    overflow="hidden"
-                    align="stretch"
-                    _focusWithin={{ borderColor: "blue.400", boxShadow: "0 0 0 1px var(--chakra-colors-blue-400)" }}
-                  >
-                    <Textarea
-                      ref={inputRef}
-                      value={messageText}
-                      onChange={(e) => setMessageText(e.target.value)}
-                      placeholder="اكتب طلب التقرير..."
-                      rows={2}
-                      resize="none"
-                      maxLength={MESSAGE_LIMIT}
-                      isDisabled={sending}
-                      border="none"
-                      bg="transparent"
-                      _focus={{ boxShadow: "none" }}
-                      fontSize="sm"
-                      lineHeight="1.75"
-                      flex={1}
-                      px={4}
-                      py={3}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSubmit(e);
-                        }
-                      }}
-                    />
-                    <Button
-                      type="submit"
-                      colorScheme="blue"
-                      borderRadius="0"
-                      px={6}
-                      leftIcon={<FaPaperPlane />}
-                      isLoading={sending}
-                      isDisabled={!messageText.trim() || sending}
-                      alignSelf="stretch"
-                    >
-                      إرسال
-                    </Button>
-                  </Flex>
-                  <Flex justify="space-between" mt={2} fontSize="xs" color={muted}>
-                    <Text>Enter للإرسال</Text>
-                    <Text>{messageText.length}/{MESSAGE_LIMIT}</Text>
-                  </Flex>
                 </Box>
-              </Box>
-            </Flex>
-
-            {/* دليل جانبي — desktop */}
-            <Box
-              w="300px"
-              flexShrink={0}
-              borderRightWidth="1px"
-              borderColor={borderColor}
-              bg={toolbarBg}
-              p={5}
-              overflowY="auto"
-              display={{ base: "none", lg: "block" }}
-            >
-              <GuidePanel botInfo={botInfo} onExampleClick={sendMessage} sending={sending} />
+              )}
             </Box>
+
+            <ChatComposer
+              messageText={messageText}
+              setMessageText={setMessageText}
+              onSubmit={handleSubmit}
+              sending={sending}
+              inputRef={inputRef}
+              quickCommands={quickCommands}
+              onQuickCommand={handleQuickCommand}
+              muted={muted}
+              borderColor={borderColor}
+              shellBg={chatBg}
+            />
           </Flex>
+
+          {/* دليل جانبي — desktop */}
+          <Box
+            w={{ lg: "280px", xl: "300px" }}
+            flexShrink={0}
+            borderRightWidth="1px"
+            borderColor={borderColor}
+            bg={guidePanelBg}
+            p={4}
+            overflowY="auto"
+            display={{ base: "none", lg: "block" }}
+            sx={{ overscrollBehavior: "contain" }}
+          >
+            <GuidePanel botInfo={botInfo} onExampleClick={sendMessage} sending={sending} />
+          </Box>
         </Flex>
-      </Container>
+      </Flex>
 
       <Drawer isOpen={guideOpen} placement="right" onClose={closeGuide} size="sm">
         <DrawerOverlay />
-        <DrawerContent>
+        <DrawerContent maxH="100dvh">
           <DrawerCloseButton />
-          <DrawerHeader borderBottomWidth="1px">دليل الاستخدام</DrawerHeader>
-          <DrawerBody py={5}>
-            <GuidePanel botInfo={botInfo} onExampleClick={(ex) => { sendMessage(ex); closeGuide(); }} sending={sending} compact />
+          <DrawerHeader borderBottomWidth="1px" fontSize="md">
+            دليل الاستخدام
+          </DrawerHeader>
+          <DrawerBody py={5} overflowY="auto">
+            <GuidePanel
+              botInfo={botInfo}
+              onExampleClick={(ex) => {
+                sendMessage(ex);
+                closeGuide();
+              }}
+              sending={sending}
+              compact
+            />
           </DrawerBody>
         </DrawerContent>
       </Drawer>

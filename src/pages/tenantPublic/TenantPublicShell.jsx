@@ -32,7 +32,7 @@ export default function TenantPublicShell({
   seoPage = "home",
   seoSlug,
   className = "",
-  showSearch = true,
+  showSearch = false,
 }) {
   const { isDarkMode, toggleTheme } = useTenantPublicTheme();
   const [navScrolled, setNavScrolled] = useState(false);

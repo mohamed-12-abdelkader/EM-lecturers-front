@@ -2,9 +2,11 @@ import { useRef } from "react";
 import {
   motion,
   useInView,
+  useMotionValue,
   useReducedMotion,
   useScroll,
   useSpring,
+  useTransform,
   AnimatePresence,
 } from "framer-motion";
 
@@ -401,6 +403,63 @@ export function ShimmerCTA({ children, className = "" }) {
       )}
       <div className="relative z-10">{children}</div>
     </motion.div>
+  );
+}
+
+/** تفاعل ثلاثي الأبعاد بالماوس + طفو خفيف */
+export function Tilt3D({
+  children,
+  className = "",
+  maxTilt = 12,
+  floatPx = 8,
+  floatDuration = 5.5,
+}) {
+  const ref = useRef(null);
+  const reduceMotion = useReducedMotion();
+  const pointerX = useMotionValue(0);
+  const pointerY = useMotionValue(0);
+
+  const rotateX = useSpring(useTransform(pointerY, [-0.5, 0.5], [maxTilt, -maxTilt]), {
+    stiffness: 280,
+    damping: 24,
+  });
+  const rotateY = useSpring(useTransform(pointerX, [-0.5, 0.5], [-maxTilt, maxTilt]), {
+    stiffness: 280,
+    damping: 24,
+  });
+
+  const handlePointerMove = (event) => {
+    if (reduceMotion || !ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    pointerX.set((event.clientX - rect.left) / rect.width - 0.5);
+    pointerY.set((event.clientY - rect.top) / rect.height - 0.5);
+  };
+
+  const resetPointer = () => {
+    pointerX.set(0);
+    pointerY.set(0);
+  };
+
+  if (reduceMotion) {
+    return <div className={className}>{children}</div>;
+  }
+
+  return (
+    <div
+      ref={ref}
+      className={className}
+      onMouseMove={handlePointerMove}
+      onMouseLeave={resetPointer}
+      style={{ perspective: 1200 }}
+    >
+      <motion.div
+        style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
+        animate={{ y: [0, -floatPx, 0] }}
+        transition={{ duration: floatDuration, repeat: Infinity, ease: "easeInOut" }}
+      >
+        {children}
+      </motion.div>
+    </div>
   );
 }
 

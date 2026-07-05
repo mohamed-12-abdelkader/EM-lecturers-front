@@ -16,7 +16,17 @@ body {
   font-style: normal;
   font-variation-settings: "slnt" 0;
   background-color: #f8fafc;
-  overflow-x: hidden;
+  overflow-x: clip;
+}
+
+@supports not (overflow-x: clip) {
+  body {
+    overflow-x: hidden;
+  }
+}
+
+#root {
+  isolation: isolate;
 }
 
 [data-theme='dark'] body {
