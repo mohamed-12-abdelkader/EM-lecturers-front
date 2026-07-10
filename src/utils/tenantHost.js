@@ -6,7 +6,15 @@
 const RESERVED_SUBDOMAINS = new Set(["www", "api", "stream", "admin", "app", "cdn"]);
 
 /** نطاقات جذر معروفة — احتياطي إذا لم تُحقَن من env عند البناء */
-const FALLBACK_TENANT_ROOTS = ["emlectures.com"];
+const FALLBACK_TENANT_ROOTS = ["em-online.online", "emlectures.com"];
+
+function parseRootDomains(rootDomain) {
+  const fromEnv = String(rootDomain || "")
+    .split(",")
+    .map((d) => d.trim().toLowerCase())
+    .filter(Boolean);
+  return [...new Set([...fromEnv, ...FALLBACK_TENANT_ROOTS])];
+}
 
 function parseSubdomainFromHost(hostname, rootDomain) {
   const host = String(hostname || "").toLowerCase();
@@ -18,10 +26,7 @@ function parseSubdomainFromHost(hostname, rootDomain) {
     return sub;
   }
 
-  const roots = [
-    String(rootDomain || "").toLowerCase(),
-    ...FALLBACK_TENANT_ROOTS,
-  ].filter(Boolean);
+  const roots = parseRootDomains(rootDomain);
 
   for (const root of roots) {
     if (host === root || host.endsWith(`.${root}`)) {
@@ -50,9 +55,10 @@ export function buildTenantPublicUrl(subdomain, options = {}) {
     return options.fallbackOrigin || "";
   }
 
-  const root = String(
-    options.rootDomain || import.meta.env.VITE_TENANT_ROOT_DOMAIN || FALLBACK_TENANT_ROOTS[0] || "",
-  ).toLowerCase();
+  const root =
+    String(options.rootDomain || "").toLowerCase() ||
+    parseRootDomains(import.meta.env.VITE_TENANT_ROOT_DOMAIN)[0] ||
+    "";
 
   if (typeof window !== "undefined") {
     const protocol = window.location.protocol;
