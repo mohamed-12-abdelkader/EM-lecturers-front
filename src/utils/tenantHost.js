@@ -1,27 +1,45 @@
 /**
- * يستخرج slug المستأجر من النطاق (مثل mohamed-haredy.localhost).
+ * يستخرج slug المستأجر من النطاق (مثل mohamed-haredy.localhost أو omar-mohamed.emlectures.com).
  * يُرجع null على localhost العادي أو عند غياب نطاق فرعي للمستأجر.
  */
-export function getTenantSubdomain() {
-  if (typeof window === "undefined") return null;
-  const host = window.location.hostname.toLowerCase();
 
-  if (host === "localhost" || host === "127.0.0.1") return null;
+const RESERVED_SUBDOMAINS = new Set(["www", "api", "stream", "admin", "app", "cdn"]);
+
+/** نطاقات جذر معروفة — احتياطي إذا لم تُحقَن من env عند البناء */
+const FALLBACK_TENANT_ROOTS = ["emlectures.com"];
+
+function parseSubdomainFromHost(hostname, rootDomain) {
+  const host = String(hostname || "").toLowerCase();
+  if (!host || host === "localhost" || host === "127.0.0.1") return null;
 
   if (host.endsWith(".localhost")) {
     const sub = host.slice(0, -".localhost".length);
-    if (!sub || sub === "www") return null;
+    if (!sub || RESERVED_SUBDOMAINS.has(sub)) return null;
     return sub;
   }
 
-  const root = (import.meta.env.VITE_TENANT_ROOT_DOMAIN || "").toLowerCase();
-  if (root && host.endsWith(`.${root}`)) {
-    const sub = host.slice(0, -(`.${root}`).length);
-    if (!sub || sub === "www") return null;
-    return sub;
+  const roots = [
+    String(rootDomain || "").toLowerCase(),
+    ...FALLBACK_TENANT_ROOTS,
+  ].filter(Boolean);
+
+  for (const root of roots) {
+    if (host === root || host.endsWith(`.${root}`)) {
+      const sub = host === root ? "" : host.slice(0, -(`.${root}`).length);
+      if (!sub || RESERVED_SUBDOMAINS.has(sub)) return null;
+      return sub;
+    }
   }
 
   return null;
+}
+
+export function getTenantSubdomain() {
+  if (typeof window === "undefined") return null;
+  return parseSubdomainFromHost(
+    window.location.hostname,
+    import.meta.env.VITE_TENANT_ROOT_DOMAIN,
+  );
 }
 
 /** الرابط العام لمنصة المدرس (subdomain) — يعمل في المتصفح وعلى السيرفر. */
@@ -33,7 +51,7 @@ export function buildTenantPublicUrl(subdomain, options = {}) {
   }
 
   const root = String(
-    options.rootDomain || import.meta.env.VITE_TENANT_ROOT_DOMAIN || "",
+    options.rootDomain || import.meta.env.VITE_TENANT_ROOT_DOMAIN || FALLBACK_TENANT_ROOTS[0] || "",
   ).toLowerCase();
 
   if (typeof window !== "undefined") {
