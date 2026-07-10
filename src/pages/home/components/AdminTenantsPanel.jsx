@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
-  SimpleGrid,
   Heading,
   Text,
   VStack,
@@ -22,10 +21,6 @@ import {
   Spinner,
   IconButton,
   Tooltip,
-  Stat,
-  StatLabel,
-  StatNumber,
-  StatHelpText,
   useToast,
   AlertDialog,
   AlertDialogOverlay,
@@ -36,24 +31,19 @@ import {
   FormHelperText,
   useDisclosure,
 } from "@chakra-ui/react";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
   MdSearch,
   MdClose,
   MdPeople,
-  MdSchool,
   MdMenuBook,
-  MdPublic,
-  MdEmail,
-  MdPhone,
   MdOpenInNew,
   MdRefresh,
   MdDomain,
   MdEdit,
   MdDelete,
 } from "react-icons/md";
-import { FaChalkboardTeacher, FaLayerGroup } from "react-icons/fa";
+import { FaChalkboardTeacher } from "react-icons/fa";
 import {
   fetchAdminTenants,
   deleteAdminTenant,
@@ -61,41 +51,26 @@ import {
   isDefaultTenant,
   isDeletedTenant,
 } from "../../../api/adminTenantsApi";
+import { AD_BLUE, AD_ORANGE, AD_PACKAGE_META } from "../adminDashboardTheme";
 
-const MotionBox = motion(Box);
 const PAGE_SIZE = 12;
-
-const PACKAGE_META = {
-  bronze: { label: "برونزية", colorScheme: "orange" },
-  silver: { label: "فضية", colorScheme: "gray" },
-  gold: { label: "ذهبية", colorScheme: "yellow" },
-  platinum: { label: "بلاتينية", colorScheme: "purple" },
-};
 
 function getPackageMeta(pkg) {
   const key = String(pkg || "bronze").toLowerCase();
-  return PACKAGE_META[key] || { label: key, colorScheme: "blue" };
+  return AD_PACKAGE_META[key] || { label: key, colorScheme: "blue" };
 }
-
-const cardGradients = [
-  "linear-gradient(135deg, #4299E1 0%, #3182CE 100%)",
-  "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-  "linear-gradient(135deg, #DD6B20 0%, #C05621 100%)",
-  "linear-gradient(135deg, #38B2AC 0%, #319795 100%)",
-];
 
 function formatNumber(value) {
   const n = Number(value) || 0;
   return n.toLocaleString("ar-EG");
 }
 
-function TenantCard({ tenant, index, onDelete }) {
+function TenantRow({ tenant, onDelete }) {
   const navigate = useNavigate();
-  const cardBg = useColorModeValue("white", "gray.800");
-  const borderColor = useColorModeValue("gray.100", "gray.700");
+  const border = useColorModeValue("gray.100", "gray.700");
+  const hoverBg = useColorModeValue("gray.50", "whiteAlpha.50");
   const muted = useColorModeValue("gray.500", "gray.400");
-  const surface = useColorModeValue("gray.50", "whiteAlpha.50");
-  const gradient = cardGradients[index % cardGradients.length];
+  const title = useColorModeValue("gray.900", "white");
   const owner = tenant.owner || null;
   const stats = tenant.stats || {};
   const platformUrl = getTenantPlatformUrl(tenant.subdomain);
@@ -113,251 +88,159 @@ function TenantCard({ tenant, index, onDelete }) {
   };
 
   return (
-    <MotionBox
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: (index % PAGE_SIZE) * 0.04, duration: 0.35 }}
-      h="full"
+    <Flex
+      direction={{ base: "column", lg: "row" }}
+      align={{ base: "stretch", lg: "center" }}
+      gap={{ base: 3, lg: 4 }}
+      px={{ base: 3, md: 4 }}
+      py={{ base: 3.5, md: 3 }}
+      borderBottom="1px solid"
+      borderColor={border}
+      transition="background 0.15s"
+      _hover={{ bg: hoverBg }}
+      _last={{ borderBottom: "none" }}
     >
-      <Box
-        h="full"
-        bg={cardBg}
-        borderRadius="2xl"
-        borderWidth="1px"
-        borderColor={borderColor}
-        overflow="hidden"
-        boxShadow="lg"
-        position="relative"
-        display="flex"
-        flexDirection="column"
-        _hover={{
-          transform: "translateY(-4px)",
-          boxShadow: "xl",
-          borderColor: "blue.200",
-        }}
-        transition="all 0.25s ease"
-      >
-        <Box h="5px" bgGradient={gradient} />
-        <Box p={{ base: 4, md: 5 }} flex="1" display="flex" flexDirection="column">
-          <Flex justify="space-between" align="start" gap={3} mb={3}>
-            <HStack align="start" spacing={3} minW={0} flex={1}>
-              <Avatar
-                name={tenant.display_name || tenant.subdomain}
-                src={avatarSrc}
-                size={{ base: "md", md: "lg" }}
-                bgGradient={!avatarSrc ? gradient : undefined}
-                color="white"
-                fontWeight="bold"
-                flexShrink={0}
-              />
-              <VStack align="start" spacing={1.5} minW={0} flex={1}>
-                <Heading size={{ base: "sm", md: "md" }} noOfLines={2} lineHeight="1.4">
-                  {tenant.display_name || tenant.subdomain}
-                </Heading>
-                <HStack spacing={2} flexWrap="wrap">
-                  <Badge
-                    colorScheme="blue"
-                    variant="subtle"
-                    borderRadius="md"
-                    fontFamily="mono"
-                    fontSize="xs"
-                    maxW="full"
-                    noOfLines={1}
-                  >
-                    {tenant.subdomain}
-                  </Badge>
-                  {specialty ? (
-                    <Badge colorScheme="purple" variant="subtle" fontSize="xs">
-                      {specialty}
-                    </Badge>
-                  ) : null}
-                </HStack>
-                <HStack spacing={2} flexWrap="wrap">
-                  <Badge
-                    colorScheme={isDeleted ? "red" : tenant.is_active ? "green" : "orange"}
-                    borderRadius="full"
-                    px={2}
-                    fontSize="xs"
-                  >
-                    {isDeleted ? "محذوفة" : tenant.is_active ? "نشطة" : "موقوفة"}
-                  </Badge>
-                  {owner?.subscription_package ? (
-                    <Badge
-                      colorScheme={packageMeta.colorScheme}
-                      variant="solid"
-                      borderRadius="full"
-                      px={2}
-                      fontSize="xs"
-                    >
-                      باقة {packageMeta.label}
-                    </Badge>
-                  ) : null}
-                </HStack>
-              </VStack>
-            </HStack>
-            <HStack spacing={1} flexShrink={0}>
-              {!isDeleted && (
-                <Tooltip label="تعديل المنصة" hasArrow>
-                  <IconButton
-                    aria-label="تعديل المنصة"
-                    icon={<MdEdit />}
-                    size="sm"
-                    colorScheme="orange"
-                    variant="outline"
-                    borderRadius="lg"
-                    onClick={handleEdit}
-                  />
-                </Tooltip>
-              )}
-              {!isDefault && !isDeleted && onDelete ? (
-                <Tooltip label="حذف المنصة" hasArrow>
-                  <IconButton
-                    aria-label="حذف المنصة"
-                    icon={<MdDelete />}
-                    size="sm"
-                    colorScheme="red"
-                    variant="outline"
-                    borderRadius="lg"
-                    onClick={() => onDelete(tenant)}
-                  />
-                </Tooltip>
-              ) : null}
-              {canOpenPlatform ? (
-                <Tooltip label="فتح المنصة" hasArrow>
-                  <IconButton
-                    as="a"
-                    href={platformUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="فتح المنصة"
-                    icon={<MdOpenInNew />}
-                    size="sm"
-                    variant="ghost"
-                    colorScheme="blue"
-                    borderRadius="lg"
-                  />
-                </Tooltip>
-              ) : null}
-            </HStack>
-          </Flex>
-
-          {tenant.bio ? (
-            <Text fontSize="xs" color={muted} noOfLines={2} mb={3} lineHeight="1.7">
-              {tenant.bio.replace(/\r\n/g, " ")}
+      <HStack spacing={3} flex={1} minW={0}>
+        <Avatar
+          name={tenant.display_name || tenant.subdomain}
+          src={avatarSrc}
+          size="md"
+          bg={AD_BLUE}
+          color="white"
+          flexShrink={0}
+        />
+        <Box minW={0} flex={1}>
+          <Text fontWeight="800" color={title} noOfLines={1} fontSize="sm">
+            {tenant.display_name || tenant.subdomain}
+          </Text>
+          <HStack spacing={2} mt={1} flexWrap="wrap">
+            <Text fontSize="xs" color={muted} fontFamily="mono" noOfLines={1}>
+              {tenant.subdomain}
+            </Text>
+            {specialty ? (
+              <Text fontSize="xs" color={muted} noOfLines={1}>
+                · {specialty}
+              </Text>
+            ) : null}
+          </HStack>
+          {owner?.name ? (
+            <Text fontSize="xs" color={muted} mt={1} noOfLines={1}>
+              المالك: {owner.name}
             </Text>
           ) : null}
-
-          <Box
-            mb={4}
-            p={3}
-            borderRadius="xl"
-            bg={surface}
-            borderWidth="1px"
-            borderColor={borderColor}
-            flex="1"
-          >
-            <Text fontSize="xs" color={muted} mb={2} fontWeight="semibold">
-              مالك المنصة
-            </Text>
-            {owner?.name ? (
-              <HStack spacing={3} align="start">
-                <Avatar name={owner.name} src={owner.avatar} size="sm" />
-                <VStack align="start" spacing={1} minW={0} flex={1}>
-                  <Text fontWeight="700" fontSize="sm" noOfLines={1}>
-                    {owner.name}
-                  </Text>
-                  <HStack spacing={2} flexWrap="wrap">
-                    {owner.subject ? (
-                      <Badge colorScheme="purple" variant="outline" fontSize="xs">
-                        {owner.subject}
-                      </Badge>
-                    ) : null}
-                    {owner.account_status ? (
-                      <Badge
-                        fontSize="xs"
-                        colorScheme={owner.account_status === "active" ? "green" : "orange"}
-                        variant="subtle"
-                      >
-                        {owner.account_status === "active" ? "حساب نشط" : owner.account_status}
-                      </Badge>
-                    ) : null}
-                  </HStack>
-                  {owner.email ? (
-                    <HStack spacing={1} color={muted} fontSize="xs" minW={0}>
-                      <Icon as={MdEmail} flexShrink={0} />
-                      <Text noOfLines={1} wordBreak="break-all">
-                        {owner.email}
-                      </Text>
-                    </HStack>
-                  ) : null}
-                  {owner.phone ? (
-                    <HStack spacing={1} color={muted} fontSize="xs" dir="ltr">
-                      <Icon as={MdPhone} flexShrink={0} />
-                      <Text>{owner.phone}</Text>
-                    </HStack>
-                  ) : null}
-                </VStack>
-              </HStack>
-            ) : (
-              <Text fontSize="sm" color={muted}>
-                لا يوجد مالك مسجّل لهذه المنصة
-              </Text>
-            )}
-          </Box>
-
-          <SimpleGrid columns={3} spacing={{ base: 1.5, md: 2 }}>
-            <Box textAlign="center" p={{ base: 2, md: 2.5 }} borderRadius="lg" bg={surface}>
-              <Icon as={FaChalkboardTeacher} color="blue.500" boxSize={4} mb={1} />
-              <Text fontWeight="800" fontSize={{ base: "md", md: "lg" }} lineHeight="1">
-                {formatNumber(stats.teachers_count)}
-              </Text>
-              <Text fontSize="xs" color={muted}>
-                مدرس
-              </Text>
-            </Box>
-            <Box textAlign="center" p={{ base: 2, md: 2.5 }} borderRadius="lg" bg={surface}>
-              <Icon as={MdMenuBook} color="orange.500" boxSize={4} mb={1} />
-              <Text fontWeight="800" fontSize={{ base: "md", md: "lg" }} lineHeight="1">
-                {formatNumber(stats.courses_count)}
-              </Text>
-              <Text fontSize="xs" color={muted}>
-                كورس
-              </Text>
-            </Box>
-            <Box textAlign="center" p={{ base: 2, md: 2.5 }} borderRadius="lg" bg={surface}>
-              <Icon as={MdPeople} color="teal.500" boxSize={4} mb={1} />
-              <Text fontWeight="800" fontSize={{ base: "md", md: "lg" }} lineHeight="1">
-                {formatNumber(stats.students_count)}
-              </Text>
-              <Text fontSize="xs" color={muted}>
-                طالب
-              </Text>
-            </Box>
-          </SimpleGrid>
-
-          <Button
-            mt={4}
-            w="full"
-            size="sm"
-            colorScheme="orange"
-            variant="outline"
-            borderRadius="xl"
-            leftIcon={<MdEdit />}
-            onClick={handleEdit}
-            isDisabled={isDeleted}
-          >
-            تعديل المنصة
-          </Button>
         </Box>
-      </Box>
-    </MotionBox>
+      </HStack>
+
+      <HStack spacing={2} flexShrink={0} flexWrap="wrap">
+        <Badge
+          colorScheme={isDeleted ? "red" : tenant.is_active ? "green" : "orange"}
+          borderRadius="md"
+          px={2}
+          fontSize="xs"
+          fontWeight="700"
+        >
+          {isDeleted ? "محذوفة" : tenant.is_active ? "نشطة" : "موقوفة"}
+        </Badge>
+        {owner?.subscription_package ? (
+          <Badge
+            colorScheme={packageMeta.colorScheme}
+            variant="subtle"
+            borderRadius="md"
+            px={2}
+            fontSize="xs"
+          >
+            {packageMeta.label}
+          </Badge>
+        ) : null}
+      </HStack>
+
+      <HStack
+        spacing={{ base: 3, md: 5 }}
+        flexShrink={0}
+        color={muted}
+        fontSize="xs"
+        minW={{ lg: "220px" }}
+        justify={{ base: "flex-start", lg: "center" }}
+      >
+        <HStack spacing={1}>
+          <Icon as={FaChalkboardTeacher} boxSize={3.5} color={AD_BLUE} />
+          <Text fontWeight="700" color={title}>
+            {formatNumber(stats.teachers_count)}
+          </Text>
+          <Text>مدرس</Text>
+        </HStack>
+        <HStack spacing={1}>
+          <Icon as={MdMenuBook} boxSize={3.5} color={AD_ORANGE} />
+          <Text fontWeight="700" color={title}>
+            {formatNumber(stats.courses_count)}
+          </Text>
+          <Text>كورس</Text>
+        </HStack>
+        <HStack spacing={1}>
+          <Icon as={MdPeople} boxSize={3.5} color="teal.500" />
+          <Text fontWeight="700" color={title}>
+            {formatNumber(stats.students_count)}
+          </Text>
+          <Text>طالب</Text>
+        </HStack>
+      </HStack>
+
+      <HStack spacing={1} flexShrink={0} justify={{ base: "flex-end", lg: "flex-end" }}>
+        {!isDeleted ? (
+          <Tooltip label="تعديل" hasArrow>
+            <IconButton
+              aria-label="تعديل المنصة"
+              icon={<MdEdit />}
+              size="sm"
+              variant="ghost"
+              color={AD_ORANGE}
+              borderRadius="lg"
+              cursor="pointer"
+              onClick={handleEdit}
+            />
+          </Tooltip>
+        ) : null}
+        {canOpenPlatform ? (
+          <Tooltip label="فتح المنصة" hasArrow>
+            <IconButton
+              as="a"
+              href={platformUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="فتح المنصة"
+              icon={<MdOpenInNew />}
+              size="sm"
+              variant="ghost"
+              color={AD_BLUE}
+              borderRadius="lg"
+              cursor="pointer"
+            />
+          </Tooltip>
+        ) : null}
+        {!isDefault && !isDeleted && onDelete ? (
+          <Tooltip label="حذف" hasArrow>
+            <IconButton
+              aria-label="حذف المنصة"
+              icon={<MdDelete />}
+              size="sm"
+              variant="ghost"
+              colorScheme="red"
+              borderRadius="lg"
+              cursor="pointer"
+              onClick={() => onDelete(tenant)}
+            />
+          </Tooltip>
+        ) : null}
+      </HStack>
+    </Flex>
   );
 }
 
 export default function AdminTenantsPanel({ onSummaryChange }) {
   const toast = useToast();
   const cancelRef = useRef(null);
-  const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
+  const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } =
+    useDisclosure();
 
   const [tenants, setTenants] = useState([]);
   const [total, setTotal] = useState(0);
@@ -377,11 +260,12 @@ export default function AdminTenantsPanel({ onSummaryChange }) {
   const searchTimeoutRef = useRef(null);
 
   const cardBg = useColorModeValue("white", "gray.800");
-  const borderColor = useColorModeValue("gray.200", "gray.600");
+  const borderColor = useColorModeValue("gray.200", "gray.700");
   const muted = useColorModeValue("gray.500", "gray.400");
+  const title = useColorModeValue("gray.900", "white");
   const inputBg = useColorModeValue("white", "gray.700");
-  const kpiBg = useColorModeValue("white", "gray.800");
-  const emptyBg = useColorModeValue("blue.50", "whiteAlpha.50");
+  const emptyBg = useColorModeValue("gray.50", "whiteAlpha.50");
+  const headerBg = useColorModeValue("gray.50", "whiteAlpha.50");
 
   const page = Math.floor(offset / PAGE_SIZE) + 1;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -549,180 +433,115 @@ export default function AdminTenantsPanel({ onSummaryChange }) {
   }, [total, aggregateStats, packageBreakdown, onSummaryChange]);
 
   return (
-    <VStack align="stretch" spacing={6}>
-      <SimpleGrid columns={{ base: 1, sm: 2, md: 4 }} spacing={{ base: 3, md: 4 }}>
-        {[
-          {
-            label: "إجمالي المنصات",
-            value: formatNumber(total),
-            help: "في النظام",
-            icon: MdDomain,
-            color: "blue.500",
-            iconBg: "blue.50",
-          },
-          {
-            label: "نشطة (الصفحة)",
-            value: formatNumber(aggregateStats.active),
-            help: "من المعروض",
-            icon: MdPublic,
-            color: "green.500",
-            iconBg: "green.50",
-          },
-          {
-            label: "طلاب (الصفحة)",
-            value: formatNumber(aggregateStats.students),
-            help: "مجموع الصفحة الحالية",
-            icon: MdPeople,
-            color: "teal.500",
-            iconBg: "teal.50",
-          },
-          {
-            label: "كورسات (الصفحة)",
-            value: formatNumber(aggregateStats.courses),
-            help: "مجموع الصفحة الحالية",
-            icon: MdSchool,
-            color: "orange.500",
-            iconBg: "orange.50",
-          },
-        ].map((item) => (
-          <Box
-            key={item.label}
-            bg={kpiBg}
-            borderRadius="2xl"
-            p={4}
-            borderWidth="1px"
-            borderColor={borderColor}
-            boxShadow="md"
-            position="relative"
-            overflow="hidden"
-          >
-            <Box
-              position="absolute"
-              top={0}
-              left={0}
-              right={0}
-              h="3px"
-              bgGradient="linear(to-r, #4299E1, #DD6B20)"
-            />
-            <HStack justify="space-between" align="start">
-              <Stat size="sm">
-                <StatLabel color={muted} fontSize="xs">
-                  {item.label}
-                </StatLabel>
-                <StatNumber fontSize="2xl">{item.value}</StatNumber>
-                <StatHelpText mb={0} fontSize="xs">
-                  {item.help}
-                </StatHelpText>
-              </Stat>
-              <Flex
-                w={10}
-                h={10}
-                borderRadius="xl"
-                bg={item.iconBg}
-                align="center"
-                justify="center"
-              >
-                <Icon as={item.icon} color={item.color} boxSize={5} />
-              </Flex>
-            </HStack>
-          </Box>
-        ))}
-      </SimpleGrid>
-
+    <VStack align="stretch" spacing={0}>
       <Box
         bg={cardBg}
-        borderRadius="2xl"
-        borderWidth="1px"
+        border="1px solid"
         borderColor={borderColor}
-        boxShadow="lg"
+        borderRadius="xl"
         overflow="hidden"
       >
-        <Box h="4px" bgGradient="linear(to-r, #4299E1, #DD6B20)" />
-        <Box p={{ base: 4, md: 6 }}>
-          <Flex
-            direction={{ base: "column", lg: "row" }}
-            gap={4}
-            align={{ lg: "center" }}
-            justify="space-between"
-            mb={5}
-          >
-            <VStack align="start" spacing={1}>
-              <HStack>
-                <Icon as={FaLayerGroup} color="blue.500" boxSize={5} />
-                <Heading size="md">منصات المدرسين</Heading>
-              </HStack>
-              <Text fontSize="sm" color={muted}>
-                إدارة ومراقبة جميع المنصات التعليمية المستقلة
-              </Text>
-            </VStack>
-
+        <Flex
+          direction={{ base: "column", md: "row" }}
+          justify="space-between"
+          align={{ base: "stretch", md: "center" }}
+          gap={3}
+          px={{ base: 4, md: 5 }}
+          py={4}
+          borderBottom="1px solid"
+          borderColor={borderColor}
+        >
+          <Box>
             <HStack spacing={2}>
-              <Tooltip label="تحديث" hasArrow>
-                <IconButton
-                  aria-label="تحديث"
-                  icon={<MdRefresh />}
-                  variant="outline"
-                  colorScheme="blue"
-                  borderRadius="xl"
-                  onClick={loadTenants}
-                  isLoading={loading}
-                />
-              </Tooltip>
+              <Icon as={MdDomain} color={AD_BLUE} boxSize={5} />
+              <Heading size="sm" color={title} fontWeight="800">
+                منصات المدرسين
+              </Heading>
+              <Badge
+                borderRadius="md"
+                bg={`${AD_BLUE}14`}
+                color={AD_BLUE}
+                fontWeight="800"
+                px={2}
+              >
+                {formatNumber(total)}
+              </Badge>
             </HStack>
-          </Flex>
+            <Text fontSize="xs" color={muted} mt={1}>
+              بحث، فلترة، وتعديل المنصات التعليمية
+            </Text>
+          </Box>
 
-          <SimpleGrid
-            columns={{ base: 1, sm: 2, lg: 3, xl: 6 }}
-            spacing={3}
-            mb={5}
-          >
-            <InputGroup size="md">
+          <Tooltip label="تحديث" hasArrow>
+            <IconButton
+              aria-label="تحديث"
+              icon={<MdRefresh />}
+              size="sm"
+              variant="outline"
+              borderColor={borderColor}
+              borderRadius="lg"
+              onClick={loadTenants}
+              isLoading={loading}
+              cursor="pointer"
+            />
+          </Tooltip>
+        </Flex>
+
+        <Box px={{ base: 3, md: 4 }} py={3} bg={headerBg} borderBottom="1px solid" borderColor={borderColor}>
+          <Flex direction={{ base: "column", lg: "row" }} gap={2} align={{ lg: "center" }}>
+            <InputGroup size="sm" maxW={{ lg: "280px" }} flex={1}>
               <InputLeftElement pointerEvents="none">
-                <Icon as={MdSearch} color="blue.400" />
+                <Icon as={MdSearch} color="gray.400" />
               </InputLeftElement>
               <Input
-                placeholder="بحث: subdomain، اسم المنصة، المالك..."
+                placeholder="بحث بالاسم أو subdomain..."
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 bg={inputBg}
-                borderRadius="xl"
-                pr={searchInput ? 10 : 4}
+                borderRadius="lg"
+                borderColor={borderColor}
               />
-              {searchInput && (
-                <Button
+              {searchInput ? (
+                <IconButton
+                  aria-label="مسح البحث"
+                  icon={<MdClose />}
+                  size="xs"
+                  variant="ghost"
                   position="absolute"
                   left={1}
                   top="50%"
                   transform="translateY(-50%)"
-                  size="xs"
-                  variant="ghost"
-                  onClick={() => setSearchInput("")}
                   zIndex={2}
-                >
-                  <Icon as={MdClose} />
-                </Button>
-              )}
+                  onClick={() => setSearchInput("")}
+                />
+              ) : null}
             </InputGroup>
 
             <Select
+              size="sm"
               value={activeFilter}
               onChange={(e) => {
                 setActiveFilter(e.target.value);
                 setOffset(0);
               }}
               bg={inputBg}
-              borderRadius="xl"
+              borderRadius="lg"
+              borderColor={borderColor}
+              maxW={{ lg: "140px" }}
             >
               <option value="">كل الحالات</option>
-              <option value="true">نشطة فقط</option>
-              <option value="false">موقوفة فقط</option>
+              <option value="true">نشطة</option>
+              <option value="false">موقوفة</option>
             </Select>
 
             <Select
+              size="sm"
               value={packageFilter}
               onChange={(e) => setPackageFilter(e.target.value)}
               bg={inputBg}
-              borderRadius="xl"
+              borderRadius="lg"
+              borderColor={borderColor}
+              maxW={{ lg: "140px" }}
             >
               <option value="">كل الباقات</option>
               <option value="bronze">برونزية</option>
@@ -731,182 +550,134 @@ export default function AdminTenantsPanel({ onSummaryChange }) {
               <option value="platinum">بلاتينية</option>
             </Select>
 
-            <FormControl
-              display="flex"
-              alignItems="center"
-              justifyContent="space-between"
-              px={3}
-              py={2}
-              borderWidth="1px"
-              borderColor={borderColor}
-              borderRadius="xl"
-              bg={inputBg}
-            >
-              <FormLabel htmlFor="include-default" mb={0} fontSize="sm">
-                إظهار المنصة الرئيسية
-              </FormLabel>
-              <Switch
-                id="include-default"
-                colorScheme="blue"
-                isChecked={includeDefault}
-                onChange={(e) => {
-                  setIncludeDefault(e.target.checked);
-                  setOffset(0);
-                }}
-              />
-            </FormControl>
-
-            <FormControl
-              display="flex"
-              alignItems="center"
-              justifyContent="space-between"
-              px={3}
-              py={2}
-              borderWidth="1px"
-              borderColor={borderColor}
-              borderRadius="xl"
-              bg={inputBg}
-            >
-              <FormLabel htmlFor="include-deleted" mb={0} fontSize="sm">
-                إظهار المحذوفة
-              </FormLabel>
-              <Switch
-                id="include-deleted"
-                colorScheme="red"
-                isChecked={includeDeleted}
-                onChange={(e) => {
-                  setIncludeDeleted(e.target.checked);
-                  setOffset(0);
-                }}
-              />
-            </FormControl>
-
-            <HStack
-              justify="center"
-              px={3}
-              py={2}
-              borderWidth="1px"
-              borderColor={borderColor}
-              borderRadius="xl"
-              bg={inputBg}
-            >
-              <Badge colorScheme="blue" borderRadius="full" px={3}>
-                {formatNumber(total)}
-              </Badge>
-              <Text fontSize="sm" color={muted}>
-                منصة
-              </Text>
+            <HStack spacing={4} flexWrap="wrap" ms={{ lg: "auto" }}>
+              <FormControl display="flex" alignItems="center" w="auto">
+                <FormLabel htmlFor="include-default" mb={0} fontSize="xs" me={2} whiteSpace="nowrap">
+                  الرئيسية
+                </FormLabel>
+                <Switch
+                  id="include-default"
+                  size="sm"
+                  colorScheme="blue"
+                  isChecked={includeDefault}
+                  onChange={(e) => {
+                    setIncludeDefault(e.target.checked);
+                    setOffset(0);
+                  }}
+                />
+              </FormControl>
+              <FormControl display="flex" alignItems="center" w="auto">
+                <FormLabel htmlFor="include-deleted" mb={0} fontSize="xs" me={2} whiteSpace="nowrap">
+                  المحذوفة
+                </FormLabel>
+                <Switch
+                  id="include-deleted"
+                  size="sm"
+                  colorScheme="red"
+                  isChecked={includeDeleted}
+                  onChange={(e) => {
+                    setIncludeDeleted(e.target.checked);
+                    setOffset(0);
+                  }}
+                />
+              </FormControl>
             </HStack>
-          </SimpleGrid>
-
-          {Object.keys(packageBreakdown).length > 0 ? (
-            <HStack spacing={2} mb={4} flexWrap="wrap">
-              {Object.entries(packageBreakdown).map(([pkg, count]) => {
-                const meta = getPackageMeta(pkg);
-                return (
-                  <Badge
-                    key={pkg}
-                    colorScheme={meta.colorScheme}
-                    variant="subtle"
-                    borderRadius="full"
-                    px={3}
-                    py={1}
-                    fontSize="xs"
-                  >
-                    {meta.label}: {formatNumber(count)}
-                  </Badge>
-                );
-              })}
-            </HStack>
-          ) : null}
-
-          {loading ? (
-            <Flex justify="center" align="center" minH="280px" direction="column" gap={4}>
-              <Spinner size="xl" color="blue.500" thickness="3px" />
-              <Text color={muted}>جاري تحميل المنصات...</Text>
-            </Flex>
-          ) : error ? (
-            <Box textAlign="center" py={12} px={4}>
-              <Text color="red.500" fontWeight="semibold" mb={4}>
-                {error}
-              </Text>
-              <Button colorScheme="blue" onClick={loadTenants} borderRadius="xl">
-                إعادة المحاولة
-              </Button>
-            </Box>
-          ) : filteredTenants.length === 0 ? (
-            <Box
-              textAlign="center"
-              py={14}
-              px={6}
-              borderRadius="2xl"
-              bg={emptyBg}
-              borderWidth="2px"
-              borderStyle="dashed"
-              borderColor={borderColor}
-            >
-              <Icon as={MdDomain} boxSize={12} color={muted} mb={4} opacity={0.6} />
-              <Heading size="sm" mb={2}>
-                لا توجد منصات
-              </Heading>
-              <Text fontSize="sm" color={muted}>
-                {debouncedSearch || packageFilter
-                  ? "لم يُعثر على نتائج — جرّب تغيير البحث أو الفلاتر"
-                  : "لم تُسجَّل منصات بعد في النظام"}
-              </Text>
-            </Box>
-          ) : (
-            <>
-              <SimpleGrid
-                columns={{ base: 1, md: 2, xl: 3, "2xl": 3 }}
-                spacing={{ base: 4, md: 5 }}
-              >
-                {filteredTenants.map((tenant, index) => (
-                  <TenantCard
-                    key={tenant.id}
-                    tenant={tenant}
-                    index={index}
-                    onDelete={openDeleteDialog}
-                  />
-                ))}
-              </SimpleGrid>
-
-              {totalPages > 1 && (
-                <Flex
-                  mt={8}
-                  justify="space-between"
-                  align="center"
-                  flexWrap="wrap"
-                  gap={3}
-                >
-                  <Text fontSize="sm" color={muted}>
-                    صفحة {page} من {totalPages}
-                  </Text>
-                  <HStack>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      borderRadius="xl"
-                      onClick={() => setOffset((prev) => Math.max(0, prev - PAGE_SIZE))}
-                      isDisabled={offset === 0}
-                    >
-                      السابق
-                    </Button>
-                    <Button
-                      size="sm"
-                      colorScheme="blue"
-                      borderRadius="xl"
-                      onClick={() => setOffset((prev) => prev + PAGE_SIZE)}
-                      isDisabled={offset + PAGE_SIZE >= total}
-                    >
-                      التالي
-                    </Button>
-                  </HStack>
-                </Flex>
-              )}
-            </>
-          )}
+          </Flex>
         </Box>
+
+        {loading ? (
+          <Flex justify="center" align="center" minH="240px" direction="column" gap={3}>
+            <Spinner size="lg" color={AD_BLUE} thickness="3px" />
+            <Text fontSize="sm" color={muted}>
+              جاري تحميل المنصات...
+            </Text>
+          </Flex>
+        ) : error ? (
+          <Box textAlign="center" py={12} px={4}>
+            <Text color="red.500" fontWeight="600" mb={3} fontSize="sm">
+              {error}
+            </Text>
+            <Button size="sm" colorScheme="blue" onClick={loadTenants} borderRadius="lg">
+              إعادة المحاولة
+            </Button>
+          </Box>
+        ) : filteredTenants.length === 0 ? (
+          <Box textAlign="center" py={14} px={6} bg={emptyBg}>
+            <Icon as={MdDomain} boxSize={10} color={muted} mb={3} opacity={0.5} />
+            <Text fontWeight="700" color={title} mb={1}>
+              لا توجد منصات
+            </Text>
+            <Text fontSize="sm" color={muted}>
+              {debouncedSearch || packageFilter
+                ? "لم يُعثر على نتائج — جرّب تغيير البحث أو الفلاتر"
+                : "لم تُسجَّل منصات بعد في النظام"}
+            </Text>
+          </Box>
+        ) : (
+          <>
+            <Box display={{ base: "none", lg: "block" }} px={4} py={2} bg={headerBg}>
+              <Flex fontSize="xs" fontWeight="700" color={muted} gap={4}>
+                <Text flex={1}>المنصة</Text>
+                <Text w="120px">الحالة</Text>
+                <Text w="220px" textAlign="center">
+                  الإحصائيات
+                </Text>
+                <Text w="108px" textAlign="end">
+                  إجراءات
+                </Text>
+              </Flex>
+            </Box>
+
+            <Box>
+              {filteredTenants.map((tenant) => (
+                <TenantRow
+                  key={tenant.id}
+                  tenant={tenant}
+                  onDelete={openDeleteDialog}
+                />
+              ))}
+            </Box>
+
+            {totalPages > 1 ? (
+              <Flex
+                px={4}
+                py={3}
+                justify="space-between"
+                align="center"
+                borderTop="1px solid"
+                borderColor={borderColor}
+                flexWrap="wrap"
+                gap={2}
+              >
+                <Text fontSize="xs" color={muted}>
+                  صفحة {page} من {totalPages}
+                </Text>
+                <HStack spacing={2}>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    borderRadius="md"
+                    onClick={() => setOffset((prev) => Math.max(0, prev - PAGE_SIZE))}
+                    isDisabled={offset === 0}
+                  >
+                    السابق
+                  </Button>
+                  <Button
+                    size="xs"
+                    bg={AD_BLUE}
+                    color="white"
+                    borderRadius="md"
+                    _hover={{ bg: "#2B6CB0" }}
+                    onClick={() => setOffset((prev) => prev + PAGE_SIZE)}
+                    isDisabled={offset + PAGE_SIZE >= total}
+                  >
+                    التالي
+                  </Button>
+                </HStack>
+              </Flex>
+            ) : null}
+          </>
+        )}
       </Box>
 
       <AlertDialog
@@ -916,19 +687,18 @@ export default function AdminTenantsPanel({ onSummaryChange }) {
         isCentered
       >
         <AlertDialogOverlay>
-          <AlertDialogContent mx={4}>
-            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+          <AlertDialogContent mx={4} borderRadius="xl">
+            <AlertDialogHeader fontSize="md" fontWeight="800">
               حذف المنصة
             </AlertDialogHeader>
             <AlertDialogBody>
               <VStack align="stretch" spacing={4}>
-                <Text fontSize="sm" lineHeight="1.8">
+                <Text fontSize="sm" lineHeight="1.8" color={muted}>
                   سيتم تعطيل المنصة{" "}
-                  <Text as="span" fontWeight="bold">
+                  <Text as="span" fontWeight="700" color={title}>
                     {tenantToDelete?.display_name || tenantToDelete?.subdomain}
                   </Text>{" "}
-                  وأرشفة الـ subdomain وتحرير الاسم للاستخدام لاحقاً. كما سيتم تعطيل حساب المالك
-                  وجميع المعلمين والطلاب على هذه المنصة.
+                  وأرشفة الـ subdomain وتعطيل حسابات المالك والمعلمين والطلاب.
                 </Text>
                 <FormControl>
                   <FormLabel fontSize="sm" mb={1}>
@@ -939,6 +709,7 @@ export default function AdminTenantsPanel({ onSummaryChange }) {
                     onChange={(e) => setConfirmSubdomain(e.target.value)}
                     placeholder={tenantToDelete?.subdomain || "subdomain"}
                     fontFamily="mono"
+                    borderRadius="lg"
                     autoFocus
                   />
                   <FormHelperText fontSize="xs">
@@ -948,13 +719,21 @@ export default function AdminTenantsPanel({ onSummaryChange }) {
               </VStack>
             </AlertDialogBody>
             <AlertDialogFooter gap={2}>
-              <Button ref={cancelRef} onClick={closeDeleteDialog} isDisabled={deleting}>
+              <Button
+                ref={cancelRef}
+                onClick={closeDeleteDialog}
+                isDisabled={deleting}
+                borderRadius="lg"
+                size="sm"
+              >
                 إلغاء
               </Button>
               <Button
                 colorScheme="red"
                 onClick={handleDeleteTenant}
                 isLoading={deleting}
+                borderRadius="lg"
+                size="sm"
                 isDisabled={
                   !tenantToDelete ||
                   confirmSubdomain.trim().toLowerCase() !==

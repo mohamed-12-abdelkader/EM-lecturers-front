@@ -134,7 +134,7 @@ import ScrollToTop from "../../components/scollToTop/ScrollToTop";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import CourseStreams from "../../components/stream/courseStreams";
 import StudentStreamsList from "../../components/stream/studentStreamsList";
-import nextEduLogo from "../../img/next logo.png";
+import eduPlatformLogo from "../../img/2 (5).png";
 
 // Modal Components
 const LectureModal = ({ isOpen, onClose, type, data, onSubmit, loading }) => {
@@ -2602,9 +2602,9 @@ D) has made`}
       const codesPerPage = 12; // 3 columns × 4 rows
       const pageWidth = 297; // mm
       const pageHeight = 210; // mm
-      const logoUrl = nextEduLogo.startsWith("http")
-        ? nextEduLogo
-        : `${window.location.origin}${nextEduLogo}`;
+      const logoUrl = eduPlatformLogo.startsWith("http")
+        ? eduPlatformLogo
+        : `${window.location.origin}${eduPlatformLogo}`;
       const courseName = courseData?.course?.title || "الكورس";
       const teacherName = user?.name || "المدرس";
       const pdf = new jsPDF("l", "mm", "a4");
@@ -2727,8 +2727,9 @@ border:1px solid #dbeafe;
 border-radius:10px;
 padding:6px 10px;
 ">
-<img src="${logoUrl}" alt="Logo" style="
-width:88px;
+<img src="${logoUrl}" alt="Edu Platform" style="
+width:150px;
+max-height:48px;
 height:auto;
 object-fit:contain;
 opacity:1;
@@ -2784,7 +2785,7 @@ font-weight:800;
 letter-spacing:0.3px;
 display:block;
 ">
- 01111272393 & 01288781012 & 01210726096
+ 01111272393 & 01288781012 
 </span>
 
 </div>
