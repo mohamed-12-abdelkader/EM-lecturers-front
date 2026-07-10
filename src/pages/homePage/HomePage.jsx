@@ -25,6 +25,7 @@ import {
   CardBody,
   Container,
   Spinner,
+  Skeleton,
   useToast,
   IconButton,
   Select,
@@ -60,6 +61,7 @@ import MyCourses from "../../components/courses/MyCourses";
 import MyTeacher from "../myTeacher/MyTeacher";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import ScientificChatPanel from "../../components/scientificChat/ScientificChatPanel";
+import HomeProHero from "./components/HomeProHero";
 
 const MotionBox = motion(Box);
 const MotionCard = motion(Card);
@@ -831,17 +833,9 @@ const HomePage = () => {
   const errorIconColor = useColorModeValue("red.500", "red.400");
   const errorTextColor = useColorModeValue("red.600", "red.300");
   const enrolledCount = availableCourses.filter((c) => c?.is_enrolled).length;
+  const studentId =
+    user?.id ?? userData?.id ?? user?.student_id ?? userData?.student_id ?? null;
   const pageBgColor = useColorModeValue("#f0f4fa", "gray.900");
-  const welcomeGradient = useColorModeValue(
-    "linear-gradient(135deg, #1d82f5 0%, #1175eb 55%, #0e66d0 100%)",
-    "linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 55%, #1e40af 100%)",
-  );
-  const welcomeCardShadow = useColorModeValue(
-    "0 18px 40px rgba(15, 23, 42, 0.10)",
-    "0 22px 44px rgba(0,0,0,0.45)",
-  );
-  const progressTrackBg = useColorModeValue("gray.200", "gray.700");
-  const activityBg = useColorModeValue("blue.50", "gray.700");
   const courseCardShadow = useColorModeValue(
     "0 10px 30px rgba(15,23,42,0.08)",
     "0 12px 32px rgba(0,0,0,0.35)",
@@ -955,202 +949,15 @@ const HomePage = () => {
         ) : null}
 
         {/* Welcome Section */}
-        <Card
-          bg={cardBg}
-          borderWidth="1px"
-          borderColor={cardBorder}
-          borderRadius="2xl"
-          boxShadow={welcomeCardShadow}
-          overflow="hidden"
-          w="100%"
-          maxW="100%"
-          alignSelf="stretch"
-          sx={{
-            "@media (max-width: 48em)": {
-              width: "100% !important",
-              maxWidth: "100% !important",
-            },
-            "@media screen and (min-width: 750px) and (max-width: 850px)": {
-              width: "100% !important",
-              maxWidth: "100% !important",
-              minWidth: "100% !important",
-              flexBasis: "100% !important",
-            },
-          }}
-        >
-          <Box
-            px={{ base: 3, md: 6 }}
-            py={{ base: 3.5, md: 6 }}
-            bg={welcomeGradient}
-            position="relative"
-            overflow="hidden"
-            color="white"
-          >
-            <Box
-              position="absolute"
-              top="-34px"
-              right="-28px"
-              w="170px"
-              h="170px"
-              borderRadius="full"
-              bg="whiteAlpha.200"
-            />
-            <Box
-              position="absolute"
-              bottom="-40px"
-              left="-24px"
-              w="150px"
-              h="150px"
-              borderRadius="full"
-              bg="orange.400"
-              opacity={0.2}
-            />
-            <Flex
-              position="relative"
-              zIndex={1}
-              direction={{ base: "column-reverse", md: "row" }}
-              align={{ base: "center", md: "center" }}
-              justify="space-between"
-              gap={{ base: 3, md: 6 }}
-              sx={{
-                "@media screen and (min-width: 750px) and (max-width: 850px)": {
-                  flexDirection: "column-reverse",
-                  alignItems: "stretch",
-                  gap: "16px",
-                },
-              }}
-            >
-              <VStack align={{ base: "center", md: "start" }} spacing={{ base: 2.5, md: 3 }} flex={1} textAlign={{ base: "center", md: "start" }}>
-                <HStack
-                  bg="whiteAlpha.260"
-                  borderRadius="full"
-                  px={2.5}
-                  py={1.5}
-                  spacing={2}
-                  borderWidth="1px"
-                  borderColor="whiteAlpha.400"
-                >
-                  <Avatar
-                    size="xs"
-                    name={teacherDisplayName || "Teacher"}
-                    src={teacherAvatar || undefined}
-                    bg="white"
-                    color="blue.600"
-                  />
-                  <Text fontSize={{ base: "0.66rem", md: "0.72rem" }} fontWeight="bold">
-                    في منصة مستر {teacherDisplayName || "مدرسك"}
-                  </Text>
-                </HStack>
-
-                <Heading
-                  as="h1"
-                  fontSize={{ base: "1.34rem", md: "2.3rem" }}
-                  lineHeight={{ base: 1.45, md: 1.3 }}
-                  fontWeight="black"
-                  letterSpacing="-0.3px"
-                >
-                  مرحبًا بك، <Text as="span" color="orange.300">{user?.name || "عزيزي الطالب"}</Text>
-                  <br />
-                  في منصة مستر <Text as="span" color="orange.300">{teacherDisplayName || "مدرسك"}</Text>
-                </Heading>
-
-                <VStack spacing={2} w={{ base: "100%", md: "auto" }}>
-                  <Button
-                    bg="orange.500"
-                    color="white"
-                    _hover={{ bg: "orange.400" }}
-                    borderRadius="xl"
-                    px={6}
-                    w={{ base: "100%", md: "auto" }}
-                    size={{ base: "sm", md: "md" }}
-                    fontWeight="black"
-                    onClick={() => navigate("/my-courses")}
-                  >
-                    ابدأ التعلم الآن
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    color="white"
-                    _hover={{ bg: "whiteAlpha.220" }}
-                    borderRadius="xl"
-                    w={{ base: "100%", md: "auto" }}
-                    size={{ base: "sm", md: "md" }}
-                    fontWeight="bold"
-                    onClick={() => navigate("/lectures_taple")}
-                  >
-                    أكمل من حيث توقفت
-                  </Button>
-                </VStack>
-              </VStack>
-
-              <Flex
-                display="flex"
-                align="center"
-                justify={{ base: "center", md: "flex-end" }}
-                minW={{ base: "auto", md: "210px" }}
-                mb={{ base: 1, md: 0 }}
-              >
-                <Box
-                  position="relative"
-                  w={{ base: "138px", md: "210px" }}
-                  h={{ base: "138px", md: "210px" }}
-                  borderRadius="2xl"
-                  bg="whiteAlpha.220"
-                  borderWidth="1px"
-                  borderColor="whiteAlpha.500"
-                  boxShadow="0 16px 40px rgba(2,6,23,0.28)"
-                  p={{ base: 1.5, md: 2 }}
-                  sx={{
-                    "@media screen and (min-width: 750px) and (max-width: 850px)": {
-                      width: "170px",
-                      height: "170px",
-                    },
-                  }}
-                >
-                  <Box
-                    w="100%"
-                    h="100%"
-                    borderRadius="xl"
-                    overflow="hidden"
-                    bg="whiteAlpha.300"
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                  >
-                    {teacherAvatar ? (
-                      <Box
-                        as="img"
-                        src={teacherAvatar}
-                        alt={teacherDisplayName || "Teacher"}
-                        w="100%"
-                        h="100%"
-                        objectFit="cover"
-                      />
-                    ) : (
-                      <Icon as={FaUser} boxSize={{ base: 10, md: 16 }} color="white" opacity={0.95} />
-                    )}
-                  </Box>
-                  <Badge
-                    position="absolute"
-                    bottom={{ base: "-9px", md: "-10px" }}
-                    right="50%"
-                    transform="translateX(50%)"
-                    bg="orange.500"
-                    color="white"
-                    borderRadius="full"
-                    px={{ base: 2.5, md: 3 }}
-                    py={{ base: 0.8, md: 1 }}
-                    fontSize={{ base: "0.62rem", md: "0.72rem" }}
-                    fontWeight="black"
-                    boxShadow="0 8px 18px rgba(251,146,60,0.45)"
-                  >
-                    مستر {teacherDisplayName || "مدرسك"}
-                  </Badge>
-                </Box>
-              </Flex>
-            </Flex>
-          </Box>
-        </Card>
+        <HomeProHero
+          studentName={user?.name}
+          studentId={studentId}
+          teacherName={teacherDisplayName}
+          teacherAvatar={teacherAvatar}
+          onStartLearning={() => navigate("/my-courses")}
+          onContinue={() => navigate("/lectures_taple")}
+          onActivateWithQr={() => setIsQrScannerOpen(true)}
+        />
 
         {/* Header Stats */}
         <SimpleGrid
@@ -1163,9 +970,7 @@ const HomePage = () => {
           }}
         >
           {[
-            { title: "محاضراتك المتاحة", value: 0 },
-            { title: "كل الكورسات المتاحة", value: availableCourses.length },
-            { title: "كورسات مشترك بها", value: enrolledCount },
+            
           ].map((item) => (
             <Card
               key={item.title}
@@ -1199,132 +1004,13 @@ const HomePage = () => {
           ))}
         </SimpleGrid>
 
-        {/* Mid Dashboard Panels */}
-        <SimpleGrid
-          columns={{ base: 1, lg: 3 }}
-          spacing={3}
-          sx={{
-            "@media screen and (min-width: 750px) and (max-width: 850px)": {
-              gridTemplateColumns: "1fr !important",
-            },
-          }}
+        {/* My Courses Section */}
+        <div
         >
-          <Card
-            bg={cardBg}
-            borderWidth="1px"
-            borderColor={cardBorder}
-            borderRadius="xl"
-            boxShadow={cardShadow}
-            w="100%"
-            maxW="100%"
-            alignSelf="stretch"
-            sx={{
-              "@media (max-width: 48em)": {
-                width: "100% !important",
-                maxWidth: "100% !important",
-              },
-              "@media screen and (min-width: 750px) and (max-width: 850px)": {
-                width: "100% !important",
-                maxWidth: "100% !important",
-                minWidth: "100% !important",
-                flexBasis: "100% !important",
-              },
-            }}
-          >
-            <CardBody py={4}>
-              <VStack spacing={3} py={1}>
-                <Text fontSize="sm" fontWeight="bold" color={headingColor}>
-                  البث
-                </Text>
-                <Heading size="md" color={headingColor}>
-                  0%
-                </Heading>
-                <Box h="2" w="full" bg={progressTrackBg} borderRadius="full" overflow="hidden">
-                  <Box h="full" w="0%" bg="orange.500" />
-                </Box>
-                <Text
-                  fontSize="xs"
-                  color={subtextColor}
-                  textAlign="center"
-                  bg={useColorModeValue("gray.50", "gray.700")}
-                  borderRadius="lg"
-                  px={3}
-                  py={1.5}
-                >
-                  ملخص حالة المنصة الدراسية
-                </Text>
-              </VStack>
-            </CardBody>
-          </Card>
-
-          <Card
-            gridColumn={{ lg: "span 2" }}
-            bg={cardBg}
-            borderWidth="1px"
-            borderColor={cardBorder}
-            borderRadius="xl"
-            boxShadow={cardShadow}
-            w="100%"
-            maxW="100%"
-            alignSelf="stretch"
-            sx={{
-              "@media (max-width: 48em)": {
-                width: "100% !important",
-                maxWidth: "100% !important",
-              },
-              "@media screen and (min-width: 750px) and (max-width: 850px)": {
-                width: "100% !important",
-                maxWidth: "100% !important",
-                minWidth: "100% !important",
-                flexBasis: "100% !important",
-                gridColumn: "span 1 !important",
-              },
-            }}
-          >
-            <CardBody py={4}>
-              <Flex justify="space-between" align="center" mb={3} px={1}>
-                <Text fontWeight="black" fontSize="lg" color={headingColor}>
-                  نشاطاتك التعليمية
-                </Text>
-                <Text
-                  fontSize="xs"
-                  color={subtextColor}
-                  bg={useColorModeValue("gray.100", "gray.700")}
-                  borderRadius="md"
-                  px={2.5}
-                  py={1}
-                >
-                  اليوم
-                </Text>
-              </Flex>
-              <Box
-                h={{ base: "148px", md: "160px" }}
-                borderRadius="lg"
-                borderWidth="1px"
-                borderColor={cardBorder}
-                bg={activityBg}
-                position="relative"
-                overflow="hidden"
-              >
-                <Box
-                  position="absolute"
-                  inset="0"
-                  opacity={0.28}
-                  backgroundImage="linear-gradient(to right, rgba(0,0,0,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(0,0,0,0.08) 1px, transparent 1px)"
-                  backgroundSize="60px 32px"
-                />
-                <Box
-                  position="absolute"
-                  left="0"
-                  right="0"
-                  bottom="18px"
-                  h="2px"
-                  bg="orange.500"
-                />
-              </Box>
-            </CardBody>
-          </Card>
-        </SimpleGrid>
+          
+            <MyCourses embedded />
+        
+        </div>
 
         {/* Courses Section */}
         <Card 
@@ -1352,13 +1038,45 @@ const HomePage = () => {
           }}
         >
           <CardBody p={{ base: 2, md: 3 }}>
-            <Text className="mb-8" fontWeight="bold" color={headingColor} mb={3}>
-              الكورسات المتوفرة
-            </Text>
-            <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} spacing={4}>
+            <Flex align="center" justify="space-between" mb={3} gap={3}>
+              <Text fontWeight="bold" color={headingColor}>
+                الكورسات المتوفرة
+              </Text>
+              {coursesLoading ? (
+                <HStack spacing={2} color={subtextColor}>
+                  <Spinner size="sm" color="blue.500" thickness="3px" />
+                  <Text fontSize="xs" fontWeight="medium">
+                    جاري تحميل الكورسات...
+                  </Text>
+                </HStack>
+              ) : null}
+            </Flex>
+            {coursesLoading ? (
+              <SimpleGrid columns={{ base: 1, md: 3 }} spacing={{ base: 3, md: 4 }}>
+                {[0, 1, 2].map((i) => (
+                  <Card
+                    key={`course-skeleton-${i}`}
+                    bg={cardBg}
+                    borderWidth="1px"
+                    borderColor={courseCardBorder}
+                    borderRadius="xl"
+                    overflow="hidden"
+                    boxShadow={courseCardShadow}
+                  >
+                    <Skeleton h={{ base: "130px", md: "140px" }} startColor="gray.100" endColor="gray.200" />
+                    <Box p={3}>
+                      <Skeleton height="14px" mb={2} borderRadius="md" />
+                      <Skeleton height="12px" width="70%" mb={3} borderRadius="md" />
+                      <Skeleton height="12px" width="50%" mb={4} borderRadius="md" />
+                      <Skeleton height="36px" borderRadius="lg" />
+                    </Box>
+                  </Card>
+                ))}
+              </SimpleGrid>
+            ) : (
+            <SimpleGrid columns={{ base: 1, md: 3 }} spacing={{ base: 3, md: 4 }}>
               {availableCourses.map((course) => (
                 <Card
-                
                   key={course.id}
                   bg={cardBg}
                   borderWidth="1px"
@@ -1368,27 +1086,25 @@ const HomePage = () => {
                   boxShadow={courseCardShadow}
                   w="100%"
                   maxW="100%"
-                  alignSelf="stretch"
-                  transition="all 0.25s ease"
+                  h="full"
+                  display="flex"
+                  flexDirection="column"
+                  transition="all 0.2s ease"
                   _hover={{
-                    transform: "translateY(-4px)",
+                    transform: "translateY(-2px)",
                     boxShadow: courseCardHoverShadow,
                     borderColor: "blue.200",
                   }}
-                  sx={{
-                    "@media (max-width: 48em)": {
-                      width: "100% !important",
-                      maxWidth: "100% !important",
-                    },
-            "@media screen and (min-width: 750px) and (max-width: 850px)": {
-              width: "100% !important",
-              maxWidth: "100% !important",
-              minWidth: "100% !important",
-              flexBasis: "100% !important",
-            },
-                  }}
                 >
-                  <Box h="155px" overflow="hidden" bg={courseImageBg} position="relative">
+                  <Box
+                    position="relative"
+                    flexShrink={0}
+                    w="full"
+                    aspectRatio={16 / 9}
+                    maxH={{ base: "130px", md: "140px" }}
+                    overflow="hidden"
+                    bg={courseImageBg}
+                  >
                     <Box
                       as="img"
                       src={
@@ -1420,58 +1136,66 @@ const HomePage = () => {
                       {course?.grade?.name || "عام"}
                     </Badge>
                   </Box>
-                  <Box p={3}>
-                    <Flex justify="space-between" align="start" gap={2} mb={1.5}>
-                      <Text fontSize="sm" fontWeight="black" color={headingColor} noOfLines={2} flex={1}>
+                  <Box
+                    p={3}
+                    flex="1"
+                    display="flex"
+                    flexDirection="column"
+                    gap={2}
+                    minH={{ base: "148px", md: "152px" }}
+                  >
+                    <Flex justify="space-between" align="start" gap={2}>
+                      <Text
+                        fontSize="sm"
+                        fontWeight="bold"
+                        color={headingColor}
+                        noOfLines={2}
+                        flex={1}
+                        lineHeight="1.45"
+                        minH="2.5rem"
+                      >
                         {course.title}
                       </Text>
                       {course.is_enrolled ? (
-                        <Badge colorScheme="green" borderRadius="full" px={2}>
+                        <Badge colorScheme="green" borderRadius="full" px={2} fontSize="0.65rem" flexShrink={0}>
                           مشترك
                         </Badge>
+                      ) : isCourseFree(course) ? (
+                        <Badge colorScheme="green" variant="subtle" borderRadius="full" px={2} fontSize="0.65rem" flexShrink={0}>
+                          مجاني
+                        </Badge>
                       ) : (
-                        <Badge colorScheme="orange" borderRadius="full" px={2}>
+                        <Badge colorScheme="orange" borderRadius="full" px={2} fontSize="0.65rem" flexShrink={0}>
                           متاح
                         </Badge>
                       )}
                     </Flex>
-                    <Text fontSize="xs" color={subtextColor} mb={1}>
-                      {teacherDisplayName || "مستر"}
-                    </Text>
-                    <Text fontSize="lg" fontWeight="black" color={isCourseFree(course) ? "green.500" : "orange.500"} mb={2}>
-                      {isCourseFree(course) ? "مجاني" : `${course.price} جنيه`}
-                    </Text>
+                    <HStack justify="space-between" fontSize="xs" color={subtextColor}>
+                      <Text noOfLines={1}>{teacherDisplayName || "مستر"}</Text>
+                      <Text fontWeight="bold" color={isCourseFree(course) ? "green.500" : "orange.500"}>
+                        {isCourseFree(course) ? "مجاني" : `${course.price} جنيه`}
+                      </Text>
+                    </HStack>
                     {course.description ? (
-                      <Text fontSize="xs" color={subtextColor} mb={3} noOfLines={2} lineHeight="1.7">
+                      <Text fontSize="xs" color={subtextColor} noOfLines={1} lineHeight="1.6">
                         {course.description}
                       </Text>
-                    ) : null}
-                    <VStack spacing={1.5}>
-                      {course.is_enrolled ? (
+                    ) : (
+                      <Box flex="1" />
+                    )}
+                    <Box mt="auto" pt={1}>
+                      {course.is_enrolled || isCourseFree(course) ? (
                         <Button
                           size="sm"
                           w="full"
+                          h="36px"
                           bg="blue.500"
                           color="white"
                           _hover={{ bg: "blue.600" }}
                           borderRadius="lg"
-                          fontWeight="black"
+                          fontSize="sm"
+                          fontWeight="bold"
                           onClick={() => navigate(`/CourseDetailsPage/${course.id}`)}
-                        >
-                          دخول للكورس
-                        </Button>
-                      ) : isCourseFree(course) ? (
-                        <Button
-                          size="sm"
-                          w="full"
-                          bg="blue.500"
-                          color="white"
-                          _hover={{ bg: "blue.600" }}
-                          borderRadius="lg"
-                          fontWeight="black"
-                          isLoading={activatingFreeCourseId === course.id}
-                          loadingText="جاري الدخول..."
-                          onClick={() => handleActivateFreeCourse(course)}
                         >
                           دخول للكورس
                         </Button>
@@ -1479,21 +1203,24 @@ const HomePage = () => {
                         <Button
                           size="sm"
                           w="full"
+                          h="36px"
                           bg="orange.500"
                           color="white"
                           _hover={{ bg: "orange.600" }}
                           borderRadius="lg"
-                          fontWeight="black"
+                          fontSize="sm"
+                          fontWeight="bold"
                           onClick={() => openCourseActivationModal(course)}
                         >
                           اشترك الآن
                         </Button>
                       )}
-                    </VStack>
+                    </Box>
                   </Box>
                 </Card>
               ))}
             </SimpleGrid>
+            )}
             {!coursesLoading && availableCourses.length === 0 ? (
               <Text mt={3} fontSize="sm" color={subtextColor}>
                 لا توجد كورسات متاحة حالياً في منصة المستر.

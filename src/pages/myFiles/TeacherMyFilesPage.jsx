@@ -62,6 +62,7 @@ import {
   FaThLarge,
   FaList,
   FaPlay,
+  FaGoogleDrive,
 } from "react-icons/fa";
 import { MdInsertDriveFile } from "react-icons/md";
 import UploadFileModal from "./components/UploadFileModal";
@@ -73,9 +74,16 @@ import {
   deleteFileCategory,
   fetchFiles,
   fetchFileStatistics,
-  fetchFile,
-  fetchFileContent,
+  fetchFilePreview,
+  fetchFileEmbed,
   buildFileViewSrc,
+  buildFileOpenSrc,
+  createFileViewObjectUrl,
+  addDriveFile,
+  bulkAddDriveLinks,
+  getDrivePreviewSrc,
+  getDriveOpenUrl,
+  isDriveFile,
   uploadFile,
   updateFile,
   deleteFile,
@@ -97,8 +105,12 @@ function categoryScheme(id) {
   return CATEGORY_SCHEMES[(id || 0) % CATEGORY_SCHEMES.length];
 }
 
-function fileTypeMeta(ext) {
-  const e = (ext || "").toLowerCase();
+function fileTypeMeta(file) {
+  if (isDriveFile(file)) {
+    return { Icon: FaGoogleDrive, color: "green.500", bg: "green.50", label: "Drive" };
+  }
+  const ext = (file?.fileExtension || file || "").toString().toLowerCase();
+  const e = typeof file === "string" ? file : ext;
   if (e === "pdf") return { Icon: FaFilePdf, color: "red.500", bg: "red.50" };
   if (["ppt", "pptx"].includes(e)) return { Icon: FaPlay, color: "orange.500", bg: "orange.50" };
   if (["doc", "docx"].includes(e)) return { Icon: FaFileWord, color: "blue.500", bg: "blue.50" };
@@ -118,6 +130,14 @@ export default function TeacherMyFilesPage() {
   const token = localStorage.getItem("token");
   const toast = useToast();
   const cancelRef = useRef();
+  const previewObjectUrlRef = useRef("");
+
+  const revokePreviewUrl = useCallback(() => {
+    if (previewObjectUrlRef.current?.startsWith("blob:")) {
+      URL.revokeObjectURL(previewObjectUrlRef.current);
+    }
+    previewObjectUrlRef.current = "";
+  }, []);
 
   const [loading, setLoading] = useState(true);
   const [files, setFiles] = useState([]);
@@ -140,12 +160,21 @@ export default function TeacherMyFilesPage() {
   const previewModal = useDisclosure();
 
   const [previewFile, setPreviewFile] = useState(null);
+  const [previewData, setPreviewData] = useState(null);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [previewMode, setPreviewMode] = useState("blob");
   const [previewTextContent, setPreviewTextContent] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [downloadingId, setDownloadingId] = useState(null);
 
-  const [editForm, setEditForm] = useState({ id: null, name: "", description: "", categoryId: "" });
+  const [editForm, setEditForm] = useState({
+    id: null,
+    name: "",
+    description: "",
+    categoryId: "",
+    driveUrl: "",
+    sourceType: "upload",
+  });
   const [categoryName, setCategoryName] = useState("");
   const [editingCategory, setEditingCategory] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -222,33 +251,68 @@ export default function TeacherMyFilesPage() {
   const handleOpenFile = async (file) => {
     if (openingFileId === file.id) return;
     setOpeningFileId(file.id);
+    revokePreviewUrl();
     setPreviewFile(file);
+    setPreviewData(null);
     setPreviewUrl("");
+    setPreviewMode("blob");
     setPreviewTextContent(null);
     setPreviewLoading(true);
     previewModal.onOpen();
     try {
-      const details = await fetchFile(file.id, token);
-      const normalized = details || file;
-      setPreviewFile(normalized);
+      const preview = await fetchFilePreview(file.id, token, { includeText: true });
+      const normalizedFile = preview?.file || file;
+      setPreviewFile(normalizedFile);
+      setPreviewData(preview);
+
+      if (preview?.content?.supported || preview?.content?.text || preview?.content?.paragraphs?.length) {
+        setPreviewTextContent(preview.content);
+      }
+
+      const driveFile = isDriveFile(normalizedFile) || isDriveFile(file);
+
+      if (driveFile) {
+        let embedData = null;
+        try {
+          embedData = await fetchFileEmbed(file.id, token);
+        } catch {
+          embedData = null;
+        }
+        const iframeSrc = getDrivePreviewSrc(normalizedFile, embedData);
+        if (iframeSrc) {
+          setPreviewUrl(iframeSrc);
+          setPreviewMode("drive");
+          setPreviewData((prev) => ({
+            ...prev,
+            embed: embedData,
+            openUrl: getDriveOpenUrl(normalizedFile, embedData),
+          }));
+        }
+        return;
+      }
 
       const canPreview =
-        normalized.canPreviewInline ||
-        normalized.previewType === "pdf" ||
-        normalized.previewType === "image";
+        preview?.preview?.canPreviewInline ||
+        normalizedFile.canPreviewInline ||
+        preview?.preview?.viewerComponent === "pdf-viewer" ||
+        preview?.preview?.viewerComponent === "image-viewer";
 
       if (canPreview) {
-        setPreviewUrl(buildFileViewSrc(file.id, token));
-
-        if (normalized.previewType === "pdf") {
-          try {
-            const contentData = await fetchFileContent(file.id, token);
-            if (contentData?.content?.supported && contentData.content.text) {
-              setPreviewTextContent(contentData.content);
-            }
-          } catch {
-            // النص المستخرج اختياري
-          }
+        try {
+          const objectUrl = await createFileViewObjectUrl(file.id, token, {
+            mimeType: normalizedFile.mimeType,
+          });
+          previewObjectUrlRef.current = objectUrl;
+          setPreviewUrl(objectUrl);
+          setPreviewMode("blob");
+        } catch {
+          const directUrl = buildFileViewSrc(
+            file.id,
+            token,
+            preview?.urls?.view || normalizedFile.absoluteViewUrl || normalizedFile.viewUrl,
+          );
+          setPreviewUrl(directUrl);
+          setPreviewMode("url");
         }
       }
     } catch (err) {
@@ -262,6 +326,13 @@ export default function TeacherMyFilesPage() {
 
   const handleDownloadFile = async (file) => {
     if (downloadingId === file.id) return;
+
+    if (isDriveFile(file)) {
+      const openUrl = getDriveOpenUrl(file) || buildFileOpenSrc(file.id, token);
+      window.open(openUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+
     setDownloadingId(file.id);
     try {
       const data = await downloadFile(file.id, token);
@@ -295,10 +366,49 @@ export default function TeacherMyFilesPage() {
 
   const closePreview = () => {
     previewModal.onClose();
+    revokePreviewUrl();
     setPreviewFile(null);
+    setPreviewData(null);
     setPreviewUrl("");
+    setPreviewMode("blob");
     setPreviewTextContent(null);
     setPreviewLoading(false);
+  };
+
+  useEffect(() => () => revokePreviewUrl(), [revokePreviewUrl]);
+
+  const handleAddDrive = async (payload) => {
+    setBusy(true);
+    try {
+      await addDriveFile(payload, token);
+      toast({ title: "تمت إضافة رابط Google Drive", status: "success", isClosable: true });
+      refreshAll();
+    } catch (e) {
+      toast({ title: apiErrorMessage(e), status: "error", isClosable: true });
+      throw e;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleBulkDriveLinks = async (payload) => {
+    setBusy(true);
+    try {
+      const result = await bulkAddDriveLinks(payload, token);
+      const added = result?.added?.length ?? result?.links?.length ?? payload.links.length;
+      const errors = result?.errors?.length ?? 0;
+      toast({
+        title: errors > 0 ? `تمت إضافة ${added} روابط مع ${errors} أخطاء` : `تمت إضافة ${added} روابط`,
+        status: errors > 0 ? "warning" : "success",
+        isClosable: true,
+      });
+      refreshAll();
+    } catch (e) {
+      toast({ title: apiErrorMessage(e), status: "error", isClosable: true });
+      throw e;
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleUploadWithProgress = async (payload, onProgress) => {
@@ -325,6 +435,9 @@ export default function TeacherMyFilesPage() {
           name: editForm.name.trim(),
           description: editForm.description?.trim() || null,
           categoryId: editForm.categoryId ? Number(editForm.categoryId) : null,
+          ...(editForm.sourceType === "drive"
+            ? { driveUrl: editForm.driveUrl?.trim() || undefined }
+            : {}),
         },
         token
       );
@@ -411,7 +524,7 @@ export default function TeacherMyFilesPage() {
               boxShadow="0 8px 24px rgba(59,130,246,0.35)"
               onClick={uploadModal.onOpen}
             >
-              رفع ملف جديد
+              إضافة ملف
             </Button>
             <Button
               leftIcon={<Icon as={FaFolderPlus} />}
@@ -639,6 +752,8 @@ export default function TeacherMyFilesPage() {
                     name: f.name,
                     description: f.description || "",
                     categoryId: f.categoryId ? String(f.categoryId) : "",
+                    driveUrl: f.driveUrl || "",
+                    sourceType: f.sourceType || "upload",
                   });
                   editModal.onOpen();
                 }}
@@ -662,6 +777,8 @@ export default function TeacherMyFilesPage() {
                     name: f.name,
                     description: f.description || "",
                     categoryId: f.categoryId ? String(f.categoryId) : "",
+                    driveUrl: f.driveUrl || "",
+                    sourceType: f.sourceType || "upload",
                   });
                   editModal.onOpen();
                 }}
@@ -701,6 +818,8 @@ export default function TeacherMyFilesPage() {
         onClose={uploadModal.onClose}
         categories={categories}
         busy={busy}
+        onAddDrive={handleAddDrive}
+        onBulkDriveLinks={handleBulkDriveLinks}
         onUpload={handleUploadWithProgress}
       />
 
@@ -708,11 +827,17 @@ export default function TeacherMyFilesPage() {
         isOpen={previewModal.isOpen}
         onClose={closePreview}
         file={previewFile}
+        previewData={previewData}
         previewUrl={previewUrl}
+        previewMode={previewMode}
         textContent={previewTextContent}
         loading={previewLoading}
         onDownload={handleDownloadFile}
         downloading={previewFile && downloadingId === previewFile.id}
+        onOpenExternal={(f) => {
+          const url = getDriveOpenUrl(f, previewData?.embed) || buildFileOpenSrc(f.id, token);
+          window.open(url, "_blank", "noopener,noreferrer");
+        }}
       />
 
       {/* Edit modal */}
@@ -757,6 +882,19 @@ export default function TeacherMyFilesPage() {
                   ))}
                 </Select>
               </FormControl>
+              {editForm.sourceType === "drive" ? (
+                <FormControl>
+                  <FormLabel>رابط Google Drive</FormLabel>
+                  <Input
+                    value={editForm.driveUrl}
+                    onChange={(e) => setEditForm((f) => ({ ...f, driveUrl: e.target.value }))}
+                    borderRadius="lg"
+                    bg={inputBg}
+                    dir="ltr"
+                    placeholder="https://drive.google.com/file/d/.../view"
+                  />
+                </FormControl>
+              ) : null}
             </VStack>
           </ModalBody>
           <ModalFooter>
@@ -908,9 +1046,9 @@ function KpiCard({ label, value, sub, icon, iconBg, iconColor, progress }) {
 function FileGridCard({ file, onOpen, onDownload, onEdit, onDelete, isOpening, downloadingId }) {
   const bg = useColorModeValue("white", "gray.800");
   const border = useColorModeValue("gray.100", "gray.600");
-  const meta = fileTypeMeta(file.fileExtension);
+  const meta = fileTypeMeta(file);
   const scheme = categoryScheme(file.categoryId || 0);
-  const showThumb = isImageExt(file.fileExtension) && file.fileUrl;
+  const showThumb = !isDriveFile(file) && isImageExt(file.fileExtension) && file.fileUrl;
 
   return (
     <Box
@@ -1025,6 +1163,11 @@ function FileGridCard({ file, onOpen, onDownload, onEdit, onDelete, isOpening, d
           ) : (
             <Box />
           )}
+          {isDriveFile(file) ? (
+            <Badge fontSize="10px" colorScheme="green" borderRadius="full">
+              Drive
+            </Badge>
+          ) : null}
           <Text fontSize="xs" color="gray.400" flexShrink={0}>
             {formatFileSize(file.fileSize)}
           </Text>
@@ -1037,7 +1180,7 @@ function FileGridCard({ file, onOpen, onDownload, onEdit, onDelete, isOpening, d
 function FileListRow({ file, onOpen, onDownload, onEdit, onDelete, isOpening, downloadingId }) {
   const bg = useColorModeValue("white", "gray.800");
   const border = useColorModeValue("gray.100", "gray.600");
-  const meta = fileTypeMeta(file.fileExtension);
+  const meta = fileTypeMeta(file);
   const scheme = categoryScheme(file.categoryId || 0);
 
   return (
@@ -1088,6 +1231,11 @@ function FileListRow({ file, onOpen, onDownload, onEdit, onDelete, isOpening, do
               color={scheme.color}
             >
               {file.categoryName}
+            </Badge>
+          )}
+          {isDriveFile(file) && (
+            <Badge fontSize="10px" colorScheme="green" borderRadius="full">
+              Drive
             </Badge>
           )}
         </HStack>

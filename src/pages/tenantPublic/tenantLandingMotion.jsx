@@ -277,7 +277,7 @@ export function ScrollProgress() {
       className="pointer-events-none fixed inset-x-0 top-0 z-[200] h-[3px] origin-left"
       style={{
         scaleX,
-        background: "linear-gradient(to right, #DD6B20, #3182CE, #DD6B20)",
+        background: "linear-gradient(to right, #A16207, #1E3A5F, #2563EB, #A16207)",
         backgroundSize: "200% 100%",
       }}
       animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
@@ -463,7 +463,7 @@ export function Tilt3D({
   );
 }
 
-export function AnimatedUnderline({ className = "", color = "#DD6B20" }) {
+export function AnimatedUnderline({ className = "", color = "#A16207" }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-40px" });
   const reduceMotion = useReducedMotion();

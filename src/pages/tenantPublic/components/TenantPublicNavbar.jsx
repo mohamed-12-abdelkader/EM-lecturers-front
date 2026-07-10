@@ -30,7 +30,7 @@ function useTenantArabicFonts() {
     link.id = TENANT_FONT_LINK_ID;
     link.rel = "stylesheet";
     link.href =
-      "https://fonts.googleapis.com/css2?family=Cairo:wght@600;700&family=Tajawal:wght@400;500;700&display=swap";
+      "https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@300;400;500;700&display=swap";
     document.head.appendChild(link);
   }, []);
 }
@@ -77,7 +77,7 @@ function ThemeToggle({ isDark, onToggle, onDark = false }) {
     >
       <FaSun
         className={`pointer-events-none absolute left-2.5 text-xs transition-colors ${
-          !isDark ? "text-orange-500" : "text-slate-400"
+          !isDark ? "text-[#A16207]" : "text-slate-400"
         }`}
         aria-hidden
       />
@@ -117,23 +117,23 @@ export function TenantPublicNavbar({
   const solidNav = alwaysSolid || navScrolled || isMobileMenuOpen;
 
   const linkClass = solidNav
-    ? "text-slate-600 hover:bg-slate-100 hover:text-blue-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-blue-300"
-    : "text-white/90 hover:bg-white/10 hover:text-white";
+    ? "cursor-pointer text-slate-600 transition-colors duration-200 hover:bg-slate-100 hover:text-[#1E3A5F] dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-blue-300"
+    : "cursor-pointer text-white/90 transition-colors duration-200 hover:bg-white/10 hover:text-white";
 
   const loginClass = solidNav
-    ? "border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 dark:border-slate-600 dark:text-slate-200 dark:hover:border-blue-500/40 dark:hover:bg-blue-500/10"
-    : "border-white/30 text-white hover:border-white/50 hover:bg-white/10";
+    ? "cursor-pointer border-slate-200 text-slate-700 transition-colors duration-200 hover:border-[#2563EB]/40 hover:bg-[#E9EEF5] hover:text-[#1E3A5F] dark:border-slate-600 dark:text-slate-200 dark:hover:border-blue-500/40 dark:hover:bg-blue-500/10"
+    : "cursor-pointer border-white/30 text-white transition-colors duration-200 hover:border-white/50 hover:bg-white/10";
 
   const menuBtnClass = solidNav
-    ? "border-slate-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50 dark:border-slate-600 dark:text-slate-200"
-    : "border-white/30 text-white hover:bg-white/10";
+    ? "cursor-pointer border-slate-200 text-slate-700 transition-colors duration-200 hover:border-[#2563EB]/40 hover:bg-[#E9EEF5] dark:border-slate-600 dark:text-slate-200"
+    : "cursor-pointer border-white/30 text-white transition-colors duration-200 hover:bg-white/10";
 
   return (
     <motion.header
       initial="hidden"
       animate="visible"
       variants={slideDown}
-      className={`fixed inset-x-0 top-0 z-50 font-[family-name:var(--tenant-nav-font,'Tajawal','Segoe_UI',Tahoma,sans-serif)] transition-all duration-300 ${
+      className={`fixed inset-x-0 top-0 z-50 font-[family-name:var(--tenant-nav-font,'Noto_Sans_Arabic','Segoe_UI',Tahoma,sans-serif)] transition-all duration-300 ${
         solidNav
           ? "border-b border-slate-200/90 bg-white/95 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/95"
           : "border-b border-white/10 bg-slate-950/35 backdrop-blur-md"
@@ -152,7 +152,7 @@ export function TenantPublicNavbar({
           ) : (
             <span
               className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${
-                solidNav ? "bg-blue-600" : "bg-blue-600 ring-2 ring-white/25"
+                solidNav ? "bg-[#1E3A5F]" : "bg-[#1E3A5F] ring-2 ring-white/25"
               }`}
             >
               {brandName.slice(0, 1)}
@@ -160,7 +160,7 @@ export function TenantPublicNavbar({
           )}
           <div className="min-w-0 text-right leading-tight">
             <p
-              className={`truncate font-[family-name:var(--tenant-nav-heading,'Cairo','Tajawal',sans-serif)] text-base font-bold ${
+              className={`truncate font-[family-name:var(--tenant-nav-heading,'Noto_Naskh_Arabic','Noto_Sans_Arabic',sans-serif)] text-base font-bold ${
                 solidNav ? "text-slate-900 dark:text-slate-100" : "text-white"
               }`}
             >
@@ -210,7 +210,7 @@ export function TenantPublicNavbar({
             </a>
             <a
               href={signupHref}
-              className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600"
+              className="cursor-pointer rounded-lg bg-[#A16207] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-[#854D0E]"
             >
               حساب جديد
             </a>
@@ -243,7 +243,7 @@ export function TenantPublicNavbar({
                   key={href}
                   href={href}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-blue-300"
+                  className="cursor-pointer rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 transition-colors duration-200 hover:bg-[#E9EEF5] hover:text-[#1E3A5F] dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-blue-300"
                 >
                   {label}
                 </a>
@@ -260,7 +260,7 @@ export function TenantPublicNavbar({
               <a
                 href={signupHref}
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="inline-flex h-11 items-center justify-center rounded-lg bg-orange-500 text-sm font-semibold text-white hover:bg-orange-600"
+                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-lg bg-[#A16207] text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#854D0E]"
               >
                 حساب جديد
               </a>

@@ -31,6 +31,7 @@ import { fetchFinanceDashboard, financeErrorMessage } from "../../../api/finance
 import ExpiringSubscriptionsTable, {
   ExpiringSoonSummary,
 } from "./ExpiringSubscriptionsTable";
+import FinanceIncomeDetailsSection from "./FinanceIncomeDetailsSection";
 import {
   DASHBOARD_PERIODS,
   PLAN_CODES,
@@ -185,6 +186,8 @@ export default function FinanceDashboardTab({ refreshKey }) {
               bg="gray.100"
             />
           </SimpleGrid>
+
+          <FinanceIncomeDetailsSection refreshKey={refreshKey} />
 
           {(data?.outstanding_balances_count ?? 0) > 0 ||
           (data?.outstanding_balances ?? []).length > 0 ? (

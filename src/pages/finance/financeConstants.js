@@ -121,6 +121,34 @@ export const INVOICE_TYPES = {
   adjustment: "تعديل",
 };
 
+/** أنواع عمليات الدخل في تفاصيل الإيرادات */
+export const INCOME_PAYMENT_TYPES = {
+  subscription: { label: "اشتراك جديد", colorScheme: "blue" },
+  renewal: { label: "تجديد", colorScheme: "purple" },
+  upgrade: { label: "ترقية", colorScheme: "yellow" },
+  additional_payment: { label: "دفعة إضافية", colorScheme: "teal" },
+  extra_payment: { label: "دفعة إضافية", colorScheme: "teal" },
+  payment: { label: "دفعة إضافية", colorScheme: "teal" },
+  reversal: { label: "استرداد عند الإلغاء", colorScheme: "red" },
+  cancellation_refund: { label: "استرداد عند الإلغاء", colorScheme: "red" },
+  refund: { label: "استرداد عند الإلغاء", colorScheme: "red" },
+};
+
+export function incomePaymentTypeMeta(type) {
+  if (!type) return { label: "—", colorScheme: "gray" };
+  return (
+    INCOME_PAYMENT_TYPES[type] || {
+      label: type,
+      colorScheme: "gray",
+    }
+  );
+}
+
+export function incomePaymentTypeLabel(row) {
+  if (!row) return "—";
+  return row.payment_type_label || incomePaymentTypeMeta(row.payment_type).label;
+}
+
 export const INVOICE_STATUS = {
   paid: { label: "مدفوعة", colorScheme: "green" },
   partial: { label: "جزئية", colorScheme: "orange" },

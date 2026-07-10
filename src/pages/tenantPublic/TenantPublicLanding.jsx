@@ -1,59 +1,31 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  FaBookOpen,
-  FaChalkboardTeacher,
-  FaClipboardList,
-  FaFacebook,
-  FaInstagram,
-  FaTelegram,
-  FaVideo,
-  FaWhatsapp,
-  FaPlay,
-  FaArrowLeft,
-  FaUsers,
-  FaGraduationCap,
-  FaAward,
-  FaStar,
-  FaCheck,
-} from "react-icons/fa";
+import { FaAward, FaGraduationCap, FaUsers } from "react-icons/fa";
 import {
   fetchTenantPublic,
   fetchPlatformPublicFreeLectures,
   fetchPlatformPublicCourses,
 } from "../../api/tenantPublicApi";
 import FreeLecturePlayerModal from "./components/FreeLecturePlayerModal";
-import TenantHeroSection, { TeacherPortrait } from "./components/TenantHeroSection";
-import {
-  tlCard,
-  tlCardHover,
-  tlSectionMuted,
-  tlSectionWhite,
-  tlBtnPrimary,
-  tlEyebrow,
-  tlHeading,
-} from "./tenantLandingTheme";
+import TenantProHero from "./components/landing/TenantProHero";
+import TenantProBentoWall from "./components/landing/TenantProBentoWall";
+import TenantProVideoStrip from "./components/landing/TenantProVideoStrip";
+import TenantProCoursesBento from "./components/landing/TenantProCoursesBento";
+import { TenantProReviews, TenantProCta } from "./components/landing/TenantProReviewsCta";
+import TenantProFooter from "./components/landing/TenantProFooter";
+import { TL_ACCENT, TL_PRIMARY, TL_SECONDARY, TL_BORDER } from "./tenantLandingTheme";
 import {
   TenantPublicNavbar,
   TENANT_NAV_LINKS,
   useTenantPublicTheme,
 } from "./components/TenantPublicNavbar";
-import {
-  motion,
-  AnimatePresence,
-  Reveal,
-  StaggerGrid,
-  StaggerItem,
-  MotionCard,
-  AnimatedSection,
-  ScrollProgress,
-} from "./tenantLandingMotion";
+import { motion, ScrollProgress } from "./tenantLandingMotion";
 import { useTenantPageMetadata } from "../../Hooks/tenantPublic/useTenantPageMetadata";
 import { getPortraitImageUrl } from "../../utils/highQualityImageUrl";
 
 const TENANT_FONT_LINK_ID = "tenant-public-arabic-fonts";
-const TENANT_FONT_BODY = "'Tajawal', 'Segoe UI', Tahoma, sans-serif";
-const TENANT_FONT_HEADING = "'Cairo', 'Tajawal', sans-serif";
+const TENANT_FONT_BODY = "'Noto Sans Arabic', 'Segoe UI', Tahoma, sans-serif";
+const TENANT_FONT_HEADING = "'Noto Naskh Arabic', 'Noto Sans Arabic', sans-serif";
 
 function useTenantArabicFonts() {
   useEffect(() => {
@@ -62,228 +34,48 @@ function useTenantArabicFonts() {
     link.id = TENANT_FONT_LINK_ID;
     link.rel = "stylesheet";
     link.href =
-      "https://fonts.googleapis.com/css2?family=Cairo:wght@600;700&family=Tajawal:wght@400;500;700&display=swap";
+      "https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@300;400;500;700&display=swap";
     document.head.appendChild(link);
   }, []);
 }
 
 function buildCssVars(theme) {
-  if (!theme) return {};
+  if (!theme) {
+    return {
+      "--tl-primary": TL_PRIMARY,
+      "--tl-secondary": TL_SECONDARY,
+      "--tl-accent": TL_ACCENT,
+      "--tl-border": TL_BORDER,
+    };
+  }
   return {
-    "--t-primary": theme.primary_color || "#0f172a",
-    "--t-secondary": theme.secondary_color || "#64748b",
-    "--t-accent": theme.accent_color || "#3b82f6",
-    "--t-text": theme.text_color || "#1e293b",
+    "--t-primary": theme.primary_color || TL_PRIMARY,
+    "--t-secondary": theme.secondary_color || TL_SECONDARY,
+    "--t-accent": theme.accent_color || TL_ACCENT,
+    "--t-text": theme.text_color || "#0F172A",
+    "--tl-primary": theme.primary_color || TL_PRIMARY,
+    "--tl-secondary": theme.secondary_color || TL_SECONDARY,
+    "--tl-accent": theme.accent_color || TL_ACCENT,
+    "--tl-border": TL_BORDER,
     "--t-font-body": theme.font_body_size || "1rem",
     "--t-line-body": theme.line_height_body || "1.75",
-    "--t-weight-heading": theme.font_weight_heading || "800",
-    "--t-max": theme.layout_max_width || "1200px",
+    "--t-weight-heading": theme.font_weight_heading || "700",
+    "--t-max": theme.layout_max_width || "1400px",
   };
 }
 
-const SERVICE_ICONS = [FaChalkboardTeacher, FaBookOpen, FaVideo, FaClipboardList];
-
-const SERVICE_DESC_FALLBACK = [
-  "شرح واضح ومنظم يساعدك تفهم الدرس خطوة بخطوة.",
-  "متابعة مستواك وتوجيهك للخطوة التالية.",
-  "أسئلة وتطبيقات عملية تثبت المعلومة.",
-  "إجابة على استفساراتك ومتابعة تقدمك.",
+const DEFAULT_SERVICES = [
+  { title: "شرح مبسط", description: "شرح واضح ومنظم يساعدك تفهم الدرس خطوة بخطوة بدون تعقيد." },
+  { title: "متابعة مستمرة", description: "متابعة مستواك وتوجيهك للخطوة التالية في كل مرحلة من التعلم." },
+  { title: "تدريب وتطبيق", description: "أسئلة وتطبيقات عملية تثبت المعلومة وتجهزك للاختبارات." },
+  { title: "دعم مستمر", description: "إجابة على استفساراتك ومتابعة تقدمك حتى تحقق هدفك." },
 ];
 
-/** تنويع بسيط — أزرق / برتقالي */
-const SERVICE_ACCENT = [
-  { iconBg: "bg-blue-50 text-blue-600", border: "border-blue-100" },
-  { iconBg: "bg-orange-50 text-orange-600", border: "border-orange-100" },
-  { iconBg: "bg-blue-50 text-blue-600", border: "border-blue-100" },
-  { iconBg: "bg-orange-50 text-orange-600", border: "border-orange-100" },
+const DEFAULT_TESTIMONIALS = [
+  { name: "أحمد محمد", text: "أفضل منصة تعليمية جربتها، الشرح واضح والمتابعة ممتازة.", rating: 5 },
+  { name: "سارة علي", text: "المحتوى منظم جداً وساعدني أحسن درجاتي بشكل ملحوظ.", rating: 5 },
+  { name: "محمود حسن", text: "تجربة تعليمية رائعة مع متابعة مستمرة ودعم سريع.", rating: 5 },
 ];
-
-function ServiceFeatureCard({ service, index, className = "" }) {
-  const Icon = SERVICE_ICONS[index % SERVICE_ICONS.length];
-  const accent = SERVICE_ACCENT[index % SERVICE_ACCENT.length];
-  const description =
-    service.description?.trim() || SERVICE_DESC_FALLBACK[index % SERVICE_DESC_FALLBACK.length];
-
-  return (
-    <MotionCard lift>
-      <article className={`${tlCard} ${tlCardHover} p-6 ${className}`}>
-        <div
-          className={`mb-5 inline-flex h-12 w-12 items-center justify-center rounded-2xl ${accent.iconBg}`}
-        >
-          <Icon className="text-xl" />
-        </div>
-        <h3 className="font-heading text-lg font-bold text-slate-900 dark:text-slate-100">
-          {service.title}
-        </h3>
-        <p className="mt-2 text-sm leading-7 text-slate-600 dark:text-slate-400">{description}</p>
-      </article>
-    </MotionCard>
-  );
-}
-
-function formatCoursePrice(rawPrice, isFreeFlag) {
-  if (isFreeFlag) return { label: "مجاني", isFree: true };
-  const priceNum = Number(rawPrice);
-  const hasPrice =
-    rawPrice != null && String(rawPrice).trim() !== "" && !Number.isNaN(priceNum);
-  if (!hasPrice) return { label: "مجاني", isFree: true };
-  if (priceNum === 0) return { label: "مجاني", isFree: true };
-  return { label: `${priceNum.toLocaleString("ar-EG")} ج.م`, isFree: false };
-}
-
-function courseIsFree(course) {
-  if (course?.is_free != null) return Boolean(course.is_free);
-  if (course?.isFree != null) return Boolean(course.isFree);
-  const priceNum = Number(course?.price);
-  return Number.isFinite(priceNum) && priceNum === 0;
-}
-
-function CourseCard({ course, courseFallbackImage, loginHref }) {
-  const courseTitle = (course.title || course.name || "كورس").trim();
-  const ownCourseImage =
-    course.image_url || course.cover_url || course.thumbnail || course.avatar;
-  const usesFallbackImage = !ownCourseImage && Boolean(courseFallbackImage);
-  const courseImg = ownCourseImage || courseFallbackImage;
-  const free = courseIsFree(course);
-  const { label: priceLabel, isFree } = formatCoursePrice(course.price, free);
-  const gradeName =
-    course.grade?.name || course.grade_name || course.grade || null;
-
-  return (
-    <MotionCard>
-      <motion.article layout className={`flex flex-col overflow-hidden ${tlCard} ${tlCardHover}`}>
-      <div className="relative aspect-[16/10] overflow-hidden rounded-t-2xl bg-slate-100 dark:bg-slate-800">
-        <motion.img
-          src={courseImg}
-          alt={courseTitle}
-          className="h-full w-full object-cover"
-          loading="lazy"
-          whileHover={{ scale: 1.06 }}
-          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-        />
-        {usesFallbackImage ? (
-          <div
-            className="absolute inset-0 flex items-end bg-gradient-to-t from-black/80 via-black/35 to-black/10 px-4 pb-4 pt-16"
-            aria-hidden
-          >
-            <h3 className="font-heading w-full text-right text-lg font-bold leading-snug text-white drop-shadow-md md:text-xl">
-              {courseTitle}
-            </h3>
-          </div>
-        ) : null}
-        {gradeName ? (
-          <span className="absolute right-3 top-3 z-10 rounded-md bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white">
-            {gradeName}
-          </span>
-        ) : null}
-        <span
-          className={`absolute left-3 top-3 z-10 rounded-md px-2.5 py-1 text-xs font-semibold text-white ${
-            isFree ? "bg-green-600" : "bg-orange-500"
-          }`}
-        >
-          {isFree ? "مجاني" : "مدفوع"}
-        </span>
-      </div>
-
-      <div className="flex flex-1 flex-col p-4 text-right md:p-5">
-        {!usesFallbackImage ? (
-          <h3 className="font-heading text-base font-bold leading-snug text-slate-900 dark:text-slate-100">
-            {courseTitle}
-          </h3>
-        ) : null}
-        {(course.description || course.summary) && (
-          <p className="mt-2 line-clamp-2 flex-1 text-sm leading-7 text-slate-600 dark:text-slate-400">
-            {course.description || course.summary}
-          </p>
-        )}
-
-        <div className="mt-4 flex items-end justify-between gap-3 border-t border-slate-100 pt-3 dark:border-slate-700">
-          <div>
-            <p className="text-xs text-slate-500">السعر</p>
-            <p className={`mt-0.5 text-lg font-bold ${isFree ? "text-green-600" : "text-orange-600"}`}>
-              {priceLabel}
-            </p>
-          </div>
-          {course.lessons_count != null || course.lectures_count != null ? (
-            <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-              {(course.lessons_count ?? course.lectures_count).toLocaleString("ar-EG")} درس
-            </span>
-          ) : null}
-        </div>
-
-        <a href={loginHref} className={`mt-4 w-full gap-2 ${tlBtnPrimary}`}>
-          اشترك الآن
-          <FaArrowLeft className="text-xs" />
-        </a>
-      </div>
-      </motion.article>
-    </MotionCard>
-  );
-}
-
-
-function SectionHeading({ eyebrow, title, subtitle, align = "center" }) {
-  const wrap = align === "center" ? "mx-auto max-w-2xl text-center" : "max-w-2xl text-right";
-
-  return (
-    <StaggerGrid className={wrap}>
-      {eyebrow ? (
-        <StaggerItem variant="blur">
-          <p className={tlEyebrow}>{eyebrow}</p>
-        </StaggerItem>
-      ) : null}
-      <StaggerItem variant="blur">
-        <h2 className={`${tlHeading} mt-2`}>{title}</h2>
-      </StaggerItem>
-      {subtitle ? (
-        <StaggerItem variant="blur">
-          <p className="mt-4 text-sm leading-8 text-slate-600 dark:text-slate-400 md:text-base">{subtitle}</p>
-        </StaggerItem>
-      ) : null}
-    </StaggerGrid>
-  );
-}
-
-function TestimonialCard({ item }) {
-  const rating = Number(item.rating) || 5;
-  return (
-    <article className={`${tlCard} ${tlCardHover} p-6 text-right`}>
-      <div className="mb-3 flex justify-end gap-0.5 text-amber-400">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <FaStar key={i} className={i < rating ? "opacity-100" : "opacity-25"} />
-        ))}
-      </div>
-      <p className="text-sm leading-8 text-slate-600 dark:text-slate-300">"{item.text}"</p>
-      <div className="mt-4 flex items-center justify-end gap-3">
-        <div>
-          <p className="text-sm font-bold text-slate-900 dark:text-white">{item.name}</p>
-          <p className="text-xs text-slate-500">طالب</p>
-        </div>
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
-          {(item.name || "ط").slice(0, 1)}
-        </span>
-      </div>
-    </article>
-  );
-}
-
-function SocialLink({ href, label, children }) {
-  if (!href) return null;
-  return (
-    <motion.a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label={label}
-      className="flex h-9 w-9 items-center justify-center rounded-lg border border-blue-100 bg-blue-50 text-blue-500 dark:border-slate-700 dark:bg-slate-800 dark:text-blue-300"
-      whileHover={{ y: -4, scale: 1.08, backgroundColor: "rgba(59,130,246,0.15)" }}
-      whileTap={{ scale: 0.95 }}
-      transition={{ duration: 0.22 }}
-    >
-      {children}
-    </motion.a>
-  );
-}
 
 export default function TenantPublicLanding({ subdomain }) {
   const { isDarkMode, toggleTheme } = useTenantPublicTheme();
@@ -318,7 +110,6 @@ export default function TenantPublicLanding({ subdomain }) {
   const tenant = payload?.tenant;
   const landing = payload?.landing;
   const theme = landing?.theme;
-
   const cssVars = useMemo(() => buildCssVars(theme), [theme]);
 
   const freeLectures = useMemo(() => {
@@ -331,19 +122,13 @@ export default function TenantPublicLanding({ subdomain }) {
     return Array.isArray(list) ? list : [];
   }, [coursesResponse]);
 
-  const heroBgImageRaw = useMemo(() => {
+  const teacherPortraitUrl = useMemo(() => {
     const hero = landing?.hero || {};
-    return hero.image_url || tenant?.avatar_url || null;
+    const raw = hero.image_url || tenant?.avatar_url || null;
+    return raw ? getPortraitImageUrl(raw) : null;
   }, [landing, tenant]);
 
-  const teacherPortraitUrl = useMemo(() => {
-    if (!heroBgImageRaw) return null;
-    return getPortraitImageUrl(heroBgImageRaw);
-  }, [heroBgImageRaw]);
-
-  const fontFamily = TENANT_FONT_BODY;
   const teacher = payload?.teacher;
-
   useTenantPageMetadata(subdomain, "home", undefined, { tenant, teacher, subdomain });
 
   useEffect(() => {
@@ -380,26 +165,14 @@ export default function TenantPublicLanding({ subdomain }) {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.4 }}
-        className="flex min-h-screen flex-col items-center justify-center gap-6 bg-[#f4f7fc] dark:bg-slate-950"
+        className="flex min-h-screen flex-col items-center justify-center gap-6 bg-[#0F172A]"
         dir="rtl"
       >
-        <motion.div
-          className="relative h-14 w-14"
-          animate={{ scale: [1, 1.05, 1] }}
-          transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-        >
-          <div className="absolute inset-0 rounded-full border-2 border-blue-200 dark:border-blue-900" />
-          <div className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-orange-500 border-r-blue-500" />
-        </motion.div>
-        <motion.p
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.4 }}
-          className="text-sm font-medium text-slate-500 dark:text-slate-400"
-        >
-          جاري تحميل الصفحة…
-        </motion.p>
+        <div className="relative h-14 w-14">
+          <div className="absolute inset-0 rounded-full border-2 border-white/10" />
+          <div className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[#A16207] border-r-[#2563EB]" />
+        </div>
+        <p className="text-sm font-medium text-slate-400">جاري تحميل الصفحة…</p>
       </motion.div>
     );
   }
@@ -409,21 +182,10 @@ export default function TenantPublicLanding({ subdomain }) {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-50 px-4 text-center dark:bg-slate-950"
+        className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#F8FAFC] px-4 text-center dark:bg-slate-950"
         dir="rtl"
       >
-        <motion.div
-          initial={{ scale: 0.9 }}
-          animate={{ scale: 1 }}
-          transition={{ delay: 0.1, type: "spring", stiffness: 260, damping: 20 }}
-          className="mb-2 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50 text-2xl text-red-500 dark:bg-red-950/40"
-        >
-          !
-        </motion.div>
-        <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">
-          لم نتمكن من تحميل هذه الصفحة
-        </p>
+        <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">لم نتمكن من تحميل هذه الصفحة</p>
         <p className="max-w-md text-slate-600 dark:text-slate-400">
           {error?.message || "تأكد أن النطاق الفرعي صحيح وأن الخادم يعمل."}
         </p>
@@ -435,33 +197,8 @@ export default function TenantPublicLanding({ subdomain }) {
   const about = landing?.about || {};
   const stats = landing?.statistics || {};
   const services = Array.isArray(landing?.services) ? landing.services : [];
-  const displayServices =
-    services.length > 0
-      ? services.slice(0, 4)
-      : [
-          {
-            title: "شرح مبسط",
-            description: "شرح واضح ومنظم يساعدك تفهم الدرس خطوة بخطوة بدون تعقيد.",
-          },
-          {
-            title: "متابعة مستمرة",
-            description: "متابعة مستواك وتوجيهك للخطوة التالية في كل مرحلة من التعلم.",
-          },
-          {
-            title: "تدريب وتطبيق",
-            description: "أسئلة وتطبيقات عملية تثبت المعلومة وتجهزك للاختبارات.",
-          },
-          {
-            title: "دعم مستمر",
-            description: "إجابة على استفساراتك ومتابعة تقدمك حتى تحقق هدفك.",
-          },
-        ];
-  const faq = Array.isArray(landing?.faq) ? landing.faq : [];
-  const testimonials = Array.isArray(landing?.testimonials)
-    ? landing.testimonials
-    : [];
+  const testimonials = Array.isArray(landing?.testimonials) ? landing.testimonials : [];
   const contact = landing?.contact || {};
-  const teacherGrades = Array.isArray(payload?.teacher_grades) ? payload.teacher_grades : [];
 
   const brandName = tenant.display_name || tenant.subdomain || subdomain;
   const teacherName = payload?.teacher?.name || brandName;
@@ -470,10 +207,19 @@ export default function TenantPublicLanding({ subdomain }) {
     (hero.title && hero.title.trim()) ||
     (specialty ? `احترف ${specialty} مع ${teacherName}` : `تعلّم مع ${teacherName}`);
 
+  const bioText =
+    about.bio ||
+    tenant.bio ||
+    payload?.teacher?.description ||
+    "شرح منظم، متابعة مستمرة، وتدريب مكثف يساعدك تحقق أفضل النتائج.";
+
   const placeholderPhoto =
     "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=3840&q=100&auto=format";
   const courseFallbackImage = hero.image_url || tenant.avatar_url || placeholderPhoto;
- 
+
+  const displayServices = services.length > 0 ? services.slice(0, 4) : DEFAULT_SERVICES;
+  const displayTestimonials = testimonials.length > 0 ? testimonials.slice(0, 3) : DEFAULT_TESTIMONIALS;
+
   const statBarItems = [
     stats.courses_count != null && {
       value: `${Number(stats.courses_count).toLocaleString("ar-EG")}+`,
@@ -491,86 +237,29 @@ export default function TenantPublicLanding({ subdomain }) {
 
   const heroStats = [
     {
-      value:
-        stats.students_count != null
-          ? `${Number(stats.students_count).toLocaleString("ar-EG")}+`
-          : "10k+",
+      value: stats.students_count != null ? `${Number(stats.students_count).toLocaleString("ar-EG")}+` : "10k+",
       label: "طالب",
       icon: FaUsers,
     },
     {
-      value:
-        stats.courses_count != null
-          ? `${Number(stats.courses_count).toLocaleString("ar-EG")}+`
-          : "50+",
+      value: stats.courses_count != null ? `${Number(stats.courses_count).toLocaleString("ar-EG")}+` : "50+",
       label: "كورس",
       icon: FaGraduationCap,
     },
     {
-      value:
-        stats.years_experience != null
-          ? `${Number(stats.years_experience).toLocaleString("ar-EG")}+`
-          : "10+",
+      value: stats.years_experience != null ? `${Number(stats.years_experience).toLocaleString("ar-EG")}+` : "10+",
       label: "سنوات خبرة",
       icon: FaAward,
     },
   ];
 
-  const joinHref = contact.whatsapp || contact.telegram || "#cta";
   const siteOrigin = typeof window !== "undefined" ? window.location.origin : "";
   const loginHref = `${siteOrigin}/login`;
   const signupHref = `${siteOrigin}/signup`;
+  const joinHref = contact.whatsapp || contact.telegram || "#cta";
 
-  const displayTestimonials =
-    testimonials.length > 0
-      ? testimonials.slice(0, 3)
-      : [
-          {
-            name: "أحمد محمد",
-            text: "أفضل منصة تعليمية جربتها، الشرح واضح والمتابعة ممتازة.",
-            rating: 5,
-          },
-          {
-            name: "سارة علي",
-            text: "المحتوى منظم جداً وساعدني أحسن درجاتي بشكل ملحوظ.",
-            rating: 5,
-          },
-          {
-            name: "محمود حسن",
-            text: "تجربة تعليمية رائعة مع متابعة مستمرة ودعم سريع.",
-            rating: 5,
-          },
-        ];
-  const benefitItems = [
-    {
-      title: displayServices[0]?.title || "شرح مبسط",
-      description: displayServices[0]?.description || "شرح واضح ومنظم يساعدك تفهم الدرس خطوة بخطوة.",
-      icon: FaBookOpen,
-      color: "text-blue-500",
-      bg: "bg-blue-50",
-    },
-    {
-      title: displayServices[1]?.title || "متابعة مستمرة",
-      description: displayServices[1]?.description || "متابعة مستواك وتوجيهك للخطوة التالية في كل مرحلة.",
-      icon: FaChalkboardTeacher,
-      color: "text-orange-500",
-      bg: "bg-orange-50",
-    },
-    {
-      title: displayServices[2]?.title || "تدريب وتطبيق",
-      description: displayServices[2]?.description || "أسئلة وتطبيقات عملية تثبت المعلومة وتجهزك للاختبارات.",
-      icon: FaClipboardList,
-      color: "text-blue-500",
-      bg: "bg-blue-50",
-    },
-    {
-      title: displayServices[3]?.title || "دعم مستمر",
-      description: displayServices[3]?.description || "إجابة على استفساراتك ومتابعة تقدمك حتى تحقق هدفك.",
-      icon: FaVideo,
-      color: "text-orange-500",
-      bg: "bg-orange-50",
-    },
-  ];
+  const bioSnippet = (tenant.bio || about.bio || "منصة تعليمية متكاملة تساعدك تحقق أفضل النتائج.").slice(0, 140);
+  const bioSuffix = (tenant.bio || about.bio || "").length > 140 ? "…" : "";
 
   return (
     <motion.div
@@ -579,85 +268,30 @@ export default function TenantPublicLanding({ subdomain }) {
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
       dir="rtl"
       data-theme={isDarkMode ? "dark" : "light"}
-      className={`tenant-public-page ${isDarkMode ? "dark tenant-dark" : "tenant-light"} min-h-screen overflow-x-hidden bg-white text-[var(--t-text)] antialiased selection:bg-blue-500/20 selection:text-slate-900 dark:selection:bg-orange-500/20 dark:selection:text-slate-100`}
+      className={`tenant-public-page ${isDarkMode ? "dark tenant-dark" : "tenant-light"} min-h-screen overflow-x-hidden bg-[#F8FAFC] text-[var(--t-text)] antialiased`}
       style={{
         ...cssVars,
-        fontFamily,
+        fontFamily: TENANT_FONT_BODY,
         fontSize: "var(--t-font-body)",
         lineHeight: "var(--t-line-body)",
         WebkitFontSmoothing: "antialiased",
-        MozOsxFontSmoothing: "grayscale",
-        textRendering: "optimizeLegibility",
       }}
     >
       <style>{`
-        .tenant-public-page {
-          font-family: ${TENANT_FONT_BODY};
-          font-feature-settings: "kern" 1, "liga" 1;
-        }
         .tenant-public-page h1,
         .tenant-public-page h2,
         .tenant-public-page h3,
         .tenant-public-page .font-heading {
           font-family: ${TENANT_FONT_HEADING};
-          letter-spacing: -0.01em;
         }
-        .tenant-public-page.tenant-dark {
-          background: #020617;
-          color: #e2e8f0;
-        }
-        .tenant-public-page.tenant-dark section,
-        .tenant-public-page.tenant-dark main {
-          color: #e2e8f0;
-        }
-        .tenant-public-page.tenant-dark .bg-white,
-        .tenant-public-page.tenant-dark .bg-white\\/90,
-        .tenant-public-page.tenant-dark .bg-white\\/95,
-        .tenant-public-page.tenant-dark .bg-white\\/80,
-        .tenant-public-page.tenant-dark .bg-white\\/75,
-        .tenant-public-page.tenant-dark .bg-slate-50,
-        .tenant-public-page.tenant-dark .bg-slate-100,
-        .tenant-public-page.tenant-dark .bg-\\[\\#f6f8fc\\],
-        .tenant-public-page.tenant-dark .bg-\\[\\#f0f4fa\\],
-        .tenant-public-page.tenant-dark .bg-\\[\\#f4f6f9\\] {
-          background-color: #0f172a !important;
-        }
-        .tenant-public-page.tenant-dark .bg-blue-50 { background-color: rgb(30 58 138 / 0.2) !important; }
-        .tenant-public-page.tenant-dark .bg-orange-50 { background-color: rgb(154 52 18 / 0.15) !important; }
-        .tenant-public-page.tenant-dark .border-slate-100,
-        .tenant-public-page.tenant-dark .border-slate-200,
-        .tenant-public-page.tenant-dark .border-slate-200\\/60,
-        .tenant-public-page.tenant-dark .border-slate-200\\/70,
-        .tenant-public-page.tenant-dark .border-slate-200\\/80,
-        .tenant-public-page.tenant-dark .border-slate-200\\/90 {
-          border-color: #334155 !important;
-        }
-        .tenant-public-page.tenant-dark .text-slate-900 { color: #f8fafc !important; }
-        .tenant-public-page.tenant-dark .text-slate-800 { color: #e2e8f0 !important; }
-        .tenant-public-page.tenant-dark .text-slate-700 { color: #cbd5e1 !important; }
-        .tenant-public-page.tenant-dark .text-slate-600 { color: #94a3b8 !important; }
-        .tenant-public-page.tenant-dark .text-slate-500,
-        .tenant-public-page.tenant-dark .text-slate-400 { color: #94a3b8 !important; }
-        .tenant-public-page.tenant-dark .text-blue-600 { color: #60a5fa !important; }
-        .tenant-public-page.tenant-dark .text-\\[\\#0f1f3d\\] { color: #f1f5f9 !important; }
-        .tenant-public-page.tenant-dark .hover\\:text-\\[\\#0f1f3d\\]:hover { color: #f8fafc !important; }
-        .tenant-public-page.tenant-dark .from-blue-50 { --tw-gradient-from: rgb(30 58 138 / 0.25) !important; }
-        .tenant-public-page.tenant-dark .to-white { --tw-gradient-to: #0f172a !important; }
-        .tenant-public-page.tenant-dark .from-orange-50 { --tw-gradient-from: rgb(154 52 18 / 0.2) !important; }
-        .tenant-public-page.tenant-dark section .bg-\\[linear-gradient\\(180deg\\,\\#ffffff_0\\%\\,\\#f8fafc_45\\%\\,\\#ffffff_100\\%\\)\\] {
-          background: linear-gradient(180deg, #020617 0%, #0f172a 45%, #020617 100%) !important;
-        }
-        .tenant-public-page.tenant-dark .border-dashed { border-color: #475569 !important; }
+        .tenant-public-page.tenant-dark { background: #020617; color: #e2e8f0; }
         html { scroll-behavior: smooth; }
         body:has(.tenant-public-page) { overflow-x: hidden; }
-        @media (prefers-reduced-motion: reduce) {
-          html { scroll-behavior: auto; }
-        }
+        @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
       `}</style>
 
       <ScrollProgress />
 
-      {/* Navbar */}
       <TenantPublicNavbar
         brandName={brandName}
         specialty={specialty}
@@ -669,413 +303,61 @@ export default function TenantPublicLanding({ subdomain }) {
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         navScrolled={navScrolled}
-        alwaysSolid
         brandHref="#home"
         navLinks={TENANT_NAV_LINKS}
       />
 
-      <main className="bg-white transition-colors duration-300 dark:bg-slate-950">
-        <TenantHeroSection
+      <main>
+        <TenantProHero
           specialty={specialty}
           teacherName={teacherName}
           heroTitle={heroTitle}
-          bioText={
-            about.bio ||
-            tenant.bio ||
-            payload?.teacher?.description ||
-            "شرح منظم، متابعة مستمرة، وتدريب مكثف يساعدك تحقق أفضل النتائج."
-          }
-          about={about}
+          bioText={bioText}
           signupHref={signupHref}
           loginHref={loginHref}
           heroStats={heroStats}
           teacherImageUrl={teacherPortraitUrl}
         />
 
-        {/* About */}
-        <AnimatedSection id="about" className={`scroll-mt-20 py-16 md:py-20 ${tlSectionWhite}`} dir="rtl">
-          <div className="mx-auto max-w-6xl px-4 md:px-6 lg:px-8">
-            <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16" dir="ltr">
-              <div className="order-1 flex justify-center lg:order-none">
-                <TeacherPortrait src={teacherPortraitUrl} alt={teacherName} variant="about" />
-              </div>
-              <div className="order-2 text-right lg:order-none" dir="rtl">
-                <Reveal variant="blurUp">
-                  <p className={tlEyebrow}>تعرّف علينا</p>
-                  <h2 className={`${tlHeading} mt-2`}>لماذا {teacherName}؟</h2>
-                  <p className="mt-5 text-sm leading-8 text-slate-600 dark:text-slate-300 sm:text-base">
-                    {about.bio ||
-                      tenant.bio ||
-                      payload?.teacher?.description ||
-                      "شرح منظم، متابعة مستمرة، وتدريب مكثف يساعدك تحقق أفضل النتائج."}
-                  </p>
-                  <ul className="mt-6 space-y-3" dir="rtl">
-                    {benefitItems.slice(0, 4).map((item) => (
-                      <li
-                        key={item.title}
-                        className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-200"
-                      >
-                        <FaCheck className="mt-0.5 shrink-0 text-blue-500" />
-                        <span>{item.title}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <a href={signupHref} className={`mt-8 gap-2 ${tlBtnPrimary}`}>
-                    ابدأ الآن
-                    <FaArrowLeft className="text-xs" />
-                  </a>
-                </Reveal>
-              </div>
-            </div>
-          </div>
-        </AnimatedSection>
+        <TenantProBentoWall
+          teacherName={teacherName}
+          bioText={bioText}
+          services={displayServices}
+          signupHref={signupHref}
+          teacherImageUrl={teacherPortraitUrl}
+        />
 
-        {/* Features / Why Us */}
-        {displayServices.length > 0 && (
-          <AnimatedSection id="services" className={`scroll-mt-20 py-16 md:py-20 ${tlSectionMuted}`} dir="rtl">
-            <div className="mx-auto max-w-[var(--t-max)] px-4 md:px-6 lg:px-8">
-              <SectionHeading
-                eyebrow="لماذا نحن"
-                title="لماذا تتعلم معنا؟"
-                subtitle="تجربة تعليمية تجمع بين الشرح الواضح والمتابعة المستمرة."
-              />
+        <TenantProVideoStrip
+          lectures={freeLectures}
+          loading={freeLecturesLoading}
+          fallbackImage={courseFallbackImage}
+          onPlay={setActiveFreeLecture}
+        />
 
-              {statBarItems.length > 0 && (
-                <StaggerGrid className="mt-8 flex flex-wrap items-center justify-center gap-3">
-                  {statBarItems.map((item) => (
-                    <StaggerItem key={item.label} variant="blur">
-                      <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                        <span className="font-bold text-blue-600 dark:text-blue-400">{item.value}</span>
-                        <span className="text-slate-600 dark:text-slate-400">{item.label}</span>
-                      </div>
-                    </StaggerItem>
-                  ))}
-                </StaggerGrid>
-              )}
+        <TenantProCoursesBento
+          courses={courses}
+          loading={coursesLoading}
+          fallbackImage={courseFallbackImage}
+          loginHref={loginHref}
+          signupHref={signupHref}
+        />
 
-              <StaggerGrid className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
-                {displayServices.map((s, i) => (
-                  <StaggerItem key={`${s.title}-${i}`} variant="blur">
-                    <ServiceFeatureCard service={s} index={i} />
-                  </StaggerItem>
-                ))}
-              </StaggerGrid>
+        <TenantProReviews testimonials={displayTestimonials} />
 
-              <Reveal className="mt-10" variant="scaleIn" delay={0.1}>
-              <div className={`flex flex-col items-center justify-between gap-4 p-6 sm:flex-row ${tlCard}`}>
-                <div className="flex items-center gap-3 text-right">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-white">
-                    <FaGraduationCap />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">جاهز تبدأ؟</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">أنشئ حسابك وابدأ التعلم</p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <a
-                    href={loginHref}
-                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 dark:border-slate-600 dark:text-slate-200"
-                  >
-                    تسجيل الدخول
-                  </a>
-                  <a href={signupHref} className={tlBtnPrimary}>
-                    إنشاء حساب
-                  </a>
-                </div>
-              </div>
-              </Reveal>
-            </div>
-          </AnimatedSection>
-        )}
-
-
-        {/* Free Lectures */}
-        <AnimatedSection id="videos" className={`scroll-mt-20 py-16 md:py-20 ${tlSectionWhite}`} dir="rtl">
-          <div className="mx-auto max-w-[var(--t-max)] px-4 md:px-6 lg:px-8">
-            <SectionHeading
-              eyebrow="محاضرات مجانية"
-              title="محاضرات مجانية"
-              subtitle="شاهد محاضرات مجانية وتعرّف على أسلوب الشرح قبل الاشتراك."
-            />
-
-            {freeLecturesLoading ? (
-              <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="aspect-video animate-pulse rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800"
-                  />
-                ))}
-              </div>
-            ) : freeLectures.length > 0 ? (
-              <StaggerGrid className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {freeLectures.map((lecture) => (
-                  <StaggerItem key={lecture.id} variant="blur">
-                  <motion.button
-                    type="button"
-                    onClick={() => setActiveFreeLecture(lecture)}
-                    className="group block w-full text-right"
-                    whileHover={{ y: -6, transition: { duration: 0.25 } }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <div className={`relative overflow-hidden rounded-2xl ${tlCard}`}>
-                      <motion.img
-                        src={lecture.image_url || courseFallbackImage}
-                        alt={lecture.title}
-                        className="aspect-video w-full object-cover"
-                        loading="lazy"
-                        whileHover={{ scale: 1.05 }}
-                        transition={{ duration: 0.4 }}
-                      />
-                      <div className="absolute inset-0 flex items-center justify-center bg-slate-900/45 transition group-hover:bg-slate-900/55">
-                        <motion.span
-                          className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-blue-600 shadow-md"
-                          whileHover={{ scale: 1.15 }}
-                          animate={{ scale: [1, 1.06, 1] }}
-                          transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-                        >
-                          <FaPlay className="mr-[-2px]" />
-                        </motion.span>
-                      </div>
-                    </div>
-                    <p className="mt-2.5 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                      {lecture.title}
-                    </p>
-                  </motion.button>
-                  </StaggerItem>
-                ))}
-              </StaggerGrid>
-            ) : (
-              <Reveal variant="springPop" className="mt-10">
-                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center dark:border-slate-600 dark:bg-slate-900/50">
-                  <p className="text-base font-semibold text-slate-800 dark:text-slate-100">
-                    لا توجد محاضرات مجانية حالياً
-                  </p>
-                  <p className="mt-2 text-sm text-slate-500">تابعنا — سيتم إضافة محاضرات قريباً</p>
-                </div>
-              </Reveal>
-            )}
-          </div>
-        </AnimatedSection>
-
-        {/* Courses */}
-        <AnimatedSection id="courses" className={`scroll-mt-20 py-16 md:py-20 ${tlSectionMuted}`} dir="rtl">
-          <div className="mx-auto max-w-[var(--t-max)] px-4 md:px-6 lg:px-8">
-            <SectionHeading
-              eyebrow="الكورسات"
-              title="الكورسات المتاحة"
-              subtitle="اختر الكورس المناسب واشترك للوصول إلى المحتوى كاملاً."
-            />
-
-            {coursesLoading ? (
-              <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-80 animate-pulse rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
-                  />
-                ))}
-              </div>
-            ) : courses.length > 0 ? (
-              <>
-                <Reveal variant="blurUp" className="mt-6 text-center text-sm text-slate-600 dark:text-slate-400">
-                  <span className="font-bold text-blue-600 dark:text-blue-400">
-                    {courses.length.toLocaleString("ar-EG")}
-                  </span>{" "}
-                  كورس متاح للاشتراك
-                </Reveal>
-
-                <StaggerGrid className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                  {courses.map((c, i) => (
-                    <StaggerItem key={c.id ?? `course-${i}`} variant="blur">
-                      <CourseCard
-                        course={c}
-                        courseFallbackImage={courseFallbackImage}
-                        loginHref={loginHref}
-                      />
-                    </StaggerItem>
-                  ))}
-                </StaggerGrid>
-              </>
-            ) : (
-              <Reveal variant="springPop" className="mt-10">
-                <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center dark:border-slate-600 dark:bg-slate-900">
-                  <motion.div
-                    className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-blue-50 text-xl text-blue-600 dark:bg-blue-900/30"
-                    animate={{ y: [0, -4, 0] }}
-                    transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-                  >
-                    <FaBookOpen />
-                  </motion.div>
-                  <p className="text-base font-semibold text-slate-800 dark:text-slate-100">لا توجد كورسات متاحة حالياً</p>
-                  <p className="mt-2 text-sm text-slate-500">سيتم عرض الكورسات هنا فور إضافتها</p>
-                  <motion.a
-                    href={signupHref}
-                    className="mt-5 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white"
-                    whileHover={{ scale: 1.04, boxShadow: "0 12px 28px rgba(37,99,235,0.35)" }}
-                    whileTap={{ scale: 0.97 }}
-                  >
-                    أنشئ حسابك
-                    <FaArrowLeft className="text-xs" />
-                  </motion.a>
-                </div>
-              </Reveal>
-            )}
-          </div>
-        </AnimatedSection>
-
-        {/* Testimonials */}
-        {displayTestimonials.length > 0 && (
-          <AnimatedSection className={`py-16 md:py-20 ${tlSectionWhite}`} dir="rtl">
-            <div className="mx-auto max-w-[var(--t-max)] px-4 md:px-6 lg:px-8">
-              <SectionHeading
-                eyebrow="آراء الطلاب"
-                title="ماذا يقول طلابنا؟"
-                subtitle="تجارب حقيقية من طلاب تعلّموا على المنصة."
-              />
-              <StaggerGrid className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {displayTestimonials.map((item, i) => (
-                  <StaggerItem key={`${item.name}-${i}`} variant="blur">
-                    <TestimonialCard item={item} />
-                  </StaggerItem>
-                ))}
-              </StaggerGrid>
-            </div>
-          </AnimatedSection>
-        )}
-
-        {/* CTA */}
-        <AnimatedSection id="cta" className={`px-4 py-16 md:px-6 lg:px-8 ${tlSectionMuted}`}>
-          <Reveal variant="scaleIn" className="mx-auto max-w-5xl">
-          <motion.div
-            className="rounded-3xl bg-[#3182CE] px-6 py-12 text-center text-white shadow-[0_20px_50px_rgba(49,130,206,0.35)] md:px-12 md:py-14"
-            whileHover={{ y: -3 }}
-            transition={{ duration: 0.3 }}
-          >
-            <h2 className="font-heading text-2xl font-bold md:text-3xl">ابدأ رحلة التعلم اليوم</h2>
-            <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-blue-100 md:text-base">
-              انضم الآن واستفد من الشرح المنظم والمتابعة المستمرة.
-            </p>
-            <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <motion.a
-                href={signupHref}
-                className="inline-flex min-w-[150px] items-center justify-center rounded-full bg-white px-7 py-3 text-sm font-bold text-[#3182CE] shadow-md"
-                whileHover={{ scale: 1.04 }}
-                whileTap={{ scale: 0.97 }}
-              >
-                سجّل الآن
-              </motion.a>
-              <motion.a
-                href={loginHref}
-                className="inline-flex min-w-[150px] items-center justify-center rounded-full border-2 border-white/50 px-7 py-3 text-sm font-medium text-white hover:bg-white/10"
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.97 }}
-              >
-                تسجيل الدخول
-              </motion.a>
-            </div>
-          </motion.div>
-          </Reveal>
-        </AnimatedSection>
+        <TenantProCta signupHref={signupHref} loginHref={loginHref} />
       </main>
 
-      {/* Footer */}
-      <AnimatedSection as="footer" id="contact" className="border-t border-slate-200 bg-white py-14 text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
-        <div className="mx-auto max-w-[var(--t-max)] px-4 py-12 md:px-6 lg:px-8">
-          <StaggerGrid className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            <StaggerItem className="sm:col-span-2 lg:col-span-1">
-              <div className="flex items-center gap-2">
-                {tenant.avatar_url ? (
-                  <img src={tenant.avatar_url} alt="" className="h-9 w-9 rounded-full object-cover" />
-                ) : (
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
-                    {brandName.slice(0, 1)}
-                  </span>
-                )}
-                <p className="font-heading text-base font-bold text-slate-900 dark:text-slate-100">{brandName}</p>
-              </div>
-              <p className="mt-4 max-w-xs text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-                {(tenant.bio || about.bio || "منصة تعليمية متكاملة تساعدك تحقق أفضل النتائج.").slice(0, 140)}
-                {(tenant.bio || about.bio || "").length > 140 ? "…" : ""}
-              </p>
-            </StaggerItem>
-            <StaggerItem>
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">روابط سريعة</p>
-              <ul className="mt-4 space-y-2.5 text-sm">
-                {[
-                  ["#home", "الرئيسية"],
-                  ["#services", "لماذا نحن"],
-                  ["#videos", "محاضرات مجانية"],
-                  ["#courses", "الكورسات"],
-                ].map(([href, label]) => (
-                  <li key={href}>
-                    <a href={href} className="transition hover:text-blue-500 dark:hover:text-orange-400">
-                      {label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </StaggerItem>
-            <StaggerItem>
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">الدعم</p>
-              <ul className="mt-4 space-y-2.5 text-sm">
-                <li>
-                  <a href={loginHref} className="transition hover:text-blue-500 dark:hover:text-orange-400">
-                    تسجيل الدخول
-                  </a>
-                </li>
-                <li>
-                  <a href={signupHref} className="transition hover:text-blue-500 dark:hover:text-orange-400">
-                    إنشاء حساب
-                  </a>
-                </li>
-                <li>
-                  <a href={joinHref} className="transition hover:text-blue-500 dark:hover:text-orange-400">
-                    تواصل معنا
-                  </a>
-                </li>
-              </ul>
-            </StaggerItem>
-            <StaggerItem>
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">تابعنا</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <SocialLink href={contact.facebook} label="Facebook">
-                  <FaFacebook />
-                </SocialLink>
-                <SocialLink href={contact.instagram} label="Instagram">
-                  <FaInstagram />
-                </SocialLink>
-                <SocialLink href={contact.telegram} label="Telegram">
-                  <FaTelegram />
-                </SocialLink>
-                <SocialLink href={contact.whatsapp} label="WhatsApp">
-                  <FaWhatsapp />
-                </SocialLink>
-              </div>
-            </StaggerItem>
-          </StaggerGrid>
-          <Reveal variant="fadeIn" delay={0.15}>
-          <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-slate-200 pt-6 text-xs text-slate-400 dark:border-slate-800 sm:flex-row">
-            <div className="text-center sm:text-start">
-              <p>© {new Date().getFullYear()} EM Lectures. جميع الحقوق محفوظة.</p>
-              <p className="mt-1 text-slate-500 dark:text-slate-500">
-                هذه المنصة تابعة لشركة EM Lectures.
-              </p>
-            </div>
-            <div className="flex gap-4">
-              <a href="#" className="hover:text-blue-500 dark:hover:text-orange-400">سياسة الخصوصية</a>
-              <a href="#" className="hover:text-blue-500 dark:hover:text-orange-400">الشروط والأحكام</a>
-            </div>
-          </div>
-          </Reveal>
-        </div>
-      </AnimatedSection>
-
-      <FreeLecturePlayerModal
-        lecture={activeFreeLecture}
-        onClose={() => setActiveFreeLecture(null)}
+      <TenantProFooter
+        brandName={brandName}
+        tenantAvatar={tenant.avatar_url}
+        bioSnippet={bioSnippet + bioSuffix}
+        loginHref={loginHref}
+        signupHref={signupHref}
+        joinHref={joinHref}
+        contact={contact}
       />
+
+      <FreeLecturePlayerModal lecture={activeFreeLecture} onClose={() => setActiveFreeLecture(null)} />
     </motion.div>
   );
 }

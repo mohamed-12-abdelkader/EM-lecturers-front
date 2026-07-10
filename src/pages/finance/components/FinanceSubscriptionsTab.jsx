@@ -1,19 +1,23 @@
 import {
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogOverlay,
   Badge,
   Box,
   Button,
   Card,
   CardBody,
+  Checkbox,
   Flex,
   FormControl,
   FormLabel,
   Heading,
   HStack,
+  Icon,
   Input,
-  Menu,
-  MenuButton,
-  MenuItem,
-  MenuList,
   Modal,
   ModalBody,
   ModalCloseButton,
@@ -21,6 +25,10 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
+  Popover,
+  PopoverAnchor,
+  PopoverBody,
+  PopoverContent,
   Select,
   Spinner,
   Table,
@@ -37,10 +45,20 @@ import {
   VStack,
   IconButton,
 } from "@chakra-ui/react";
-import { useCallback, useEffect, useState } from "react";
-import { MdAdd, MdAutorenew, MdMoreVert, MdPayments, MdTrendingUp } from "react-icons/md";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  MdAdd,
+  MdAutorenew,
+  MdCancel,
+  MdDelete,
+  MdMoreVert,
+  MdPayments,
+  MdTrendingUp,
+} from "react-icons/md";
+import {
+  cancelFinanceSubscription,
   createFinanceSubscription,
+  deleteFinanceSubscription,
   fetchFinancePlans,
   fetchFinanceSubscriptions,
   fetchFinanceTeachers,
@@ -64,6 +82,11 @@ import RecordPaymentModal from "./RecordPaymentModal";
 import SubscriptionUpgradeModal from "./SubscriptionUpgradeModal";
 
 const PAGE_SIZE = 15;
+const DELETABLE_STATUSES = new Set(["cancelled", "expired", "suspended"]);
+
+function deferAction(fn) {
+  window.setTimeout(fn, 0);
+}
 
 export default function FinanceSubscriptionsTab({
   refreshKey,
@@ -89,6 +112,9 @@ export default function FinanceSubscriptionsTab({
   const renewModal = useDisclosure();
   const paymentModal = useDisclosure();
   const upgradeModal = useDisclosure();
+  const cancelModal = useDisclosure();
+  const deleteModal = useDisclosure();
+  const deleteDialogRef = useRef();
   const toast = useToast();
 
   const [createForm, setCreateForm] = useState({
@@ -106,6 +132,9 @@ export default function FinanceSubscriptionsTab({
     notes: "",
     plan_id: "",
   });
+  const [cancelForm, setCancelForm] = useState({ reason: "", notes: "" });
+  const [deleteForce, setDeleteForce] = useState(false);
+  const [actionsSubId, setActionsSubId] = useState(null);
 
   const cardBg = useColorModeValue("white", "gray.800");
   const border = useColorModeValue("gray.100", "gray.700");
@@ -302,6 +331,114 @@ export default function FinanceSubscriptionsTab({
     }
   };
 
+  const openCancel = (sub) => {
+    setSelectedSub(sub);
+    setCancelForm({ reason: "", notes: "" });
+    setActionsSubId(null);
+    deferAction(() => cancelModal.onOpen());
+  };
+
+  const openDelete = (sub) => {
+    setSelectedSub(sub);
+    setDeleteForce(false);
+    setActionsSubId(null);
+    deferAction(() => deleteModal.onOpen());
+  };
+
+  const openPayment = (sub) => {
+    setSelectedSub(sub);
+    setActionsSubId(null);
+    deferAction(() => paymentModal.onOpen());
+  };
+
+  const openRenew = (sub) => {
+    setSelectedSub(sub);
+    setRenewForm({
+      payment_method: "cash",
+      paid_amount: "",
+      notes: "",
+      plan_id: String(sub.plan_id || ""),
+    });
+    setActionsSubId(null);
+    deferAction(() => renewModal.onOpen());
+  };
+
+  const openUpgrade = (sub) => {
+    setSelectedSub(sub);
+    setActionsSubId(null);
+    deferAction(() => upgradeModal.onOpen());
+  };
+
+  const runStatusAction = async (sub, status) => {
+    setActionsSubId(null);
+    await handleStatus(sub, status);
+  };
+
+  const handleCancel = async () => {
+    if (!selectedSub) return;
+    setActionLoading(true);
+    try {
+      await cancelFinanceSubscription(selectedSub.id, {
+        reason: cancelForm.reason.trim() || undefined,
+        notes: cancelForm.notes.trim() || undefined,
+      });
+      toast({
+        title: "تم إلغاء الاشتراك",
+        description: "تم تصفير المبلغ المتبقي وإلغاء الفواتير المفتوحة",
+        status: "success",
+        duration: 4000,
+        isClosable: true,
+      });
+      cancelModal.onClose();
+      onChanged?.();
+      load();
+    } catch (err) {
+      toast({
+        title: "خطأ",
+        description: financeErrorMessage(err),
+        status: "error",
+        duration: 6000,
+        isClosable: true,
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!selectedSub) return;
+    const hasRemaining = Number(selectedSub.remaining_amount) > 0;
+    if (hasRemaining && !deleteForce) {
+      toast({
+        title: "لا يمكن الحذف",
+        description: "يوجد مبلغ متبقي — فعّل «حذف قسري» أو ألغِ الاشتراك أولاً",
+        status: "warning",
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      await deleteFinanceSubscription(selectedSub.id, { force: hasRemaining && deleteForce });
+      toast({ title: "تم حذف الاشتراك من القائمة", status: "success", duration: 3000, isClosable: true });
+      deleteModal.onClose();
+      onChanged?.();
+      load();
+    } catch (err) {
+      toast({
+        title: "خطأ",
+        description: financeErrorMessage(err),
+        status: "error",
+        duration: 6000,
+        isClosable: true,
+      });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.floor(offset / PAGE_SIZE) + 1;
 
@@ -381,7 +518,7 @@ export default function FinanceSubscriptionsTab({
         </Button>
       </HStack>
 
-      <Card bg={cardBg} borderWidth="1px" borderColor={border} borderRadius="2xl" overflow="hidden">
+      <Card bg={cardBg} borderWidth="1px" borderColor={border} borderRadius="2xl" overflow="visible">
         <CardBody p={0}>
           {loading ? (
             <Flex justify="center" py={14}>
@@ -448,70 +585,117 @@ export default function FinanceSubscriptionsTab({
                           <Td>
                             <Badge colorScheme={st.colorScheme}>{st.label}</Badge>
                           </Td>
-                          <Td>
-                            <Menu>
-                              <MenuButton
-                                as={IconButton}
-                                icon={<MdMoreVert />}
-                                variant="ghost"
-                                size="sm"
-                                aria-label="إجراءات"
-                              />
-                              <MenuList>
-                                {sub.remaining_amount > 0 ? (
-                                  <MenuItem
-                                    icon={<MdPayments />}
-                                    onClick={() => {
-                                      setSelectedSub(sub);
-                                      paymentModal.onOpen();
-                                    }}
-                                  >
-                                    تسجيل دفعة
-                                  </MenuItem>
-                                ) : null}
-                                <MenuItem
-                                  icon={<MdAutorenew />}
-                                  onClick={() => {
-                                    setSelectedSub(sub);
-                                    setRenewForm({
-                                      payment_method: "cash",
-                                      paid_amount: "",
-                                      notes: "",
-                                      plan_id: String(sub.plan_id || ""),
-                                    });
-                                    renewModal.onOpen();
+                          <Td position="relative" zIndex={actionsSubId === sub.id ? 2 : 1}>
+                            <Popover
+                              isOpen={actionsSubId === sub.id}
+                              onClose={() => setActionsSubId(null)}
+                              placement="bottom-end"
+                              strategy="fixed"
+                              closeOnBlur
+                              isLazy
+                            >
+                              <PopoverAnchor>
+                                <IconButton
+                                  aria-label="إجراءات"
+                                  icon={<MdMoreVert />}
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActionsSubId((current) =>
+                                      current === sub.id ? null : sub.id,
+                                    );
                                   }}
-                                >
-                                  تجديد
-                                </MenuItem>
-                                {sub.status === "active" ? (
-                                  <MenuItem
-                                    icon={<MdTrendingUp />}
-                                    onClick={() => {
-                                      setSelectedSub(sub);
-                                      upgradeModal.onOpen();
-                                    }}
-                                  >
-                                    ترقية الباقة
-                                  </MenuItem>
-                                ) : null}
-                                {sub.status !== "suspended" ? (
-                                  <MenuItem onClick={() => handleStatus(sub, "suspended")}>
-                                    تعليق
-                                  </MenuItem>
-                                ) : null}
-                                {sub.status !== "active" ? (
-                                  <MenuItem onClick={() => handleStatus(sub, "active")}>
-                                    تفعيل
-                                  </MenuItem>
-                                ) : null}
-                                {sub.status !== "cancelled" ? (
-                                  <MenuItem onClick={() => handleStatus(sub, "cancelled")}>
-                                    إلغاء
-                                  </MenuItem>
-                                ) : null}
-                              </MenuList>
-                            </Menu>
+                                />
+                              </PopoverAnchor>
+                              <PopoverContent
+                                w="220px"
+                                zIndex={2000}
+                                shadow="lg"
+                                borderRadius="xl"
+                                _focus={{ outline: "none" }}
+                              >
+                                <PopoverBody p={1}>
+                                  <VStack align="stretch" spacing={0}>
+                                    {sub.remaining_amount > 0 ? (
+                                      <Button
+                                        variant="ghost"
+                                        justifyContent="flex-start"
+                                        size="sm"
+                                        leftIcon={<Icon as={MdPayments} />}
+                                        onClick={() => openPayment(sub)}
+                                      >
+                                        تسجيل دفعة
+                                      </Button>
+                                    ) : null}
+                                    <Button
+                                      variant="ghost"
+                                      justifyContent="flex-start"
+                                      size="sm"
+                                      leftIcon={<Icon as={MdAutorenew} />}
+                                      onClick={() => openRenew(sub)}
+                                    >
+                                      تجديد
+                                    </Button>
+                                    {sub.status === "active" ? (
+                                      <Button
+                                        variant="ghost"
+                                        justifyContent="flex-start"
+                                        size="sm"
+                                        leftIcon={<Icon as={MdTrendingUp} />}
+                                        onClick={() => openUpgrade(sub)}
+                                      >
+                                        ترقية الباقة
+                                      </Button>
+                                    ) : null}
+                                    {sub.status !== "suspended" ? (
+                                      <Button
+                                        variant="ghost"
+                                        justifyContent="flex-start"
+                                        size="sm"
+                                        onClick={() => runStatusAction(sub, "suspended")}
+                                      >
+                                        تعليق
+                                      </Button>
+                                    ) : null}
+                                    {sub.status !== "active" ? (
+                                      <Button
+                                        variant="ghost"
+                                        justifyContent="flex-start"
+                                        size="sm"
+                                        onClick={() => runStatusAction(sub, "active")}
+                                      >
+                                        تفعيل
+                                      </Button>
+                                    ) : null}
+                                    {sub.status !== "cancelled" ? (
+                                      <Button
+                                        variant="ghost"
+                                        justifyContent="flex-start"
+                                        size="sm"
+                                        color="orange.600"
+                                        leftIcon={<Icon as={MdCancel} />}
+                                        onClick={() => openCancel(sub)}
+                                      >
+                                        إلغاء الاشتراك
+                                      </Button>
+                                    ) : null}
+                                    {DELETABLE_STATUSES.has(sub.status) ? (
+                                      <Button
+                                        variant="ghost"
+                                        justifyContent="flex-start"
+                                        size="sm"
+                                        color="red.500"
+                                        leftIcon={<Icon as={MdDelete} />}
+                                        onClick={() => openDelete(sub)}
+                                      >
+                                        حذف من القائمة
+                                      </Button>
+                                    ) : null}
+                                  </VStack>
+                                </PopoverBody>
+                              </PopoverContent>
+                            </Popover>
                           </Td>
                         </Tr>
                       );
@@ -763,6 +947,127 @@ export default function FinanceSubscriptionsTab({
         plans={plans}
         onSuccess={handleUpgradeSuccess}
       />
+
+      <Modal isOpen={cancelModal.isOpen} onClose={cancelModal.onClose} size="md">
+        <ModalOverlay />
+        <ModalContent dir="rtl">
+          <ModalHeader>إلغاء الاشتراك</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody>
+            <VStack spacing={4} align="stretch">
+              <Text fontSize="sm" color={muted}>
+                {selectedSub?.subscription_number || `#${selectedSub?.id}`} —{" "}
+                {selectedSub?.teacher_name}
+              </Text>
+              <Box
+                p={3}
+                borderRadius="lg"
+                bg="orange.50"
+                borderWidth="1px"
+                borderColor="orange.100"
+                _dark={{ bg: "orange.900", borderColor: "orange.800" }}
+              >
+                <Text fontSize="xs" color={muted}>
+                  عند الإلغاء: تصبح الحالة «ملغي» ويُصفَّر المبلغ المتبقي، وتُلغى الفواتير
+                  المفتوحة (غير مدفوعة / جزئية). إن لم يبقَ اشتراك نشط آخر تُعطَّل منصة المدرس
+                  وقد تُحدَّث باقته إلى bronze.
+                </Text>
+              </Box>
+              <FormControl>
+                <FormLabel>سبب الإلغاء</FormLabel>
+                <Input
+                  placeholder="مثال: طلب المدرس"
+                  value={cancelForm.reason}
+                  onChange={(e) => setCancelForm((p) => ({ ...p, reason: e.target.value }))}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>ملاحظات (اختياري)</FormLabel>
+                <Textarea
+                  placeholder="ملاحظة إضافية..."
+                  value={cancelForm.notes}
+                  onChange={(e) => setCancelForm((p) => ({ ...p, notes: e.target.value }))}
+                  rows={3}
+                />
+              </FormControl>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="ghost" mr={3} onClick={cancelModal.onClose}>
+              تراجع
+            </Button>
+            <Button colorScheme="orange" onClick={handleCancel} isLoading={actionLoading}>
+              تأكيد الإلغاء
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <AlertDialog
+        isOpen={deleteModal.isOpen}
+        leastDestructiveRef={deleteDialogRef}
+        onClose={deleteModal.onClose}
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent dir="rtl">
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              حذف الاشتراك من القائمة
+            </AlertDialogHeader>
+            <AlertDialogBody>
+              <VStack align="stretch" spacing={3}>
+                <Text>
+                  هل تريد حذف اشتراك{" "}
+                  <strong>
+                    {selectedSub?.subscription_number || `#${selectedSub?.id}`}
+                  </strong>{" "}
+                  للمدرس <strong>{selectedSub?.teacher_name}</strong>؟
+                </Text>
+                <Text fontSize="sm" color={muted}>
+                  يُزال السجل من القائمة. الدفعات المرتبطة تُحذف تلقائياً، والفواتير تبقى بدون
+                  ربط بالاشتراك.
+                </Text>
+                {Number(selectedSub?.remaining_amount) > 0 ? (
+                  <Box
+                    p={3}
+                    borderRadius="lg"
+                    bg="red.50"
+                    borderWidth="1px"
+                    borderColor="red.100"
+                    _dark={{ bg: "red.900", borderColor: "red.800" }}
+                  >
+                    <Text fontSize="sm" fontWeight="semibold" mb={2}>
+                      يوجد مبلغ متبقي: {formatMoney(selectedSub.remaining_amount)}
+                    </Text>
+                    <Checkbox
+                      isChecked={deleteForce}
+                      onChange={(e) => setDeleteForce(e.target.checked)}
+                      colorScheme="red"
+                    >
+                      حذف قسري (force=true)
+                    </Checkbox>
+                  </Box>
+                ) : null}
+              </VStack>
+            </AlertDialogBody>
+            <AlertDialogFooter>
+              <Button ref={deleteDialogRef} onClick={deleteModal.onClose}>
+                تراجع
+              </Button>
+              <Button
+                colorScheme="red"
+                onClick={handleDelete}
+                ml={3}
+                isLoading={actionLoading}
+                isDisabled={
+                  Number(selectedSub?.remaining_amount) > 0 && !deleteForce
+                }
+              >
+                حذف
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
     </VStack>
   );
 }

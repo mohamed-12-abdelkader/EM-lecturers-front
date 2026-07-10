@@ -119,6 +119,8 @@ import baseUrl from "../../api/baseUrl";
 import UserType from "../../Hooks/auth/userType";
 import { useParams, useNavigate } from "react-router-dom";
 import CourseHeroSection from "./components/CourseHeroSection";
+import CourseProTabBar, { CourseProTab } from "./components/CourseProTabBar";
+import { crContainer } from "./courseTheme";
 import LectureCard from "./components/LectureCard";
 import LecturesTab from "./components/LecturesTab";
 import CourseExamsTab from "./components/CourseExamsTab";
@@ -921,7 +923,7 @@ const CourseDetailsPage = () => {
   };
 
   // Colors for light and dark mode
-  const pageBg = useColorModeValue("white", "gray.900");
+  const pageBg = useColorModeValue("gray.50", "gray.900");
   const sectionBg = useColorModeValue("white", "gray.800");
   const headingColor = useColorModeValue("blue.700", "blue.200");
   const textColor = useColorModeValue("gray.700", "gray.300");
@@ -3057,54 +3059,8 @@ display:block;
   }
 
   const { course, lectures } = courseData;
-  // =========================
-  // MOCK DATA (جاهزة للاستبدال لاحقاً بـ APIs)
-  // =========================
   const mockCompletionPercent = 62;
-  const mockStats = [
-    {
-      label: "عدد المحاضرات",
-      value: `${lectures?.length || 0}`,
-      icon: FaBookOpen,
-      tone: "blue",
-    },
-    {
-      label: "المدة المتوقعة",
-      value: "6 أسابيع",
-      icon: FaClock,
-      tone: "orange",
-    },
-    {
-      label: "المستوى",
-      value: course?.grade_name || "الصف الثالث الثانوي",
-      icon: FaGraduationCap,
-      tone: "purple",
-    },
-    {
-      label: "تقييم الطلاب",
-      value: "4.8/5",
-      icon: FaStar,
-      tone: "blue",
-    },
-  ];
-  const mockLearningPath = [
-    {
-      title: "الأسبوع 1",
-      desc: "تهيئة المفاهيم + تدريبات سريعة على نمط الأسئلة",
-    },
-    {
-      title: "الأسبوع 2",
-      desc: "حل تدريجي مع مراجعة نقاط الضعف (Mock نص)",
-    },
-    {
-      title: "الأسبوع 3",
-      desc: "اختبارات قصيرة + بنك أسئلة للتثبيت",
-    },
-    {
-      title: "الأسبوع 4",
-      desc: "مراجعة نهائية + امتحان تجريبي شامل",
-    },
-  ];
+
   return (
     <Box minH="100vh" bg={pageBg} dir="rtl" overflowX="hidden">
       {/* Hero Section - Full Width Image with Overlay */}
@@ -3112,6 +3068,9 @@ display:block;
         course={course}
         isTeacher={isTeacher}
         isAdmin={isAdmin}
+        completionPercent={mockCompletionPercent}
+        showProgress={!isTeacher && !isAdmin}
+        lecturesCount={lectures?.length || 0}
       />
 
       {/* Video Player */}
@@ -3127,42 +3086,34 @@ display:block;
 
       {/* زر إنشاء أكواد للمدرس فقط */}
       {isTeacher && (
-        <Flex
-          justify={{ base: "center", md: "flex-end" }}
-          align="center"
-          px={{ base: 2, sm: 6, md: 10 }}
-          mt={{ base: 2, md: 4 }}
-          mb={{ base: 0, md: -8 }}
-          gap={{ base: 2, md: 3 }}
-          direction={{ base: "column", sm: "row" }}
-          flexWrap="wrap"
-        >
-          <Button
-            colorScheme="purple"
-            leftIcon={<FaKey />}
-            borderRadius="xl"
-            onClick={() => setCodeModalOpen(true)}
-            w={{ base: "100%", sm: "auto" }}
-            size={{ base: "sm", md: "md" }}
-            fontSize={{ base: "xs", md: "sm" }}
-          >
-            إنشاء أكواد
-          </Button>
-          <Button
-            colorScheme="blue"
-            leftIcon={<FaKey />}
-            borderRadius="xl"
-            onClick={() => {
-              setShowCodesModal(true);
-              fetchActivationCodes();
-            }}
-            w={{ base: "100%", sm: "auto" }}
-            size={{ base: "sm", md: "md" }}
-            fontSize={{ base: "xs", md: "sm" }}
-          >
-            عرض أكواد الكورس
-          </Button>
-        </Flex>
+        <Box className={crContainer} dir="rtl" py={3}>
+          <Flex justify={{ base: "stretch", md: "flex-end" }} gap={3} flexWrap="wrap">
+            <Button
+              colorScheme="orange"
+              leftIcon={<FaKey />}
+              borderRadius="xl"
+              onClick={() => setCodeModalOpen(true)}
+              w={{ base: "full", sm: "auto" }}
+              size="sm"
+            >
+              إنشاء أكواد
+            </Button>
+            <Button
+              colorScheme="blue"
+              variant="outline"
+              leftIcon={<FaKey />}
+              borderRadius="xl"
+              onClick={() => {
+                setShowCodesModal(true);
+                fetchActivationCodes();
+              }}
+              w={{ base: "full", sm: "auto" }}
+              size="sm"
+            >
+              عرض أكواد الكورس
+            </Button>
+          </Flex>
+        </Box>
       )}
       {/* مودال إنشاء الأكواد */}
       <Modal
@@ -3817,209 +3768,50 @@ display:block;
         </ModalContent>
       </Modal>
 
-      <VStack
-        spacing={4}
-        align="stretch"
-        maxW="container.xl"
-        mx="auto"
-        px={{ base: 0, sm: 3, md: 4 }}
-        py={{ base: 4, sm: 6, md: 8 }}
-        className="lecture_container"
-        w="full"
-      >
+      <Box className={crContainer} py={{ base: 4, md: 8 }} dir="rtl" w="full">
         <MotionBox
           initial="hidden"
           animate="visible"
           variants={itemVariants}
-          bg={sectionBg}
-          borderRadius="2xl"
-          shadow="sm"
-          borderWidth="1px"
-          borderColor={borderColor}
           w="100%"
           minW={0}
           overflowX="hidden"
         >
-          <Box px={{ base: 2, sm: 4, md: 6 }} py={4}>
-            <Tabs
-              index={tabIndex}
-              onChange={setTabIndex}
-              variant="unstyled"
-              size={{ base: "sm", md: "md" }}
-            >
-              <Box mb={6} overflow={{ base: "visible", md: "hidden" }}>
-                <TabList
-                  bg={useColorModeValue("white", "whiteAlpha.100")}
-                  p={{ base: 2, md: 2.5 }}
-                  borderRadius="2xl"
-                  display="flex"
-                  flexWrap={{ base: "wrap", md: "nowrap" }}
-                  gap={2}
-                  w={{ base: "full", md: "auto" }}
-                  boxShadow={useColorModeValue("0 8px 24px rgba(15,23,42,0.08)", "0 8px 24px rgba(0,0,0,0.35)")}
-                  borderWidth="1px"
-                  borderColor={useColorModeValue("gray.200", "whiteAlpha.200")}
-                  position="relative"
-                  zIndex={1}
-                >
-                  {hasActiveLiveStream && (
-                    <Tab
-                      fontWeight="bold"
-                      fontSize={{ base: "13px", sm: "15px" }}
-                      color={useColorModeValue("red.600", "red.400")}
-                      borderRadius="full"
-                      py={{ base: 2.5, md: 3 }}
-                      px={{ base: 4, md: 5 }}
-                      flex={{ base: "1 1 calc(50% - 8px)", md: "initial" }}
-                      justifyContent="center"
-                      _selected={{
-                        color: "white",
-                        bgGradient: "linear(to-r, red.500, red.400)",
-                        boxShadow: "0 6px 16px rgba(229, 62, 62, 0.35)",
-                        transform: "translateY(-1px)",
-                      }}
-                      _hover={{
-                        color: useColorModeValue("red.700", "red.200"),
-                        bg: useColorModeValue("red.50", "whiteAlpha.200"),
-                      }}
-                      border="2px solid"
-                      borderColor={useColorModeValue("red.200", "red.400")}
-                      transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
-                      display="flex"
-                      alignItems="center"
-                      gap={2}
-                    >
-                      <Icon
-                        as={FaBroadcastTower}
-                        fontSize="lg"
-                        animation="pulse 1.5s ease-in-out infinite"
-                      />
-                      المحاضرات المباشرة
-                      <Badge
-                        colorScheme="red"
-                        variant="solid"
-                        borderRadius="full"
-                        px={2}
-                        animation="pulse 1.5s ease-in-out infinite"
-                      >
-                        مباشر الآن
-                      </Badge>
-                    </Tab>
-                  )}
-                  <Tab
-                    fontWeight="bold"
-                    fontSize={{ base: "13px", sm: "15px" }}
-                    color={useColorModeValue("gray.600", "gray.400")}
-                    borderRadius="full"
-                    py={{ base: 2.5, md: 3 }}
-                    px={{ base: 4, md: 5 }}
-                    flex={{ base: "1 1 calc(50% - 8px)", md: "initial" }}
-                    justifyContent="center"
-                    _selected={{
-                      color: "white",
-                      bgGradient: "linear(to-r, blue.500, blue.400)",
-                      boxShadow: "0 6px 16px rgba(49, 130, 206, 0.32)",
-                      transform: "translateY(-1px)",
-                    }}
-                    _hover={{
-                      color: useColorModeValue("blue.600", "blue.300"),
-                      bg: useColorModeValue("blue.50", "whiteAlpha.200"),
-                    }}
-                    transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
-                    display="flex"
-                    alignItems="center"
-                    gap={2}
-                  >
-                    <Icon as={FaPlayCircle} fontSize="lg" />
-                    المحاضرات
-                  </Tab>
-                  {!hasActiveLiveStream && (
-                    <Tab
-                      fontWeight="bold"
-                      fontSize={{ base: "13px", sm: "15px" }}
-                      color={useColorModeValue("gray.600", "gray.400")}
-                      borderRadius="full"
-                      py={{ base: 2.5, md: 3 }}
-                      px={{ base: 4, md: 5 }}
-                      flex={{ base: "1 1 calc(50% - 8px)", md: "initial" }}
-                      justifyContent="center"
-                      _selected={{
-                        color: "white",
-                        bgGradient: "linear(to-r, green.500, green.400)",
-                        boxShadow: "0 6px 16px rgba(56, 161, 105, 0.32)",
-                        transform: "translateY(-1px)",
-                      }}
-                      _hover={{
-                        color: useColorModeValue("green.600", "green.300"),
-                        bg: useColorModeValue("green.50", "whiteAlpha.200"),
-                      }}
-                      transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
-                      display="flex"
-                      alignItems="center"
-                      gap={2}
-                    >
-                      <Icon as={FaVideo} fontSize="lg" />
-                      المحاضرات المباشرة
-                    </Tab>
-                  )}
-
-                  <Tab
-                    fontWeight="bold"
-                    fontSize={{ base: "13px", sm: "15px" }}
-                    color={useColorModeValue("gray.600", "gray.400")}
-                    borderRadius="full"
-                    py={{ base: 2.5, md: 3 }}
-                    px={{ base: 4, md: 5 }}
-                    flex={{ base: "1 1 calc(50% - 8px)", md: "initial" }}
-                    justifyContent="center"
-                    _selected={{
-                      color: "white",
-                      bgGradient: "linear(to-r, purple.500, purple.400)",
-                      boxShadow: "0 6px 16px rgba(128, 90, 213, 0.32)",
-                      transform: "translateY(-1px)",
-                    }}
-                    _hover={{
-                      color: useColorModeValue("purple.600", "purple.300"),
-                      bg: useColorModeValue("purple.50", "whiteAlpha.200"),
-                    }}
-                    transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
-                    display="flex"
-                    alignItems="center"
-                    gap={2}
-                  >
-                    <Icon as={FaRobot} fontSize="lg" />
-                    المساعد العلمي
-                  </Tab>
-
-                  <Tab
-                    fontWeight="bold"
-                    fontSize={{ base: "13px", sm: "15px" }}
-                    color={useColorModeValue("gray.600", "gray.400")}
-                    borderRadius="full"
-                    py={{ base: 2.5, md: 3 }}
-                    px={{ base: 4, md: 5 }}
-                    flex={{ base: "1 1 calc(50% - 8px)", md: "initial" }}
-                    justifyContent="center"
-                    _selected={{
-                      color: "white",
-                      bgGradient: "linear(to-r, orange.500, orange.400)",
-                      boxShadow: "0 6px 16px rgba(237, 137, 54, 0.32)",
-                      transform: "translateY(-1px)",
-                    }}
-                    _hover={{
-                      color: useColorModeValue("orange.500", "orange.300"),
-                      bg: useColorModeValue("orange.50", "whiteAlpha.200"),
-                    }}
-                    transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
-                    display="flex"
-                    alignItems="center"
-                    gap={2}
-                  >
-                    <Icon as={FaListOl} fontSize="lg" />
-                    الامتحانات
-                  </Tab>
-                </TabList>
-              </Box>
+          <Tabs
+            index={tabIndex}
+            onChange={setTabIndex}
+            variant="unstyled"
+            size={{ base: "sm", md: "md" }}
+          >
+            <CourseProTabBar>
+              {hasActiveLiveStream && (
+                <CourseProTab colorKey="red">
+                  <Icon as={FaBroadcastTower} fontSize="lg" animation="pulse 1.5s ease-in-out infinite" />
+                  المحاضرات المباشرة
+                  <Badge colorScheme="red" variant="solid" borderRadius="full" px={2} animation="pulse 1.5s ease-in-out infinite">
+                    مباشر الآن
+                  </Badge>
+                </CourseProTab>
+              )}
+              <CourseProTab colorKey="blue">
+                <Icon as={FaPlayCircle} fontSize="lg" />
+                المحاضرات
+              </CourseProTab>
+              {!hasActiveLiveStream && (
+                <CourseProTab colorKey="green">
+                  <Icon as={FaVideo} fontSize="lg" />
+                  المحاضرات المباشرة
+                </CourseProTab>
+              )}
+              <CourseProTab colorKey="purple">
+                <Icon as={FaRobot} fontSize="lg" />
+                المساعد العلمي
+              </CourseProTab>
+              <CourseProTab colorKey="orange">
+                <Icon as={FaListOl} fontSize="lg" />
+                الامتحانات
+              </CourseProTab>
+            </CourseProTabBar>
 
               <TabPanels p={0}>
                 {hasActiveLiveStream && (
@@ -4047,15 +3839,10 @@ display:block;
                     </Box>
                   </TabPanel>
                 )}
-                <TabPanel px={{ base: 0, sm: 2, md: 4 }} py={4}>
+                <TabPanel px={0} py={4}>
                   <Box
-                    bg={sectionBg}
-                    borderRadius="xl"
-                    borderWidth="1px"
-                    borderColor={borderColor}
-                    p={{ base: 3, md: 4 }}
+                    className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:p-6"
                     minH="280px"
-                    boxShadow="sm"
                   >
                     <LecturesTab
                       lectures={lectures}
@@ -4152,9 +3939,8 @@ display:block;
                 </TabPanel>
               </TabPanels>
             </Tabs>
-          </Box>
         </MotionBox>
-      </VStack>
+      </Box>
 
       {/* Lecture Modal */}
       <LectureModal

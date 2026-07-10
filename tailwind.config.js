@@ -5,7 +5,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Changa', 'Noto Sans Arabic', 'sans-serif'],
+        sans: ['"Noto Sans Arabic"', 'Changa', 'sans-serif'],
+        heading: ['"Noto Naskh Arabic"', '"Noto Sans Arabic"', 'sans-serif'],
       },
     },
   },

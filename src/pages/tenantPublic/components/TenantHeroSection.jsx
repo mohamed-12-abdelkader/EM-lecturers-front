@@ -1,12 +1,17 @@
 import { motion } from "framer-motion";
-import { FaArrowLeft, FaAward, FaGraduationCap } from "react-icons/fa";
+import { FaArrowLeft, FaAward, FaChalkboardTeacher, FaGraduationCap } from "react-icons/fa";
 import { HeroStagger, HeroStaggerItem, Tilt3D } from "../tenantLandingMotion";
-import { TL_BLUE, TL_ORANGE, tlBtnOutline, tlBtnPrimary } from "../tenantLandingTheme";
+import {
+  TL_BLUE,
+  TL_ORANGE,
+  tlBtnOutlineDark,
+  tlBtnPrimary,
+} from "../tenantLandingTheme";
 
 const EASE = [0.22, 1, 0.36, 1];
 
 const PORTRAIT_BG = {
-  hero: `linear-gradient(165deg, ${TL_BLUE} 0%, #2b6cb0 50%, #2563a8 100%)`,
+  hero: `linear-gradient(165deg, ${TL_BLUE} 0%, #2b6cb0 50%, #2c5282 100%)`,
   about: `linear-gradient(155deg, #FBD38D 0%, ${TL_ORANGE} 38%, #c05621 72%, #9c4221 100%)`,
 };
 
@@ -86,7 +91,7 @@ function PortraitFrame({ src, alt, variant, sizeVar }) {
           </div>
         ) : (
           <div className="flex h-full w-full items-center justify-center">
-            <span className="text-6xl opacity-40">👨‍🏫</span>
+            <FaChalkboardTeacher className="text-6xl text-white/40" aria-hidden />
           </div>
         )}
       </motion.div>
@@ -94,7 +99,7 @@ function PortraitFrame({ src, alt, variant, sizeVar }) {
   );
 }
 
-/** بورتريه مع أنيميشن 3D — hero أزرق / about برتقالي */
+/** بورتريه مع أنيميشن 3D — hero navy / about gold */
 export function TeacherPortrait({ src, alt, variant = "hero", enable3D = true }) {
   const sizeVar = variant === "about" ? "min(380px, 90vw)" : "min(360px, 88vw)";
   const isAbout = variant === "about";
@@ -219,9 +224,7 @@ export default function TenantHeroSection({
 
               <HeroStaggerItem as="p" className="mb-2 text-sm font-semibold text-slate-600 dark:text-slate-400">
                 منصة{" "}
-                <span className="font-bold" style={{ color: TL_BLUE }}>
-                  {teacherName}
-                </span>
+                <span className="font-bold text-blue-500">{teacherName}</span>
               </HeroStaggerItem>
 
               <HeroStaggerItem as="h1">
@@ -238,13 +241,13 @@ export default function TenantHeroSection({
                 <HeroStaggerItem className="mb-6 flex flex-wrap justify-end gap-2">
                   {about.experience ? (
                     <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white px-4 py-2 text-xs font-medium text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                      <FaAward style={{ color: TL_ORANGE }} />
+                      <FaAward className="text-orange-500" />
                       {about.experience}
                     </span>
                   ) : null}
                   {about.qualifications ? (
                     <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white px-4 py-2 text-xs font-medium text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                      <FaGraduationCap style={{ color: TL_BLUE }} />
+                      <FaGraduationCap className="text-blue-500" />
                       {about.qualifications}
                     </span>
                   ) : null}
@@ -256,7 +259,7 @@ export default function TenantHeroSection({
                   ابدأ التعلّم الآن
                   <FaArrowLeft className="text-[10px]" />
                 </a>
-                <a href={loginHref} className={tlBtnOutline}>
+                <a href={loginHref} className={tlBtnOutlineDark}>
                   تسجيل الدخول
                 </a>
               </HeroStaggerItem>
@@ -269,10 +272,11 @@ export default function TenantHeroSection({
                     return (
                       <motion.div
                         key={item.label}
-                        className="rounded-2xl border border-slate-100 bg-white px-3 py-4 text-center shadow-[0_6px_20px_rgba(15,23,42,0.05)] dark:border-slate-700 dark:bg-slate-900"
+                        className="rounded-2xl border border-slate-100 bg-white px-3 py-4 text-center shadow-[0_6px_20px_rgba(49,130,206,0.08)] dark:border-slate-700 dark:bg-slate-900"
                         style={{ transformStyle: "preserve-3d" }}
                         whileHover={{
                           y: -6,
+                          scale: 1.02,
                           rotateX: 6,
                           rotateY: i === 0 ? -4 : i === 2 ? 4 : 0,
                           boxShadow: "0 16px 32px rgba(49, 130, 206, 0.15)",
@@ -280,8 +284,7 @@ export default function TenantHeroSection({
                         transition={{ type: "spring", stiffness: 380, damping: 22 }}
                       >
                         <Icon
-                          className="mx-auto mb-2 text-lg"
-                          style={{ color: i === 1 ? TL_ORANGE : TL_BLUE }}
+                          className={`mx-auto mb-2 text-lg ${i === 1 ? "text-orange-500" : "text-blue-500"}`}
                         />
                         <p className="font-heading text-lg font-bold text-slate-900 dark:text-white">
                           {item.value}

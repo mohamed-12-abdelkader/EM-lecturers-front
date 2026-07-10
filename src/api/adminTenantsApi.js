@@ -25,6 +25,7 @@ function adminHeaders(token, contentType) {
  *   search?: string,
  *   is_active?: boolean | "",
  *   include_default?: boolean,
+ *   include_deleted?: boolean,
  * }} params
  * @param {string} token
  */
@@ -47,6 +48,9 @@ export async function fetchAdminTenants(params = {}, token) {
   }
   if (params.include_default) {
     query.set("include_default", "true");
+  }
+  if (params.include_deleted) {
+    query.set("include_deleted", "true");
   }
 
   const { data } = await baseUrl.get(`${ADMIN_TENANTS_API}?${query}`, {
@@ -131,6 +135,52 @@ export async function patchAdminTenantMultipart(tenantId, formData, token) {
   }
 
   return data;
+}
+
+/**
+ * DELETE /api/admin/tenants/:id
+ * Auth: أدمن على tenant default — يتطلب تأكيد الـ subdomain
+ * @param {number|string} tenantId
+ * @param {{ confirm_subdomain: string }} options
+ * @param {string} token
+ */
+export async function deleteAdminTenant(tenantId, { confirm_subdomain } = {}, token) {
+  const id = Number(tenantId);
+  if (!id) {
+    throw new Error("معرّف المنصة غير صالح");
+  }
+
+  const subdomain = String(confirm_subdomain || "").trim();
+  const config = {
+    headers: adminHeaders(token, "application/json"),
+  };
+
+  if (subdomain) {
+    config.data = { confirm_subdomain: subdomain };
+  }
+
+  const { data } = await baseUrl.delete(`${ADMIN_TENANTS_API}/${id}`, config);
+
+  if (!data?.success) {
+    const err = new Error(data?.message || "فشل حذف المنصة");
+    err.response = { data };
+    throw err;
+  }
+
+  return data;
+}
+
+export function isDefaultTenant(tenant) {
+  if (!tenant) return false;
+  if (tenant.is_default === true) return true;
+  return String(tenant.subdomain || "").toLowerCase() === "default";
+}
+
+export function isDeletedTenant(tenant) {
+  if (!tenant) return false;
+  if (tenant.is_deleted === true || tenant.deleted_at) return true;
+  const subdomain = String(tenant.subdomain || "");
+  return /^deleted-\d+-/i.test(subdomain);
 }
 
 export function getTenantPlatformUrl(subdomain) {

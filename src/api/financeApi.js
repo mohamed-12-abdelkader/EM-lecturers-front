@@ -68,6 +68,28 @@ export async function fetchFinanceDashboard(period = "month") {
   return assertSuccess(data, "فشل تحميل لوحة المالية");
 }
 
+export async function fetchFinanceIncomeDetails(params = {}) {
+  const { data } = await baseUrl.get(`${FINANCE_API}/income/details${buildQuery(params)}`, {
+    headers: financeHeaders(),
+  });
+  const payload = assertSuccess(data, "فشل تحميل تفاصيل الدخل");
+  if (Array.isArray(payload)) {
+    return { items: payload, total: payload.length, summary: {} };
+  }
+  const summary = payload?.summary ?? {};
+  return {
+    items: payload?.items ?? payload?.income ?? payload?.details ?? [],
+    total: Number(payload?.total) || 0,
+    limit: payload?.limit,
+    offset: payload?.offset,
+    summary: {
+      gross_collected: summary.gross_collected ?? payload?.gross_collected,
+      active_revenue: summary.active_revenue ?? payload?.active_revenue,
+      reversed_amount: summary.reversed_amount ?? payload?.reversed_amount,
+    },
+  };
+}
+
 export async function fetchFinancePlans() {
   const { data } = await baseUrl.get(`${FINANCE_API}/plans`, {
     headers: financeHeaders(),
@@ -128,6 +150,21 @@ export async function updateFinanceSubscriptionStatus(id, payload) {
     headers: financeHeaders("application/json"),
   });
   return assertSuccess(data, "فشل تحديث حالة الاشتراك");
+}
+
+export async function cancelFinanceSubscription(id, payload = {}) {
+  const { data } = await baseUrl.post(`${FINANCE_API}/subscriptions/${id}/cancel`, payload, {
+    headers: financeHeaders("application/json"),
+  });
+  return assertSuccess(data, "فشل إلغاء الاشتراك");
+}
+
+export async function deleteFinanceSubscription(id, { force = false } = {}) {
+  const { data } = await baseUrl.delete(
+    `${FINANCE_API}/subscriptions/${id}${buildQuery({ force: force ? true : undefined })}`,
+    { headers: financeHeaders() },
+  );
+  return assertSuccess(data, "فشل حذف الاشتراك");
 }
 
 export async function fetchFinanceSubscriptionById(id) {

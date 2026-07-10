@@ -26,6 +26,15 @@ import {
   StatLabel,
   StatNumber,
   StatHelpText,
+  useToast,
+  AlertDialog,
+  AlertDialogOverlay,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogBody,
+  AlertDialogFooter,
+  FormHelperText,
+  useDisclosure,
 } from "@chakra-ui/react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -42,11 +51,15 @@ import {
   MdRefresh,
   MdDomain,
   MdEdit,
+  MdDelete,
 } from "react-icons/md";
 import { FaChalkboardTeacher, FaLayerGroup } from "react-icons/fa";
 import {
   fetchAdminTenants,
+  deleteAdminTenant,
   getTenantPlatformUrl,
+  isDefaultTenant,
+  isDeletedTenant,
 } from "../../../api/adminTenantsApi";
 
 const MotionBox = motion(Box);
@@ -76,7 +89,7 @@ function formatNumber(value) {
   return n.toLocaleString("ar-EG");
 }
 
-function TenantCard({ tenant, index }) {
+function TenantCard({ tenant, index, onDelete }) {
   const navigate = useNavigate();
   const cardBg = useColorModeValue("white", "gray.800");
   const borderColor = useColorModeValue("gray.100", "gray.700");
@@ -89,6 +102,9 @@ function TenantCard({ tenant, index }) {
   const avatarSrc = tenant.avatar_url || owner?.avatar || undefined;
   const packageMeta = getPackageMeta(owner?.subscription_package);
   const specialty = tenant.specialty || owner?.subject;
+  const isDefault = isDefaultTenant(tenant);
+  const isDeleted = isDeletedTenant(tenant);
+  const canOpenPlatform = !isDeleted && platformUrl !== "#";
 
   const handleEdit = () => {
     navigate(`/admin/addteacher?mode=edit&tenantId=${tenant.id}`, {
@@ -158,12 +174,12 @@ function TenantCard({ tenant, index }) {
                 </HStack>
                 <HStack spacing={2} flexWrap="wrap">
                   <Badge
-                    colorScheme={tenant.is_active ? "green" : "red"}
+                    colorScheme={isDeleted ? "red" : tenant.is_active ? "green" : "orange"}
                     borderRadius="full"
                     px={2}
                     fontSize="xs"
                   >
-                    {tenant.is_active ? "نشطة" : "موقوفة"}
+                    {isDeleted ? "محذوفة" : tenant.is_active ? "نشطة" : "موقوفة"}
                   </Badge>
                   {owner?.subscription_package ? (
                     <Badge
@@ -180,31 +196,48 @@ function TenantCard({ tenant, index }) {
               </VStack>
             </HStack>
             <HStack spacing={1} flexShrink={0}>
-              <Tooltip label="تعديل المنصة" hasArrow>
-                <IconButton
-                  aria-label="تعديل المنصة"
-                  icon={<MdEdit />}
-                  size="sm"
-                  colorScheme="orange"
-                  variant="outline"
-                  borderRadius="lg"
-                  onClick={handleEdit}
-                />
-              </Tooltip>
-              <Tooltip label="فتح المنصة" hasArrow>
-                <IconButton
-                  as="a"
-                  href={platformUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="فتح المنصة"
-                  icon={<MdOpenInNew />}
-                  size="sm"
-                  variant="ghost"
-                  colorScheme="blue"
-                  borderRadius="lg"
-                />
-              </Tooltip>
+              {!isDeleted && (
+                <Tooltip label="تعديل المنصة" hasArrow>
+                  <IconButton
+                    aria-label="تعديل المنصة"
+                    icon={<MdEdit />}
+                    size="sm"
+                    colorScheme="orange"
+                    variant="outline"
+                    borderRadius="lg"
+                    onClick={handleEdit}
+                  />
+                </Tooltip>
+              )}
+              {!isDefault && !isDeleted && onDelete ? (
+                <Tooltip label="حذف المنصة" hasArrow>
+                  <IconButton
+                    aria-label="حذف المنصة"
+                    icon={<MdDelete />}
+                    size="sm"
+                    colorScheme="red"
+                    variant="outline"
+                    borderRadius="lg"
+                    onClick={() => onDelete(tenant)}
+                  />
+                </Tooltip>
+              ) : null}
+              {canOpenPlatform ? (
+                <Tooltip label="فتح المنصة" hasArrow>
+                  <IconButton
+                    as="a"
+                    href={platformUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="فتح المنصة"
+                    icon={<MdOpenInNew />}
+                    size="sm"
+                    variant="ghost"
+                    colorScheme="blue"
+                    borderRadius="lg"
+                  />
+                </Tooltip>
+              ) : null}
             </HStack>
           </Flex>
 
@@ -311,6 +344,7 @@ function TenantCard({ tenant, index }) {
             borderRadius="xl"
             leftIcon={<MdEdit />}
             onClick={handleEdit}
+            isDisabled={isDeleted}
           >
             تعديل المنصة
           </Button>
@@ -321,17 +355,25 @@ function TenantCard({ tenant, index }) {
 }
 
 export default function AdminTenantsPanel({ onSummaryChange }) {
+  const toast = useToast();
+  const cancelRef = useRef(null);
+  const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure();
+
   const [tenants, setTenants] = useState([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [tenantToDelete, setTenantToDelete] = useState(null);
+  const [confirmSubdomain, setConfirmSubdomain] = useState("");
 
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("");
   const [packageFilter, setPackageFilter] = useState("");
   const [includeDefault, setIncludeDefault] = useState(true);
+  const [includeDeleted, setIncludeDeleted] = useState(false);
   const searchTimeoutRef = useRef(null);
 
   const cardBg = useColorModeValue("white", "gray.800");
@@ -378,6 +420,7 @@ export default function AdminTenantsPanel({ onSummaryChange }) {
                 ? false
                 : "",
           include_default: includeDefault,
+          include_deleted: includeDeleted,
         },
         token,
       );
@@ -390,11 +433,78 @@ export default function AdminTenantsPanel({ onSummaryChange }) {
     } finally {
       setLoading(false);
     }
-  }, [offset, debouncedSearch, activeFilter, includeDefault]);
+  }, [offset, debouncedSearch, activeFilter, includeDefault, includeDeleted]);
 
   useEffect(() => {
     loadTenants();
   }, [loadTenants]);
+
+  const openDeleteDialog = (tenant) => {
+    setTenantToDelete(tenant);
+    setConfirmSubdomain("");
+    onDeleteOpen();
+  };
+
+  const closeDeleteDialog = () => {
+    if (deleting) return;
+    setTenantToDelete(null);
+    setConfirmSubdomain("");
+    onDeleteClose();
+  };
+
+  const handleDeleteTenant = async () => {
+    const token = localStorage.getItem("token");
+    if (!tenantToDelete || !token) return;
+
+    const expected = String(tenantToDelete.subdomain || "").trim().toLowerCase();
+    const typed = confirmSubdomain.trim().toLowerCase();
+
+    if (!expected || typed !== expected) {
+      toast({
+        title: "تأكيد غير صحيح",
+        description: `اكتب subdomain المنصة بالضبط: ${tenantToDelete.subdomain}`,
+        status: "warning",
+        duration: 4000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const result = await deleteAdminTenant(
+        tenantToDelete.id,
+        { confirm_subdomain: tenantToDelete.subdomain },
+        token,
+      );
+
+      const archived = result?.data?.archived_subdomain;
+      toast({
+        title: result?.message || "تم حذف المنصة بنجاح",
+        description: archived
+          ? `تم أرشفة الاسم إلى: ${archived}`
+          : "تم تعطيل المنصة وحساباتها",
+        status: "success",
+        duration: 5000,
+        isClosable: true,
+      });
+
+      setTenantToDelete(null);
+      setConfirmSubdomain("");
+      onDeleteClose();
+      await loadTenants();
+    } catch (err) {
+      toast({
+        title: "فشل حذف المنصة",
+        description: err.response?.data?.message || err.message || "حدث خطأ غير متوقع",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const filteredTenants = useMemo(() => {
     if (!packageFilter) return tenants;
@@ -562,7 +672,7 @@ export default function AdminTenantsPanel({ onSummaryChange }) {
           </Flex>
 
           <SimpleGrid
-            columns={{ base: 1, sm: 2, lg: 3, xl: 5 }}
+            columns={{ base: 1, sm: 2, lg: 3, xl: 6 }}
             spacing={3}
             mb={5}
           >
@@ -641,6 +751,31 @@ export default function AdminTenantsPanel({ onSummaryChange }) {
                 isChecked={includeDefault}
                 onChange={(e) => {
                   setIncludeDefault(e.target.checked);
+                  setOffset(0);
+                }}
+              />
+            </FormControl>
+
+            <FormControl
+              display="flex"
+              alignItems="center"
+              justifyContent="space-between"
+              px={3}
+              py={2}
+              borderWidth="1px"
+              borderColor={borderColor}
+              borderRadius="xl"
+              bg={inputBg}
+            >
+              <FormLabel htmlFor="include-deleted" mb={0} fontSize="sm">
+                إظهار المحذوفة
+              </FormLabel>
+              <Switch
+                id="include-deleted"
+                colorScheme="red"
+                isChecked={includeDeleted}
+                onChange={(e) => {
+                  setIncludeDeleted(e.target.checked);
                   setOffset(0);
                 }}
               />
@@ -727,7 +862,12 @@ export default function AdminTenantsPanel({ onSummaryChange }) {
                 spacing={{ base: 4, md: 5 }}
               >
                 {filteredTenants.map((tenant, index) => (
-                  <TenantCard key={tenant.id} tenant={tenant} index={index} />
+                  <TenantCard
+                    key={tenant.id}
+                    tenant={tenant}
+                    index={index}
+                    onDelete={openDeleteDialog}
+                  />
                 ))}
               </SimpleGrid>
 
@@ -768,6 +908,65 @@ export default function AdminTenantsPanel({ onSummaryChange }) {
           )}
         </Box>
       </Box>
+
+      <AlertDialog
+        isOpen={isDeleteOpen}
+        leastDestructiveRef={cancelRef}
+        onClose={closeDeleteDialog}
+        isCentered
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent mx={4}>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              حذف المنصة
+            </AlertDialogHeader>
+            <AlertDialogBody>
+              <VStack align="stretch" spacing={4}>
+                <Text fontSize="sm" lineHeight="1.8">
+                  سيتم تعطيل المنصة{" "}
+                  <Text as="span" fontWeight="bold">
+                    {tenantToDelete?.display_name || tenantToDelete?.subdomain}
+                  </Text>{" "}
+                  وأرشفة الـ subdomain وتحرير الاسم للاستخدام لاحقاً. كما سيتم تعطيل حساب المالك
+                  وجميع المعلمين والطلاب على هذه المنصة.
+                </Text>
+                <FormControl>
+                  <FormLabel fontSize="sm" mb={1}>
+                    للتأكيد، اكتب subdomain المنصة:
+                  </FormLabel>
+                  <Input
+                    value={confirmSubdomain}
+                    onChange={(e) => setConfirmSubdomain(e.target.value)}
+                    placeholder={tenantToDelete?.subdomain || "subdomain"}
+                    fontFamily="mono"
+                    autoFocus
+                  />
+                  <FormHelperText fontSize="xs">
+                    المطلوب: <strong>{tenantToDelete?.subdomain}</strong>
+                  </FormHelperText>
+                </FormControl>
+              </VStack>
+            </AlertDialogBody>
+            <AlertDialogFooter gap={2}>
+              <Button ref={cancelRef} onClick={closeDeleteDialog} isDisabled={deleting}>
+                إلغاء
+              </Button>
+              <Button
+                colorScheme="red"
+                onClick={handleDeleteTenant}
+                isLoading={deleting}
+                isDisabled={
+                  !tenantToDelete ||
+                  confirmSubdomain.trim().toLowerCase() !==
+                    String(tenantToDelete?.subdomain || "").trim().toLowerCase()
+                }
+              >
+                حذف المنصة
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
     </VStack>
   );
 }

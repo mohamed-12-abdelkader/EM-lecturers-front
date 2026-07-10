@@ -21,15 +21,7 @@ import {
   useColorModeValue,
   useDisclosure,
   Box,
-  Heading,
-  Flex,
-  Badge,
-  AspectRatio,
   Center,
-  Image,
-  SimpleGrid,
-  Container,
-  Spinner,
   Avatar,
   Table,
   Thead,
@@ -38,6 +30,7 @@ import {
   Th,
   Td,
   TableContainer,
+  Badge,
 } from "@chakra-ui/react";
 import {
   FaUserGraduate,
@@ -50,19 +43,51 @@ import {
   FaPhone,
   FaEnvelope,
   FaExternalLinkAlt,
+  FaArrowRight,
+  FaBookOpen,
+  FaChevronLeft,
 } from "react-icons/fa";
-import { Link } from "react-router-dom";
-import baseUrl from "../../../api/baseUrl";
-import { motion } from "framer-motion";
+import { Link, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
+import baseUrl from "../../../api/baseUrl";
+import { crBtnOutline, crBtnSecondary, crContainer } from "../courseTheme";
 
-const MotionBox = motion(Box);
+function RatingStars({ value }) {
+  const num = Math.min(5, Math.max(0, Number(value) || 0));
+  return (
+    <span className="inline-flex items-center gap-1" aria-label={`تقييم ${num} من 5`}>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <FaStar
+          key={i}
+          className={`text-[11px] ${i < Math.round(num) ? "text-orange-400" : "text-slate-300"}`}
+        />
+      ))}
+    </span>
+  );
+}
+
+function MetaDivider() {
+  return <span className="hidden h-4 w-px bg-slate-200 sm:inline-block" aria-hidden />;
+}
+
+function InlineMeta({ icon: IconComp, children }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300">
+      <IconComp className="shrink-0 text-xs text-blue-500" />
+      <span>{children}</span>
+    </span>
+  );
+}
 
 const CourseHeroSection = ({
   course,
   isTeacher,
   isAdmin,
+  completionPercent,
+  showProgress = false,
+  lecturesCount = 0,
 }) => {
+  const navigate = useNavigate();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const {
     isOpen: isEnrollmentsOpen,
@@ -81,11 +106,6 @@ const CourseHeroSection = ({
   const tableHeadBg = useColorModeValue("gray.50", "gray.700");
   const mutedTextColor = useColorModeValue("gray.500", "gray.400");
   const borderColor = useColorModeValue("gray.200", "gray.600");
-  const mutedText = useColorModeValue("gray.600", "gray.300");
-  const shellBg = useColorModeValue(
-    "linear-gradient(180deg, #eff6ff 0%, #f8fafc 50%, #ffffff 100%)",
-    "linear-gradient(180deg, #0f172a 0%, #0b1220 50%, #090f1a 100%)",
-  );
 
   const fetchEnrollments = async () => {
     if (!course?.id) return;
@@ -125,20 +145,10 @@ const CourseHeroSection = ({
     });
   }, [enrollments, enrollmentSearch]);
 
-  // =========================
-  // HERO DATA (من API مع fallback)
-  // =========================
   const ratingRaw =
-    course?.rating ??
-    course?.average_rating ??
-    course?.avg_rating ??
-    course?.course_rating ??
-    course?.rate;
-
+    course?.rating ?? course?.average_rating ?? course?.avg_rating ?? course?.course_rating ?? course?.rate;
   const ratingNum = ratingRaw != null ? Number(ratingRaw) : null;
-  const ratingDisplay = Number.isFinite(ratingNum)
-    ? ratingNum.toFixed(1)
-    : "4.8";
+  const ratingDisplay = Number.isFinite(ratingNum) ? ratingNum.toFixed(1) : "4.8";
 
   const durationText =
     course?.duration_text ??
@@ -149,29 +159,19 @@ const CourseHeroSection = ({
         : "12 ساعة");
 
   const studentsCountRaw =
-    course?.students_count ??
-    course?.enrolled_students ??
-    course?.total_students ??
-    course?.participants;
-
-  const studentsCountNum =
-    studentsCountRaw != null ? Number(studentsCountRaw) : null;
-
+    course?.students_count ?? course?.enrolled_students ?? course?.total_students ?? course?.participants;
+  const studentsCountNum = studentsCountRaw != null ? Number(studentsCountRaw) : null;
   const studentsDisplay = (() => {
     if (!Number.isFinite(studentsCountNum)) return "500+";
-    if (studentsCountNum >= 1000)
-      return `${Math.floor(studentsCountNum / 100) / 10}k+`;
+    if (studentsCountNum >= 1000) return `${Math.floor(studentsCountNum / 100) / 10}k+`;
     return `${studentsCountNum}+`;
   })();
 
   const heroSubtitle =
-    course?.subtitle ??
-    course?.headline ??
-    course?.category_name ??
-    course?.grade_name ??
-    "كورس تعليمي احترافي";
+    course?.subtitle ?? course?.headline ?? course?.category_name ?? course?.grade_name ?? "كورس تعليمي";
 
-  const heroTitleRaw = course?.title_en ?? course?.title ?? "Course";
+  const gradeName = course?.grade_name || null;
+  const courseTitle = course?.title || "الكورس";
 
   const handleActivateStudent = async () => {
     if (!studentId.trim()) {
@@ -192,7 +192,6 @@ const CourseHeroSection = ({
         {},
         { headers: { Authorization: `Bearer ${token}` } },
       );
-
       toast({
         title: "تم التفعيل بنجاح",
         description: `تم تفعيل الطالب برقم ${studentId} للكورس`,
@@ -200,7 +199,6 @@ const CourseHeroSection = ({
         duration: 3000,
         isClosable: true,
       });
-
       onClose();
       setStudentId("");
       if (isEnrollmentsOpen) fetchEnrollments();
@@ -219,190 +217,158 @@ const CourseHeroSection = ({
 
   return (
     <>
-      <Box dir="rtl" position="relative" bg={shellBg}>
-        <Container maxW="8xl" px={{ base: 0, md: 6 }}>
-          <MotionBox
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45 }}
-            position="relative"
-            borderRadius={{ base: 0, md: "2xl" }}
-            overflow="hidden"
-            boxShadow={useColorModeValue("0 20px 45px rgba(37,99,235,0.14)", "0 20px 45px rgba(0,0,0,0.35)")}
-          >
-            <Box
-              minH={{ base: "230px", md: "300px" }}
-              bg="blue.500"
-              color="white"
-              px={{ base: 4, md: 8 }}
-              py={{ base: 5, md: 8 }}
-            >
-              <Flex justify="flex-end" align="start" direction="row" gap={4}>
-                <VStack align="end" spacing={2} w={{ base: "100%", md: "70%" }} mr={0} ml="auto">
-                  <Text fontSize="sm" color="whiteAlpha.800">
-                    العودة
-                  </Text>
-                  <Heading w="full" fontSize={{ base: "xl", md: "3xl" }} textAlign="right">
-                    {course?.title || heroTitleRaw}
-                  </Heading>
-                  <Text w="full" textAlign="right" color="whiteAlpha.900" fontSize={{ base: "sm", md: "md" }}>
-                    {heroSubtitle}
-                  </Text>
-                </VStack>
-              </Flex>
-            </Box>
+      <section className="relative bg-white dark:bg-slate-950" dir="rtl">
+        {/* شريط علوي */}
+        <div className="bg-blue-500 pb-20 pt-5 md:pb-28 md:pt-6">
+          <div className={crContainer}>
+            <nav className="flex flex-wrap items-center gap-2 text-sm text-blue-100">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="inline-flex cursor-pointer items-center gap-1.5 font-medium text-white/90 transition-colors hover:text-white"
+              >
+                <FaArrowRight className="text-[10px]" />
+                الكورسات
+              </button>
+              <FaChevronLeft className="text-[9px] text-blue-200" aria-hidden />
+              <span className="max-w-[200px] truncate font-medium text-white sm:max-w-md">{courseTitle}</span>
+            </nav>
+          </div>
+        </div>
 
-            <Box bg={useColorModeValue("gray.50", "gray.800")} pt={{ base: 4, md: 6 }} pb={{ base: 5, md: 6 }} px={{ base: 4, md: 8 }}>
-              <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3}>
-                <Badge bg="blue.50" color="blue.700" borderRadius="md" px={3} py={2} fontSize="sm">
-                  <HStack><Icon as={FaClock} /><Text>{durationText}</Text></HStack>
-                </Badge>
-                <Badge bg="blue.50" color="blue.700" borderRadius="md" px={3} py={2} fontSize="sm">
-                  <HStack><Icon as={FaUsers} /><Text>{studentsDisplay} طالب</Text></HStack>
-                </Badge>
-                <Badge bg="blue.50" color="blue.700" borderRadius="md" px={3} py={2} fontSize="sm">
-                  <HStack><Icon as={FaStar} /><Text>{ratingDisplay} / 5</Text></HStack>
-                </Badge>
-              </SimpleGrid>
-
-              <Text mt={4} color={mutedText} noOfLines={2}>
-                {course.description || "محتوى احترافي منظم يساعدك على الفهم والتطبيق خطوة بخطوة."}
-              </Text>
-
-              <HStack spacing={3} flexWrap="wrap" mt={4}>
-                {(isTeacher || isAdmin) && (
-                  <Button colorScheme="blue" borderRadius="lg" leftIcon={<Icon as={FaUserPlus} />} onClick={onOpen}>
-                    تفعيل طالب
-                  </Button>
-                )}
-                {isTeacher && (
-                  <Link to={`/CourseStatisticsPage/${course.id}`}>
-                    <Button variant="outline" colorScheme="blue" borderRadius="lg" leftIcon={<Icon as={FaChartBar} />}>
-                      الإحصائيات
-                    </Button>
-                  </Link>
-                )}
-                {canManageStudents && (
-                  <Button
-                    variant="outline"
-                    colorScheme="blue"
-                    borderRadius="lg"
-                    leftIcon={<Icon as={FaUserGraduate} />}
-                    onClick={handleOpenEnrollmentsModal}
-                  >
-                    المشتركين ({studentsCountNum ?? enrollments.length ?? 0})
-                  </Button>
-                )}
-              </HStack>
-            </Box>
-
-            <Box
-              position={{ base: "relative", md: "absolute" }}
-              left={{ base: "auto", md: 6 }}
-              bottom={{ base: "auto", md: 6 }}
-              mt={{ base: -24, md: 0 }}
-              mx={{ base: 4, md: 0 }}
-              w={{ base: "calc(100% - 32px)", md: "420px" }}
-              borderRadius="lg"
-              overflow="hidden"
-              border="6px solid"
-              borderColor="white"
-              boxShadow="2xl"
-              zIndex={2}
-            >
-              <AspectRatio ratio={16 / 9}>
-                <Image
-                  src={course.avatar || "https://via.placeholder.com/1200x700/3b82f6/ffffff?text=Course"}
-                  alt={course.title}
-                  objectFit="cover"
+        {/* المحتوى الرئيسي */}
+        <div className={`${crContainer} relative z-10 -mt-16 pb-8 md:-mt-20`}>
+          <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
+            {/* غلاف الكورس */}
+            <div className="mx-auto w-full max-w-[400px] shrink-0 md:mx-0 md:w-[min(100%,380px)]">
+              <div className="overflow-hidden rounded-xl border-[3px] border-white bg-slate-200 shadow-[0_12px_40px_rgba(15,23,42,0.18)] dark:border-slate-800">
+                <img
+                  src={course?.avatar || "https://via.placeholder.com/760x428/2B6CB0/FFFFFF?text=Course"}
+                  alt={courseTitle}
+                  className="aspect-video w-full object-cover"
+                  loading="eager"
                 />
-              </AspectRatio>
-            </Box>
-          </MotionBox>
-        </Container>
-      </Box>
+              </div>
+            </div>
 
-      {/* Activate Student Modal - متجاوب */}
-      <Modal
-        isOpen={isOpen}
-        onClose={onClose}
-        isCentered
-        size={{ base: "full", md: "md" }}
-        scrollBehavior="inside"
-      >
+            {/* بطاقة التفاصيل */}
+            <div className="min-w-0 flex-1 rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:p-7">
+              <div className="flex flex-wrap items-center justify-start gap-2">
+                {gradeName && (
+                  <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
+                    {gradeName}
+                  </span>
+                )}
+                <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  {heroSubtitle}
+                </span>
+              </div>
+
+              <h1 className="mt-3 font-heading text-2xl font-bold leading-snug text-slate-900 dark:text-white md:text-[1.65rem] lg:text-3xl">
+                {courseTitle}
+              </h1>
+
+              <p className="mt-3 line-clamp-3 text-sm leading-7 text-slate-600 dark:text-slate-400 md:text-[15px]">
+                {course?.description || "محتوى تعليمي منظم يأخذك خطوة بخطوة من الأساسيات حتى الإتقان."}
+              </p>
+
+              {/* بيانات سريعة */}
+              <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-y border-slate-100 py-4 dark:border-slate-800">
+                <InlineMeta icon={FaClock}>{durationText}</InlineMeta>
+                <MetaDivider />
+                <InlineMeta icon={FaUsers}>{studentsDisplay} طالب</InlineMeta>
+                <MetaDivider />
+                <span className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                  <RatingStars value={ratingDisplay} />
+                  <span className="font-bold text-slate-800 dark:text-white">{ratingDisplay}</span>
+                </span>
+                {lecturesCount > 0 && (
+                  <>
+                    <MetaDivider />
+                    <InlineMeta icon={FaBookOpen}>{lecturesCount} محاضرة</InlineMeta>
+                  </>
+                )}
+              </div>
+
+              {showProgress && completionPercent != null && (
+                <div className="mt-5">
+                  <div className="mb-2 flex items-center justify-between text-sm">
+                    <span className="font-semibold text-slate-700 dark:text-slate-200">تقدمك في الكورس</span>
+                    <span className="font-bold text-blue-500">{completionPercent}%</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div
+                      className="h-full rounded-full bg-blue-500 transition-all duration-700"
+                      style={{ width: `${completionPercent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {(canManageStudents || isTeacher) && (
+                <div className="mt-6 flex flex-wrap gap-2.5 border-t border-slate-100 pt-5 dark:border-slate-800">
+                  {(isTeacher || isAdmin) && (
+                    <button type="button" className={crBtnSecondary} onClick={onOpen}>
+                      <FaUserPlus />
+                      تفعيل طالب
+                    </button>
+                  )}
+                  {isTeacher && (
+                    <Link to={`/CourseStatisticsPage/${course.id}`} className={crBtnOutline}>
+                      <FaChartBar />
+                      الإحصائيات
+                    </Link>
+                  )}
+                  {canManageStudents && (
+                    <button type="button" className={crBtnOutline} onClick={handleOpenEnrollmentsModal}>
+                      <FaUserGraduate />
+                      المشتركين ({studentsCountNum ?? enrollments.length ?? 0})
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Activate Student Modal */}
+      <Modal isOpen={isOpen} onClose={onClose} isCentered size={{ base: "full", md: "md" }} scrollBehavior="inside">
         <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(5px)" />
         <ModalContent
           bg={useColorModeValue("white", "gray.800")}
           borderRadius={{ base: "none", md: "2xl" }}
-          boxShadow="2xl"
           mx={{ base: 0, md: 4 }}
           maxH={{ base: "100vh", md: "90vh" }}
         >
-          <ModalHeader
-            pt={{ base: 4, md: 6 }}
-            pb={{ base: 3, md: 4 }}
-            borderBottomWidth="1px"
-            borderColor="gray.100"
-          >
+          <ModalHeader borderBottomWidth="1px" borderColor="gray.100">
             <HStack spacing={3}>
-              <Center w={10} h={10} bg="blue.100" borderRadius="full">
+              <Center w={10} h={10} bg="blue.50" borderRadius="lg">
                 <Icon as={FaUserPlus} color="blue.500" boxSize={5} />
               </Center>
-              <Text
-                fontWeight="bold"
-                fontSize={{ base: "md", md: "xl" }}
-                color={useColorModeValue("gray.800", "gray.100")}
-              >
-                تفعيل طالب للكورس
-              </Text>
+              <Text fontWeight="bold">تفعيل طالب للكورس</Text>
             </HStack>
           </ModalHeader>
-          <ModalCloseButton left={4} right="auto" mt={2} />
-          <ModalBody py={{ base: 4, md: 8 }}>
-            <VStack spacing={{ base: 4, md: 6 }}>
-              <Text
-                fontSize={{ base: "sm", md: "md" }}
-                color={useColorModeValue("gray.500", "gray.300")}
-                textAlign="center"
-              >
-                قم بإدخال رقم الطالب (ID) لتفعيله في هذا الكورس مباشرة.
+          <ModalCloseButton left={4} right="auto" />
+          <ModalBody py={6}>
+            <VStack spacing={4}>
+              <Text fontSize="sm" color={mutedTextColor} textAlign="center">
+                أدخل رقم الطالب (ID) لتفعيله في هذا الكورس.
               </Text>
               <FormControl isRequired>
-                <FormLabel
-                  fontWeight="bold"
-                  color={useColorModeValue("gray.700", "gray.200")}
-                >
-                  رقم الطالب
-                </FormLabel>
+                <FormLabel fontWeight="bold">رقم الطالب</FormLabel>
                 <Input
                   type="number"
                   value={studentId}
                   onChange={(e) => setStudentId(e.target.value)}
                   placeholder="مثال: 12345"
-                  size={{ base: "md", md: "lg" }}
-                  borderRadius="xl"
-                  bg={useColorModeValue("gray.50", "gray.700")}
-                  border="2px solid"
-                  borderColor={useColorModeValue("gray.200", "gray.600")}
-                  _focus={{
-                    borderColor: "blue.500",
-                    bg: useColorModeValue("white", "gray.900"),
-                    boxShadow: "0 0 0 1px #3182ce",
-                  }}
+                  borderRadius="lg"
                 />
               </FormControl>
             </VStack>
           </ModalBody>
-          <ModalFooter pb={{ base: 4, md: 6 }} flexWrap="wrap" gap={2}>
-            <Button
-              variant="ghost"
-              mr={{ base: 0, md: 3 }}
-              onClick={onClose}
-              isDisabled={isLoading}
-              borderRadius="xl"
-              size={{ base: "md", md: "lg" }}
-              color={useColorModeValue("gray.500", "gray.300")}
-            >
+          <ModalFooter gap={2}>
+            <Button variant="ghost" onClick={onClose} isDisabled={isLoading} borderRadius="lg">
               إلغاء
             </Button>
             <Button
@@ -411,11 +377,9 @@ const CourseHeroSection = ({
               isLoading={isLoading}
               loadingText="جاري التفعيل..."
               leftIcon={<Icon as={FaUserPlus} />}
-              borderRadius="xl"
-              size={{ base: "md", md: "lg" }}
-              shadow="lg"
+              borderRadius="lg"
             >
-              تفعيل الطالب
+              تفعيل
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -430,23 +394,16 @@ const CourseHeroSection = ({
         scrollBehavior="inside"
       >
         <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(5px)" />
-        <ModalContent
-          bg={modalBg}
-          borderRadius={{ base: "none", md: "2xl" }}
-          maxH={{ base: "100vh", md: "90vh" }}
-          mx={{ base: 0, md: 4 }}
-        >
-          <ModalHeader borderBottomWidth="1px" borderColor={borderColor} py={4}>
+        <ModalContent bg={modalBg} borderRadius={{ base: "none", md: "2xl" }} maxH={{ base: "100vh", md: "90vh" }} mx={{ base: 0, md: 4 }}>
+          <ModalHeader borderBottomWidth="1px" borderColor={borderColor}>
             <HStack spacing={3}>
-              <Center w={10} h={10} bg="blue.100" borderRadius="full">
+              <Center w={10} h={10} bg="blue.50" borderRadius="lg">
                 <Icon as={FaUsers} color="blue.500" />
               </Center>
               <Box>
-                <Text fontWeight="bold" fontSize={{ base: "md", md: "lg" }}>
-                  الطلاب المسجلين في الكورس
-                </Text>
+                <Text fontWeight="bold">الطلاب المسجلين</Text>
                 <Text fontSize="sm" color={mutedTextColor}>
-                  {course?.title || "—"}
+                  {courseTitle}
                 </Text>
               </Box>
             </HStack>
@@ -462,19 +419,16 @@ const CourseHeroSection = ({
                 value={enrollmentSearch}
                 onChange={(e) => setEnrollmentSearch(e.target.value)}
                 placeholder="ابحث بالاسم أو البريد أو الهاتف..."
-                borderRadius="xl"
+                borderRadius="lg"
               />
             </InputGroup>
 
             {loadingEnrollments ? (
               <Center py={12}>
-                <VStack spacing={3}>
-                  <Spinner size="lg" color="blue.500" />
-                  <Text color={mutedTextColor}>جاري تحميل الطلاب...</Text>
-                </VStack>
+                <Text color={mutedTextColor}>جاري التحميل...</Text>
               </Center>
             ) : filteredEnrollments.length > 0 ? (
-              <TableContainer borderWidth="1px" borderColor={borderColor} borderRadius="xl">
+              <TableContainer borderWidth="1px" borderColor={borderColor} borderRadius="lg">
                 <Table size="sm" variant="simple">
                   <Thead bg={tableHeadBg}>
                     <Tr>
@@ -512,16 +466,10 @@ const CourseHeroSection = ({
                           </VStack>
                         </Td>
                         <Td fontSize="xs" whiteSpace="nowrap">
-                          {student.enrolled_at
-                            ? dayjs(student.enrolled_at).format("YYYY/MM/DD")
-                            : "—"}
+                          {student.enrolled_at ? dayjs(student.enrolled_at).format("YYYY/MM/DD") : "—"}
                         </Td>
                         <Td>
-                          <Badge
-                            colorScheme={student.is_blocked_by_teacher ? "red" : "green"}
-                            variant="subtle"
-                            fontSize="xs"
-                          >
+                          <Badge colorScheme={student.is_blocked_by_teacher ? "red" : "green"} variant="subtle" fontSize="xs">
                             {student.is_blocked_by_teacher ? "محظور" : "نشط"}
                           </Badge>
                         </Td>
@@ -532,20 +480,15 @@ const CourseHeroSection = ({
               </TableContainer>
             ) : (
               <Center py={12}>
-                <VStack spacing={3}>
-                  <Icon as={FaUsers} boxSize={10} color="gray.300" />
-                  <Text color={mutedTextColor}>
-                    {enrollmentSearch.trim()
-                      ? "لا توجد نتائج مطابقة للبحث"
-                      : "لا يوجد طلاب مسجلين في هذا الكورس بعد"}
-                  </Text>
-                </VStack>
+                <Text color={mutedTextColor}>
+                  {enrollmentSearch.trim() ? "لا توجد نتائج" : "لا يوجد طلاب مسجلين بعد"}
+                </Text>
               </Center>
             )}
           </ModalBody>
 
-          <ModalFooter borderTopWidth="1px" borderColor={borderColor} gap={2} flexWrap="wrap">
-            <Button variant="ghost" onClick={onEnrollmentsClose} borderRadius="xl">
+          <ModalFooter borderTopWidth="1px" borderColor={borderColor} gap={2}>
+            <Button variant="ghost" onClick={onEnrollmentsClose} borderRadius="lg">
               إغلاق
             </Button>
             <Link to={`/CourseStudentsPage/${course.id}`}>
@@ -553,7 +496,7 @@ const CourseHeroSection = ({
                 as="span"
                 colorScheme="blue"
                 variant="outline"
-                borderRadius="xl"
+                borderRadius="lg"
                 leftIcon={<Icon as={FaExternalLinkAlt} />}
                 onClick={onEnrollmentsClose}
               >

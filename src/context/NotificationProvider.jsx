@@ -271,12 +271,17 @@ export function NotificationProvider({ children }) {
       auth: { token },
       transports: ["websocket", "polling"],
       reconnection: true,
+      reconnectionAttempts: 8,
+      reconnectionDelay: 2000,
+      reconnectionDelayMax: 12000,
+      timeout: 12000,
     });
 
     socketRef.current = socket;
 
     socket.on("connect", () => setIsSocketConnected(true));
     socket.on("disconnect", () => setIsSocketConnected(false));
+    socket.on("connect_error", () => setIsSocketConnected(false));
 
     socket.on("notification:new", (payload) => {
       const notification = payload?.notification || payload;

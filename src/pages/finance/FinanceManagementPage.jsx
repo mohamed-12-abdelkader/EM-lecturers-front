@@ -157,7 +157,7 @@ export default function FinanceManagementPage() {
           borderColor={panelBorder}
           borderRadius="2xl"
           shadow="lg"
-          overflow="hidden"
+          overflow="visible"
         >
           <Tabs
             index={tabIndex}
