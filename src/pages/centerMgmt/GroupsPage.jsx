@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link as RouterLink, useOutletContext } from "react-router-dom";
+import { Link as RouterLink } from "react-router-dom";
 import {
   Badge,
   Box,
@@ -32,48 +32,52 @@ import {
 } from "@chakra-ui/react";
 import { FaEdit, FaPlus, FaTrash, FaUsers } from "react-icons/fa";
 import {
-  useGrades,
-  useGroups,
   useGroupMutations,
+  useGroups,
+  usePlatformGrades,
 } from "../../Hooks/centerMgmt/useCenterMgmtQueries";
 import { apiErrorMessage } from "../../api/centerMgmtApi";
-import { WEEK_DAYS, field, formatMoney } from "./centerMgmtUtils";
+import { WEEK_DAYS, field, formatMoney, todayISO } from "./centerMgmtUtils";
 import { EmptyState, LoadingBlock, PageHeader, Surface } from "./components/UiBits";
 
 const emptyForm = {
   name: "",
   gradeId: "",
+  subjectId: "",
   days: [],
-  sessionTime: "16:00",
-  durationMinutes: 120,
-  maxCapacity: 25,
+  startTime: "16:00",
+  endTime: "18:00",
+  monthlyFee: 300,
+  studyStartDate: todayISO(),
   status: "active",
-  defaultFee: "",
   notes: "",
 };
 
 export default function GroupsPage() {
-  const { centerId, center } = useOutletContext();
   const toast = useToast();
   const [search, setSearch] = useState("");
   const [gradeFilter, setGradeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
+
   const params = useMemo(
     () => ({
       search: search || undefined,
       gradeId: gradeFilter || undefined,
       status: statusFilter || undefined,
+      page,
+      limit: 20,
     }),
-    [search, gradeFilter, statusFilter]
+    [search, gradeFilter, statusFilter, page]
   );
 
-  const { data: grades = [] } = useGrades(centerId);
-  const { data: groups = [], isLoading } = useGroups(centerId, params);
-  const { createGroup, updateGroup, deleteGroup } = useGroupMutations(centerId);
+  const { data: grades = [] } = usePlatformGrades();
+  const { data, isLoading } = useGroups(params);
+  const groups = data?.items || [];
+  const { createGroup, updateGroup, deleteGroup } = useGroupMutations();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
-  const currency = field(center, "currency") || "EGP";
 
   const gradeMap = useMemo(() => {
     const map = {};
@@ -88,7 +92,6 @@ export default function GroupsPage() {
     setForm({
       ...emptyForm,
       gradeId: grades[0]?.id ? String(grades[0].id) : "",
-      defaultFee: field(center, "default_fee", "defaultFee") || "",
     });
     onOpen();
   };
@@ -98,32 +101,34 @@ export default function GroupsPage() {
     setForm({
       name: field(group, "name") || "",
       gradeId: String(field(group, "grade_id", "gradeId") || ""),
+      subjectId: String(field(group, "subject_id", "subjectId") || ""),
       days: field(group, "days") || [],
-      sessionTime: field(group, "session_time", "sessionTime") || "16:00",
-      durationMinutes: field(group, "duration_minutes", "durationMinutes") || 120,
-      maxCapacity: field(group, "max_capacity", "maxCapacity") || 25,
+      startTime: field(group, "start_time", "startTime") || "16:00",
+      endTime: field(group, "end_time", "endTime") || "18:00",
+      monthlyFee: field(group, "monthly_fee", "monthlyFee") ?? 300,
+      studyStartDate: String(field(group, "study_start_date", "studyStartDate") || "").slice(0, 10),
       status: field(group, "status") || "active",
-      defaultFee: field(group, "default_fee", "defaultFee") || "",
       notes: field(group, "notes") || "",
     });
     onOpen();
   };
 
   const handleSave = async () => {
-    if (!form.name.trim() || !form.gradeId) {
-      toast({ title: "الاسم والصف مطلوبان", status: "warning", duration: 2500 });
+    if (!form.name.trim() || !form.gradeId || !form.days.length) {
+      toast({ title: "الاسم والصف والأيام مطلوبة", status: "warning", duration: 2500 });
       return;
     }
     const payload = {
       name: form.name.trim(),
       gradeId: Number(form.gradeId),
+      subjectId: form.subjectId ? Number(form.subjectId) : undefined,
       days: form.days,
-      sessionTime: form.sessionTime || undefined,
-      durationMinutes: Number(form.durationMinutes) || undefined,
-      maxCapacity: Number(form.maxCapacity) || undefined,
+      startTime: form.startTime || undefined,
+      endTime: form.endTime || undefined,
+      monthlyFee: Number(form.monthlyFee) || 0,
+      studyStartDate: form.studyStartDate || undefined,
       status: form.status,
-      defaultFee: form.defaultFee === "" ? undefined : Number(form.defaultFee),
-      notes: form.notes || undefined,
+      notes: form.notes || null,
     };
     try {
       if (editing) {
@@ -153,7 +158,7 @@ export default function GroupsPage() {
     <>
       <PageHeader
         title="المجموعات"
-        description="نظّم مواعيد الحصص والطاقة الاستيعابية لكل مجموعة."
+        description="أنشئ مجموعات الدراسة وحدد الأيام والرسوم الشهرية."
         actions={
           <Button leftIcon={<FaPlus />} colorScheme="blue" borderRadius="xl" onClick={openCreate}>
             مجموعة جديدة
@@ -166,13 +171,19 @@ export default function GroupsPage() {
           <Input
             placeholder="بحث بالاسم..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             borderRadius="xl"
           />
           <Select
             placeholder="كل الصفوف"
             value={gradeFilter}
-            onChange={(e) => setGradeFilter(e.target.value)}
+            onChange={(e) => {
+              setGradeFilter(e.target.value);
+              setPage(1);
+            }}
             borderRadius="xl"
           >
             {grades.map((g) => (
@@ -184,7 +195,10 @@ export default function GroupsPage() {
           <Select
             placeholder="كل الحالات"
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => {
+              setStatusFilter(e.target.value);
+              setPage(1);
+            }}
             borderRadius="xl"
           >
             <option value="active">نشطة</option>
@@ -199,60 +213,73 @@ export default function GroupsPage() {
         <EmptyState
           icon={FaUsers}
           title="لا توجد مجموعات"
-          description="أنشئ مجموعة وحدد الصف وأيام الحضور."
+          description="ابدأ بإنشاء أول مجموعة دراسية."
           action={
-            <Button leftIcon={<FaPlus />} colorScheme="blue" onClick={openCreate}>
+            <Button colorScheme="blue" borderRadius="xl" onClick={openCreate}>
               إنشاء مجموعة
             </Button>
           }
         />
       ) : (
-        <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
+        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
           {groups.map((group) => {
             const days = field(group, "days") || [];
+            const gradeId = field(group, "grade_id", "gradeId");
             return (
-              <Surface key={group.id} _hover={{ borderColor: "blue.300" }} transition="all 0.2s">
-                <Flex justify="space-between" align="flex-start" mb={3}>
+              <Surface key={group.id}>
+                <Flex justify="space-between" align="flex-start" gap={3} mb={3}>
                   <Box>
-                    <Text fontWeight="bold" fontSize="lg" mb={1}>
+                    <Text
+                      as={RouterLink}
+                      to={`/center-mgmt/groups/${group.id}`}
+                      fontWeight="bold"
+                      fontSize="lg"
+                      color="blue.600"
+                      _hover={{ textDecoration: "underline" }}
+                    >
                       {field(group, "name")}
                     </Text>
-                    <Text fontSize="sm" color="gray.500">
-                      {gradeMap[field(group, "grade_id", "gradeId")] || "بدون صف"}
+                    <Text fontSize="sm" color="gray.500" mt={1}>
+                      {gradeMap[gradeId] || `صف #${gradeId || "—"}`}
                     </Text>
                   </Box>
                   <Badge colorScheme={field(group, "status") === "paused" ? "orange" : "green"}>
                     {field(group, "status") === "paused" ? "متوقفة" : "نشطة"}
                   </Badge>
                 </Flex>
-                <VStack align="stretch" spacing={1} fontSize="sm" color="gray.600" mb={4}>
-                  <Text>
-                    الوقت: {field(group, "session_time", "sessionTime") || "—"} ·{" "}
-                    {field(group, "duration_minutes", "durationMinutes") || "—"} دقيقة
+
+                <Wrap spacing={2} mb={3}>
+                  {days.map((d) => (
+                    <WrapItem key={d}>
+                      <Badge variant="subtle">{d}</Badge>
+                    </WrapItem>
+                  ))}
+                </Wrap>
+
+                <SimpleGrid columns={2} spacing={2} mb={4} fontSize="sm">
+                  <Text color="gray.500">
+                    الوقت:{" "}
+                    <Text as="span" color="gray.800" fontWeight="medium">
+                      {field(group, "start_time", "startTime") || "—"} –{" "}
+                      {field(group, "end_time", "endTime") || "—"}
+                    </Text>
                   </Text>
-                  <Text>
-                    السعة: {field(group, "max_capacity", "maxCapacity") || "—"} · الرسوم:{" "}
-                    {formatMoney(field(group, "default_fee", "defaultFee"), currency)}
+                  <Text color="gray.500">
+                    الرسوم:{" "}
+                    <Text as="span" color="gray.800" fontWeight="medium">
+                      {formatMoney(field(group, "monthly_fee", "monthlyFee"))}
+                    </Text>
                   </Text>
-                  <Wrap mt={1}>
-                    {days.map((d) => (
-                      <WrapItem key={d}>
-                        <Badge variant="subtle" colorScheme="blue">
-                          {d}
-                        </Badge>
-                      </WrapItem>
-                    ))}
-                  </Wrap>
-                </VStack>
+                </SimpleGrid>
+
                 <Flex gap={2}>
                   <Button
                     as={RouterLink}
-                    to={`/center-mgmt/${centerId}/groups/${group.id}`}
-                    flex={1}
-                    colorScheme="blue"
-                    variant="solid"
+                    to={`/center-mgmt/groups/${group.id}`}
                     size="sm"
+                    variant="outline"
                     borderRadius="lg"
+                    flex={1}
                   >
                     التفاصيل
                   </Button>
@@ -278,39 +305,73 @@ export default function GroupsPage() {
         </SimpleGrid>
       )}
 
-      <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg">
+      {(data?.totalPages || 1) > 1 && (
+        <Flex justify="center" gap={2} mt={5}>
+          <Button
+            size="sm"
+            isDisabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+            borderRadius="lg"
+          >
+            السابق
+          </Button>
+          <Text fontSize="sm" alignSelf="center">
+            {page} / {data.totalPages}
+          </Text>
+          <Button
+            size="sm"
+            isDisabled={page >= data.totalPages}
+            onClick={() => setPage((p) => p + 1)}
+            borderRadius="lg"
+          >
+            التالي
+          </Button>
+        </Flex>
+      )}
+
+      <Modal isOpen={isOpen} onClose={onClose} size="xl" isCentered>
         <ModalOverlay />
-        <ModalContent borderRadius="2xl" mx={3} maxH="90vh" overflowY="auto">
+        <ModalContent dir="rtl" borderRadius="2xl">
           <ModalHeader>{editing ? "تعديل المجموعة" : "مجموعة جديدة"}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            <VStack spacing={4}>
+            <VStack spacing={4} align="stretch">
               <FormControl isRequired>
                 <FormLabel>اسم المجموعة</FormLabel>
                 <Input
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   borderRadius="xl"
-                  placeholder="مجموعة السبت"
                 />
               </FormControl>
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
+                <FormControl isRequired>
+                  <FormLabel>الصف</FormLabel>
+                  <Select
+                    value={form.gradeId}
+                    onChange={(e) => setForm((f) => ({ ...f, gradeId: e.target.value }))}
+                    borderRadius="xl"
+                  >
+                    <option value="">اختر الصف</option>
+                    {grades.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {field(g, "name")}
+                      </option>
+                    ))}
+                  </Select>
+                </FormControl>
+                <FormControl>
+                  <FormLabel>المادة (اختياري — رقم ID)</FormLabel>
+                  <Input
+                    value={form.subjectId}
+                    onChange={(e) => setForm((f) => ({ ...f, subjectId: e.target.value }))}
+                    borderRadius="xl"
+                    placeholder="subjectId"
+                  />
+                </FormControl>
+              </SimpleGrid>
               <FormControl isRequired>
-                <FormLabel>الصف</FormLabel>
-                <Select
-                  value={form.gradeId}
-                  onChange={(e) => setForm((f) => ({ ...f, gradeId: e.target.value }))}
-                  borderRadius="xl"
-                >
-                  <option value="">اختر الصف</option>
-                  {grades.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {field(g, "name")}
-                    </option>
-                  ))}
-                </Select>
-              </FormControl>
-              <FormControl>
-                <FormLabel>أيام الحضور</FormLabel>
+                <FormLabel>أيام المجموعة</FormLabel>
                 <CheckboxGroup
                   value={form.days}
                   onChange={(days) => setForm((f) => ({ ...f, days }))}
@@ -324,76 +385,73 @@ export default function GroupsPage() {
                   </Wrap>
                 </CheckboxGroup>
               </FormControl>
-              <SimpleGrid columns={2} spacing={3} w="full">
+              <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3}>
                 <FormControl>
-                  <FormLabel>وقت الحصة</FormLabel>
+                  <FormLabel>من</FormLabel>
                   <Input
                     type="time"
-                    value={form.sessionTime}
-                    onChange={(e) => setForm((f) => ({ ...f, sessionTime: e.target.value }))}
+                    value={form.startTime}
+                    onChange={(e) => setForm((f) => ({ ...f, startTime: e.target.value }))}
                     borderRadius="xl"
                   />
                 </FormControl>
                 <FormControl>
-                  <FormLabel>المدة (دقيقة)</FormLabel>
-                  <NumberInput
-                    min={1}
-                    value={form.durationMinutes}
-                    onChange={(_, n) =>
-                      setForm((f) => ({ ...f, durationMinutes: Number.isNaN(n) ? "" : n }))
-                    }
-                  >
-                    <NumberInputField borderRadius="xl" />
-                  </NumberInput>
+                  <FormLabel>إلى</FormLabel>
+                  <Input
+                    type="time"
+                    value={form.endTime}
+                    onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))}
+                    borderRadius="xl"
+                  />
                 </FormControl>
                 <FormControl>
-                  <FormLabel>السعة القصوى</FormLabel>
+                  <FormLabel>الرسوم الشهرية</FormLabel>
                   <NumberInput
-                    min={1}
-                    value={form.maxCapacity}
-                    onChange={(_, n) =>
-                      setForm((f) => ({ ...f, maxCapacity: Number.isNaN(n) ? "" : n }))
-                    }
-                  >
-                    <NumberInputField borderRadius="xl" />
-                  </NumberInput>
-                </FormControl>
-                <FormControl>
-                  <FormLabel>الرسوم</FormLabel>
-                  <NumberInput
+                    value={form.monthlyFee}
                     min={0}
-                    value={form.defaultFee}
                     onChange={(_, n) =>
-                      setForm((f) => ({ ...f, defaultFee: Number.isNaN(n) ? "" : n }))
+                      setForm((f) => ({ ...f, monthlyFee: Number.isNaN(n) ? 0 : n }))
                     }
                   >
                     <NumberInputField borderRadius="xl" />
                   </NumberInput>
                 </FormControl>
               </SimpleGrid>
-              <FormControl>
-                <FormLabel>الحالة</FormLabel>
-                <Select
-                  value={form.status}
-                  onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
-                  borderRadius="xl"
-                >
-                  <option value="active">نشطة</option>
-                  <option value="paused">متوقفة</option>
-                </Select>
-              </FormControl>
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
+                <FormControl>
+                  <FormLabel>بداية الدراسة</FormLabel>
+                  <Input
+                    type="date"
+                    value={form.studyStartDate}
+                    onChange={(e) => setForm((f) => ({ ...f, studyStartDate: e.target.value }))}
+                    borderRadius="xl"
+                  />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>الحالة</FormLabel>
+                  <Select
+                    value={form.status}
+                    onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+                    borderRadius="xl"
+                  >
+                    <option value="active">نشطة</option>
+                    <option value="paused">متوقفة</option>
+                  </Select>
+                </FormControl>
+              </SimpleGrid>
               <FormControl>
                 <FormLabel>ملاحظات</FormLabel>
                 <Textarea
                   value={form.notes}
                   onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                   borderRadius="xl"
+                  rows={3}
                 />
               </FormControl>
             </VStack>
           </ModalBody>
           <ModalFooter gap={2}>
-            <Button variant="ghost" onClick={onClose}>
+            <Button variant="ghost" onClick={onClose} borderRadius="xl">
               إلغاء
             </Button>
             <Button

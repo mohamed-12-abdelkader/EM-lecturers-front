@@ -70,378 +70,216 @@ function buildQuery(params = {}) {
   return qs ? `?${qs}` : "";
 }
 
-function centerPath(centerId, suffix = "") {
-  return `${API}/centers/${centerId}${suffix}`;
-}
-
-// ---------- Centers ----------
-export async function fetchCenters() {
-  const { data } = await baseUrl.get(`${API}/centers`, { headers: authHeaders() });
-  const payload = unwrap(data, "فشل تحميل السناتر");
-  return Array.isArray(payload) ? payload : payload?.centers ?? [];
-}
-
-export async function fetchCenter(centerId) {
-  const { data } = await baseUrl.get(centerPath(centerId), { headers: authHeaders() });
-  return unwrap(data, "فشل تحميل بيانات السنتر");
-}
-
-export async function createCenter(payload) {
-  const { data } = await baseUrl.post(`${API}/centers`, payload, {
-    headers: authHeaders("application/json"),
-  });
-  return unwrap(data, "فشل إنشاء السنتر");
-}
-
-export async function updateCenter(centerId, payload) {
-  const { data } = await baseUrl.put(centerPath(centerId), payload, {
-    headers: authHeaders("application/json"),
-  });
-  return unwrap(data, "فشل تحديث السنتر");
-}
-
-export async function deleteCenter(centerId) {
-  const { data } = await baseUrl.delete(centerPath(centerId), { headers: authHeaders() });
-  return unwrap(data, "فشل حذف السنتر");
+// ---------- Shared lookups ----------
+export async function fetchPlatformGrades() {
+  const { data } = await baseUrl.get("/api/users/grades", { headers: authHeaders() });
+  const list = data?.grades ?? data?.data?.grades ?? data?.data ?? data;
+  return Array.isArray(list) ? list : [];
 }
 
 // ---------- Dashboard ----------
-export async function fetchCenterDashboard(centerId) {
-  const { data } = await baseUrl.get(centerPath(centerId, "/dashboard"), {
+export async function fetchDashboard(params = {}) {
+  const { data } = await baseUrl.get(`${API}/dashboard${buildQuery(params)}`, {
     headers: authHeaders(),
   });
-  return unwrap(data, "فشل تحميل لوحة السنتر");
+  return unwrap(data, "فشل تحميل لوحة التحكم");
 }
 
-export async function fetchFinanceDashboard(centerId, params = {}) {
-  const { data } = await baseUrl.get(
-    centerPath(centerId, `/finance/dashboard${buildQuery(params)}`),
-    { headers: authHeaders() }
-  );
-  return unwrap(data, "فشل تحميل لوحة الماليات");
-}
-
-// ---------- Grades ----------
-export async function fetchGrades(centerId) {
-  const { data } = await baseUrl.get(centerPath(centerId, "/grades"), {
+export async function fetchFinanceReport(params = {}) {
+  const { data } = await baseUrl.get(`${API}/reports/finance${buildQuery(params)}`, {
     headers: authHeaders(),
   });
-  const payload = unwrap(data, "فشل تحميل الصفوف");
-  return Array.isArray(payload) ? payload : [];
+  return unwrap(data, "فشل تحميل التقرير المالي");
 }
 
-export async function createGrade(centerId, payload) {
-  const { data } = await baseUrl.post(centerPath(centerId, "/grades"), payload, {
-    headers: authHeaders("application/json"),
-  });
-  return unwrap(data, "فشل إضافة الصف");
-}
-
-export async function updateGrade(centerId, gradeId, payload) {
-  const { data } = await baseUrl.put(centerPath(centerId, `/grades/${gradeId}`), payload, {
-    headers: authHeaders("application/json"),
-  });
-  return unwrap(data, "فشل تحديث الصف");
-}
-
-export async function deleteGrade(centerId, gradeId) {
-  const { data } = await baseUrl.delete(centerPath(centerId, `/grades/${gradeId}`), {
+export async function fetchActivityLogs(params = {}) {
+  const { data } = await baseUrl.get(`${API}/activity-logs${buildQuery(params)}`, {
     headers: authHeaders(),
   });
-  return unwrap(data, "فشل حذف الصف");
+  return unwrapList(data, "فشل تحميل سجل النشاط");
 }
 
 // ---------- Groups ----------
-export async function fetchGroups(centerId, params = {}) {
-  const { data } = await baseUrl.get(centerPath(centerId, `/groups${buildQuery(params)}`), {
+export async function fetchGroups(params = {}) {
+  const { data } = await baseUrl.get(`${API}/groups${buildQuery(params)}`, {
     headers: authHeaders(),
   });
-  const payload = unwrap(data, "فشل تحميل المجموعات");
-  return Array.isArray(payload) ? payload : [];
+  return unwrapList(data, "فشل تحميل المجموعات");
 }
 
-export async function fetchGroup(centerId, groupId) {
-  const { data } = await baseUrl.get(centerPath(centerId, `/groups/${groupId}`), {
+export async function fetchGroup(groupId) {
+  const { data } = await baseUrl.get(`${API}/groups/${groupId}`, {
     headers: authHeaders(),
   });
   return unwrap(data, "فشل تحميل المجموعة");
 }
 
-export async function createGroup(centerId, payload) {
-  const { data } = await baseUrl.post(centerPath(centerId, "/groups"), payload, {
+export async function createGroup(payload) {
+  const { data } = await baseUrl.post(`${API}/groups`, payload, {
     headers: authHeaders("application/json"),
   });
   return unwrap(data, "فشل إنشاء المجموعة");
 }
 
-export async function updateGroup(centerId, groupId, payload) {
-  const { data } = await baseUrl.put(centerPath(centerId, `/groups/${groupId}`), payload, {
+export async function updateGroup(groupId, payload) {
+  const { data } = await baseUrl.put(`${API}/groups/${groupId}`, payload, {
     headers: authHeaders("application/json"),
   });
   return unwrap(data, "فشل تحديث المجموعة");
 }
 
-export async function deleteGroup(centerId, groupId) {
-  const { data } = await baseUrl.delete(centerPath(centerId, `/groups/${groupId}`), {
+export async function deleteGroup(groupId) {
+  const { data } = await baseUrl.delete(`${API}/groups/${groupId}`, {
     headers: authHeaders(),
   });
   return unwrap(data, "فشل حذف المجموعة");
 }
 
-export async function fetchGroupStudents(centerId, groupId) {
-  const { data } = await baseUrl.get(centerPath(centerId, `/groups/${groupId}/students`), {
+export async function fetchGroupStudents(groupId) {
+  const { data } = await baseUrl.get(`${API}/groups/${groupId}/students`, {
     headers: authHeaders(),
   });
   const payload = unwrap(data, "فشل تحميل طلاب المجموعة");
-  return Array.isArray(payload) ? payload : [];
+  if (Array.isArray(payload)) return payload;
+  return payload?.items ?? payload?.students ?? [];
 }
 
 // ---------- Students ----------
-export async function fetchStudents(centerId, params = {}) {
-  const { data } = await baseUrl.get(centerPath(centerId, `/students${buildQuery(params)}`), {
+export async function fetchStudents(params = {}) {
+  const { data } = await baseUrl.get(`${API}/students${buildQuery(params)}`, {
     headers: authHeaders(),
   });
   return unwrapList(data, "فشل تحميل الطلاب");
 }
 
-export async function fetchStudent(centerId, studentId) {
-  const { data } = await baseUrl.get(centerPath(centerId, `/students/${studentId}`), {
+export async function fetchStudent(studentId) {
+  const { data } = await baseUrl.get(`${API}/students/${studentId}`, {
     headers: authHeaders(),
   });
   return unwrap(data, "فشل تحميل بيانات الطالب");
 }
 
-export async function createStudent(centerId, payload) {
-  const { data } = await baseUrl.post(centerPath(centerId, "/students"), payload, {
+export async function createStudent(payload) {
+  const { data } = await baseUrl.post(`${API}/students`, payload, {
     headers: authHeaders("application/json"),
   });
   return unwrap(data, "فشل إضافة الطالب");
 }
 
-export async function updateStudent(centerId, studentId, payload) {
-  const { data } = await baseUrl.put(centerPath(centerId, `/students/${studentId}`), payload, {
+export async function updateStudent(studentId, payload) {
+  const { data } = await baseUrl.put(`${API}/students/${studentId}`, payload, {
     headers: authHeaders("application/json"),
   });
   return unwrap(data, "فشل تحديث الطالب");
 }
 
-export async function deleteStudent(centerId, studentId) {
-  const { data } = await baseUrl.delete(centerPath(centerId, `/students/${studentId}`), {
+export async function deleteStudent(studentId) {
+  const { data } = await baseUrl.delete(`${API}/students/${studentId}`, {
     headers: authHeaders(),
   });
   return unwrap(data, "فشل حذف الطالب");
 }
 
-export async function fetchStudentQr(centerId, studentId) {
-  const { data } = await baseUrl.get(centerPath(centerId, `/students/${studentId}/qr`), {
+export async function fetchStudentQr(studentId) {
+  const { data } = await baseUrl.get(`${API}/students/${studentId}/qr`, {
     headers: authHeaders(),
   });
   return unwrap(data, "فشل تحميل QR الطالب");
 }
 
-export async function enrollStudent(centerId, studentId, payload) {
-  const { data } = await baseUrl.post(
-    centerPath(centerId, `/students/${studentId}/enroll`),
-    payload,
-    { headers: authHeaders("application/json") }
-  );
+export async function enrollStudent(studentId, payload) {
+  const { data } = await baseUrl.post(`${API}/students/${studentId}/enroll`, payload, {
+    headers: authHeaders("application/json"),
+  });
   return unwrap(data, "فشل تسجيل الطالب في المجموعة");
 }
 
-export async function unenrollStudent(centerId, studentId, payload) {
-  const { data } = await baseUrl.post(
-    centerPath(centerId, `/students/${studentId}/unenroll`),
-    payload,
-    { headers: authHeaders("application/json") }
-  );
+export async function unenrollStudent(studentId, payload) {
+  const { data } = await baseUrl.post(`${API}/students/${studentId}/unenroll`, payload, {
+    headers: authHeaders("application/json"),
+  });
   return unwrap(data, "فشل إلغاء تسجيل الطالب");
 }
 
-// ---------- Attendance ----------
-export async function createAttendanceSession(centerId, payload) {
-  const { data } = await baseUrl.post(centerPath(centerId, "/attendance/sessions"), payload, {
-    headers: authHeaders("application/json"),
-  });
-  return unwrap(data, "فشل فتح جلسة الحضور");
-}
-
-export async function fetchAttendanceSessions(centerId, params = {}) {
+export async function fetchStudentAttendanceReport(studentId, params = {}) {
   const { data } = await baseUrl.get(
-    centerPath(centerId, `/attendance/sessions${buildQuery(params)}`),
+    `${API}/students/${studentId}/attendance-report${buildQuery(params)}`,
     { headers: authHeaders() }
   );
-  return unwrapList(data, "فشل تحميل جلسات الحضور");
+  return unwrap(data, "فشل تحميل تقرير الحضور");
 }
 
-export async function fetchSessionAttendance(centerId, sessionId) {
-  const { data } = await baseUrl.get(
-    centerPath(centerId, `/attendance/sessions/${sessionId}`),
-    { headers: authHeaders() }
-  );
-  const payload = unwrap(data, "فشل تحميل حضور الجلسة");
-  return Array.isArray(payload) ? payload : [];
-}
-
-export async function scanAttendance(centerId, payload) {
-  const { data } = await baseUrl.post(centerPath(centerId, "/attendance/scan"), payload, {
+// ---------- Billing months & subscriptions ----------
+export async function openBillingMonth(payload) {
+  const { data } = await baseUrl.post(`${API}/months/open`, payload, {
     headers: authHeaders("application/json"),
   });
-  return unwrap(data, "فشل تسجيل الحضور بالـ QR");
+  return unwrap(data, "فشل فتح الشهر");
 }
 
-export async function recordAttendance(centerId, payload) {
-  const { data } = await baseUrl.post(centerPath(centerId, "/attendance/record"), payload, {
-    headers: authHeaders("application/json"),
-  });
-  return unwrap(data, "فشل تسجيل الحضور");
-}
-
-export async function bulkRecordAttendance(centerId, payload) {
-  const { data } = await baseUrl.post(centerPath(centerId, "/attendance/bulk"), payload, {
-    headers: authHeaders("application/json"),
-  });
-  return unwrap(data, "فشل التسجيل الجماعي");
-}
-
-export async function fetchStudentAttendanceStats(centerId, studentId, params = {}) {
-  const { data } = await baseUrl.get(
-    centerPath(centerId, `/attendance/students/${studentId}/stats${buildQuery(params)}`),
-    { headers: authHeaders() }
-  );
-  return unwrap(data, "فشل تحميل إحصائيات الحضور");
-}
-
-export async function fetchTodayAttendance(centerId) {
-  const { data } = await baseUrl.get(centerPath(centerId, "/attendance/today"), {
+export async function fetchBillingMonths(params = {}) {
+  const { data } = await baseUrl.get(`${API}/months${buildQuery(params)}`, {
     headers: authHeaders(),
   });
-  return unwrap(data, "فشل تحميل حضور اليوم");
+  const payload = unwrap(data, "فشل تحميل الأشهر");
+  return Array.isArray(payload) ? payload : payload?.items ?? payload?.months ?? [];
 }
 
-// ---------- Subscriptions ----------
-export async function fetchSubscriptions(centerId, params = {}) {
+export async function fetchMonthSubscriptions(year, month, params = {}) {
   const { data } = await baseUrl.get(
-    centerPath(centerId, `/subscriptions${buildQuery(params)}`),
+    `${API}/months/${year}/${month}/subscriptions${buildQuery(params)}`,
     { headers: authHeaders() }
   );
   return unwrapList(data, "فشل تحميل الاشتراكات");
 }
 
-export async function generateMonthlySubscriptions(centerId, payload) {
-  const { data } = await baseUrl.post(
-    centerPath(centerId, "/subscriptions/generate-monthly"),
-    payload,
-    { headers: authHeaders("application/json") }
-  );
-  return unwrap(data, "فشل توليد الاشتراكات");
-}
-
-export async function updateSubscriptionStatus(centerId, subscriptionId, status) {
-  const { data } = await baseUrl.patch(
-    centerPath(centerId, `/subscriptions/${subscriptionId}/status`),
-    { status },
-    { headers: authHeaders("application/json") }
-  );
-  return unwrap(data, "فشل تحديث حالة الاشتراك");
+export async function updateSubscription(subscriptionId, payload) {
+  const { data } = await baseUrl.patch(`${API}/subscriptions/${subscriptionId}`, payload, {
+    headers: authHeaders("application/json"),
+  });
+  return unwrap(data, "فشل تحديث الاشتراك");
 }
 
 // ---------- Payments ----------
-export async function fetchPayments(centerId, params = {}) {
-  const { data } = await baseUrl.get(centerPath(centerId, `/payments${buildQuery(params)}`), {
+export async function fetchPayments(params = {}) {
+  const { data } = await baseUrl.get(`${API}/payments${buildQuery(params)}`, {
     headers: authHeaders(),
   });
   return unwrapList(data, "فشل تحميل المدفوعات");
 }
 
-export async function createPayment(centerId, payload) {
-  const { data } = await baseUrl.post(centerPath(centerId, "/payments"), payload, {
+export async function createPayment(payload) {
+  const { data } = await baseUrl.post(`${API}/payments`, payload, {
     headers: authHeaders("application/json"),
   });
   return unwrap(data, "فشل تسجيل الدفعة");
 }
 
-export async function fetchPaymentReceipt(centerId, paymentId) {
-  const { data } = await baseUrl.get(centerPath(centerId, `/payments/${paymentId}/receipt`), {
-    headers: authHeaders(),
-  });
-  return unwrap(data, "فشل تحميل الإيصال");
-}
-
-// ---------- Staff ----------
-export async function fetchStaff(centerId) {
-  const { data } = await baseUrl.get(centerPath(centerId, "/staff"), {
-    headers: authHeaders(),
-  });
-  const payload = unwrap(data, "فشل تحميل الموظفين");
-  return Array.isArray(payload) ? payload : [];
-}
-
-export async function inviteStaff(centerId, payload) {
-  const { data } = await baseUrl.post(centerPath(centerId, "/staff"), payload, {
+// ---------- Attendance ----------
+export async function scanAttendance(payload) {
+  const { data } = await baseUrl.post(`${API}/attendance/scan`, payload, {
     headers: authHeaders("application/json"),
   });
-  return unwrap(data, "فشل إضافة الموظف");
+  return unwrap(data, "فشل تسجيل الحضور بالـ QR");
 }
 
-export async function updateStaff(centerId, staffId, payload) {
-  const { data } = await baseUrl.patch(centerPath(centerId, `/staff/${staffId}`), payload, {
+export async function recordAttendance(payload) {
+  const { data } = await baseUrl.post(`${API}/attendance/record`, payload, {
     headers: authHeaders("application/json"),
   });
-  return unwrap(data, "فشل تحديث الموظف");
+  return unwrap(data, "فشل تسجيل الحضور");
 }
 
-export async function removeStaff(centerId, staffId) {
-  const { data } = await baseUrl.delete(centerPath(centerId, `/staff/${staffId}`), {
+export async function bulkRecordAttendance(payload) {
+  const { data } = await baseUrl.post(`${API}/attendance/bulk`, payload, {
+    headers: authHeaders("application/json"),
+  });
+  return unwrap(data, "فشل التسجيل الجماعي");
+}
+
+export async function fetchTodayAttendance(params = {}) {
+  const { data } = await baseUrl.get(`${API}/attendance/today${buildQuery(params)}`, {
     headers: authHeaders(),
   });
-  return unwrap(data, "فشل حذف الموظف");
-}
-
-// ---------- Activity & Notifications ----------
-export async function fetchActivityLogs(centerId, params = {}) {
-  const { data } = await baseUrl.get(
-    centerPath(centerId, `/activity-logs${buildQuery(params)}`),
-    { headers: authHeaders() }
-  );
-  return unwrapList(data, "فشل تحميل سجل النشاط");
-}
-
-export async function fetchNotifications(centerId) {
-  const { data } = await baseUrl.get(centerPath(centerId, "/notifications"), {
-    headers: authHeaders(),
-  });
-  const payload = unwrap(data, "فشل تحميل الإشعارات");
-  return Array.isArray(payload) ? payload : [];
-}
-
-export async function markNotificationRead(centerId, notificationId) {
-  const { data } = await baseUrl.patch(
-    centerPath(centerId, `/notifications/${notificationId}/read`),
-    {},
-    { headers: authHeaders("application/json") }
-  );
-  return unwrap(data, "فشل تحديث الإشعار");
-}
-
-export async function markAllNotificationsRead(centerId) {
-  const { data } = await baseUrl.post(
-    centerPath(centerId, "/notifications/read-all"),
-    {},
-    { headers: authHeaders("application/json") }
-  );
-  return unwrap(data, "فشل تحديث الإشعارات");
-}
-
-// ---------- Reports ----------
-export async function fetchReport(centerId, type, params = {}) {
-  const format = params.format || "json";
-  const { data } = await baseUrl.get(
-    centerPath(centerId, `/reports/${type}${buildQuery({ ...params, format })}`),
-    {
-      headers: authHeaders(),
-      responseType: format === "csv" ? "blob" : "json",
-    }
-  );
-  if (format === "csv") return data;
-  return unwrap(data, "فشل تحميل التقرير");
+  return unwrap(data, "فشل تحميل حضور اليوم");
 }

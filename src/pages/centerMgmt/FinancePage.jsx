@@ -1,10 +1,17 @@
 import { useMemo, useState } from "react";
-import { useOutletContext } from "react-router-dom";
 import {
-  Input,
+  Badge,
   Select,
   SimpleGrid,
+  Table,
+  TableContainer,
+  Tbody,
+  Td,
   Text,
+  Th,
+  Thead,
+  Tr,
+  VStack,
 } from "@chakra-ui/react";
 import {
   FaUsers,
@@ -13,127 +20,193 @@ import {
   FaUserClock,
   FaExclamationTriangle,
 } from "react-icons/fa";
-import { useFinanceDashboard } from "../../Hooks/centerMgmt/useCenterMgmtQueries";
-import { currentMonthYear, field, formatMoney } from "./centerMgmtUtils";
+import { useFinanceReport, useGroups } from "../../Hooks/centerMgmt/useCenterMgmtQueries";
+import {
+  MONTH_NAMES,
+  currentMonthYear,
+  field,
+  formatMoney,
+  studentName,
+} from "./centerMgmtUtils";
 import { EmptyState, KpiCard, LoadingBlock, PageHeader, Surface } from "./components/UiBits";
 
+function ListBlock({ title, items, empty }) {
+  return (
+    <Surface>
+      <Text fontWeight="bold" mb={3}>
+        {title}{" "}
+        <Badge ms={1} colorScheme="blue">
+          {items.length}
+        </Badge>
+      </Text>
+      {items.length === 0 ? (
+        <Text fontSize="sm" color="gray.500">
+          {empty}
+        </Text>
+      ) : (
+        <TableContainer maxH="280px" overflowY="auto">
+          <Table size="sm">
+            <Thead>
+              <Tr>
+                <Th>الطالب</Th>
+                <Th>المتبقي</Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {items.map((row, idx) => (
+                <Tr key={row.id || idx}>
+                  <Td>{studentName(row) || field(row, "student_name")}</Td>
+                  <Td>
+                    {formatMoney(
+                      field(row, "remaining", "amount_due", "amountDue") ?? 0
+                    )}
+                  </Td>
+                </Tr>
+              ))}
+            </Tbody>
+          </Table>
+        </TableContainer>
+      )}
+    </Surface>
+  );
+}
+
 export default function FinancePage() {
-  const { centerId, center } = useOutletContext();
   const now = currentMonthYear();
   const [month, setMonth] = useState(String(now.month));
   const [year, setYear] = useState(String(now.year));
-  const [search, setSearch] = useState("");
+  const [groupId, setGroupId] = useState("");
+
   const params = useMemo(
     () => ({
-      month: Number(month) || undefined,
-      year: Number(year) || undefined,
-      search: search || undefined,
+      year: Number(year),
+      month: Number(month),
+      groupId: groupId || undefined,
     }),
-    [month, year, search]
+    [year, month, groupId]
   );
-  const { data, isLoading, isError, error } = useFinanceDashboard(centerId, params);
-  const currency = field(center, "currency") || "EGP";
+
+  const { data: groupsData } = useGroups({ limit: 100 });
+  const groups = groupsData?.items || [];
+  const { data, isLoading, isError, error } = useFinanceReport(params);
 
   if (isLoading) return <LoadingBlock />;
   if (isError) {
-    return <EmptyState title="تعذر تحميل الماليات" description={error?.message} />;
+    return <EmptyState title="تعذر تحميل التقرير المالي" description={error?.message} />;
   }
+
+  const unpaid = data?.unpaid || data?.unpaidList || [];
+  const partial = data?.partial || data?.partialList || [];
+  const exempt = data?.exempt || data?.exemptList || [];
 
   return (
     <>
       <PageHeader
-        title="الماليات"
-        description="إيرادات الشهر، المدفوعون، والمتأخرات في نظرة واحدةحدة."
+        title="التقرير المالي"
+        description="إجمالي المطلوب والمحصّل والمتبقي، مع قوائم غير المسددين."
       />
 
       <Surface mb={5}>
         <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3}>
           <Select value={month} onChange={(e) => setMonth(e.target.value)} borderRadius="xl">
-            {Array.from({ length: 12 }, (_, i) => (
-              <option key={i + 1} value={i + 1}>شهر {i + 1}</option>
+            {MONTH_NAMES.slice(1).map((name, idx) => (
+              <option key={name} value={idx + 1}>
+                {name}
+              </option>
             ))}
           </Select>
-          <Input type="number" value={year} onChange={(e) => setYear(e.target.value)} borderRadius="xl" />
-          <Input
-            placeholder="بحث باسم الطالب..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+          <Select value={year} onChange={(e) => setYear(e.target.value)} borderRadius="xl">
+            {[now.year - 1, now.year, now.year + 1].map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </Select>
+          <Select
+            placeholder="كل المجموعات"
+            value={groupId}
+            onChange={(e) => setGroupId(e.target.value)}
             borderRadius="xl"
-          />
+          >
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {field(g, "name")}
+              </option>
+            ))}
+          </Select>
         </SimpleGrid>
       </Surface>
 
-      <SimpleGrid columns={{ base: 2, md: 3 }} spacing={4} mb={6}>
+      <SimpleGrid columns={{ base: 2, md: 3, lg: 5 }} spacing={4} mb={6}>
         <KpiCard
-          label="عدد الطلاب"
-          value={field(data, "studentsCount", "students_count") ?? 0}
+          label="الطلاب"
+          value={data?.studentsCount ?? data?.totalStudents ?? 0}
           icon={FaUsers}
           color="blue"
         />
         <KpiCard
-          label="الإيرادات"
-          value={formatMoney(field(data, "revenue", "totalRevenue", "monthlyRevenue"), currency)}
-          icon={FaMoneyBillWave}
-          color="green"
-        />
-        <KpiCard
-          label="مدفوعون"
-          value={field(data, "paidCount", "paid_count") ?? 0}
+          label="مشتركون"
+          value={data?.subscribersCount ?? data?.subscribedCount ?? 0}
           icon={FaUserCheck}
           color="teal"
         />
         <KpiCard
-          label="غير مدفوعين"
-          value={field(data, "unpaidCount", "unpaid_count") ?? 0}
+          label="إجمالي المطلوب"
+          value={formatMoney(data?.totalDue ?? data?.monthTotalDue)}
+          icon={FaMoneyBillWave}
+          color="purple"
+        />
+        <KpiCard
+          label="المحصّل"
+          value={formatMoney(data?.totalCollected ?? data?.monthCollected)}
+          icon={FaUserCheck}
+          color="green"
+        />
+        <KpiCard
+          label="المتبقي"
+          value={formatMoney(data?.totalRemaining ?? data?.monthRemaining)}
+          icon={FaExclamationTriangle}
+          color="orange"
+        />
+      </SimpleGrid>
+
+      <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4} mb={6}>
+        <KpiCard
+          label="غير مدفوع"
+          value={data?.unpaidCount ?? unpaid.length}
           icon={FaUserClock}
           color="orange"
         />
         <KpiCard
-          label="متأخرون"
-          value={field(data, "arrearsCount", "lateCount", "arrears_count") ?? 0}
-          icon={FaExclamationTriangle}
-          color="red"
+          label="دفع جزئي"
+          value={data?.partialCount ?? partial.length}
+          color="yellow"
         />
         <KpiCard
-          label="إجمالي المتأخرات"
-          value={formatMoney(field(data, "arrearsTotal", "totalArrears", "arrears_total"), currency)}
-          icon={FaMoneyBillWave}
+          label="معفى"
+          value={data?.exemptCount ?? exempt.length}
+          color="purple"
+        />
+        <KpiCard
+          label="غير مشترك"
+          value={data?.nonSubscribersCount ?? data?.unsubscribedCount ?? 0}
           color="red"
         />
       </SimpleGrid>
 
       <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
-        <Breakdown title="حسب الصف" items={field(data, "byGrade", "revenueByGrade") || []} currency={currency} />
-        <Breakdown title="حسب المجموعة" items={field(data, "byGroup", "revenueByGroup") || []} currency={currency} />
-        <Breakdown title="حسب الشهر" items={field(data, "byMonth", "revenueByMonth") || []} currency={currency} />
+        <ListBlock title="لم يدفعوا" items={unpaid} empty="لا يوجد" />
+        <ListBlock title="دفع جزئي" items={partial} empty="لا يوجد" />
+        <ListBlock title="معفيون" items={exempt} empty="لا يوجد" />
       </SimpleGrid>
-    </>
-  );
-}
 
-function Breakdown({ title, items, currency }) {
-  const list = Array.isArray(items) ? items : [];
-  return (
-    <Surface>
-      <Text fontWeight="bold" mb={3}>
-        {title}
-      </Text>
-      {list.length === 0 ? (
-        <Text fontSize="sm" color="gray.500">
-          لا توجد بيانات
-        </Text>
-      ) : (
-        list.slice(0, 8).map((item, idx) => (
-          <SimpleGrid key={idx} columns={2} py={2} borderBottomWidth={idx < list.length - 1 ? "1px" : 0} borderColor="gray.100">
-            <Text fontSize="sm" noOfLines={1}>
-              {field(item, "name", "label", "month", "grade_name", "group_name") || `#${idx + 1}`}
-            </Text>
-            <Text fontSize="sm" fontWeight="bold" textAlign="left">
-              {formatMoney(field(item, "amount", "revenue", "total"), currency)}
-            </Text>
-          </SimpleGrid>
-        ))
+      {!data && (
+        <VStack mt={6}>
+          <Text fontSize="sm" color="gray.500">
+            لا توجد بيانات لهذا الفلتر
+          </Text>
+        </VStack>
       )}
-    </Surface>
+    </>
   );
 }

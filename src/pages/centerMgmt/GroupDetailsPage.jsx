@@ -1,4 +1,4 @@
-import { Link as RouterLink, useOutletContext, useParams } from "react-router-dom";
+import { Link as RouterLink, useParams } from "react-router-dom";
 import {
   Badge,
   Box,
@@ -17,19 +17,14 @@ import {
   WrapItem,
 } from "@chakra-ui/react";
 import { FaArrowRight } from "react-icons/fa";
-import {
-  useGroup,
-  useGroupStudents,
-} from "../../Hooks/centerMgmt/useCenterMgmtQueries";
-import { field, formatMoney, studentCode, studentName } from "./centerMgmtUtils";
+import { useGroup, useGroupStudents } from "../../Hooks/centerMgmt/useCenterMgmtQueries";
+import { field, formatDate, formatMoney, studentCode, studentName } from "./centerMgmtUtils";
 import { EmptyState, LoadingBlock, PageHeader, Surface } from "./components/UiBits";
 
 export default function GroupDetailsPage() {
-  const { centerId, center } = useOutletContext();
   const { groupId } = useParams();
-  const { data: group, isLoading: loadingGroup } = useGroup(centerId, groupId);
-  const { data: students = [], isLoading: loadingStudents } = useGroupStudents(centerId, groupId);
-  const currency = field(center, "currency") || "EGP";
+  const { data: group, isLoading: loadingGroup } = useGroup(groupId);
+  const { data: students = [], isLoading: loadingStudents } = useGroupStudents(groupId);
 
   if (loadingGroup) return <LoadingBlock />;
   if (!group) {
@@ -37,7 +32,7 @@ export default function GroupDetailsPage() {
       <EmptyState
         title="المجموعة غير موجودة"
         action={
-          <Button as={RouterLink} to={`/center-mgmt/${centerId}/groups`} colorScheme="blue">
+          <Button as={RouterLink} to="/center-mgmt/groups" colorScheme="blue">
             العودة للمجموعات
           </Button>
         }
@@ -55,7 +50,7 @@ export default function GroupDetailsPage() {
         actions={
           <Button
             as={RouterLink}
-            to={`/center-mgmt/${centerId}/groups`}
+            to="/center-mgmt/groups"
             leftIcon={<FaArrowRight />}
             variant="ghost"
             size="sm"
@@ -70,48 +65,50 @@ export default function GroupDetailsPage() {
           <Text fontSize="xs" color="gray.500">
             الوقت
           </Text>
-          <Text fontWeight="bold">{field(group, "session_time", "sessionTime") || "—"}</Text>
+          <Text fontWeight="bold">
+            {field(group, "start_time", "startTime") || "—"} –{" "}
+            {field(group, "end_time", "endTime") || "—"}
+          </Text>
         </Surface>
         <Surface>
           <Text fontSize="xs" color="gray.500">
-            المدة
+            الرسوم الشهرية
           </Text>
           <Text fontWeight="bold">
-            {field(group, "duration_minutes", "durationMinutes") || "—"} دقيقة
+            {formatMoney(field(group, "monthly_fee", "monthlyFee"))}
           </Text>
         </Surface>
         <Surface>
           <Text fontSize="xs" color="gray.500">
-            السعة
-          </Text>
-          <Text fontWeight="bold">{field(group, "max_capacity", "maxCapacity") || "—"}</Text>
-        </Surface>
-        <Surface>
-          <Text fontSize="xs" color="gray.500">
-            الرسوم
+            بداية الدراسة
           </Text>
           <Text fontWeight="bold">
-            {formatMoney(field(group, "default_fee", "defaultFee"), currency)}
+            {formatDate(field(group, "study_start_date", "studyStartDate"))}
           </Text>
+        </Surface>
+        <Surface>
+          <Text fontSize="xs" color="gray.500">
+            الحالة
+          </Text>
+          <Badge colorScheme={field(group, "status") === "paused" ? "orange" : "green"} mt={1}>
+            {field(group, "status") === "paused" ? "متوقفة" : "نشطة"}
+          </Badge>
         </Surface>
       </SimpleGrid>
 
       <Surface mb={5}>
-        <Flex justify="space-between" align="center" mb={3} flexWrap="wrap" gap={2}>
-          <Text fontWeight="bold">أيام الحضور</Text>
-          <Badge colorScheme={field(group, "status") === "paused" ? "orange" : "green"}>
-            {field(group, "status") === "paused" ? "متوقفة" : "نشطة"}
-          </Badge>
-        </Flex>
+        <Text fontWeight="bold" mb={3}>
+          أيام المجموعة
+        </Text>
         <Wrap>
           {days.length === 0 ? (
             <Text fontSize="sm" color="gray.500">
-              لم تُحدد أيام
+              لا توجد أيام محددة
             </Text>
           ) : (
             days.map((d) => (
               <WrapItem key={d}>
-                <Badge colorScheme="blue" borderRadius="md" px={3} py={1}>
+                <Badge colorScheme="blue" px={3} py={1} borderRadius="md">
                   {d}
                 </Badge>
               </WrapItem>
@@ -119,18 +116,18 @@ export default function GroupDetailsPage() {
           )}
         </Wrap>
         {field(group, "notes") ? (
-          <Text mt={3} fontSize="sm" color="gray.600">
+          <Text fontSize="sm" color="gray.600" mt={4}>
             {field(group, "notes")}
           </Text>
         ) : null}
       </Surface>
 
-      <Surface p={0} overflow="hidden">
-        <Flex px={5} py={4} justify="space-between" align="center">
-          <Text fontWeight="bold">طلاب المجموعة ({students.length})</Text>
+      <Surface>
+        <Flex justify="space-between" align="center" mb={4}>
+          <Text fontWeight="bold">الطلاب ({students.length})</Text>
           <Button
             as={RouterLink}
-            to={`/center-mgmt/${centerId}/students`}
+            to="/center-mgmt/students"
             size="sm"
             colorScheme="blue"
             variant="outline"
@@ -139,18 +136,14 @@ export default function GroupDetailsPage() {
             إدارة الطلاب
           </Button>
         </Flex>
+
         {loadingStudents ? (
-          <LoadingBlock />
+          <LoadingBlock label="جاري تحميل الطلاب..." />
         ) : students.length === 0 ? (
-          <Box p={5}>
-            <EmptyState
-              title="لا يوجد طلاب في هذه المجموعة"
-              description="أضف طالباً واختر هذه المجموعة عند التسجيل."
-            />
-          </Box>
+          <EmptyState title="لا يوجد طلاب في هذه المجموعة" />
         ) : (
           <TableContainer>
-            <Table>
+            <Table size="sm">
               <Thead>
                 <Tr>
                   <Th>الكود</Th>
@@ -168,12 +161,12 @@ export default function GroupDetailsPage() {
                     <Td>
                       <Button
                         as={RouterLink}
-                        to={`/center-mgmt/${centerId}/students/${s.id}`}
+                        to={`/center-mgmt/students/${s.id}`}
                         size="xs"
                         variant="ghost"
                         colorScheme="blue"
                       >
-                        الملف
+                        عرض
                       </Button>
                     </Td>
                   </Tr>

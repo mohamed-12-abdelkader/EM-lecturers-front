@@ -1,4 +1,5 @@
-import { Link as RouterLink, useOutletContext } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import {
   Box,
   Button,
@@ -8,67 +9,108 @@ import {
   VStack,
   HStack,
   Badge,
+  Select,
   useColorModeValue,
 } from "@chakra-ui/react";
 import {
   FaUsers,
   FaLayerGroup,
-  FaGraduationCap,
   FaUserCheck,
   FaUserTimes,
   FaMoneyBillWave,
   FaExclamationTriangle,
   FaClock,
+  FaUserClock,
 } from "react-icons/fa";
-import { useCenterDashboard } from "../../Hooks/centerMgmt/useCenterMgmtQueries";
-import { formatMoney, formatDate, field } from "./centerMgmtUtils";
+import { useActivityLogs, useDashboard } from "../../Hooks/centerMgmt/useCenterMgmtQueries";
+import {
+  currentMonthYear,
+  field,
+  formatDate,
+  formatMoney,
+  MONTH_NAMES,
+} from "./centerMgmtUtils";
 import { EmptyState, KpiCard, LoadingBlock, PageHeader, Surface } from "./components/UiBits";
 
 const QUICK = [
-  { to: "students", label: "الطلاب", desc: "إضافة ومتابعة الطلاب" },
+  { to: "students", label: "الطلاب", desc: "إضافة ومتابعة و QR" },
   { to: "attendance", label: "الحضور", desc: "مسح QR أو تسجيل يدوي" },
-  { to: "subscriptions", label: "الاشتراكات", desc: "توليد اشتراكات الشهر" },
-  { to: "payments", label: "المدفوعات", desc: "تحصيل وإيصالات" },
-  { to: "groups", label: "المجموعات", desc: "الجداول والطاقة الاستيعابية" },
-  { to: "finance", label: "الماليات", desc: "إيرادات ومتأخرات" },
+  { to: "subscriptions", label: "الاشتراكات", desc: "فتح شهر ومتابعة الدفع" },
+  { to: "payments", label: "المدفوعات", desc: "تسجيل التحصيل" },
+  { to: "groups", label: "المجموعات", desc: "الجداول والرسوم" },
+  { to: "finance", label: "التقرير المالي", desc: "مطلوب / محصّل / متبقي" },
 ];
 
 export default function CenterDashboardPage() {
-  const { centerId, center } = useOutletContext();
-  const { data, isLoading, isError, error } = useCenterDashboard(centerId);
+  const now = currentMonthYear();
+  const [month, setMonth] = useState(String(now.month));
+  const [year, setYear] = useState(String(now.year));
+  const params = useMemo(
+    () => ({ year: Number(year), month: Number(month) }),
+    [year, month]
+  );
+
+  const { data, isLoading, isError, error } = useDashboard(params);
+  const { data: activityData } = useActivityLogs({ limit: 15 });
+  const activity = activityData?.items || [];
+
   const muted = useColorModeValue("gray.600", "gray.400");
   const softBg = useColorModeValue("gray.50", "gray.700");
   const outlineBorder = useColorModeValue("gray.200", "gray.600");
-  const currency = field(center, "currency") || "EGP";
 
   if (isLoading) return <LoadingBlock label="جاري تحميل لوحة التحكم..." />;
   if (isError) {
     return (
-      <EmptyState
-        title="تعذر تحميل اللوحة"
-        description={error?.message || "حاول مرة أخرى"}
-      />
+      <EmptyState title="تعذر تحميل اللوحة" description={error?.message || "حاول مرة أخرى"} />
     );
   }
 
-  const activity = data?.recentActivity || [];
+  const years = [now.year - 1, now.year, now.year + 1];
 
   return (
     <Box>
       <PageHeader
         title="لوحة التحكم"
-        description={`نظرة سريعة على ${field(center, "name") || "السنتر"}`}
+        description={`نظرة على ${MONTH_NAMES[Number(month)] || ""} ${year}`}
+        actions={
+          <HStack spacing={2}>
+            <Select
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+              borderRadius="xl"
+              w="140px"
+              size="sm"
+            >
+              {MONTH_NAMES.slice(1).map((name, idx) => (
+                <option key={name} value={idx + 1}>
+                  {name}
+                </option>
+              ))}
+            </Select>
+            <Select
+              value={year}
+              onChange={(e) => setYear(e.target.value)}
+              borderRadius="xl"
+              w="100px"
+              size="sm"
+            >
+              {years.map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </Select>
+          </HStack>
+        }
       />
 
       <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4} mb={6}>
         <KpiCard label="الطلاب" value={data?.studentsCount ?? 0} icon={FaUsers} color="blue" />
-        <KpiCard label="المجموعات" value={data?.groupsCount ?? 0} icon={FaLayerGroup} color="teal" />
-        <KpiCard label="الصفوف" value={data?.gradesCount ?? 0} icon={FaGraduationCap} color="purple" />
         <KpiCard
-          label="إيراد الشهر"
-          value={formatMoney(data?.monthlyRevenue, currency)}
-          icon={FaMoneyBillWave}
-          color="green"
+          label="المجموعات"
+          value={data?.groupsCount ?? 0}
+          icon={FaLayerGroup}
+          color="teal"
         />
         <KpiCard
           label="حضور اليوم"
@@ -83,14 +125,26 @@ export default function CenterDashboardPage() {
           color="red"
         />
         <KpiCard
-          label="غير مدفوع"
-          value={data?.unpaidCount ?? 0}
+          label="متأخر اليوم"
+          value={data?.todayLate ?? 0}
+          icon={FaUserClock}
+          color="orange"
+        />
+        <KpiCard
+          label="محصّل الشهر"
+          value={formatMoney(data?.monthCollected ?? data?.monthTotalPaid)}
+          icon={FaMoneyBillWave}
+          color="green"
+        />
+        <KpiCard
+          label="متبقي الشهر"
+          value={formatMoney(data?.monthRemaining)}
           icon={FaClock}
           color="orange"
         />
         <KpiCard
-          label="اشتراكات منتهية"
-          value={data?.expiredSubscriptions ?? 0}
+          label="غير مسدّد"
+          value={data?.unpaidRenewals ?? 0}
           icon={FaExclamationTriangle}
           color="red"
         />
@@ -107,7 +161,7 @@ export default function CenterDashboardPage() {
                 <Button
                   key={item.to}
                   as={RouterLink}
-                  to={`/center-mgmt/${centerId}/${item.to}`}
+                  to={`/center-mgmt/${item.to}`}
                   variant="outline"
                   justifyContent="flex-start"
                   h="auto"
@@ -126,11 +180,62 @@ export default function CenterDashboardPage() {
               ))}
             </SimpleGrid>
           </Surface>
+
+          {(data?.recentPayments?.length > 0 || data?.recentAttendance?.length > 0) && (
+            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mt={5}>
+              <Surface>
+                <Text fontWeight="bold" mb={3}>
+                  آخر المدفوعات
+                </Text>
+                <VStack align="stretch" spacing={2}>
+                  {(data?.recentPayments || []).slice(0, 5).map((p, idx) => (
+                    <Flex
+                      key={p.id || idx}
+                      justify="space-between"
+                      gap={2}
+                      p={2}
+                      borderRadius="lg"
+                      bg={softBg}
+                    >
+                      <Text fontSize="sm" noOfLines={1}>
+                        {field(p, "student_name", "studentName", "full_name") || "دفعة"}
+                      </Text>
+                      <Text fontSize="sm" fontWeight="bold">
+                        {formatMoney(field(p, "amount"))}
+                      </Text>
+                    </Flex>
+                  ))}
+                </VStack>
+              </Surface>
+              <Surface>
+                <Text fontWeight="bold" mb={3}>
+                  آخر الحضور
+                </Text>
+                <VStack align="stretch" spacing={2}>
+                  {(data?.recentAttendance || []).slice(0, 5).map((a, idx) => (
+                    <Flex
+                      key={a.id || idx}
+                      justify="space-between"
+                      gap={2}
+                      p={2}
+                      borderRadius="lg"
+                      bg={softBg}
+                    >
+                      <Text fontSize="sm" noOfLines={1}>
+                        {field(a, "student_name", "studentName", "full_name") || "حضور"}
+                      </Text>
+                      <Badge>{field(a, "status") || "—"}</Badge>
+                    </Flex>
+                  ))}
+                </VStack>
+              </Surface>
+            </SimpleGrid>
+          )}
         </Box>
 
         <Surface>
           <Flex justify="space-between" align="center" mb={4}>
-            <Text fontWeight="bold">آخر النشاط</Text>
+            <Text fontWeight="bold">سجل النشاط</Text>
             <Badge colorScheme="blue">{activity.length}</Badge>
           </Flex>
           {activity.length === 0 ? (
@@ -138,22 +243,15 @@ export default function CenterDashboardPage() {
               لا يوجد نشاط حديث
             </Text>
           ) : (
-            <VStack align="stretch" spacing={3} maxH="360px" overflowY="auto">
-              {activity.slice(0, 10).map((item, idx) => (
-                <Box
-                  key={item.id || idx}
-                  p={3}
-                  borderRadius="lg"
-                  bg={softBg}
-                >
+            <VStack align="stretch" spacing={3} maxH="420px" overflowY="auto">
+              {activity.map((item, idx) => (
+                <Box key={item.id || idx} p={3} borderRadius="lg" bg={softBg}>
                   <Text fontSize="sm" fontWeight="medium" noOfLines={2}>
-                    {field(item, "action", "message", "description") || "نشاط"}
+                    {field(item, "action", "message", "description", "event") || "نشاط"}
                   </Text>
-                  <HStack mt={1} spacing={2}>
-                    <Text fontSize="xs" color={muted}>
-                      {formatDate(field(item, "created_at", "createdAt"))}
-                    </Text>
-                  </HStack>
+                  <Text fontSize="xs" color={muted} mt={1}>
+                    {formatDate(field(item, "created_at", "createdAt"))}
+                  </Text>
                 </Box>
               ))}
             </VStack>

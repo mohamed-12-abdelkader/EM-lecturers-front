@@ -55,11 +55,9 @@ import ManagedStudentsPage from "../pages/teacher/managedStudents/ManagedStudent
 import StudentReport from "../pages/teacher/StudentReport";
 import PlatformStudents from "../pages/teacher/PlatformStudents";
 
-// Center Management v2
-import CentersPage from "../pages/centerMgmt/CentersPage";
+// Center Management (teacher-center API)
 import CenterLayout from "../pages/centerMgmt/components/CenterLayout";
 import CenterDashboardPage from "../pages/centerMgmt/CenterDashboardPage";
-import GradesPage from "../pages/centerMgmt/GradesPage";
 import GroupsPage from "../pages/centerMgmt/GroupsPage";
 import GroupDetailsPage from "../pages/centerMgmt/GroupDetailsPage";
 import StudentsPage from "../pages/centerMgmt/StudentsPage";
@@ -68,8 +66,6 @@ import AttendancePage from "../pages/centerMgmt/AttendancePage";
 import SubscriptionsPage from "../pages/centerMgmt/SubscriptionsPage";
 import PaymentsPage from "../pages/centerMgmt/PaymentsPage";
 import FinancePage from "../pages/centerMgmt/FinancePage";
-import StaffPage from "../pages/centerMgmt/StaffPage";
-import ReportsPage from "../pages/centerMgmt/ReportsPage";
 
 // Exam Components
 import Exam from "../pages/exam/Exam";
@@ -501,10 +497,8 @@ const AppRouter = () => {
           </Route>
           <Route path="teacher-students" element={<TeacherStudents />} />
           <Route path="managed-students" element={<ManagedStudentsPage />} />
-          <Route path="center-mgmt" element={<CentersPage />} />
-          <Route path="center-mgmt/:centerId" element={<CenterLayout />}>
+          <Route path="center-mgmt" element={<CenterLayout />}>
             <Route index element={<CenterDashboardPage />} />
-            <Route path="grades" element={<GradesPage />} />
             <Route path="groups" element={<GroupsPage />} />
             <Route path="groups/:groupId" element={<GroupDetailsPage />} />
             <Route path="students" element={<StudentsPage />} />
@@ -513,8 +507,6 @@ const AppRouter = () => {
             <Route path="subscriptions" element={<SubscriptionsPage />} />
             <Route path="payments" element={<PaymentsPage />} />
             <Route path="finance" element={<FinancePage />} />
-            <Route path="staff" element={<StaffPage />} />
-            <Route path="reports" element={<ReportsPage />} />
           </Route>
           <Route path="teacher-students/:studentId" element={<StudentReport />} />
           <Route path="platform-students" element={<PlatformStudents />} />

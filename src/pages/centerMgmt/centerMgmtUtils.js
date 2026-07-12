@@ -10,14 +10,6 @@ export const WEEK_DAYS = [
   "الجمعة",
 ];
 
-export const ROLE_LABELS = {
-  owner: "مالك",
-  admin: "أدمن",
-  teacher: "مدرس",
-  accountant: "محاسب",
-  assistant: "مساعد",
-};
-
 export const ATTENDANCE_LABELS = {
   present: { label: "حاضر", scheme: "green" },
   absent: { label: "غائب", scheme: "red" },
@@ -26,44 +18,46 @@ export const ATTENDANCE_LABELS = {
 };
 
 export const SUBSCRIPTION_LABELS = {
-  pending: { label: "غير مدفوع", scheme: "orange" },
-  active: { label: "نشط", scheme: "green" },
-  expired: { label: "منتهي", scheme: "red" },
+  paid: { label: "مدفوع", scheme: "green" },
+  unpaid: { label: "غير مدفوع", scheme: "orange" },
+  partial: { label: "جزئي", scheme: "yellow" },
+  exempt: { label: "معفى", scheme: "purple" },
 };
 
 export const PAYMENT_METHOD_LABELS = {
-  cash: "نقدي",
-  card: "بطاقة",
-  transfer: "تحويل",
-  wallet: "محفظة",
+  cash: "كاش",
+  transfer: "تحويل بنكي",
+  vodafone_cash: "فودافون كاش",
   other: "أخرى",
 };
 
-export const REPORT_TYPES = [
-  { value: "attendance", label: "كشف حضور" },
-  { value: "absences", label: "كشف غياب" },
-  { value: "subscriptions", label: "اشتراكات" },
-  { value: "arrears", label: "متأخرات" },
-  { value: "revenue", label: "إيرادات" },
-  { value: "student", label: "تقرير طالب" },
-  { value: "group", label: "تقرير مجموعة" },
-  { value: "grade", label: "تقرير صف" },
+export const MONTH_NAMES = [
+  "",
+  "يناير",
+  "فبراير",
+  "مارس",
+  "أبريل",
+  "مايو",
+  "يونيو",
+  "يوليو",
+  "أغسطس",
+  "سبتمبر",
+  "أكتوبر",
+  "نوفمبر",
+  "ديسمبر",
 ];
 
 export const CENTER_NAV = [
   { to: "", label: "لوحة التحكم", end: true },
-  { to: "grades", label: "الصفوف" },
   { to: "groups", label: "المجموعات" },
   { to: "students", label: "الطلاب" },
   { to: "attendance", label: "الحضور" },
   { to: "subscriptions", label: "الاشتراكات" },
   { to: "payments", label: "المدفوعات" },
-  { to: "finance", label: "الماليات" },
-  { to: "staff", label: "الموظفون" },
-  { to: "reports", label: "التقارير" },
+  { to: "finance", label: "التقرير المالي" },
 ];
 
-export function formatMoney(value, currency = "EGP") {
+export function formatMoney(value, currency = "ج.م") {
   const num = Number(value);
   if (Number.isNaN(num)) return `— ${currency}`;
   return `${num.toLocaleString("ar-EG")} ${currency}`;
@@ -100,4 +94,25 @@ export function studentName(row) {
 
 export function studentCode(row) {
   return field(row, "student_code", "studentCode") || "—";
+}
+
+export function groupName(row) {
+  return field(row, "name", "group_name", "groupName") || "مجموعة";
+}
+
+export function parseQrScan(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed?.token || parsed?.qrToken) {
+      return {
+        qrToken: parsed.token || parsed.qrToken,
+        qrPayload: parsed,
+      };
+    }
+  } catch {
+    // plain token
+  }
+  return { qrToken: raw };
 }

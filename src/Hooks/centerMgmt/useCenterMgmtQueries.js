@@ -3,420 +3,252 @@ import * as api from "../../api/centerMgmtApi";
 
 export const centerMgmtKeys = {
   all: ["center-mgmt"],
-  centers: () => [...centerMgmtKeys.all, "centers"],
-  center: (id) => [...centerMgmtKeys.all, "center", String(id)],
-  dashboard: (id) => [...centerMgmtKeys.all, "dashboard", String(id)],
-  finance: (id, params) => [...centerMgmtKeys.all, "finance", String(id), params],
-  grades: (id) => [...centerMgmtKeys.all, "grades", String(id)],
-  groups: (id, params) => [...centerMgmtKeys.all, "groups", String(id), params],
-  group: (centerId, groupId) => [
+  dashboard: (params) => [...centerMgmtKeys.all, "dashboard", params],
+  finance: (params) => [...centerMgmtKeys.all, "finance", params],
+  activity: (params) => [...centerMgmtKeys.all, "activity", params],
+  grades: () => [...centerMgmtKeys.all, "grades"],
+  groups: (params) => [...centerMgmtKeys.all, "groups", params],
+  group: (groupId) => [...centerMgmtKeys.all, "group", String(groupId)],
+  groupStudents: (groupId) => [...centerMgmtKeys.all, "group-students", String(groupId)],
+  students: (params) => [...centerMgmtKeys.all, "students", params],
+  student: (studentId) => [...centerMgmtKeys.all, "student", String(studentId)],
+  studentQr: (studentId) => [...centerMgmtKeys.all, "student-qr", String(studentId)],
+  studentAttendance: (studentId, params) => [
     ...centerMgmtKeys.all,
-    "group",
-    String(centerId),
-    String(groupId),
-  ],
-  groupStudents: (centerId, groupId) => [
-    ...centerMgmtKeys.all,
-    "group-students",
-    String(centerId),
-    String(groupId),
-  ],
-  students: (id, params) => [...centerMgmtKeys.all, "students", String(id), params],
-  student: (centerId, studentId) => [
-    ...centerMgmtKeys.all,
-    "student",
-    String(centerId),
+    "student-attendance",
     String(studentId),
-  ],
-  studentQr: (centerId, studentId) => [
-    ...centerMgmtKeys.all,
-    "student-qr",
-    String(centerId),
-    String(studentId),
-  ],
-  attendanceToday: (id) => [...centerMgmtKeys.all, "attendance-today", String(id)],
-  attendanceSessions: (id, params) => [
-    ...centerMgmtKeys.all,
-    "attendance-sessions",
-    String(id),
     params,
   ],
-  sessionAttendance: (centerId, sessionId) => [
-    ...centerMgmtKeys.all,
-    "session-attendance",
-    String(centerId),
-    String(sessionId),
-  ],
-  studentAttendanceStats: (centerId, studentId) => [
-    ...centerMgmtKeys.all,
-    "student-attendance-stats",
-    String(centerId),
-    String(studentId),
-  ],
-  subscriptions: (id, params) => [
+  attendanceToday: (params) => [...centerMgmtKeys.all, "attendance-today", params],
+  months: () => [...centerMgmtKeys.all, "months"],
+  subscriptions: (year, month, params) => [
     ...centerMgmtKeys.all,
     "subscriptions",
-    String(id),
+    String(year),
+    String(month),
     params,
   ],
-  payments: (id, params) => [...centerMgmtKeys.all, "payments", String(id), params],
-  staff: (id) => [...centerMgmtKeys.all, "staff", String(id)],
-  activity: (id, params) => [...centerMgmtKeys.all, "activity", String(id), params],
-  notifications: (id) => [...centerMgmtKeys.all, "notifications", String(id)],
+  payments: (params) => [...centerMgmtKeys.all, "payments", params],
 };
 
-function invalidateCenter(qc, centerId) {
-  qc.invalidateQueries({ queryKey: centerMgmtKeys.center(centerId) });
-  qc.invalidateQueries({ queryKey: centerMgmtKeys.dashboard(centerId) });
+function invalidateCore(qc) {
+  qc.invalidateQueries({ queryKey: centerMgmtKeys.all });
 }
 
-export function useCenters() {
+export function usePlatformGrades() {
   return useQuery({
-    queryKey: centerMgmtKeys.centers(),
-    queryFn: api.fetchCenters,
+    queryKey: centerMgmtKeys.grades(),
+    queryFn: api.fetchPlatformGrades,
   });
 }
 
-export function useCenter(centerId) {
+export function useDashboard(params = {}) {
   return useQuery({
-    queryKey: centerMgmtKeys.center(centerId),
-    queryFn: () => api.fetchCenter(centerId),
-    enabled: Boolean(centerId),
+    queryKey: centerMgmtKeys.dashboard(params),
+    queryFn: () => api.fetchDashboard(params),
   });
 }
 
-export function useCenterDashboard(centerId) {
+export function useFinanceReport(params = {}) {
   return useQuery({
-    queryKey: centerMgmtKeys.dashboard(centerId),
-    queryFn: () => api.fetchCenterDashboard(centerId),
-    enabled: Boolean(centerId),
+    queryKey: centerMgmtKeys.finance(params),
+    queryFn: () => api.fetchFinanceReport(params),
   });
 }
 
-export function useFinanceDashboard(centerId, params = {}) {
+export function useActivityLogs(params = { limit: 20 }) {
   return useQuery({
-    queryKey: centerMgmtKeys.finance(centerId, params),
-    queryFn: () => api.fetchFinanceDashboard(centerId, params),
-    enabled: Boolean(centerId),
+    queryKey: centerMgmtKeys.activity(params),
+    queryFn: () => api.fetchActivityLogs(params),
   });
 }
 
-export function useGrades(centerId) {
+export function useGroups(params = {}) {
   return useQuery({
-    queryKey: centerMgmtKeys.grades(centerId),
-    queryFn: () => api.fetchGrades(centerId),
-    enabled: Boolean(centerId),
+    queryKey: centerMgmtKeys.groups(params),
+    queryFn: () => api.fetchGroups(params),
   });
 }
 
-export function useGroups(centerId, params = {}) {
+export function useGroup(groupId) {
   return useQuery({
-    queryKey: centerMgmtKeys.groups(centerId, params),
-    queryFn: () => api.fetchGroups(centerId, params),
-    enabled: Boolean(centerId),
+    queryKey: centerMgmtKeys.group(groupId),
+    queryFn: () => api.fetchGroup(groupId),
+    enabled: Boolean(groupId),
   });
 }
 
-export function useGroup(centerId, groupId) {
+export function useGroupStudents(groupId) {
   return useQuery({
-    queryKey: centerMgmtKeys.group(centerId, groupId),
-    queryFn: () => api.fetchGroup(centerId, groupId),
-    enabled: Boolean(centerId && groupId),
+    queryKey: centerMgmtKeys.groupStudents(groupId),
+    queryFn: () => api.fetchGroupStudents(groupId),
+    enabled: Boolean(groupId),
   });
 }
 
-export function useGroupStudents(centerId, groupId) {
+export function useStudents(params = {}) {
   return useQuery({
-    queryKey: centerMgmtKeys.groupStudents(centerId, groupId),
-    queryFn: () => api.fetchGroupStudents(centerId, groupId),
-    enabled: Boolean(centerId && groupId),
+    queryKey: centerMgmtKeys.students(params),
+    queryFn: () => api.fetchStudents(params),
   });
 }
 
-export function useStudents(centerId, params = {}) {
+export function useStudent(studentId) {
   return useQuery({
-    queryKey: centerMgmtKeys.students(centerId, params),
-    queryFn: () => api.fetchStudents(centerId, params),
-    enabled: Boolean(centerId),
+    queryKey: centerMgmtKeys.student(studentId),
+    queryFn: () => api.fetchStudent(studentId),
+    enabled: Boolean(studentId),
   });
 }
 
-export function useStudent(centerId, studentId) {
+export function useStudentQr(studentId) {
   return useQuery({
-    queryKey: centerMgmtKeys.student(centerId, studentId),
-    queryFn: () => api.fetchStudent(centerId, studentId),
-    enabled: Boolean(centerId && studentId),
+    queryKey: centerMgmtKeys.studentQr(studentId),
+    queryFn: () => api.fetchStudentQr(studentId),
+    enabled: Boolean(studentId),
   });
 }
 
-export function useStudentQr(centerId, studentId) {
+export function useStudentAttendanceReport(studentId, params = {}) {
   return useQuery({
-    queryKey: centerMgmtKeys.studentQr(centerId, studentId),
-    queryFn: () => api.fetchStudentQr(centerId, studentId),
-    enabled: Boolean(centerId && studentId),
+    queryKey: centerMgmtKeys.studentAttendance(studentId, params),
+    queryFn: () => api.fetchStudentAttendanceReport(studentId, params),
+    enabled: Boolean(studentId),
   });
 }
 
-export function useTodayAttendance(centerId) {
+export function useTodayAttendance(params = {}) {
   return useQuery({
-    queryKey: centerMgmtKeys.attendanceToday(centerId),
-    queryFn: () => api.fetchTodayAttendance(centerId),
-    enabled: Boolean(centerId),
+    queryKey: centerMgmtKeys.attendanceToday(params),
+    queryFn: () => api.fetchTodayAttendance(params),
   });
 }
 
-export function useAttendanceSessions(centerId, params = {}) {
+export function useBillingMonths() {
   return useQuery({
-    queryKey: centerMgmtKeys.attendanceSessions(centerId, params),
-    queryFn: () => api.fetchAttendanceSessions(centerId, params),
-    enabled: Boolean(centerId),
+    queryKey: centerMgmtKeys.months(),
+    queryFn: api.fetchBillingMonths,
   });
 }
 
-export function useSessionAttendance(centerId, sessionId) {
+export function useMonthSubscriptions(year, month, params = {}) {
   return useQuery({
-    queryKey: centerMgmtKeys.sessionAttendance(centerId, sessionId),
-    queryFn: () => api.fetchSessionAttendance(centerId, sessionId),
-    enabled: Boolean(centerId && sessionId),
+    queryKey: centerMgmtKeys.subscriptions(year, month, params),
+    queryFn: () => api.fetchMonthSubscriptions(year, month, params),
+    enabled: Boolean(year && month),
   });
 }
 
-export function useStudentAttendanceStats(centerId, studentId) {
+export function usePayments(params = {}) {
   return useQuery({
-    queryKey: centerMgmtKeys.studentAttendanceStats(centerId, studentId),
-    queryFn: () => api.fetchStudentAttendanceStats(centerId, studentId),
-    enabled: Boolean(centerId && studentId),
+    queryKey: centerMgmtKeys.payments(params),
+    queryFn: () => api.fetchPayments(params),
   });
 }
 
-export function useSubscriptions(centerId, params = {}) {
-  return useQuery({
-    queryKey: centerMgmtKeys.subscriptions(centerId, params),
-    queryFn: () => api.fetchSubscriptions(centerId, params),
-    enabled: Boolean(centerId),
-  });
-}
-
-export function usePayments(centerId, params = {}) {
-  return useQuery({
-    queryKey: centerMgmtKeys.payments(centerId, params),
-    queryFn: () => api.fetchPayments(centerId, params),
-    enabled: Boolean(centerId),
-  });
-}
-
-export function useStaff(centerId) {
-  return useQuery({
-    queryKey: centerMgmtKeys.staff(centerId),
-    queryFn: () => api.fetchStaff(centerId),
-    enabled: Boolean(centerId),
-  });
-}
-
-export function useActivityLogs(centerId, params = {}) {
-  return useQuery({
-    queryKey: centerMgmtKeys.activity(centerId, params),
-    queryFn: () => api.fetchActivityLogs(centerId, params),
-    enabled: Boolean(centerId),
-  });
-}
-
-export function useNotifications(centerId) {
-  return useQuery({
-    queryKey: centerMgmtKeys.notifications(centerId),
-    queryFn: () => api.fetchNotifications(centerId),
-    enabled: Boolean(centerId),
-  });
-}
-
-export function useCenterMutations(centerId) {
+export function useGroupMutations() {
   const qc = useQueryClient();
-
-  const createCenter = useMutation({
-    mutationFn: api.createCenter,
-    onSuccess: () => qc.invalidateQueries({ queryKey: centerMgmtKeys.centers() }),
-  });
-
-  const updateCenter = useMutation({
-    mutationFn: (payload) => api.updateCenter(centerId, payload),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: centerMgmtKeys.centers() });
-      invalidateCenter(qc, centerId);
-    },
-  });
-
-  const removeCenter = useMutation({
-    mutationFn: () => api.deleteCenter(centerId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: centerMgmtKeys.centers() }),
-  });
-
-  return { createCenter, updateCenter, removeCenter };
-}
-
-export function useGradeMutations(centerId) {
-  const qc = useQueryClient();
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: centerMgmtKeys.grades(centerId) });
-    invalidateCenter(qc, centerId);
-  };
-
-  return {
-    createGrade: useMutation({
-      mutationFn: (payload) => api.createGrade(centerId, payload),
-      onSuccess: invalidate,
-    }),
-    updateGrade: useMutation({
-      mutationFn: ({ gradeId, payload }) => api.updateGrade(centerId, gradeId, payload),
-      onSuccess: invalidate,
-    }),
-    deleteGrade: useMutation({
-      mutationFn: (gradeId) => api.deleteGrade(centerId, gradeId),
-      onSuccess: invalidate,
-    }),
-  };
-}
-
-export function useGroupMutations(centerId) {
-  const qc = useQueryClient();
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "groups", String(centerId)] });
-    invalidateCenter(qc, centerId);
-  };
-
   return {
     createGroup: useMutation({
-      mutationFn: (payload) => api.createGroup(centerId, payload),
-      onSuccess: invalidate,
+      mutationFn: api.createGroup,
+      onSuccess: () => invalidateCore(qc),
     }),
     updateGroup: useMutation({
-      mutationFn: ({ groupId, payload }) => api.updateGroup(centerId, groupId, payload),
-      onSuccess: invalidate,
+      mutationFn: ({ groupId, payload }) => api.updateGroup(groupId, payload),
+      onSuccess: () => invalidateCore(qc),
     }),
     deleteGroup: useMutation({
-      mutationFn: (groupId) => api.deleteGroup(centerId, groupId),
-      onSuccess: invalidate,
+      mutationFn: (groupId) => api.deleteGroup(groupId),
+      onSuccess: () => invalidateCore(qc),
     }),
   };
 }
 
-export function useStudentMutations(centerId) {
+export function useStudentMutations() {
   const qc = useQueryClient();
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "students", String(centerId)] });
-    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "group-students"] });
-    invalidateCenter(qc, centerId);
-  };
-
   return {
     createStudent: useMutation({
-      mutationFn: (payload) => api.createStudent(centerId, payload),
-      onSuccess: invalidate,
+      mutationFn: api.createStudent,
+      onSuccess: () => invalidateCore(qc),
     }),
     updateStudent: useMutation({
-      mutationFn: ({ studentId, payload }) => api.updateStudent(centerId, studentId, payload),
-      onSuccess: invalidate,
+      mutationFn: ({ studentId, payload }) => api.updateStudent(studentId, payload),
+      onSuccess: () => invalidateCore(qc),
     }),
     deleteStudent: useMutation({
-      mutationFn: (studentId) => api.deleteStudent(centerId, studentId),
-      onSuccess: invalidate,
+      mutationFn: (studentId) => api.deleteStudent(studentId),
+      onSuccess: () => invalidateCore(qc),
     }),
     enrollStudent: useMutation({
-      mutationFn: ({ studentId, payload }) => api.enrollStudent(centerId, studentId, payload),
-      onSuccess: invalidate,
+      mutationFn: ({ studentId, payload }) => api.enrollStudent(studentId, payload),
+      onSuccess: () => invalidateCore(qc),
     }),
     unenrollStudent: useMutation({
-      mutationFn: ({ studentId, payload }) => api.unenrollStudent(centerId, studentId, payload),
-      onSuccess: invalidate,
+      mutationFn: ({ studentId, payload }) => api.unenrollStudent(studentId, payload),
+      onSuccess: () => invalidateCore(qc),
     }),
   };
 }
 
-export function useAttendanceMutations(centerId) {
+export function useAttendanceMutations() {
   const qc = useQueryClient();
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: centerMgmtKeys.attendanceToday(centerId) });
-    qc.invalidateQueries({
-      queryKey: [...centerMgmtKeys.all, "attendance-sessions", String(centerId)],
-    });
-    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "session-attendance"] });
-    invalidateCenter(qc, centerId);
+    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "attendance-today"] });
+    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "dashboard"] });
+    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "student-attendance"] });
+    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "activity"] });
   };
 
   return {
-    openSession: useMutation({
-      mutationFn: (payload) => api.createAttendanceSession(centerId, payload),
-      onSuccess: invalidate,
-    }),
     scan: useMutation({
-      mutationFn: (payload) => api.scanAttendance(centerId, payload),
+      mutationFn: api.scanAttendance,
       onSuccess: invalidate,
     }),
     record: useMutation({
-      mutationFn: (payload) => api.recordAttendance(centerId, payload),
+      mutationFn: api.recordAttendance,
       onSuccess: invalidate,
     }),
     bulk: useMutation({
-      mutationFn: (payload) => api.bulkRecordAttendance(centerId, payload),
+      mutationFn: api.bulkRecordAttendance,
       onSuccess: invalidate,
     }),
   };
 }
 
-export function useSubscriptionMutations(centerId) {
+export function useSubscriptionMutations() {
   const qc = useQueryClient();
   const invalidate = () => {
-    qc.invalidateQueries({
-      queryKey: [...centerMgmtKeys.all, "subscriptions", String(centerId)],
-    });
-    invalidateCenter(qc, centerId);
+    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "subscriptions"] });
+    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "months"] });
+    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "dashboard"] });
+    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "finance"] });
+    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "payments"] });
   };
 
   return {
-    generate: useMutation({
-      mutationFn: (payload) => api.generateMonthlySubscriptions(centerId, payload),
+    openMonth: useMutation({
+      mutationFn: api.openBillingMonth,
       onSuccess: invalidate,
     }),
-    updateStatus: useMutation({
-      mutationFn: ({ subscriptionId, status }) =>
-        api.updateSubscriptionStatus(centerId, subscriptionId, status),
+    updateSubscription: useMutation({
+      mutationFn: ({ subscriptionId, payload }) =>
+        api.updateSubscription(subscriptionId, payload),
       onSuccess: invalidate,
     }),
   };
 }
 
-export function usePaymentMutations(centerId) {
+export function usePaymentMutations() {
   const qc = useQueryClient();
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "payments", String(centerId)] });
-    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "subscriptions", String(centerId)] });
-    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "finance", String(centerId)] });
-    invalidateCenter(qc, centerId);
-  };
-
   return {
     createPayment: useMutation({
-      mutationFn: (payload) => api.createPayment(centerId, payload),
-      onSuccess: invalidate,
-    }),
-  };
-}
-
-export function useStaffMutations(centerId) {
-  const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: centerMgmtKeys.staff(centerId) });
-
-  return {
-    invite: useMutation({
-      mutationFn: (payload) => api.inviteStaff(centerId, payload),
-      onSuccess: invalidate,
-    }),
-    update: useMutation({
-      mutationFn: ({ staffId, payload }) => api.updateStaff(centerId, staffId, payload),
-      onSuccess: invalidate,
-    }),
-    remove: useMutation({
-      mutationFn: (staffId) => api.removeStaff(centerId, staffId),
-      onSuccess: invalidate,
+      mutationFn: api.createPayment,
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "payments"] });
+        qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "subscriptions"] });
+        qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "finance"] });
+        qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "dashboard"] });
+      },
     }),
   };
 }

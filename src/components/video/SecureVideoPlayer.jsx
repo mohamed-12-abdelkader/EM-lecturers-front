@@ -46,7 +46,7 @@ function getBunnyEmbed(url) {
 
 function buildPlyrOptions() {
   return {
-    disableContextMenu: true,
+    disableContextMenu: false,
     controls: [
       "play-large",
       "rewind",
@@ -87,8 +87,6 @@ function SecureHlsPlayer({
     const video = document.createElement("video");
     video.id = playerId;
     video.playsInline = true;
-    video.controlsList = "nodownload noremoteplayback";
-    video.disablePictureInPicture = true;
     video.className = "w-full h-full";
     container.appendChild(video);
 
@@ -224,8 +222,6 @@ function SecureProgressivePlayer({ url, authToken, sessionId, onPlayerReady, onE
     const video = document.createElement("video");
     video.id = playerId;
     video.playsInline = true;
-    video.controlsList = "nodownload noremoteplayback";
-    video.disablePictureInPicture = true;
     container.appendChild(video);
 
     video.src = url;

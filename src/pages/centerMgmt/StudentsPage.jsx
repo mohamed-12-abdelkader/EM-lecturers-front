@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link as RouterLink, useOutletContext } from "react-router-dom";
+import { Link as RouterLink } from "react-router-dom";
 import {
-  Badge,
   Button,
   Flex,
   FormControl,
@@ -32,13 +31,12 @@ import {
   useToast,
   VStack,
 } from "@chakra-ui/react";
-import { FaEdit, FaPlus, FaTrash } from "react-icons/fa";
+import { FaEdit, FaPlus, FaTrash, FaUserGraduate } from "react-icons/fa";
 import { FiSearch } from "react-icons/fi";
 import {
-  useGrades,
   useGroups,
-  useStudents,
   useStudentMutations,
+  useStudents,
 } from "../../Hooks/centerMgmt/useCenterMgmtQueries";
 import { apiErrorMessage } from "../../api/centerMgmtApi";
 import { field, studentCode, studentName, todayISO } from "./centerMgmtUtils";
@@ -48,18 +46,17 @@ const emptyForm = {
   fullName: "",
   phone: "",
   parentPhone: "",
-  gradeId: "",
   groupId: "",
   joinedAt: todayISO(),
+  barcode: "",
   notes: "",
 };
 
 export default function StudentsPage() {
-  const { centerId } = useOutletContext();
   const toast = useToast();
   const [search, setSearch] = useState("");
   const [debounced, setDebounced] = useState("");
-  const [gradeFilter, setGradeFilter] = useState("");
+  const [groupFilter, setGroupFilter] = useState("");
   const [page, setPage] = useState(1);
 
   useEffect(() => {
@@ -70,39 +67,25 @@ export default function StudentsPage() {
   const params = useMemo(
     () => ({
       search: debounced || undefined,
-      gradeId: gradeFilter || undefined,
+      groupId: groupFilter || undefined,
       page,
       limit: 20,
     }),
-    [debounced, gradeFilter, page]
+    [debounced, groupFilter, page]
   );
 
-  const { data: grades = [] } = useGrades(centerId);
-  const { data: groups = [] } = useGroups(centerId);
-  const { data, isLoading } = useStudents(centerId, params);
-  const { createStudent, updateStudent, deleteStudent } = useStudentMutations(centerId);
+  const { data: groupsData } = useGroups({ limit: 100 });
+  const groups = groupsData?.items || [];
+  const { data, isLoading } = useStudents(params);
+  const items = data?.items || [];
+  const { createStudent, updateStudent, deleteStudent } = useStudentMutations();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
 
-  const students = data?.items || [];
-  const totalPages = data?.totalPages || 1;
-
-  const gradeMap = useMemo(() => {
-    const map = {};
-    grades.forEach((g) => {
-      map[g.id] = field(g, "name");
-    });
-    return map;
-  }, [grades]);
-
   const openCreate = () => {
     setEditing(null);
-    setForm({
-      ...emptyForm,
-      gradeId: grades[0]?.id ? String(grades[0].id) : "",
-      joinedAt: todayISO(),
-    });
+    setForm(emptyForm);
     onOpen();
   };
 
@@ -112,9 +95,9 @@ export default function StudentsPage() {
       fullName: studentName(student),
       phone: field(student, "phone") || "",
       parentPhone: field(student, "parent_phone", "parentPhone") || "",
-      gradeId: String(field(student, "grade_id", "gradeId") || ""),
-      groupId: "",
+      groupId: String(field(student, "group_id", "groupId") || ""),
       joinedAt: String(field(student, "joined_at", "joinedAt") || todayISO()).slice(0, 10),
+      barcode: field(student, "barcode") || "",
       notes: field(student, "notes") || "",
     });
     onOpen();
@@ -122,25 +105,27 @@ export default function StudentsPage() {
 
   const handleSave = async () => {
     if (!form.fullName.trim()) {
-      toast({ title: "اسم الطالب مطلوب", status: "warning", duration: 2000 });
+      toast({ title: "اسم الطالب مطلوب", status: "warning", duration: 2500 });
       return;
     }
     const payload = {
       fullName: form.fullName.trim(),
       phone: form.phone || undefined,
       parentPhone: form.parentPhone || undefined,
-      gradeId: form.gradeId ? Number(form.gradeId) : undefined,
-      groupId: !editing && form.groupId ? Number(form.groupId) : undefined,
       joinedAt: form.joinedAt || undefined,
-      notes: form.notes || undefined,
+      barcode: form.barcode || null,
+      notes: form.notes || null,
     };
+    if (!editing && form.groupId) {
+      payload.groupId = Number(form.groupId);
+    }
     try {
       if (editing) {
         await updateStudent.mutateAsync({ studentId: editing.id, payload });
         toast({ title: "تم تحديث الطالب", status: "success", duration: 2000 });
       } else {
         await createStudent.mutateAsync(payload);
-        toast({ title: "تم إضافة الطالب مع QR", status: "success", duration: 2500 });
+        toast({ title: "تم إضافة الطالب مع QR", status: "success", duration: 2000 });
       }
       onClose();
     } catch (err) {
@@ -162,10 +147,10 @@ export default function StudentsPage() {
     <>
       <PageHeader
         title="الطلاب"
-        description="كل طالب يحصل تلقائياً على كود وQR للحضور."
+        description="أضف طلاب السنتر، ابحث بالكود أو الهاتف، وافتح صفحة QR."
         actions={
           <Button leftIcon={<FaPlus />} colorScheme="blue" borderRadius="xl" onClick={openCreate}>
-            إضافة طالب
+            طالب جديد
           </Button>
         }
       />
@@ -177,26 +162,25 @@ export default function StudentsPage() {
               <FiSearch color="gray" />
             </InputLeftElement>
             <Input
-              placeholder="بحث بالاسم أو الهاتف..."
+              placeholder="بحث بالاسم / الهاتف / الكود..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
                 setPage(1);
               }}
               borderRadius="xl"
-              pr={10}
             />
           </InputGroup>
           <Select
-            placeholder="كل الصفوف"
-            value={gradeFilter}
+            placeholder="كل المجموعات"
+            value={groupFilter}
             onChange={(e) => {
-              setGradeFilter(e.target.value);
+              setGroupFilter(e.target.value);
               setPage(1);
             }}
             borderRadius="xl"
           >
-            {grades.map((g) => (
+            {groups.map((g) => (
               <option key={g.id} value={g.id}>
                 {field(g, "name")}
               </option>
@@ -207,12 +191,13 @@ export default function StudentsPage() {
 
       {isLoading ? (
         <LoadingBlock />
-      ) : students.length === 0 ? (
+      ) : items.length === 0 ? (
         <EmptyState
+          icon={FaUserGraduate}
           title="لا يوجد طلاب"
-          description="أضف أول طالب وحدد الصف والمجموعة."
+          description="أضف أول طالب وسيُنشأ له كود و QR تلقائياً."
           action={
-            <Button leftIcon={<FaPlus />} colorScheme="blue" onClick={openCreate}>
+            <Button colorScheme="blue" borderRadius="xl" onClick={openCreate}>
               إضافة طالب
             </Button>
           }
@@ -225,47 +210,36 @@ export default function StudentsPage() {
                 <Tr>
                   <Th>الكود</Th>
                   <Th>الاسم</Th>
-                  <Th>الصف</Th>
                   <Th>الهاتف</Th>
                   <Th>ولي الأمر</Th>
-                  <Th>الحالة</Th>
-                  <Th>إجراءات</Th>
+                  <Th></Th>
                 </Tr>
               </Thead>
               <Tbody>
-                {students.map((student) => (
-                  <Tr key={student.id}>
+                {items.map((s) => (
+                  <Tr key={s.id}>
+                    <Td fontFamily="mono">{studentCode(s)}</Td>
+                    <Td fontWeight="medium">{studentName(s)}</Td>
+                    <Td>{field(s, "phone") || "—"}</Td>
+                    <Td>{field(s, "parent_phone", "parentPhone") || "—"}</Td>
                     <Td>
-                      <Text fontFamily="mono" fontSize="sm">
-                        {studentCode(student)}
-                      </Text>
-                    </Td>
-                    <Td fontWeight="medium">{studentName(student)}</Td>
-                    <Td>{gradeMap[field(student, "grade_id", "gradeId")] || "—"}</Td>
-                    <Td>{field(student, "phone") || "—"}</Td>
-                    <Td>{field(student, "parent_phone", "parentPhone") || "—"}</Td>
-                    <Td>
-                      <Badge colorScheme={student.is_active === false ? "gray" : "green"}>
-                        {student.is_active === false ? "غير نشط" : "نشط"}
-                      </Badge>
-                    </Td>
-                    <Td>
-                      <Flex gap={1}>
+                      <Flex gap={1} justify="flex-end">
                         <Button
                           as={RouterLink}
-                          to={`/center-mgmt/${centerId}/students/${student.id}`}
+                          to={`/center-mgmt/students/${s.id}`}
                           size="xs"
                           colorScheme="blue"
                           variant="outline"
+                          borderRadius="md"
                         >
-                          الملف
+                          التفاصيل
                         </Button>
                         <IconButton
                           aria-label="تعديل"
                           icon={<FaEdit />}
                           size="xs"
                           variant="ghost"
-                          onClick={() => openEdit(student)}
+                          onClick={() => openEdit(s)}
                         />
                         <IconButton
                           aria-label="حذف"
@@ -273,7 +247,7 @@ export default function StudentsPage() {
                           size="xs"
                           variant="ghost"
                           colorScheme="red"
-                          onClick={() => handleDelete(student)}
+                          onClick={() => handleDelete(s)}
                         />
                       </Flex>
                     </Td>
@@ -282,36 +256,34 @@ export default function StudentsPage() {
               </Tbody>
             </Table>
           </TableContainer>
-          <Flex justify="space-between" align="center" px={4} py={3}>
-            <Text fontSize="sm" color="gray.500">
-              الإجمالي: {data?.total ?? students.length}
-            </Text>
-            <Flex gap={2}>
-              <Button size="sm" isDisabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-                السابق
-              </Button>
-              <Text fontSize="sm" alignSelf="center">
-                {page} / {totalPages}
-              </Text>
-              <Button
-                size="sm"
-                isDisabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                التالي
-              </Button>
-            </Flex>
-          </Flex>
         </Surface>
       )}
 
-      <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg">
+      {(data?.totalPages || 1) > 1 && (
+        <Flex justify="center" gap={2} mt={5}>
+          <Button size="sm" isDisabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+            السابق
+          </Button>
+          <Text fontSize="sm" alignSelf="center">
+            {page} / {data.totalPages} · {data.total} طالب
+          </Text>
+          <Button
+            size="sm"
+            isDisabled={page >= data.totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            التالي
+          </Button>
+        </Flex>
+      )}
+
+      <Modal isOpen={isOpen} onClose={onClose} size="lg" isCentered>
         <ModalOverlay />
-        <ModalContent borderRadius="2xl" mx={3} maxH="90vh" overflowY="auto">
-          <ModalHeader>{editing ? "تعديل طالب" : "إضافة طالب"}</ModalHeader>
+        <ModalContent dir="rtl" borderRadius="2xl">
+          <ModalHeader>{editing ? "تعديل طالب" : "طالب جديد"}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            <VStack spacing={4}>
+            <VStack spacing={4} align="stretch">
               <FormControl isRequired>
                 <FormLabel>الاسم الكامل</FormLabel>
                 <Input
@@ -320,7 +292,7 @@ export default function StudentsPage() {
                   borderRadius="xl"
                 />
               </FormControl>
-              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3} w="full">
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
                 <FormControl>
                   <FormLabel>هاتف الطالب</FormLabel>
                   <Input
@@ -337,44 +309,39 @@ export default function StudentsPage() {
                     borderRadius="xl"
                   />
                 </FormControl>
+              </SimpleGrid>
+              {!editing && (
                 <FormControl>
-                  <FormLabel>الصف</FormLabel>
+                  <FormLabel>تسجيل في مجموعة (اختياري)</FormLabel>
                   <Select
-                    value={form.gradeId}
-                    onChange={(e) => setForm((f) => ({ ...f, gradeId: e.target.value }))}
+                    placeholder="بدون مجموعة"
+                    value={form.groupId}
+                    onChange={(e) => setForm((f) => ({ ...f, groupId: e.target.value }))}
                     borderRadius="xl"
                   >
-                    <option value="">بدون صف</option>
-                    {grades.map((g) => (
+                    {groups.map((g) => (
                       <option key={g.id} value={g.id}>
                         {field(g, "name")}
                       </option>
                     ))}
                   </Select>
                 </FormControl>
-                {!editing ? (
-                  <FormControl>
-                    <FormLabel>المجموعة (اختياري)</FormLabel>
-                    <Select
-                      value={form.groupId}
-                      onChange={(e) => setForm((f) => ({ ...f, groupId: e.target.value }))}
-                      borderRadius="xl"
-                    >
-                      <option value="">بدون مجموعة</option>
-                      {groups.map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {field(g, "name")}
-                        </option>
-                      ))}
-                    </Select>
-                  </FormControl>
-                ) : null}
+              )}
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
                 <FormControl>
                   <FormLabel>تاريخ الانضمام</FormLabel>
                   <Input
                     type="date"
                     value={form.joinedAt}
                     onChange={(e) => setForm((f) => ({ ...f, joinedAt: e.target.value }))}
+                    borderRadius="xl"
+                  />
+                </FormControl>
+                <FormControl>
+                  <FormLabel>باركود اختياري</FormLabel>
+                  <Input
+                    value={form.barcode}
+                    onChange={(e) => setForm((f) => ({ ...f, barcode: e.target.value }))}
                     borderRadius="xl"
                   />
                 </FormControl>
@@ -385,12 +352,13 @@ export default function StudentsPage() {
                   value={form.notes}
                   onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                   borderRadius="xl"
+                  rows={3}
                 />
               </FormControl>
             </VStack>
           </ModalBody>
           <ModalFooter gap={2}>
-            <Button variant="ghost" onClick={onClose}>
+            <Button variant="ghost" onClick={onClose} borderRadius="xl">
               إلغاء
             </Button>
             <Button

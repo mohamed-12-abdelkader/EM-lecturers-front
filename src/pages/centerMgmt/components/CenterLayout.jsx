@@ -1,25 +1,17 @@
-import { NavLink, Outlet, useParams, Link as RouterLink } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 import {
   Box,
   Container,
   Flex,
   HStack,
   Text,
-  Button,
   useColorModeValue,
-  Badge,
   Icon,
 } from "@chakra-ui/react";
-import { FaArrowRight, FaBuilding } from "react-icons/fa";
-import BrandLoadingScreen from "../../../components/loading/BrandLoadingScreen";
-import { useCenter } from "../../../Hooks/centerMgmt/useCenterMgmtQueries";
-import { ACCENT, CENTER_NAV, field } from "../centerMgmtUtils";
-import { LoadingBlock } from "./UiBits";
+import { FaSchool } from "react-icons/fa";
+import { ACCENT, CENTER_NAV } from "../centerMgmtUtils";
 
 export default function CenterLayout() {
-  const { centerId } = useParams();
-  const { data: center, isLoading, isError, error } = useCenter(centerId);
-
   const pageBg = useColorModeValue("gray.100", "gray.900");
   const cardBg = useColorModeValue("white", "gray.800");
   const border = useColorModeValue("gray.200", "gray.700");
@@ -27,28 +19,8 @@ export default function CenterLayout() {
   const navInactive = useColorModeValue("gray.600", "gray.300");
   const navHoverBg = useColorModeValue("gray.50", "gray.700");
 
-  if (isLoading) return <BrandLoadingScreen />;
-
-  if (isError) {
-    return (
-      <Box minH="100vh" bg={pageBg} py={10}>
-        <Container maxW="6xl">
-          <LoadingBlock label={error?.message || "تعذر تحميل السنتر"} />
-          <Flex justify="center" mt={4}>
-            <Button as={RouterLink} to="/center-mgmt" colorScheme="blue">
-              العودة للسناتر
-            </Button>
-          </Flex>
-        </Container>
-      </Box>
-    );
-  }
-
-  const name = field(center, "name") || "السنتر";
-  const currency = field(center, "currency") || "EGP";
-
   return (
-    <Box minH="100vh" bg={pageBg} dir="rtl">
+    <Box minH="100vh" bg={pageBg} dir="rtl" className="mt-[40px]">
       <Box
         bg={cardBg}
         borderBottomWidth="1px"
@@ -56,7 +28,6 @@ export default function CenterLayout() {
         position="sticky"
         top={0}
         zIndex={20}
-        backdropFilter="blur(8px)"
       >
         <Container maxW="7xl" py={4}>
           <Flex justify="space-between" align="center" gap={3} mb={4} flexWrap="wrap">
@@ -69,33 +40,17 @@ export default function CenterLayout() {
                 align="center"
                 justify="center"
               >
-                <Icon as={FaBuilding} color={ACCENT} />
+                <Icon as={FaSchool} color={ACCENT} />
               </Flex>
               <Box>
                 <Text fontWeight="bold" fontSize="lg" lineHeight="1.2">
-                  {name}
+                  إدارة السنتر
                 </Text>
-                <HStack spacing={2} mt={1}>
-                  <Badge colorScheme="blue" borderRadius="md">
-                    {currency}
-                  </Badge>
-                  {center?.is_active === false ? (
-                    <Badge colorScheme="red">غير نشط</Badge>
-                  ) : (
-                    <Badge colorScheme="green">نشط</Badge>
-                  )}
-                </HStack>
+                <Text fontSize="xs" color={muted} mt={1}>
+                  مجموعات · طلاب · حضور · اشتراكات · مدفوعات
+                </Text>
               </Box>
             </HStack>
-            <Button
-              as={RouterLink}
-              to="/center-mgmt"
-              variant="ghost"
-              size="sm"
-              leftIcon={<FaArrowRight />}
-            >
-              كل السناتر
-            </Button>
           </Flex>
 
           <Flex
@@ -108,11 +63,14 @@ export default function CenterLayout() {
             }}
           >
             {CENTER_NAV.map((item) => {
-              const path = item.to
-                ? `/center-mgmt/${centerId}/${item.to}`
-                : `/center-mgmt/${centerId}`;
+              const path = item.to ? `/center-mgmt/${item.to}` : "/center-mgmt";
               return (
-                <NavLink key={item.to || "home"} to={path} end={item.end} style={{ textDecoration: "none" }}>
+                <NavLink
+                  key={item.to || "home"}
+                  to={path}
+                  end={item.end}
+                  style={{ textDecoration: "none" }}
+                >
                   {({ isActive }) => (
                     <Box
                       px={3}
@@ -135,14 +93,11 @@ export default function CenterLayout() {
               );
             })}
           </Flex>
-          <Text fontSize="xs" color={muted} mt={2} display={{ base: "none", md: "block" }}>
-            إدارة بسيطة للطلاب · الحضور · الاشتراكات · الماليات
-          </Text>
         </Container>
       </Box>
 
       <Container maxW="7xl" py={{ base: 5, md: 8 }}>
-        <Outlet context={{ center, centerId }} />
+        <Outlet />
       </Container>
     </Box>
   );
