@@ -17,7 +17,6 @@ import { DotGrid, MeshGlow } from "./landingDecor.jsx";
 const featureCatalog = [
   { id: "support", label: "دعم فني" },
   { id: "courses", label: "إدارة الكورسات" },
-  { id: "center", label: "سيستم إدارة السنتر" },
   { id: "bank", label: "بنك أسئلة" },
   { id: "live", label: "لايف في الشهر" },
   { id: "aiExams", label: "إنشاء الامتحانات بالـ AI" },
@@ -38,7 +37,7 @@ const plans = [
     border: "border-emerald-500/30",
     btnClass: "from-emerald-500 to-teal-600",
     liveSessions: 6,
-    availableFeatures: ["support", "courses", "center", "bank", "live"],
+    availableFeatures: ["support", "courses", "bank", "live"],
   },
   {
     id: "silver",
@@ -51,7 +50,7 @@ const plans = [
     border: "border-slate-500/30",
     btnClass: "from-slate-600 to-slate-700",
     liveSessions: 10,
-    availableFeatures: ["support", "courses", "center", "bank", "live"],
+    availableFeatures: ["support", "courses", "bank", "live"],
   },
   {
     id: "gold",
@@ -66,7 +65,7 @@ const plans = [
     featured: true,
     liveSessions: 16,
     availableFeatures: [
-      "support", "courses", "center", "bank", "live", "aiExams", "aiAcademic",
+      "support", "courses", "bank", "live", "aiExams", "aiAcademic",
     ],
   },
   {
@@ -81,7 +80,7 @@ const plans = [
     btnClass: "from-violet-500 to-indigo-600",
     liveSessions: "unlimited",
     availableFeatures: [
-      "support", "courses", "center", "bank", "live",
+      "support", "courses", "bank", "live",
       "aiExams", "aiAcademic", "aiAnalytics", "aiSocial",
     ],
   },

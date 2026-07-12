@@ -59,6 +59,7 @@ import {
   FaLightbulb,
 } from "react-icons/fa";
 import { useParams, Link, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import ScrollToTop from "../../components/scollToTop/ScrollToTop";
 import baseUrl from "../../api/baseUrl";
 import TeacherLibraryExtractionModal from "./components/TeacherLibraryExtractionModal";
@@ -72,6 +73,14 @@ import {
 } from "./components/LessonPageChrome";
 import LessonQuestionCard, { shouldStackChoiceOptions } from "./components/LessonQuestionCard";
 import LessonQuestionsToolbar from "./components/LessonQuestionsToolbar";
+import {
+  fetchTeacherComprehensiveExams,
+  fetchTeacherLectureExams,
+  teacherQbKeys,
+  useInvalidateTeacherQuestionBank,
+  useTeacherQbLessonPassages,
+  useTeacherQbLessonQuestions,
+} from "../../Hooks/teacher/useTeacherQuestionBankQueries";
 
 // دالة لضغط الصور قبل الرفع لتجنب خطأ 413 (Payload Too Large)
 const compressImage = (file, maxWidth = 1024, quality = 0.7) => {
@@ -128,8 +137,28 @@ const Lesson = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const queryClient = useQueryClient();
+  const invalidateQb = useInvalidateTeacherQuestionBank();
+
+  const {
+    data: cachedQuestions,
+    isLoading: questionsLoading,
+    error: questionsQueryError,
+    refetch: refetchQuestions,
+  } = useTeacherQbLessonQuestions(id);
+
+  const {
+    data: cachedPassages,
+    isLoading: passagesQueryLoading,
+    error: passagesQueryError,
+    refetch: refetchPassages,
+  } = useTeacherQbLessonPassages(id);
+
+  const loading = questionsLoading && cachedQuestions === undefined;
+  const error =
+    questionsQueryError?.response?.data?.message ||
+    questionsQueryError?.message ||
+    null;
 
   // المستخدم مدرس أو أدمن؟
   const [isTeacher, setIsTeacher] = useState(false);
@@ -157,8 +186,19 @@ const Lesson = () => {
   const [exams, setExams] = useState([]);
   const [comprehensiveExams, setComprehensiveExams] = useState([]);
   const [passagesList, setPassagesList] = useState([]); // [{ passage: {...}, questions: [...] }]
-  const [passagesLoading, setPassagesLoading] = useState(false);
-  const [passagesError, setPassagesError] = useState(null);
+  const passagesLoading = passagesQueryLoading && cachedPassages === undefined;
+  const passagesError =
+    passagesQueryError?.response?.data?.message ||
+    passagesQueryError?.message ||
+    null;
+
+  useEffect(() => {
+    if (cachedQuestions !== undefined) setQuestions(cachedQuestions || []);
+  }, [cachedQuestions]);
+
+  useEffect(() => {
+    if (cachedPassages !== undefined) setPassagesList(cachedPassages || []);
+  }, [cachedPassages]);
 
   // Selection states
   const [selectedQuestions, setSelectedQuestions] = useState([]);
@@ -254,65 +294,22 @@ const Lesson = () => {
   const optionLetterBg = textSecondary;
   const questionIndexBg = useColorModeValue("blue.500", "blue.600");
 
-  // Fetch questions data
   const fetchQuestionsData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const token = localStorage.getItem("token");
-      if (!token) {
-        toast({ title: "خطأ", description: "يجب تسجيل الدخول أولاً", status: "error", duration: 3000, isClosable: true });
-        return;
-      }
-
-      const response = await baseUrl.get(`/api/question-bank-v2/lesson/${id}`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-
-      if (response.data.success) {
-        setQuestions(response.data.data?.questions || response.data.data || []);
-      }
-    } catch (err) {
-      const errorMsg = err.response?.data?.message || "حدث خطأ في جلب الأسئلة";
-      setError(errorMsg);
-    } finally {
-      setLoading(false);
-    }
+    await invalidateQb.invalidateLesson(id);
+    return refetchQuestions();
   };
 
-  // Fetch passages (أسئلة القطع) — GET /api/question-bank-v2/lesson/:lessonId/passages
-  const fetchPassages = async () => {
-    try {
-      setPassagesLoading(true);
-      setPassagesError(null);
-      const token = localStorage.getItem("token");
-      if (!token) return;
-      const response = await baseUrl.get(`/api/question-bank-v2/lesson/${id}/passages`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.data?.success && Array.isArray(response.data?.data)) {
-        setPassagesList(response.data.data);
-      } else {
-        setPassagesList([]);
-      }
-    } catch (err) {
-      setPassagesError(err.response?.data?.message || "فشل تحميل أسئلة القطع");
-      setPassagesList([]);
-    } finally {
-      setPassagesLoading(false);
-    }
-  };
+  const fetchPassages = async () => refetchPassages();
 
-  // جلب امتحانات المحاضرة
+  // جلب امتحانات المحاضرة (مع كاش)
   const fetchLectureExams = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await baseUrl.get("/api/exams/teacher/lecture-exams", {
-        headers: { Authorization: `Bearer ${token}` },
+      const examsData = await queryClient.fetchQuery({
+        queryKey: teacherQbKeys.lectureExams(),
+        queryFn: fetchTeacherLectureExams,
+        staleTime: 2 * 60 * 1000,
       });
-      if (response.data?.exams) setExams(response.data.exams);
-      else setExams([]);
+      setExams(examsData || []);
     } catch (err) {
       console.error("Error fetching lecture exams:", err);
       setExams([]);
@@ -320,15 +317,15 @@ const Lesson = () => {
     }
   };
 
-  // جلب الامتحانات الشاملة (كورس)
+  // جلب الامتحانات الشاملة (كورس) — مع كاش
   const fetchComprehensiveExams = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const response = await baseUrl.get("/api/exams/teacher", {
-        headers: { Authorization: `Bearer ${token}` },
+      const examsData = await queryClient.fetchQuery({
+        queryKey: teacherQbKeys.comprehensiveExams(),
+        queryFn: fetchTeacherComprehensiveExams,
+        staleTime: 2 * 60 * 1000,
       });
-      if (response.data?.exams) setComprehensiveExams(response.data.exams);
-      else setComprehensiveExams([]);
+      setComprehensiveExams(examsData || []);
     } catch (err) {
       console.error("Error fetching comprehensive exams:", err);
       setComprehensiveExams([]);
@@ -734,10 +731,7 @@ const Lesson = () => {
     }
   };
 
-  useEffect(() => {
-    fetchQuestionsData();
-    fetchPassages();
-  }, [id]);
+  // (lesson questions/passages cached via React Query)
 
   // Handlers
   const handleBulkSubmit = async (e) => {

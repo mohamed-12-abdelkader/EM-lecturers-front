@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Box,
   Flex,
@@ -54,10 +54,13 @@ import ScrollToTop from "../../components/scollToTop/ScrollToTop";
 import {
   createChapterLesson,
   deleteLesson as deleteLessonApi,
-  fetchChapterWithLessons,
   toastQuestionBankResult,
   updateLesson as updateLessonApi,
 } from "../../api/questionBankApi";
+import {
+  useInvalidateTeacherQuestionBank,
+  useTeacherQbChapter,
+} from "../../Hooks/teacher/useTeacherQuestionBankQueries";
 
 const MotionBox = motion(Box);
 const MotionCard = motion(Card);
@@ -66,14 +69,23 @@ const MotionButton = motion(Button);
 const ChapterQuestion = () => {
   const { id } = useParams();
   const toast = useToast();
+  const invalidateQb = useInvalidateTeacherQuestionBank();
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  
-  // Data states
-  const [chapterData, setChapterData] = useState(null);
-  const [lessons, setLessons] = useState([]);
-  
+
+  const {
+    data: chapterPayload,
+    isLoading: loading,
+    error: chapterQueryError,
+    refetch: fetchChapterData,
+  } = useTeacherQbChapter(id);
+
+  const chapterData = chapterPayload?.chapter || chapterPayload || null;
+  const lessons = chapterPayload?.lessons || [];
+  const error =
+    chapterQueryError?.response?.data?.message ||
+    chapterQueryError?.message ||
+    null;
+
   // Form states
   const [formData, setFormData] = useState({
     name: '',
@@ -135,36 +147,12 @@ const ChapterQuestion = () => {
   const badgeActiveColor = useColorModeValue("blue.700", "blue.300");
   const headerBg = useColorModeValue("white", "gray.800");
 
-  // Fetch chapter data
-  const fetchChapterData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const token = localStorage.getItem("token");
-      if (!token) {
-        toast({
-          title: "خطأ",
-          description: "يجب تسجيل الدخول أولاً",
-          status: "error",
-          duration: 3000,
-          isClosable: true,
-        });
-        return;
-      }
-
-      const data = await fetchChapterWithLessons(id);
-      if (data) {
-        setChapterData(data.chapter || data);
-        setLessons(data.lessons || []);
-      }
-    } catch (err) {
-      const errorMsg = err.response?.data?.message || "حدث خطأ في جلب بيانات الفصل";
-      setError(errorMsg);
-      console.error("Error fetching chapter:", err);
-    } finally {
-      setLoading(false);
-    }
+  const refreshChapterData = async () => {
+    await Promise.all([
+      invalidateQb.invalidateChapter(id),
+      invalidateQb.invalidateSubjects(),
+    ]);
+    return fetchChapterData();
   };
 
   // Create new lesson
@@ -294,10 +282,7 @@ const ChapterQuestion = () => {
     }
   };
 
-  // Load data on component mount
-  useEffect(() => {
-    fetchChapterData();
-  }, [id]);
+  // (chapter data cached via React Query)
 
   // Handle form input changes
   const handleInputChange = (e) => {
@@ -356,7 +341,7 @@ const ChapterQuestion = () => {
     if (result.success) {
       onClose();
       resetForm();
-      fetchChapterData(); // Refresh data
+      refreshChapterData(); // Refresh data
     }
   };
 
@@ -380,7 +365,7 @@ const ChapterQuestion = () => {
     if (result.success) {
       onEditClose();
       resetEditForm();
-      fetchChapterData(); // Refresh data
+      refreshChapterData(); // Refresh data
     }
   };
 
@@ -391,7 +376,7 @@ const ChapterQuestion = () => {
     if (result.success) {
       onDeleteClose();
       setDeletingLesson(null);
-      fetchChapterData(); // Refresh data
+      refreshChapterData(); // Refresh data
     }
   };
 

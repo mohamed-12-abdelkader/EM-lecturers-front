@@ -1,7 +1,8 @@
 import React from "react";
 import { Box, Flex, Image, useColorModeValue } from "@chakra-ui/react";
 import { motion } from "framer-motion";
-import logoImg from "../../img/next logo.png";
+
+const BRAND_LOGO = "/Picsart_25-08-26_23-28-39-014.png";
 
 /**
  * شاشة تحميل بالبراند: لوجو في المنتصف + انيميشن انتظار + شريط تقدم تحت اللوجو.
@@ -30,7 +31,15 @@ export default function BrandLoadingScreen({ progress }) {
       bg={useColorModeValue("white", "gray.900")}
       px={8}
     >
-      <Box h="1" w="full" position="absolute" top={0} left={0} right={0} bgGradient="linear(to-r, blue.500, orange.500)" />
+      <Box
+        h="1"
+        w="full"
+        position="absolute"
+        top={0}
+        left={0}
+        right={0}
+        bgGradient="linear(to-r, blue.500, orange.500)"
+      />
       <motion.div
         style={{ display: "flex", flexDirection: "column", alignItems: "center" }}
         initial={{ opacity: 0.9, scale: 1 }}
@@ -45,16 +54,24 @@ export default function BrandLoadingScreen({ progress }) {
         }}
       >
         <Image
-          src={logoImg}
-          alt="Next Edu School"
-          maxH={{ base: "100px", md: "120px" }}
+          src={BRAND_LOGO}
+          alt="EM Lectures"
+          maxH={{ base: "140px", md: "180px" }}
           w="auto"
           objectFit="contain"
           mb={8}
         />
       </motion.div>
 
-      <Box w="full" maxW="280px" h="4px" borderRadius="full" bg={trackBg} overflow="hidden" position="relative">
+      <Box
+        w="full"
+        maxW="280px"
+        h="4px"
+        borderRadius="full"
+        bg={trackBg}
+        overflow="hidden"
+        position="relative"
+      >
         {hasDeterminate ? (
           <Box
             h="full"

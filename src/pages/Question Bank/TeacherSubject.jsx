@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Badge,
@@ -18,7 +18,6 @@ import {
   Tabs,
   Text,
   useColorModeValue,
-  useToast,
   VStack,
 } from "@chakra-ui/react";
 import {
@@ -31,8 +30,8 @@ import {
   MdSchool,
   MdSearch,
 } from "react-icons/md";
-import baseUrl from "../../api/baseUrl";
 import ScrollToTop from "../../components/scollToTop/ScrollToTop";
+import { useTeacherQbSubjects } from "../../Hooks/teacher/useTeacherQuestionBankQueries";
 import {
   countSubjectBooks,
   countSubjectChapters,
@@ -242,14 +241,23 @@ function EmptyBlock({ icon, title, subtitle }) {
 }
 
 export default function TeacherSubject() {
-  const toast = useToast();
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [subjects, setSubjects] = useState([]);
   const [activeSubjectId, setActiveSubjectId] = useState(null);
   const [activeBookId, setActiveBookId] = useState(null);
   const [activeChapterId, setActiveChapterId] = useState(null);
+
+  const {
+    data: subjects = [],
+    isLoading: loading,
+    isFetching: _isFetching,
+    error: subjectsError,
+    refetch: fetchTeacherSubjects,
+  } = useTeacherQbSubjects();
+
+  const error =
+    subjectsError?.response?.data?.message ||
+    subjectsError?.message ||
+    null;
 
   const pageBg = useColorModeValue("gray.50", "gray.900");
   const cardBg = useColorModeValue("white", "gray.800");
@@ -263,39 +271,6 @@ export default function TeacherSubject() {
     "linear(to-br, blue.700, blue.600)",
   );
   const panelShadow = useColorModeValue("sm", "dark-lg");
-
-  const fetchTeacherSubjects = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const token = localStorage.getItem("token");
-      if (!token) {
-        toast({
-          title: "يجب تسجيل الدخول أولاً",
-          status: "error",
-          duration: 3000,
-          isClosable: true,
-        });
-        return;
-      }
-      const { data } = await baseUrl.get("/api/teacher/subjects", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (data?.success) {
-        setSubjects(Array.isArray(data.data) ? data.data : []);
-      } else {
-        throw new Error(data?.message || "فشل تحميل المواد");
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || "حدث خطأ في جلب المواد");
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    fetchTeacherSubjects();
-  }, [fetchTeacherSubjects]);
 
   const filteredSubjects = useMemo(
     () => subjects.filter((s) => subjectMatchesSearch(s, searchTerm.trim())),

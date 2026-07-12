@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
   Flex,
@@ -50,7 +50,6 @@ import {
   createSubjectBook,
   deleteBook,
   deleteChapterById,
-  fetchSubjectWithBooks,
   toastQuestionBankResult,
   updateBook,
   updateChapter,
@@ -63,19 +62,46 @@ import {
   getSubjectTreeStats,
   normalizeSubjectBooks,
 } from "../../utils/questionBankTree";
+import {
+  useInvalidateTeacherQuestionBank,
+  useTeacherQbSubject,
+} from "../../Hooks/teacher/useTeacherQuestionBankQueries";
 
 const SubjectPage = () => {
   const { id } = useParams();
   const toast = useToast();
+  const invalidateQb = useInvalidateTeacherQuestionBank();
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  
-  // Data states
-  const [subjectData, setSubjectData] = useState(null);
-  const [books, setBooks] = useState([]);
   const [expandedBookId, setExpandedBookId] = useState(null);
   const [activeBookId, setActiveBookId] = useState(null);
+
+  const {
+    data: subjectPayload,
+    isLoading: loading,
+    error: subjectQueryError,
+    refetch: fetchSubjectData,
+  } = useTeacherQbSubject(id);
+
+  const subjectData = subjectPayload?.subject ?? null;
+  const books = useMemo(
+    () => (subjectPayload ? normalizeSubjectBooks(subjectPayload) : []),
+    [subjectPayload],
+  );
+  const error =
+    subjectQueryError?.response?.data?.message ||
+    subjectQueryError?.message ||
+    null;
+
+  useEffect(() => {
+    if (!books.length) {
+      setExpandedBookId(null);
+      return;
+    }
+    setExpandedBookId((prev) => {
+      if (prev && books.some((book) => book.id === prev)) return prev;
+      return books[0]?.id ?? null;
+    });
+  }, [books]);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -158,39 +184,12 @@ const SubjectPage = () => {
   const badgeActiveColor = useColorModeValue("blue.700", "blue.300");
   const headerBg = useColorModeValue("white", "gray.800");
 
-  const fetchSubjectData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const token = localStorage.getItem("token");
-      if (!token) {
-        toast({
-          title: "خطأ",
-          description: "يجب تسجيل الدخول أولاً",
-          status: "error",
-          duration: 3000,
-          isClosable: true,
-        });
-        return;
-      }
-
-      const data = await fetchSubjectWithBooks(id);
-      if (data) {
-        setSubjectData(data.subject);
-        const booksList = normalizeSubjectBooks(data);
-        setBooks(booksList);
-        setExpandedBookId((prev) => {
-          if (prev && booksList.some((book) => book.id === prev)) return prev;
-          return booksList[0]?.id ?? null;
-        });
-      }
-    } catch (err) {
-      const errorMsg = err.response?.data?.message || "حدث خطأ في جلب بيانات المادة";
-      setError(errorMsg);
-    } finally {
-      setLoading(false);
-    }
+  const refreshSubjectData = async () => {
+    await Promise.all([
+      invalidateQb.invalidateSubject(id),
+      invalidateQb.invalidateSubjects(),
+    ]);
+    return fetchSubjectData();
   };
 
   const createBook = async () => {
@@ -462,10 +461,7 @@ const SubjectPage = () => {
     }
   };
 
-  // Load data on component mount
-  useEffect(() => {
-    fetchSubjectData();
-  }, [id]);
+  // (subject data cached via React Query)
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -523,7 +519,7 @@ const SubjectPage = () => {
     if (result.success) {
       onClose();
       resetForm();
-      fetchSubjectData();
+      refreshSubjectData();
     }
   };
 
@@ -544,7 +540,7 @@ const SubjectPage = () => {
     if (result.success) {
       onChapterClose();
       resetChapterForm();
-      fetchSubjectData();
+      refreshSubjectData();
     }
   };
 
@@ -565,7 +561,7 @@ const SubjectPage = () => {
     if (result.success) {
       onBookEditClose();
       resetEditForm();
-      fetchSubjectData();
+      refreshSubjectData();
     }
   };
 
@@ -586,7 +582,7 @@ const SubjectPage = () => {
     if (result.success) {
       onEditClose();
       resetEditChapterForm();
-      fetchSubjectData();
+      refreshSubjectData();
     }
   };
 
@@ -595,7 +591,7 @@ const SubjectPage = () => {
     if (result.success) {
       onDeleteClose();
       setDeleteTarget(null);
-      fetchSubjectData();
+      refreshSubjectData();
     }
   };
 

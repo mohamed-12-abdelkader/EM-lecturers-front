@@ -1,7 +1,6 @@
 import React from "react";
 import {
   MdDashboard,
-  MdGroups,
   MdAccountBalanceWallet,
   MdLibraryBooks,
   MdForum,
@@ -20,6 +19,7 @@ import {
   MdSupportAgent,
   MdCollectionsBookmark,
   MdDescription,
+  MdBusiness,
 } from "react-icons/md";
 import { FaAndroid, FaRobot, FaFolderOpen } from "react-icons/fa";
 import { Link, useLocation } from "react-router-dom";
@@ -201,8 +201,6 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
       links: [
         { to: "/QuestionLibraryPage", Icon: MdLibraryBooks, label: "مكتبة الأسئلة" },
         { to: "/Teacher_subjects", Icon: MdQuestionAnswer, label: "بنك الأسئلة" },
-        { to: "/center_groups", Icon: MdGroups, label: "إدارة السنتر" },
-    
       ],
     },
     {
@@ -227,6 +225,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
     {
       title: "الطلاب والحساب",
       links: [
+        { to: "/center-mgmt", Icon: MdBusiness, label: "إدارة السنتر" },
         { to: "/managed-students", Icon: MdManageAccounts, label: "إدارة الطلاب" },
         { to: "/teacher-students", Icon: MdPeople, label: "طلاب الكورسات" },
         { to: "/teacher-invoices", Icon: MdDescription, label: "فواتير الاشتراك" },

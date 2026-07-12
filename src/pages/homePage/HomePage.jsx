@@ -358,6 +358,7 @@ const HomePage = () => {
 
   const activateCourseWithCode = async () => {
     const code = activationCode.trim();
+    const courseId = selectedCourseForActivation?.id;
     if (!code) {
       toast({
         title: "أدخل كود التفعيل أولاً",
@@ -365,17 +366,27 @@ const HomePage = () => {
       });
       return;
     }
+    if (!courseId) {
+      toast({
+        title: "اختر الكورس أولاً",
+        description: "يجب تحديد الكورس قبل التفعيل بالكود",
+        status: "warning",
+      });
+      return;
+    }
     try {
       setIsActivatingCode(true);
-      const payload = {
-        activation_code: code,
-        ...(selectedCourseForActivation?.id
-          ? { course_id: selectedCourseForActivation.id }
-          : {}),
-      };
-      const res = await baseUrl.post("api/course/activate", payload, {
-        headers: authHeader,
-      });
+      const res = await baseUrl.post(
+        "/api/course/activate",
+        { code, course_id: Number(courseId) },
+        {
+          headers: {
+            ...authHeader,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      markCourseEnrolled(courseId);
       toast({
         title: res?.data?.message || "تم تفعيل الكورس بنجاح",
         status: "success",
@@ -383,7 +394,7 @@ const HomePage = () => {
       onClose();
       setActivationCode("");
       setSelectedCourseForActivation(null);
-      setTimeout(() => window.location.reload(), 700);
+      navigate(`/CourseDetailsPage/${courseId}`);
     } catch (error) {
       toast({
         title: error?.response?.data?.message || "فشل تفعيل الكورس بالكود",

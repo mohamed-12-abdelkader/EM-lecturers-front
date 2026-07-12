@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef } from "react";
 import {
   Box,
   Container,
@@ -66,9 +66,11 @@ import {
   FaChevronLeft,
   FaFolderOpen,
   FaSync,
+  FaBuilding,
 } from "react-icons/fa";
 import { MdAssignment, MdQuiz } from "react-icons/md";
 import { Link } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import baseUrl from "../../api/baseUrl";
 import ScrollToTop from "../../components/scollToTop/ScrollToTop";
 import TeacherSubscriptionExpiryAlert from "../../components/teacher/TeacherSubscriptionExpiryAlert";
@@ -77,29 +79,54 @@ import { useTeacherSubscriptionExpiryAlert } from "../../Hooks/useTeacherSubscri
 function KpiCard({ icon, label, value, accent = "blue" }) {
   const bg = useColorModeValue("white", "gray.800");
   const border = useColorModeValue("gray.200", "gray.700");
+  const title = useColorModeValue("gray.900", "white");
+  const muted = useColorModeValue("gray.500", "gray.400");
   const accentMap = {
-    blue: { bg: "blue.50", color: "blue.500" },
-    orange: { bg: "orange.50", color: "orange.500" },
-    green: { bg: "green.50", color: "green.500" },
+    blue: { bar: "#3182CE", soft: "blue.50", icon: "blue.500" },
+    orange: { bar: "#DD6B20", soft: "orange.50", icon: "orange.500" },
+    green: { bar: "#38A169", soft: "green.50", icon: "green.500" },
   };
   const a = accentMap[accent] || accentMap.blue;
 
   return (
-    <Box p={4} bg={bg} borderRadius="xl" borderWidth="1px" borderColor={border} flex={1} minW={0}>
-      <Flex justify="space-between" align="center" gap={3}>
-        <Box minW={0}>
-          <Text fontSize="xs" color="gray.500" mb={1} noOfLines={1}>
-            {label}
-          </Text>
-          <Text fontSize="2xl" fontWeight="bold" color={useColorModeValue("gray.800", "white")} lineHeight="1">
-            {value}
-          </Text>
-        </Box>
-        <Flex w={10} h={10} borderRadius="lg" bg={a.bg} align="center" justify="center" flexShrink={0}>
-          <Icon as={icon} color={a.color} boxSize={4} />
-        </Flex>
+    <Flex
+      bg={bg}
+      border="1px solid"
+      borderColor={border}
+      borderRadius="xl"
+      p={4}
+      align="center"
+      gap={3}
+      position="relative"
+      overflow="hidden"
+      transition="all 0.2s"
+      _hover={{
+        borderColor: a.bar,
+        transform: "translateY(-2px)",
+        boxShadow: `0 10px 24px -14px ${a.bar}88`,
+      }}
+    >
+      <Box position="absolute" top={0} insetInlineStart={0} w="3px" h="full" bg={a.bar} />
+      <Flex
+        w={11}
+        h={11}
+        borderRadius="lg"
+        bg={a.soft}
+        align="center"
+        justify="center"
+        flexShrink={0}
+      >
+        <Icon as={icon} color={a.icon} boxSize={5} />
       </Flex>
-    </Box>
+      <Box minW={0}>
+        <Text fontSize="xs" color={muted} mb={1} fontWeight="600">
+          {label}
+        </Text>
+        <Text fontSize="2xl" fontWeight="800" color={title} lineHeight="1" letterSpacing="-0.02em">
+          {value}
+        </Text>
+      </Box>
+    </Flex>
   );
 }
 
@@ -107,10 +134,11 @@ function QuickLinkCard({ link }) {
   const borderColor = useColorModeValue("gray.200", "gray.700");
   const bg = useColorModeValue("white", "gray.800");
   const titleColor = useColorModeValue("gray.800", "white");
-  const muted = useColorModeValue("gray.600", "gray.400");
-  const hoverBg = useColorModeValue("gray.50", "gray.700");
-  const iconBg = link.color === "orange" ? "orange.50" : "blue.50";
-  const iconColor = link.color === "orange" ? "orange.500" : "blue.500";
+  const muted = useColorModeValue("gray.500", "gray.400");
+  const isOrange = link.color === "orange";
+  const accent = isOrange ? "#DD6B20" : "#3182CE";
+  const iconBg = isOrange ? "orange.50" : "blue.50";
+  const iconColor = isOrange ? "orange.500" : "blue.500";
 
   return (
     <Box
@@ -119,30 +147,47 @@ function QuickLinkCard({ link }) {
       borderWidth="1px"
       borderColor={borderColor}
       borderRadius="xl"
-      _hover={{ borderColor: "blue.200", bg: hoverBg }}
-      transition="border-color 0.15s"
       h="full"
+      cursor="pointer"
+      transition="all 0.2s"
+      _hover={{
+        borderColor: accent,
+        transform: "translateY(-2px)",
+        boxShadow: `0 12px 24px -14px ${accent}99`,
+      }}
     >
-      <HStack spacing={3} align="start">
-        <Flex w={10} h={10} borderRadius="lg" bg={iconBg} color={iconColor} align="center" justify="center" flexShrink={0}>
-          <Icon as={link.icon} boxSize={4} />
-        </Flex>
-        <Box minW={0}>
-          <Text fontWeight="semibold" fontSize="sm" color={titleColor} noOfLines={1}>
-            {link.title}
-          </Text>
-          <Text fontSize="xs" color={muted} mt={0.5} noOfLines={2} lineHeight="1.5">
-            {link.description}
-          </Text>
-        </Box>
-      </HStack>
+      <Flex
+        w={10}
+        h={10}
+        borderRadius="lg"
+        bg={iconBg}
+        color={iconColor}
+        align="center"
+        justify="center"
+        mb={3}
+      >
+        <Icon as={link.icon} boxSize={4} />
+      </Flex>
+      <Text fontWeight="800" fontSize="sm" color={titleColor} noOfLines={1} mb={1}>
+        {link.title}
+      </Text>
+      <Text fontSize="xs" color={muted} noOfLines={2} lineHeight="1.6">
+        {link.description}
+      </Text>
     </Box>
   );
 }
 
-function SectionTitle({ children }) {
+function SectionTitle({ children, ...props }) {
   return (
-    <Heading size={{ base: "sm", md: "md" }} fontWeight="semibold" color={useColorModeValue("gray.800", "white")}>
+    <Heading
+      size={{ base: "sm", md: "md" }}
+      fontWeight="800"
+      color={useColorModeValue("gray.900", "white")}
+      fontFamily="'Noto Naskh Arabic', 'Noto Sans Arabic', serif"
+      letterSpacing="-0.02em"
+      {...props}
+    >
       {children}
     </Heading>
   );
@@ -205,15 +250,10 @@ function CreateCourseModalSection({ title, subtitle, children }) {
 const TeacherDashboardHome = () => {
   const user = JSON.parse(localStorage.getItem("user")) || {};
   const token = localStorage.getItem("token");
+  const queryClient = useQueryClient();
 
   // States
-  const [courses, setCourses] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [selectedGrade, setSelectedGrade] = useState("");
-  const [grades, setGrades] = useState([]);
-  const [subjects, setSubjects] = useState([]);
-  const [subjectsLoading, setSubjectsLoading] = useState(true);
   const [alertRefreshing, setAlertRefreshing] = useState(false);
   const {
     alert: subscriptionAlert,
@@ -266,6 +306,14 @@ const TeacherDashboardHome = () => {
   // Quick Links data
   const quickLinks = [
     {
+      id: 10,
+      title: "إدارة السنتر",
+      description: "طلاب · حضور · اشتراكات · ماليات",
+      icon: FaBuilding,
+      color: "blue",
+      link: "/center-mgmt",
+    },
+    {
       id: 1,
       title: "بنك الأسئلة",
       description: "اضافة اسئلة جديدة",
@@ -275,14 +323,6 @@ const TeacherDashboardHome = () => {
     },
     {
       id: 2,
-      title: "إدارة السنتر",
-      description: "المجموعات والطلاب",
-      icon: FaUsers,
-      color: "orange",
-      link: "/center_groups",
-    },
-    {
-      id: 3,
       title: "الرسائل",
       description: "تواصل مع طلابك",
       icon: FaEnvelope,
@@ -290,7 +330,7 @@ const TeacherDashboardHome = () => {
       link: "/TeacherChat",
     },
     {
-      id: 4,
+      id: 3,
       title: "مولّد الامتحانات",
       description: "اختيار أسئلة من بنكك بالذكاء الاصطناعي",
       icon: MdQuiz,
@@ -331,20 +371,88 @@ const TeacherDashboardHome = () => {
     },
   ];
 
+  // كورسات المدرس مع كاش
+  const {
+    data: courses = [],
+    isLoading: loading,
+    error: coursesError,
+    refetch: refetchCourses,
+  } = useQuery({
+    queryKey: ["teacherCourses"],
+    queryFn: async () => {
+      if (!token) throw new Error("No token found");
+      const response = await baseUrl.get("api/course/my-courses", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data.courses || [];
+    },
+    enabled: !!token,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
+
+  // الصفوف مع كاش
+  const { data: grades = [] } = useQuery({
+    queryKey: ["teacherGrades"],
+    queryFn: async () => {
+      const response = await baseUrl.get("api/teacher/grades", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data.grades || [];
+    },
+    enabled: !!token,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  // المواد والمجموعات مع كاش
+  const {
+    data: subjects = [],
+    isLoading: subjectsLoading,
+    refetch: refetchSubjects,
+  } = useQuery({
+    queryKey: ["teacherSubjects"],
+    queryFn: async () => {
+      const response = await baseUrl.get("/api/teacher/package-subjects/groups", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data.subjects || [];
+    },
+    enabled: !!token,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
+
+  const error = coursesError ? "حدث خطأ في تحميل الكورسات" : null;
+
   const totalGroups = subjects.reduce(
     (sum, s) => sum + (s.groups_count || 0),
     0,
   );
 
   // Color mode values
-  const pageBg = useColorModeValue("gray.100", "gray.900");
+  const pageBg = useColorModeValue(
+    "linear-gradient(180deg, #EEF4FB 0%, #F8FAFC 32%, #F8FAFC 100%)",
+    "gray.900",
+  );
   const cardBg = useColorModeValue("white", "gray.800");
-  const headingColor = useColorModeValue("gray.800", "white");
+  const headingColor = useColorModeValue("gray.900", "white");
   const textColor = useColorModeValue("gray.600", "gray.300");
   const borderColor = useColorModeValue("gray.200", "gray.600");
   const heroBg = useColorModeValue(
     "linear(to-l, blue.600, blue.500)",
     "linear(to-l, blue.700, blue.600)",
+  );
+  const heroCardBg = useColorModeValue("white", "gray.800");
+  const heroCardBorder = useColorModeValue("blackAlpha.100", "whiteAlpha.100");
+  const heroShadow = useColorModeValue(
+    "0 18px 40px -24px rgba(49, 130, 206, 0.35)",
+    "0 18px 40px -24px rgba(0,0,0,0.5)",
   );
   const sectionCardBg = useColorModeValue("white", "gray.800");
   const sectionBorder = useColorModeValue("gray.200", "gray.700");
@@ -359,6 +467,8 @@ const TeacherDashboardHome = () => {
   const modalFooterBg = useColorModeValue("gray.50", "gray.900");
   const modalTipBorder = useColorModeValue("blue.100", "blue.900");
   const createAvatarInputRef = useRef(null);
+  const teacherDisplayName =
+    user.name || `${user.fname || ""} ${user.lname || ""}`.trim() || "المدرس";
 
   const setCoursePricingType = (isFree) => {
     setFormData((prev) => ({
@@ -378,42 +488,14 @@ const TeacherDashboardHome = () => {
     size: { base: "sm", md: "md" },
   };
 
-  // Fetch courses
   const fetchCourses = async () => {
-    try {
-      setLoading(true);
-      setError(null); // Clear any previous errors
-
-      // Check if token exists
-      if (!token) {
-        throw new Error("No token found");
-      }
-
-      console.log("Fetching courses with token:", token); // Debug log
-      const response = await baseUrl.get("api/course/my-courses", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      console.log("API Response:", response.data); // Debug log
-      setCourses(response.data.courses || []);
-    } catch (error) {
-      console.error("Error fetching courses:", error);
-      setError("حدث خطأ في تحميل الكورسات");
-      setCourses([]); // Set empty array on error
-    } finally {
-      setLoading(false);
-    }
+    await queryClient.invalidateQueries({ queryKey: ["teacherCourses"] });
+    return refetchCourses();
   };
 
-  // Fetch grades
-  const fetchGrades = async () => {
-    try {
-      const response = await baseUrl.get("api/teacher/grades", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setGrades(response.data.grades || []);
-    } catch (error) {
-      console.error("Error fetching grades:", error);
-    }
+  const fetchSubjects = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["teacherSubjects"] });
+    return refetchSubjects();
   };
 
   const WEEKDAY_LABELS = {
@@ -429,25 +511,6 @@ const TeacherDashboardHome = () => {
   const formatDays = (days) => {
     if (!Array.isArray(days) || days.length === 0) return "";
     return days.map((d) => WEEKDAY_LABELS[d] || d).join(" - ");
-  };
-
-  // Fetch teacher package subjects with groups
-  const fetchSubjects = async () => {
-    try {
-      setSubjectsLoading(true);
-      const response = await baseUrl.get(
-        "/api/teacher/package-subjects/groups",
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      setSubjects(response.data.subjects || []);
-    } catch (error) {
-      console.error("Error fetching subjects:", error);
-      setSubjects([]);
-    } finally {
-      setSubjectsLoading(false);
-    }
   };
 
   // Handle form input changes
@@ -715,76 +778,149 @@ const TeacherDashboardHome = () => {
     ? courses.filter((course) => course.grade_id === parseInt(selectedGrade))
     : courses;
 
-  useEffect(() => {
-    console.log("Component mounted, fetching data...");
-    console.log("User:", user);
-    console.log("Token:", token);
-    fetchCourses();
-    fetchGrades();
-    fetchSubjects();
-  }, []);
-
   const handleRefreshDashboard = async () => {
-    fetchCourses();
-    fetchSubjects();
     setAlertRefreshing(true);
     try {
-      await refreshSubscriptionAlert();
+      await Promise.all([
+        fetchCourses(),
+        fetchSubjects(),
+        queryClient.invalidateQueries({ queryKey: ["teacherGrades"] }),
+        refreshSubscriptionAlert(),
+      ]);
     } finally {
       setAlertRefreshing(false);
     }
   };
 
   return (
-    <Box className="home-page" minH="100vh" bg={pageBg} dir="rtl" overflowX="hidden">
+    <Box
+      className="home-page"
+      minH="100vh"
+      bg={pageBg}
+      dir="rtl"
+      overflowX="hidden"
+      fontFamily="'Noto Sans Arabic', system-ui, sans-serif"
+    >
       <Container maxW="8xl" py={{ base: 4, md: 6 }} px={{ base: 3, md: 4 }}>
         <VStack spacing={{ base: 5, md: 6 }} align="stretch">
-          {/* Header */}
-          <Box bgGradient={heroBg} borderRadius="xl" px={{ base: 4, md: 6 }} py={{ base: 5, md: 6 }} color="white">
+          {/* Hero */}
+          <Box
+            bg={heroCardBg}
+            border="1px solid"
+            borderColor={heroCardBorder}
+            borderRadius={{ base: "2xl", md: "3xl" }}
+            overflow="hidden"
+            position="relative"
+            boxShadow={heroShadow}
+          >
+            <Box
+              position="absolute"
+              inset={0}
+              pointerEvents="none"
+              bgImage="radial-gradient(ellipse 70% 80% at 100% 0%, rgba(49,130,206,0.14), transparent 55%), radial-gradient(ellipse 50% 60% at 0% 100%, rgba(221,107,32,0.1), transparent 50%)"
+            />
+            <Box
+              position="absolute"
+              top={0}
+              insetInline={0}
+              h="3px"
+              bg="linear-gradient(90deg, #3182CE, #DD6B20)"
+            />
+
             <Flex
+              position="relative"
               direction={{ base: "column", md: "row" }}
-              align={{ base: "flex-start", md: "center" }}
+              align={{ base: "stretch", md: "center" }}
               justify="space-between"
               gap={{ base: 4, md: 6 }}
+              px={{ base: 4, md: 6 }}
+              py={{ base: 5, md: 6 }}
             >
               <HStack spacing={4} align="center" minW={0}>
-                <Image
-                  src={user.avatar || "https://placehold.co/100x100?text=User"}
-                  alt={user.name}
-                  w={{ base: "56px", md: "64px" }}
-                  h={{ base: "56px", md: "64px" }}
-                  borderRadius="full"
-                  border="2px solid"
-                  borderColor="whiteAlpha.700"
-                  objectFit="cover"
-                  flexShrink={0}
-                />
+                <Box position="relative" flexShrink={0}>
+                  <Image
+                    src={user.avatar || "https://placehold.co/100x100?text=User"}
+                    alt={teacherDisplayName}
+                    w={{ base: "64px", md: "72px" }}
+                    h={{ base: "64px", md: "72px" }}
+                    borderRadius="full"
+                    border="3px solid"
+                    borderColor="white"
+                    boxShadow="md"
+                    objectFit="cover"
+                  />
+                  <Box
+                    position="absolute"
+                    bottom="2px"
+                    insetInlineEnd="2px"
+                    w={3.5}
+                    h={3.5}
+                    bg="green.400"
+                    borderRadius="full"
+                    border="2px solid white"
+                  />
+                </Box>
                 <Box minW={0}>
-                  <Text fontSize="sm" opacity={0.9} mb={0.5}>
-                    لوحة تحكم المدرس
-                  </Text>
-                  <Heading size={{ base: "md", md: "lg" }} fontWeight="semibold" noOfLines={1}>
-                    {user.name || `${user.fname || ""} ${user.lname || ""}`.trim() || "المدرس"}
+                  <Badge
+                    mb={2}
+                    borderRadius="full"
+                    px={3}
+                    py={0.5}
+                    bg="blue.50"
+                    color="blue.600"
+                    fontWeight="800"
+                    fontSize="xs"
+                  >
+                    مساحة المدرس
+                  </Badge>
+                  <Heading
+                    as="h1"
+                    fontSize={{ base: "xl", md: "2xl" }}
+                    fontWeight="900"
+                    color={headingColor}
+                    noOfLines={1}
+                    fontFamily="'Noto Naskh Arabic', 'Noto Sans Arabic', serif"
+                    letterSpacing="-0.02em"
+                  >
+                    مرحباً، {teacherDisplayName}
                   </Heading>
-                  {user.role && (
-                    <Badge mt={2} bg="whiteAlpha.200" color="white" borderRadius="md" px={2} py={0.5} fontSize="xs">
-                      {user.role}
-                    </Badge>
-                  )}
+                  <Text mt={1.5} fontSize="sm" color={mutedTextColor} noOfLines={2}>
+                    أدِر كورساتك وموادك وتواصل مع طلابك من لوحة واحدة واضحة.
+                  </Text>
                 </Box>
               </HStack>
-              <Button
-                leftIcon={<FaSync />}
-                size="sm"
-                variant="outline"
-                color="white"
-                borderColor="whiteAlpha.400"
-                _hover={{ bg: "whiteAlpha.200" }}
-                onClick={handleRefreshDashboard}
-                alignSelf={{ base: "stretch", md: "center" }}
-              >
-                تحديث البيانات
-              </Button>
+
+              <HStack spacing={2} flexWrap="wrap" alignSelf={{ base: "stretch", md: "center" }}>
+                <Button
+                  leftIcon={<FaPlus />}
+                  size="sm"
+                  bg="#DD6B20"
+                  color="white"
+                  borderRadius="lg"
+                  fontWeight="800"
+                  cursor="pointer"
+                  onClick={onOpen}
+                  _hover={{ bg: "#C05621" }}
+                  flex={{ base: 1, sm: "initial" }}
+                >
+                  كورس جديد
+                </Button>
+                <Button
+                  leftIcon={<FaSync />}
+                  size="sm"
+                  variant="outline"
+                  borderColor="#3182CE"
+                  color="#3182CE"
+                  borderRadius="lg"
+                  fontWeight="700"
+                  cursor="pointer"
+                  onClick={handleRefreshDashboard}
+                  _hover={{ bg: "blue.50" }}
+                  flex={{ base: 1, sm: "initial" }}
+                >
+                  تحديث
+                </Button>
+              </HStack>
             </Flex>
           </Box>
 
@@ -806,9 +942,8 @@ const TeacherDashboardHome = () => {
             bg={sectionCardBg}
             borderWidth="1px"
             borderColor={sectionBorder}
-            borderRadius="xl"
+            borderRadius="2xl"
             p={{ base: 4, md: 5 }}
-            boxShadow="sm"
           >
             <Flex
               align="center"
@@ -823,12 +958,14 @@ const TeacherDashboardHome = () => {
                 as={isQuickLinksOpen ? FaChevronDown : FaChevronLeft}
                 boxSize={4}
                 color={textColor}
-                transform={isQuickLinksOpen ? "rotate(0deg)" : "rotate(-90deg)"}
               />
             </Flex>
 
             <Box display={{ base: "none", lg: "block" }} mb={4}>
               <SectionTitle>الوصول السريع</SectionTitle>
+              <Text fontSize="xs" color={mutedTextColor} mt={1}>
+                اختصارات لأهم أدوات التدريس
+              </Text>
             </Box>
 
             <Box display={{ base: "block", lg: "none" }}>
@@ -855,10 +992,13 @@ const TeacherDashboardHome = () => {
           {/* Subjects */}
           {(subjectsLoading || subjects.length > 0) && (
             <Box>
-              <SectionTitle mb={4}>المواد الدراسية</SectionTitle>
+              <SectionTitle mb={1}>المواد الدراسية</SectionTitle>
+              <Text fontSize="xs" color={mutedTextColor} mb={4}>
+                المواد والمجموعات المرتبطة بمنصتك
+              </Text>
 
-              {subjectsLoading ? (
-                <Center py={10} bg={sectionCardBg} borderRadius="xl" borderWidth="1px" borderColor={sectionBorder}>
+              {subjectsLoading && subjects.length === 0 ? (
+                <Center py={10} bg={sectionCardBg} borderRadius="2xl" borderWidth="1px" borderColor={sectionBorder}>
                   <VStack spacing={3}>
                     <Spinner size="lg" color="blue.500" thickness="3px" />
                     <Text color={mutedTextColor} fontSize="sm">جاري تحميل المواد...</Text>
@@ -874,13 +1014,17 @@ const TeacherDashboardHome = () => {
                       bg={cardBg}
                       borderWidth="1px"
                       borderColor={sectionBorder}
-                      borderRadius="xl"
+                      borderRadius="2xl"
                       overflow="hidden"
-                      boxShadow="sm"
-                      _hover={{ borderColor: "blue.200" }}
-                      transition="border-color 0.15s"
+                      cursor="pointer"
+                      transition="all 0.2s"
+                      _hover={{
+                        borderColor: "#3182CE",
+                        transform: "translateY(-3px)",
+                        boxShadow: "0 14px 28px -16px rgba(49,130,206,0.45)",
+                      }}
                     >
-                      <Box h={{ base: "140px", md: "160px" }} overflow="hidden" position="relative">
+                      <Box h={{ base: "140px", md: "150px" }} overflow="hidden" position="relative">
                         <Image
                           src={subject.image || "https://placehold.co/600x400/e2e8f0/475569?text=Subject"}
                           alt={subject.name}
@@ -888,27 +1032,42 @@ const TeacherDashboardHome = () => {
                           h="full"
                           objectFit="cover"
                         />
+                        <Box
+                          position="absolute"
+                          inset={0}
+                          bg="linear-gradient(180deg, transparent 40%, rgba(15,23,42,0.55) 100%)"
+                        />
                         <Badge
                           position="absolute"
                           bottom={3}
                           right={3}
-                          bg="orange.500"
+                          bg="#DD6B20"
                           color="white"
                           borderRadius="md"
                           fontSize="xs"
+                          fontWeight="800"
                         >
                           {subject.grade_name || "مادة دراسية"}
                         </Badge>
                       </Box>
                       <Box p={4}>
-                        <Heading size="sm" color={headingColor} noOfLines={1} mb={2}>
+                        <Heading size="sm" color={headingColor} noOfLines={1} mb={2} fontWeight="800">
                           {subject.name}
                         </Heading>
                         <HStack fontSize="xs" color={mutedTextColor} spacing={2} mb={3}>
                           <Icon as={FaUsers} color="orange.400" boxSize={3} />
                           <Text>{subject.groups_count || 0} مجموعات</Text>
                         </HStack>
-                        <Button w="full" size="sm" variant="outline" colorScheme="blue" borderRadius="lg">
+                        <Button
+                          w="full"
+                          size="sm"
+                          variant="outline"
+                          borderColor="#3182CE"
+                          color="#3182CE"
+                          borderRadius="lg"
+                          fontWeight="700"
+                          _hover={{ bg: "blue.50" }}
+                        >
                           إدارة المادة
                         </Button>
                       </Box>
@@ -928,7 +1087,12 @@ const TeacherDashboardHome = () => {
               justify="space-between"
               gap={3}
             >
-              <SectionTitle>كورساتي</SectionTitle>
+              <Box>
+                <SectionTitle>كورساتي</SectionTitle>
+                <Text fontSize="xs" color={mutedTextColor} mt={1}>
+                  {filteredCourses.length} كورس معروض
+                </Text>
+              </Box>
               <Flex direction={{ base: "column", sm: "row" }} gap={2} w={{ base: "full", sm: "auto" }}>
                 <Select
                   placeholder="تصفية حسب الصف"
@@ -951,8 +1115,12 @@ const TeacherDashboardHome = () => {
                   leftIcon={<FaPlus />}
                   onClick={onOpen}
                   size="sm"
-                  colorScheme="blue"
+                  bg="#3182CE"
+                  color="white"
                   borderRadius="lg"
+                  fontWeight="800"
+                  cursor="pointer"
+                  _hover={{ bg: "#2B6CB0" }}
                   w={{ base: "full", sm: "auto" }}
                 >
                   إضافة كورس
@@ -960,15 +1128,15 @@ const TeacherDashboardHome = () => {
               </Flex>
             </Flex>
 
-            {loading ? (
-              <Center py={10} bg={sectionCardBg} borderRadius="xl" borderWidth="1px" borderColor={sectionBorder}>
+            {loading && courses.length === 0 ? (
+              <Center py={10} bg={sectionCardBg} borderRadius="2xl" borderWidth="1px" borderColor={sectionBorder}>
                 <VStack spacing={3}>
                   <Spinner size="lg" color="blue.500" thickness="3px" />
                   <Text color={mutedTextColor} fontSize="sm">جاري تحميل الكورسات...</Text>
                 </VStack>
               </Center>
             ) : error ? (
-              <Center py={10} bg={sectionCardBg} borderRadius="xl" borderWidth="1px" borderColor={sectionBorder}>
+              <Center py={10} bg={sectionCardBg} borderRadius="2xl" borderWidth="1px" borderColor={sectionBorder}>
                 <VStack spacing={3}>
                   <Icon as={FaBookOpen} boxSize={10} color="red.400" />
                   <Text color="red.500" fontSize="sm" textAlign="center">{error}</Text>
@@ -978,11 +1146,23 @@ const TeacherDashboardHome = () => {
                 </VStack>
               </Center>
             ) : filteredCourses.length === 0 ? (
-              <Center py={10} bg={sectionCardBg} borderRadius="xl" borderWidth="1px" borderColor={sectionBorder}>
+              <Center py={12} bg={sectionCardBg} borderRadius="2xl" borderWidth="1px" borderColor={sectionBorder} borderStyle="dashed">
                 <VStack spacing={3}>
-                  <Icon as={FaBookOpen} boxSize={10} color={mutedTextColor} />
-                  <Text color={mutedTextColor} fontSize="sm">لا توجد كورسات متاحة</Text>
-                  <Button colorScheme="blue" variant="outline" size="sm" onClick={onOpen} leftIcon={<FaPlus />} borderRadius="lg">
+                  <Flex w={14} h={14} borderRadius="full" bg="blue.50" align="center" justify="center">
+                    <Icon as={FaBookOpen} boxSize={6} color="#3182CE" />
+                  </Flex>
+                  <Text color={headingColor} fontWeight="800">لا توجد كورسات بعد</Text>
+                  <Text color={mutedTextColor} fontSize="sm">ابدأ بإنشاء أول كورس لطلابك</Text>
+                  <Button
+                    bg="#DD6B20"
+                    color="white"
+                    size="sm"
+                    onClick={onOpen}
+                    leftIcon={<FaPlus />}
+                    borderRadius="lg"
+                    fontWeight="800"
+                    _hover={{ bg: "#C05621" }}
+                  >
                     إضافة أول كورس
                   </Button>
                 </VStack>
@@ -995,13 +1175,16 @@ const TeacherDashboardHome = () => {
                     bg={cardBg}
                     borderWidth="1px"
                     borderColor={sectionBorder}
-                    borderRadius="xl"
+                    borderRadius="2xl"
                     overflow="hidden"
-                    boxShadow="sm"
-                    _hover={{ borderColor: "blue.200" }}
-                    transition="border-color 0.15s"
+                    transition="all 0.2s"
+                    _hover={{
+                      borderColor: "#3182CE",
+                      transform: "translateY(-3px)",
+                      boxShadow: "0 14px 28px -16px rgba(49,130,206,0.45)",
+                    }}
                   >
-                    <Box position="relative" h={{ base: "140px", md: "160px" }} overflow="hidden">
+                    <Box position="relative" h={{ base: "140px", md: "150px" }} overflow="hidden">
                       <Image
                         src={course.avatar || "https://placehold.co/600x400/e2e8f0/475569?text=Course"}
                         alt={course.title}
@@ -1009,8 +1192,20 @@ const TeacherDashboardHome = () => {
                         h="full"
                         objectFit="cover"
                       />
+                      <Box
+                        position="absolute"
+                        inset={0}
+                        bg="linear-gradient(180deg, transparent 35%, rgba(15,23,42,0.45) 100%)"
+                      />
                       <Flex position="absolute" top={2} right={2} left={2} justify="space-between" align="center">
-                        <Badge bg="white" color="blue.700" borderRadius="md" fontSize="xs" px={2}>
+                        <Badge
+                          bg={isCourseFree(course) ? "green.500" : "white"}
+                          color={isCourseFree(course) ? "white" : "blue.700"}
+                          borderRadius="md"
+                          fontSize="xs"
+                          fontWeight="800"
+                          px={2}
+                        >
                           {isCourseFree(course) ? "مجاني" : `${course.price} ج.م`}
                         </Badge>
                         <HStack spacing={1}>
@@ -1021,6 +1216,7 @@ const TeacherDashboardHome = () => {
                             bg="white"
                             color="blue.600"
                             borderRadius="md"
+                            cursor="pointer"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleEditCourse(course);
@@ -1033,6 +1229,7 @@ const TeacherDashboardHome = () => {
                             bg="white"
                             color="red.500"
                             borderRadius="md"
+                            cursor="pointer"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleDeleteCourse(course);
@@ -1042,28 +1239,40 @@ const TeacherDashboardHome = () => {
                       </Flex>
                     </Box>
                     <Box p={4}>
-                      <HStack spacing={2} mb={2} flexWrap="wrap">
-                        <Badge colorScheme="blue" borderRadius="md" fontSize="xs">
-                          {course?.grade?.name || "بدون صف"}
-                        </Badge>
-                        <Badge colorScheme="orange" borderRadius="md" fontSize="xs">
-                          كورس
-                        </Badge>
-                      </HStack>
-                      <Heading size="sm" color={headingColor} noOfLines={2} mb={1} lineHeight="1.4">
+                      <Badge colorScheme="blue" borderRadius="md" fontSize="xs" mb={2} fontWeight="700">
+                        {course?.grade?.name || "بدون صف"}
+                      </Badge>
+                      <Heading size="sm" color={headingColor} noOfLines={2} mb={1} lineHeight="1.4" fontWeight="800">
                         {course.title}
                       </Heading>
                       <Text fontSize="xs" color={textColor} noOfLines={2} minH="32px" mb={3}>
                         {course.description}
                       </Text>
-                      <HStack fontSize="xs" color={mutedTextColor} justify="space-between" pt={2} borderTopWidth="1px" borderColor={dividerBorderColor} mb={3}>
+                      <HStack
+                        fontSize="xs"
+                        color={mutedTextColor}
+                        justify="space-between"
+                        pt={2}
+                        borderTopWidth="1px"
+                        borderColor={dividerBorderColor}
+                        mb={3}
+                      >
                         <HStack spacing={1}>
                           <Icon as={FaCalendarAlt} color="blue.400" boxSize={3} />
                           <Text>{new Date(course.created_at).toLocaleDateString("ar-EG")}</Text>
                         </HStack>
                       </HStack>
                       <Link to={`/CourseDetailsPage/${course.id}`} style={{ width: "100%" }}>
-                        <Button w="full" size="sm" colorScheme="blue" borderRadius="lg">
+                        <Button
+                          w="full"
+                          size="sm"
+                          bg="#3182CE"
+                          color="white"
+                          borderRadius="lg"
+                          fontWeight="800"
+                          cursor="pointer"
+                          _hover={{ bg: "#2B6CB0" }}
+                        >
                           إدارة الكورس
                         </Button>
                       </Link>

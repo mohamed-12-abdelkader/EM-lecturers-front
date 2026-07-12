@@ -114,7 +114,7 @@ import {
   FaBroadcastTower,
   FaRobot,
 } from "react-icons/fa";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import baseUrl from "../../api/baseUrl";
 import UserType from "../../Hooks/auth/userType";
 import { useParams, useNavigate } from "react-router-dom";
@@ -557,13 +557,12 @@ const MotionHStack = motion(HStack);
 const CourseDetailsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [userData, isAdmin, isTeacher, student] = UserType();
   const [showFullDescription, setShowFullDescription] = React.useState(false);
   const [expandedLecture, setExpandedLecture] = React.useState(null);
   const token = localStorage.getItem("token");
   const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const [courseData, setCourseData] = useState(null);
-  const [courseLoading, setCourseLoading] = useState(true);
   const [error, setError] = useState(null);
 
   // Lecture management states
@@ -640,10 +639,41 @@ const CourseDetailsPage = () => {
     },
     enabled: !!id && !!token,
     refetchInterval: 15000,
+    staleTime: 10_000,
   });
   const hasActiveLiveStream = (courseStreamsData?.meetings || []).some(
     (m) => m.status === "started",
   );
+
+  // تفاصيل الكورس مع كاش — الرجوع لنفس الكورس لا يعيد التحميل من الصفر
+  const {
+    data: courseData,
+    isLoading: courseLoading,
+    error: courseQueryError,
+    refetch: refetchCourseDetails,
+  } = useQuery({
+    queryKey: ["courseDetails", id],
+    queryFn: async () => {
+      const response = await baseUrl.get(`api/course/${id}/details`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data;
+    },
+    enabled: !!id && !!token,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
+
+  useEffect(() => {
+    if (courseQueryError) {
+      console.log("Error fetching data:", courseQueryError);
+      setError("حدث خطأ في تحميل البيانات");
+    } else if (courseData) {
+      setError(null);
+    }
+  }, [courseQueryError, courseData]);
 
   // State لمودال إنشاء الأكواد
   const [codeModalOpen, setCodeModalOpen] = useState(false);
@@ -690,26 +720,6 @@ const CourseDetailsPage = () => {
       setFilteredCodes(filtered);
     }
   }, [searchCode, activationCodes]);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setCourseLoading(true);
-        setError(null);
-        const response = await baseUrl.get(`api/course/${id}/details`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setCourseData(response.data);
-      } catch (error) {
-        console.log("Error fetching data:", error);
-        setError("حدث خطأ في تحميل البيانات");
-      } finally {
-        setCourseLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [token]);
 
   // 2. جلب الامتحانات الشاملة
   useEffect(() => {
@@ -2891,19 +2901,18 @@ display:block;
     }));
   };
 
-  // دالة تحديث البيانات بدون إعادة تحميل
+  // دالة تحديث البيانات بدون إعادة تحميل كامل للصفحة
   const refreshCourseData = async () => {
     try {
-      const response = await baseUrl.get(`api/course/${id}/details`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setCourseData(response.data);
+      await queryClient.invalidateQueries({ queryKey: ["courseDetails", id] });
+      await refetchCourseDetails();
     } catch (error) {
       console.log("Error refreshing course data:", error);
     }
   };
 
-  if (courseLoading) {
+  // شاشة التحميل فقط عند أول دخول بدون بيانات في الكاش
+  if (courseLoading && !courseData) {
     return <BrandLoadingScreen />;
   }
 

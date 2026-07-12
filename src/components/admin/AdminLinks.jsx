@@ -2,7 +2,7 @@ import { useLocation, NavLink } from "react-router-dom";
 import { useEffect, useState } from "react";
 import UserType from "../../Hooks/auth/userType";
 // أيقونات من react-icons
-import { MdDashboard, MdPersonAdd, MdCode, MdAccountBalanceWallet, MdPhoneIphone, MdDateRange, MdOndemandVideo, MdPictureAsPdf, MdGroupAdd, MdPersonAddAlt, MdQuiz, MdListAlt, MdAssignment, MdQuestionAnswer, MdCheckCircle, MdViewList, MdGroups, MdBook } from "react-icons/md";
+import { MdDashboard, MdPersonAdd, MdCode, MdAccountBalanceWallet, MdPhoneIphone, MdDateRange, MdOndemandVideo, MdPictureAsPdf, MdGroupAdd, MdPersonAddAlt, MdQuiz, MdListAlt, MdAssignment, MdQuestionAnswer, MdCheckCircle, MdViewList, MdBook } from "react-icons/md";
 
 const AdminLinks = ({ currentLink, setCurrentLink }) => {
   const location = useLocation();
@@ -51,12 +51,6 @@ const AdminLinks = ({ currentLink, setCurrentLink }) => {
       link: " فتح جهاز للطالب",
       path: "/admin/open_phone",
       icon: <MdPhoneIphone size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "إدارة المجموعات الدراسية",
-      path: "/center-groups",
-      icon: <MdGroups size={22} />,
     },
     {
       id: Math.random(),

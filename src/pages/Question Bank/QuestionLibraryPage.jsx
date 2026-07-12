@@ -65,9 +65,10 @@ import {
   teacherLibraryExamErrorMessage,
 } from "../../api/teacherLibraryExamApi";
 import {
-  normalizePassagesResponse,
-  normalizeLessonQuestionsResponse,
-} from "./utils/teacherLibraryQuestionUtils";
+  useInvalidateTeacherQuestionBank,
+  useTeacherLibraryLessonContent,
+  useTeacherLibraryLessons,
+} from "../../Hooks/teacher/useTeacherQuestionBankQueries";
 
 const API = "/api/teacher/questions";
 
@@ -113,6 +114,7 @@ function KpiCard({ label, value, sub, icon, accent = "blue" }) {
 const QuestionLibraryPage = () => {
   const toast = useToast();
   const cancelRef = useRef(null);
+  const invalidateQb = useInvalidateTeacherQuestionBank();
   const pageBg = useColorModeValue("gray.100", "gray.900");
   const cardBg = useColorModeValue("white", "gray.800");
   const borderColor = useColorModeValue("gray.200", "gray.700");
@@ -126,11 +128,59 @@ const QuestionLibraryPage = () => {
 
   const [currentView, setCurrentView] = useState("lessons");
   const [selectedLesson, setSelectedLesson] = useState(null);
-  const [lessons, setLessons] = useState([]);
   const [allQuestions, setAllQuestions] = useState([]);
   const [passages, setPassages] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [lessonLoading, setLessonLoading] = useState(false);
+
+  const {
+    data: lessons = [],
+    isLoading: loading,
+    refetch: refetchLessons,
+  } = useTeacherLibraryLessons();
+
+  const activeLessonId =
+    currentView === "lesson" && selectedLesson?.id ? selectedLesson.id : null;
+
+  const {
+    data: lessonContent,
+    isLoading: lessonLoading,
+    isFetching: _lessonFetching,
+    refetch: refetchLessonContent,
+  } = useTeacherLibraryLessonContent(activeLessonId, {
+    enabled: !!activeLessonId,
+  });
+
+  useEffect(() => {
+    if (!activeLessonId) {
+      setAllQuestions([]);
+      setPassages([]);
+      return;
+    }
+    if (!lessonContent) return;
+    setAllQuestions(lessonContent.questions || []);
+    setPassages(lessonContent.passages || []);
+    const expanded = {};
+    (lessonContent.passages || []).forEach((p) => {
+      expanded[p.id] = true;
+    });
+    setExpandedPassages(expanded);
+  }, [lessonContent, activeLessonId]);
+
+  const fetchLessons = useCallback(async () => {
+    await invalidateQb.invalidateLibraryLessons();
+    return refetchLessons();
+  }, [invalidateQb, refetchLessons]);
+
+  const fetchLessonContent = useCallback(
+    async (lessonId) => {
+      if (!lessonId) return;
+      if (String(lessonId) === String(activeLessonId)) {
+        await invalidateQb.invalidateLibraryLesson(lessonId);
+        return refetchLessonContent();
+      }
+      await invalidateQb.invalidateLibraryLesson(lessonId);
+    },
+    [activeLessonId, invalidateQb, refetchLessonContent],
+  );
 
   const [lessonTitle, setLessonTitle] = useState("");
   const [editingLesson, setEditingLesson] = useState(null);
@@ -200,83 +250,15 @@ const QuestionLibraryPage = () => {
     [lessons],
   );
 
-  const fetchLessons = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data } = await baseUrl.get(`${API}/lessons`, { headers: authHeaders() });
-      setLessons(data.lessons || []);
-    } catch {
-      toast({ title: "خطأ", description: "فشل في جلب الدروس", status: "error", duration: 3000, isClosable: true });
-    } finally {
-      setLoading(false);
-    }
-  }, [toast]);
-
-  const fetchLessonContent = useCallback(
-    async (lessonId) => {
-      setLessonLoading(true);
-      try {
-        const [questionsRes, passagesRes] = await Promise.allSettled([
-          baseUrl.get(`${API}/questions/${lessonId}`, { headers: authHeaders() }),
-          baseUrl.get(`${API}/passages/${lessonId}`, { headers: authHeaders() }),
-        ]);
-
-        const questionsPayload =
-          questionsRes.status === "fulfilled" ? questionsRes.value?.data : null;
-        const passagesPayload =
-          passagesRes.status === "fulfilled" ? passagesRes.value?.data : null;
-
-        if (!passagesPayload && !questionsPayload) {
-          throw new Error("فشل تحميل محتوى الدرس");
-        }
-
-        const normalizedPassages = normalizePassagesResponse(passagesPayload?.passages || []);
-        let normalizedQuestions = normalizeLessonQuestionsResponse(
-          questionsPayload?.questions || [],
-        );
-
-        if (!normalizedQuestions.length && normalizedPassages.length) {
-          normalizedQuestions = normalizedPassages.flatMap((p) => p.questions || []);
-        }
-
-        setPassages(normalizedPassages);
-        setAllQuestions(normalizedQuestions);
-
-        const expanded = {};
-        normalizedPassages.forEach((p) => {
-          expanded[p.id] = true;
-        });
-        setExpandedPassages(expanded);
-      } catch {
-        toast({
-          title: "خطأ",
-          description: "فشل في تحميل محتوى الدرس",
-          status: "error",
-          duration: 3000,
-          isClosable: true,
-        });
-      } finally {
-        setLessonLoading(false);
-      }
-    },
-    [toast],
-  );
-
-  useEffect(() => {
-    fetchLessons();
-  }, [fetchLessons]);
-
   useEffect(() => {
     const saved = localStorage.getItem("questionLibraryLessonId");
-    if (saved && lessons.length) {
-      const lesson = lessons.find((l) => String(l.id) === saved);
-      if (lesson) {
-        setSelectedLesson(lesson);
-        setCurrentView("lesson");
-        fetchLessonContent(lesson.id);
-      }
+    if (!saved || !lessons.length || selectedLesson) return;
+    const lesson = lessons.find((l) => String(l.id) === saved);
+    if (lesson) {
+      setSelectedLesson(lesson);
+      setCurrentView("lesson");
     }
-  }, [lessons, fetchLessonContent]);
+  }, [lessons, selectedLesson]);
 
   const openLesson = (lesson) => {
     setSelectedLesson(lesson);
@@ -285,7 +267,6 @@ const QuestionLibraryPage = () => {
     setSelectedPassageIds([]);
     setIsSelectionMode(false);
     localStorage.setItem("questionLibraryLessonId", String(lesson.id));
-    fetchLessonContent(lesson.id);
   };
 
   const backToLessons = () => {
@@ -297,7 +278,6 @@ const QuestionLibraryPage = () => {
     setSelectedPassageIds([]);
     setIsSelectionMode(false);
     localStorage.removeItem("questionLibraryLessonId");
-    fetchLessons();
   };
 
   const openCreateLesson = () => {
