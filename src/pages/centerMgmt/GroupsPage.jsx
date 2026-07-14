@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import {
-  Badge,
   Box,
   Button,
   Checkbox,
@@ -29,6 +28,7 @@ import {
   VStack,
   Wrap,
   WrapItem,
+  Badge,
 } from "@chakra-ui/react";
 import { FaEdit, FaPlus, FaTrash, FaUsers } from "react-icons/fa";
 import {
@@ -37,18 +37,26 @@ import {
   usePlatformGrades,
 } from "../../Hooks/centerMgmt/useCenterMgmtQueries";
 import { apiErrorMessage } from "../../api/centerMgmtApi";
-import { WEEK_DAYS, field, formatMoney, todayISO } from "./centerMgmtUtils";
-import { EmptyState, LoadingBlock, PageHeader, Surface } from "./components/UiBits";
+import { WEEK_DAYS, field, formatMoney } from "./centerMgmtUtils";
+import {
+  EmptyState,
+  FilterBar,
+  LoadingBlock,
+  PageHeader,
+  PaginationBar,
+  PrimaryButton,
+  StatusBadge,
+  Surface,
+} from "./components/UiBits";
 
 const emptyForm = {
   name: "",
-  gradeId: "",
-  subjectId: "",
+  grade_id: "",
+  subject_id: "",
   days: [],
-  startTime: "16:00",
-  endTime: "18:00",
-  monthlyFee: 300,
-  studyStartDate: todayISO(),
+  start_time: "16:00",
+  end_time: "18:00",
+  monthly_fee: 300,
   status: "active",
   notes: "",
 };
@@ -56,19 +64,17 @@ const emptyForm = {
 export default function GroupsPage() {
   const toast = useToast();
   const [search, setSearch] = useState("");
-  const [gradeFilter, setGradeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
 
   const params = useMemo(
     () => ({
       search: search || undefined,
-      gradeId: gradeFilter || undefined,
       status: statusFilter || undefined,
       page,
       limit: 20,
     }),
-    [search, gradeFilter, statusFilter, page]
+    [search, statusFilter, page]
   );
 
   const { data: grades = [] } = usePlatformGrades();
@@ -79,20 +85,9 @@ export default function GroupsPage() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
 
-  const gradeMap = useMemo(() => {
-    const map = {};
-    grades.forEach((g) => {
-      map[g.id] = field(g, "name");
-    });
-    return map;
-  }, [grades]);
-
   const openCreate = () => {
     setEditing(null);
-    setForm({
-      ...emptyForm,
-      gradeId: grades[0]?.id ? String(grades[0].id) : "",
-    });
+    setForm(emptyForm);
     onOpen();
   };
 
@@ -100,13 +95,12 @@ export default function GroupsPage() {
     setEditing(group);
     setForm({
       name: field(group, "name") || "",
-      gradeId: String(field(group, "grade_id", "gradeId") || ""),
-      subjectId: String(field(group, "subject_id", "subjectId") || ""),
+      grade_id: String(field(group, "grade_id", "gradeId") || ""),
+      subject_id: String(field(group, "subject_id", "subjectId") || ""),
       days: field(group, "days") || [],
-      startTime: field(group, "start_time", "startTime") || "16:00",
-      endTime: field(group, "end_time", "endTime") || "18:00",
-      monthlyFee: field(group, "monthly_fee", "monthlyFee") ?? 300,
-      studyStartDate: String(field(group, "study_start_date", "studyStartDate") || "").slice(0, 10),
+      start_time: field(group, "start_time", "startTime") || "16:00",
+      end_time: field(group, "end_time", "endTime") || "18:00",
+      monthly_fee: Number(field(group, "monthly_fee", "monthlyFee") ?? 300),
       status: field(group, "status") || "active",
       notes: field(group, "notes") || "",
     });
@@ -114,19 +108,18 @@ export default function GroupsPage() {
   };
 
   const handleSave = async () => {
-    if (!form.name.trim() || !form.gradeId || !form.days.length) {
-      toast({ title: "الاسم والصف والأيام مطلوبة", status: "warning", duration: 2500 });
+    if (!form.name.trim() || !form.days.length || form.monthly_fee === "" || form.monthly_fee == null) {
+      toast({ title: "الاسم والأيام وقيمة الاشتراك مطلوبة", status: "warning", duration: 2500 });
       return;
     }
     const payload = {
       name: form.name.trim(),
-      gradeId: Number(form.gradeId),
-      subjectId: form.subjectId ? Number(form.subjectId) : undefined,
       days: form.days,
-      startTime: form.startTime || undefined,
-      endTime: form.endTime || undefined,
-      monthlyFee: Number(form.monthlyFee) || 0,
-      studyStartDate: form.studyStartDate || undefined,
+      monthly_fee: Number(form.monthly_fee) || 0,
+      grade_id: form.grade_id ? Number(form.grade_id) : null,
+      subject_id: form.subject_id ? Number(form.subject_id) : null,
+      start_time: form.start_time || null,
+      end_time: form.end_time || null,
       status: form.status,
       notes: form.notes || null,
     };
@@ -158,16 +151,20 @@ export default function GroupsPage() {
     <>
       <PageHeader
         title="المجموعات"
-        description="أنشئ مجموعات الدراسة وحدد الأيام والرسوم الشهرية."
+        description="أنشئ مجموعات دراسية بأيام الحضور وقيمة الاشتراك الشهري."
         actions={
-          <Button leftIcon={<FaPlus />} colorScheme="blue" borderRadius="xl" onClick={openCreate}>
+          <PrimaryButton
+            leftIcon={<FaPlus />}
+            onClick={openCreate}
+            size={{ base: "sm", md: "md" }}
+          >
             مجموعة جديدة
-          </Button>
+          </PrimaryButton>
         }
       />
 
-      <Surface mb={5}>
-        <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3}>
+      <FilterBar>
+        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
           <Input
             placeholder="بحث بالاسم..."
             value={search}
@@ -176,22 +173,9 @@ export default function GroupsPage() {
               setPage(1);
             }}
             borderRadius="xl"
+            bg="white"
+            _dark={{ bg: "gray.800" }}
           />
-          <Select
-            placeholder="كل الصفوف"
-            value={gradeFilter}
-            onChange={(e) => {
-              setGradeFilter(e.target.value);
-              setPage(1);
-            }}
-            borderRadius="xl"
-          >
-            {grades.map((g) => (
-              <option key={g.id} value={g.id}>
-                {field(g, "name")}
-              </option>
-            ))}
-          </Select>
           <Select
             placeholder="كل الحالات"
             value={statusFilter}
@@ -205,7 +189,7 @@ export default function GroupsPage() {
             <option value="paused">متوقفة</option>
           </Select>
         </SimpleGrid>
-      </Surface>
+      </FilterBar>
 
       {isLoading ? (
         <LoadingBlock />
@@ -215,43 +199,44 @@ export default function GroupsPage() {
           title="لا توجد مجموعات"
           description="ابدأ بإنشاء أول مجموعة دراسية."
           action={
-            <Button colorScheme="blue" borderRadius="xl" onClick={openCreate}>
-              إنشاء مجموعة
-            </Button>
+            <PrimaryButton onClick={openCreate}>إنشاء مجموعة</PrimaryButton>
           }
         />
       ) : (
-        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={{ base: 3, md: 4 }}>
           {groups.map((group) => {
             const days = field(group, "days") || [];
-            const gradeId = field(group, "grade_id", "gradeId");
+            const paused = field(group, "status") === "paused";
             return (
-              <Surface key={group.id}>
+              <Surface key={group.id} p={{ base: 3.5, md: 5 }}>
                 <Flex justify="space-between" align="flex-start" gap={3} mb={3}>
-                  <Box>
+                  <Box minW={0}>
                     <Text
                       as={RouterLink}
                       to={`/center-mgmt/groups/${group.id}`}
-                      fontWeight="bold"
-                      fontSize="lg"
+                      fontWeight="black"
+                      fontSize={{ base: "md", md: "lg" }}
                       color="blue.600"
                       _hover={{ textDecoration: "underline" }}
+                      noOfLines={2}
                     >
                       {field(group, "name")}
                     </Text>
-                    <Text fontSize="sm" color="gray.500" mt={1}>
-                      {gradeMap[gradeId] || `صف #${gradeId || "—"}`}
+                    <Text fontSize="xs" color="gray.500" mt={1}>
+                      طلاب: {field(group, "students_count", "studentsCount") ?? "—"}
                     </Text>
                   </Box>
-                  <Badge colorScheme={field(group, "status") === "paused" ? "orange" : "green"}>
-                    {field(group, "status") === "paused" ? "متوقفة" : "نشطة"}
-                  </Badge>
+                  <StatusBadge scheme={paused ? "orange" : "green"}>
+                    {paused ? "متوقفة" : "نشطة"}
+                  </StatusBadge>
                 </Flex>
 
-                <Wrap spacing={2} mb={3}>
+                <Wrap spacing={1.5} mb={3}>
                   {days.map((d) => (
                     <WrapItem key={d}>
-                      <Badge variant="subtle">{d}</Badge>
+                      <Badge variant="subtle" borderRadius="md" fontSize="xs">
+                        {d}
+                      </Badge>
                     </WrapItem>
                   ))}
                 </Wrap>
@@ -259,14 +244,14 @@ export default function GroupsPage() {
                 <SimpleGrid columns={2} spacing={2} mb={4} fontSize="sm">
                   <Text color="gray.500">
                     الوقت:{" "}
-                    <Text as="span" color="gray.800" fontWeight="medium">
+                    <Text as="span" color="gray.800" fontWeight="semibold" _dark={{ color: "gray.100" }}>
                       {field(group, "start_time", "startTime") || "—"} –{" "}
                       {field(group, "end_time", "endTime") || "—"}
                     </Text>
                   </Text>
                   <Text color="gray.500">
-                    الرسوم:{" "}
-                    <Text as="span" color="gray.800" fontWeight="medium">
+                    الاشتراك:{" "}
+                    <Text as="span" color="gray.800" fontWeight="semibold" _dark={{ color: "gray.100" }}>
                       {formatMoney(field(group, "monthly_fee", "monthlyFee"))}
                     </Text>
                   </Text>
@@ -281,13 +266,14 @@ export default function GroupsPage() {
                     borderRadius="lg"
                     flex={1}
                   >
-                    التفاصيل
+                    الطلاب والتفاصيل
                   </Button>
                   <IconButton
                     aria-label="تعديل"
                     icon={<FaEdit />}
                     size="sm"
                     variant="ghost"
+                    borderRadius="lg"
                     onClick={() => openEdit(group)}
                   />
                   <IconButton
@@ -296,6 +282,7 @@ export default function GroupsPage() {
                     size="sm"
                     variant="ghost"
                     colorScheme="red"
+                    borderRadius="lg"
                     onClick={() => handleDelete(group)}
                   />
                 </Flex>
@@ -305,33 +292,16 @@ export default function GroupsPage() {
         </SimpleGrid>
       )}
 
-      {(data?.totalPages || 1) > 1 && (
-        <Flex justify="center" gap={2} mt={5}>
-          <Button
-            size="sm"
-            isDisabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-            borderRadius="lg"
-          >
-            السابق
-          </Button>
-          <Text fontSize="sm" alignSelf="center">
-            {page} / {data.totalPages}
-          </Text>
-          <Button
-            size="sm"
-            isDisabled={page >= data.totalPages}
-            onClick={() => setPage((p) => p + 1)}
-            borderRadius="lg"
-          >
-            التالي
-          </Button>
-        </Flex>
-      )}
+      <PaginationBar
+        page={page}
+        totalPages={data?.totalPages || 1}
+        onPrev={() => setPage((p) => p - 1)}
+        onNext={() => setPage((p) => p + 1)}
+      />
 
-      <Modal isOpen={isOpen} onClose={onClose} size="xl" isCentered>
-        <ModalOverlay />
-        <ModalContent dir="rtl" borderRadius="2xl">
+      <Modal isOpen={isOpen} onClose={onClose} size={{ base: "full", md: "xl" }} isCentered>
+        <ModalOverlay backdropFilter="blur(4px)" />
+        <ModalContent dir="rtl" borderRadius={{ base: "none", md: "2xl" }} m={0}>
           <ModalHeader>{editing ? "تعديل المجموعة" : "مجموعة جديدة"}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
@@ -344,34 +314,8 @@ export default function GroupsPage() {
                   borderRadius="xl"
                 />
               </FormControl>
-              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
-                <FormControl isRequired>
-                  <FormLabel>الصف</FormLabel>
-                  <Select
-                    value={form.gradeId}
-                    onChange={(e) => setForm((f) => ({ ...f, gradeId: e.target.value }))}
-                    borderRadius="xl"
-                  >
-                    <option value="">اختر الصف</option>
-                    {grades.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {field(g, "name")}
-                      </option>
-                    ))}
-                  </Select>
-                </FormControl>
-                <FormControl>
-                  <FormLabel>المادة (اختياري — رقم ID)</FormLabel>
-                  <Input
-                    value={form.subjectId}
-                    onChange={(e) => setForm((f) => ({ ...f, subjectId: e.target.value }))}
-                    borderRadius="xl"
-                    placeholder="subjectId"
-                  />
-                </FormControl>
-              </SimpleGrid>
               <FormControl isRequired>
-                <FormLabel>أيام المجموعة</FormLabel>
+                <FormLabel>أيام الحضور</FormLabel>
                 <CheckboxGroup
                   value={form.days}
                   onChange={(days) => setForm((f) => ({ ...f, days }))}
@@ -386,12 +330,24 @@ export default function GroupsPage() {
                 </CheckboxGroup>
               </FormControl>
               <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3}>
+                <FormControl isRequired>
+                  <FormLabel>قيمة الاشتراك</FormLabel>
+                  <NumberInput
+                    value={form.monthly_fee}
+                    min={0}
+                    onChange={(_, n) =>
+                      setForm((f) => ({ ...f, monthly_fee: Number.isNaN(n) ? 0 : n }))
+                    }
+                  >
+                    <NumberInputField borderRadius="xl" />
+                  </NumberInput>
+                </FormControl>
                 <FormControl>
                   <FormLabel>من</FormLabel>
                   <Input
                     type="time"
-                    value={form.startTime}
-                    onChange={(e) => setForm((f) => ({ ...f, startTime: e.target.value }))}
+                    value={form.start_time}
+                    onChange={(e) => setForm((f) => ({ ...f, start_time: e.target.value }))}
                     borderRadius="xl"
                   />
                 </FormControl>
@@ -399,33 +355,27 @@ export default function GroupsPage() {
                   <FormLabel>إلى</FormLabel>
                   <Input
                     type="time"
-                    value={form.endTime}
-                    onChange={(e) => setForm((f) => ({ ...f, endTime: e.target.value }))}
+                    value={form.end_time}
+                    onChange={(e) => setForm((f) => ({ ...f, end_time: e.target.value }))}
                     borderRadius="xl"
                   />
-                </FormControl>
-                <FormControl>
-                  <FormLabel>الرسوم الشهرية</FormLabel>
-                  <NumberInput
-                    value={form.monthlyFee}
-                    min={0}
-                    onChange={(_, n) =>
-                      setForm((f) => ({ ...f, monthlyFee: Number.isNaN(n) ? 0 : n }))
-                    }
-                  >
-                    <NumberInputField borderRadius="xl" />
-                  </NumberInput>
                 </FormControl>
               </SimpleGrid>
               <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
                 <FormControl>
-                  <FormLabel>بداية الدراسة</FormLabel>
-                  <Input
-                    type="date"
-                    value={form.studyStartDate}
-                    onChange={(e) => setForm((f) => ({ ...f, studyStartDate: e.target.value }))}
+                  <FormLabel>الصف (اختياري)</FormLabel>
+                  <Select
+                    placeholder="بدون صف"
+                    value={form.grade_id}
+                    onChange={(e) => setForm((f) => ({ ...f, grade_id: e.target.value }))}
                     borderRadius="xl"
-                  />
+                  >
+                    {grades.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {field(g, "name")}
+                      </option>
+                    ))}
+                  </Select>
                 </FormControl>
                 <FormControl>
                   <FormLabel>الحالة</FormLabel>
@@ -450,18 +400,22 @@ export default function GroupsPage() {
               </FormControl>
             </VStack>
           </ModalBody>
-          <ModalFooter gap={2}>
-            <Button variant="ghost" onClick={onClose} borderRadius="xl">
+          <ModalFooter gap={2} flexDir={{ base: "column-reverse", md: "row" }}>
+            <Button
+              variant="ghost"
+              onClick={onClose}
+              borderRadius="xl"
+              w={{ base: "full", md: "auto" }}
+            >
               إلغاء
             </Button>
-            <Button
-              colorScheme="blue"
+            <PrimaryButton
               onClick={handleSave}
               isLoading={createGroup.isPending || updateGroup.isPending}
-              borderRadius="xl"
+              w={{ base: "full", md: "auto" }}
             >
               حفظ
-            </Button>
+            </PrimaryButton>
           </ModalFooter>
         </ModalContent>
       </Modal>

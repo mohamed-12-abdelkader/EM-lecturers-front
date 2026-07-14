@@ -24,15 +24,7 @@ import {
   AlertTitle,
   AlertDescription,
   Switch,
-  Divider,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
   IconButton,
-  NumberInput,
-  NumberInputField,
   SimpleGrid,
   Badge,
   Container,
@@ -45,10 +37,6 @@ import {
   Image,
   Wrap,
   WrapItem,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
   Checkbox,
   CheckboxGroup,
 } from "@chakra-ui/react";
@@ -58,7 +46,6 @@ import {
   FaLock,
   FaBook,
   FaSave,
-  FaPlus,
   FaTrash,
   FaCloudUploadAlt,
   FaIdCard,
@@ -68,46 +55,13 @@ import { useSearchParams, useLocation } from "react-router-dom";
 import baseUrl from "../../api/baseUrl";
 import { fetchAdminTenantById, patchAdminTenant, patchAdminTenantMultipart } from "../../api/adminTenantsApi";
 import { compressImage, TENANT_MEDIA_COMPRESS } from "../../utils/compressImage";
-import LandingPageBuilder, { BUILDER_THEME_DEFAULTS } from "./LandingPageBuilder";
 
 const SUBDOMAIN_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-
-const emptyHero = () => ({
-  title: "",
-  subtitle: "",
-  description: "",
-  image_url: "",
-  cta_label: "",
-  cta_href: "",
-});
-
-const emptyTheme = () => ({ ...BUILDER_THEME_DEFAULTS });
-
-const emptyAbout = () => ({
-  bio: "",
-  experience: "",
-  qualifications: "",
-  achievements: "",
-});
-
-const emptyStatistics = () => ({
-  students_count: "",
-  courses_count: "",
-  years_experience: "",
-});
-
-const emptyContact = () => ({
-  whatsapp: "",
-  telegram: "",
-  facebook: "",
-  instagram: "",
-});
 
 const emptyMediaFiles = () => ({
   avatar: null,
   favicon: null,
   og_image: null,
-  hero_image: null,
 });
 
 function defaultTenantHeaders() {
@@ -140,95 +94,117 @@ function multipartSuperHeaders(token) {
   };
 }
 
-function parseNum(v) {
-  if (v === "" || v === null || v === undefined) return undefined;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : undefined;
-}
-
-function buildLandingPayload(landing) {
-  const stats = {
-    students_count: parseNum(landing.statistics.students_count),
-    courses_count: parseNum(landing.statistics.courses_count),
-    years_experience: parseNum(landing.statistics.years_experience),
-  };
-  const statistics = Object.values(stats).some((x) => x !== undefined) ? stats : {};
-
-  const services = (landing.services || [])
-    .filter((s) => (s.title || "").trim() || (s.description || "").trim())
-    .map((s) => ({
-      title: (s.title || "").trim(),
-      description: (s.description || "").trim(),
-    }));
-
-  const testimonials = (landing.testimonials || [])
-    .filter((t) => (t.name || "").trim() || (t.text || "").trim())
-    .map((t) => ({
-      name: (t.name || "").trim(),
-      text: (t.text || "").trim(),
-      rating: parseNum(t.rating) ?? 5,
-    }));
-
-  const faq = (landing.faq || [])
-    .filter((f) => (f.question || "").trim() || (f.answer || "").trim())
-    .map((f) => ({
-      question: (f.question || "").trim(),
-      answer: (f.answer || "").trim(),
-    }));
-
-  const hero = {};
-  Object.entries(landing.hero || {}).forEach(([k, v]) => {
-    if (v !== undefined && String(v).trim() !== "") hero[k] = String(v).trim();
-  });
-
-  const theme = {};
-  Object.entries(landing.theme || {}).forEach(([k, v]) => {
-    if (v !== undefined && String(v).trim() !== "") theme[k] = String(v).trim();
-  });
-
-  const about = {};
-  Object.entries(landing.about || {}).forEach(([k, v]) => {
-    if (v !== undefined && String(v).trim() !== "") about[k] = String(v).trim();
-  });
-
-  const contact = {};
-  Object.entries(landing.contact || {}).forEach(([k, v]) => {
-    if (v !== undefined && String(v).trim() !== "") contact[k] = String(v).trim();
-  });
-
-  return {
-    hero: Object.keys(hero).length ? hero : { title: "", subtitle: "" },
-    theme: Object.keys(theme).length ? theme : { primary_color: "#2563eb" },
-    services,
-    about: Object.keys(about).length ? about : {},
-    statistics,
-    testimonials,
-    faq,
-    contact: Object.keys(contact).length ? contact : {},
-  };
-}
-
 function hasAnyUpload(files) {
-  return !!(files.avatar || files.favicon || files.og_image || files.hero_image);
+  return !!(files.avatar || files.favicon || files.og_image);
 }
 
-function mapLandingFromApi(page) {
-  if (!page || typeof page !== "object") return null;
-  const stats = page.statistics || {};
+function emptyOwnerState() {
   return {
-    hero: { ...emptyHero(), ...(page.hero || {}) },
-    theme: { ...emptyTheme(), ...(page.theme || {}) },
-    services: Array.isArray(page.services) ? page.services : [],
-    about: { ...emptyAbout(), ...(page.about || {}) },
-    statistics: {
-      students_count: stats.students_count ?? "",
-      courses_count: stats.courses_count ?? "",
-      years_experience: stats.years_experience ?? "",
-    },
-    testimonials: Array.isArray(page.testimonials) ? page.testimonials : [],
-    faq: Array.isArray(page.faq) ? page.faq : [],
-    contact: { ...emptyContact(), ...(page.contact || {}) },
+    name: "",
+    email: "",
+    password: "",
+    description: "",
+    subject: "",
+    grade_ids: [],
+    facebook_url: "",
+    instagram_url: "",
+    youtube_url: "",
+    tiktok_url: "",
+    whatsapp_number: "",
+    account_status: "active",
   };
+}
+
+function buildOwnerCreatePayload(owner) {
+  const payload = {
+    name: owner.name.trim(),
+    email: owner.email.trim(),
+    password: owner.password,
+  };
+
+  if (owner.description?.trim()) payload.description = owner.description.trim();
+  if (owner.subject?.trim()) payload.subject = owner.subject.trim();
+  if (Array.isArray(owner.grade_ids) && owner.grade_ids.length) {
+    payload.grade_ids = owner.grade_ids;
+  }
+  if (owner.facebook_url?.trim()) payload.facebook_url = owner.facebook_url.trim();
+  if (owner.instagram_url?.trim()) payload.instagram_url = owner.instagram_url.trim();
+  if (owner.youtube_url?.trim()) payload.youtube_url = owner.youtube_url.trim();
+  if (owner.tiktok_url?.trim()) payload.tiktok_url = owner.tiktok_url.trim();
+  if (owner.whatsapp_number?.trim()) {
+    payload.whatsapp_number = owner.whatsapp_number.trim().replace(/^\+/, "");
+  }
+
+  return payload;
+}
+
+function appendOwnerCreateMultipart(fd, owner) {
+  fd.append("owner_name", owner.name.trim());
+  fd.append("owner_email", owner.email.trim());
+  fd.append("owner_password", owner.password);
+  if (owner.description?.trim()) fd.append("owner_description", owner.description.trim());
+  if (owner.subject?.trim()) fd.append("owner_subject", owner.subject.trim());
+  if (Array.isArray(owner.grade_ids) && owner.grade_ids.length) {
+    fd.append("owner_grade_ids", owner.grade_ids.join(","));
+  }
+  if (owner.facebook_url?.trim()) fd.append("owner_facebook_url", owner.facebook_url.trim());
+  if (owner.instagram_url?.trim()) fd.append("owner_instagram_url", owner.instagram_url.trim());
+  if (owner.youtube_url?.trim()) fd.append("owner_youtube_url", owner.youtube_url.trim());
+  if (owner.tiktok_url?.trim()) fd.append("owner_tiktok_url", owner.tiktok_url.trim());
+  if (owner.whatsapp_number?.trim()) {
+    fd.append(
+      "owner_whatsapp_number",
+      owner.whatsapp_number.trim().replace(/^\+/, ""),
+    );
+  }
+}
+
+function buildCreateTenantJsonBody({ tenant, sub, settings, ownerEnabled, owner }) {
+  const body = {
+    subdomain: sub,
+    display_name: tenant.display_name.trim(),
+    specialty: tenant.specialty.trim() || null,
+    bio: tenant.bio.trim() || null,
+    avatar_url: tenant.avatar_url.trim() || null,
+    is_active: tenant.is_active !== false,
+    seo_title: tenant.seo_title.trim() || null,
+    seo_meta_description: tenant.seo_meta_description.trim() || null,
+    favicon_url: tenant.favicon_url.trim() || null,
+    og_image_url: tenant.og_image_url.trim() || null,
+    settings: settings && typeof settings === "object" ? settings : {},
+    landing: {},
+  };
+
+  if (ownerEnabled) {
+    body.owner = buildOwnerCreatePayload(owner);
+  }
+
+  return body;
+}
+
+function appendCreateTenantMultipart(fd, { tenant, sub, settings, ownerEnabled, owner, mediaFiles }) {
+  fd.append("subdomain", sub);
+  fd.append("display_name", tenant.display_name.trim());
+  if (tenant.specialty.trim()) fd.append("specialty", tenant.specialty.trim());
+  if (tenant.bio.trim()) fd.append("bio", tenant.bio.trim());
+  if (tenant.avatar_url.trim()) fd.append("avatar_url", tenant.avatar_url.trim());
+  if (tenant.favicon_url.trim()) fd.append("favicon_url", tenant.favicon_url.trim());
+  if (tenant.og_image_url.trim()) fd.append("og_image_url", tenant.og_image_url.trim());
+  if (tenant.seo_title.trim()) fd.append("seo_title", tenant.seo_title.trim());
+  if (tenant.seo_meta_description.trim()) {
+    fd.append("seo_meta_description", tenant.seo_meta_description.trim());
+  }
+  fd.append("is_active", tenant.is_active !== false ? "true" : "false");
+  fd.append("landing", JSON.stringify({}));
+  fd.append("settings", JSON.stringify(settings && typeof settings === "object" ? settings : {}));
+
+  if (mediaFiles.avatar) fd.append("avatar", mediaFiles.avatar);
+  if (mediaFiles.favicon) fd.append("favicon", mediaFiles.favicon);
+  if (mediaFiles.og_image) fd.append("og_image", mediaFiles.og_image);
+
+  if (ownerEnabled) {
+    appendOwnerCreateMultipart(fd, owner);
+  }
 }
 
 function buildOwnerPatch(owner, ownerEnabled) {
@@ -240,8 +216,13 @@ function buildOwnerPatch(owner, ownerEnabled) {
   if (owner.password) patch.password = owner.password;
   if (owner.description?.trim()) patch.description = owner.description.trim();
   if (owner.subject?.trim()) patch.subject = owner.subject.trim();
-  if (owner.phone?.trim()) patch.phone = owner.phone.trim();
   if (owner.facebook_url?.trim()) patch.facebook_url = owner.facebook_url.trim();
+  if (owner.instagram_url?.trim()) patch.instagram_url = owner.instagram_url.trim();
+  if (owner.youtube_url?.trim()) patch.youtube_url = owner.youtube_url.trim();
+  if (owner.tiktok_url?.trim()) patch.tiktok_url = owner.tiktok_url.trim();
+  if (owner.whatsapp_number?.trim()) {
+    patch.whatsapp_number = owner.whatsapp_number.trim().replace(/^\+/, "");
+  }
   if (owner.account_status) patch.account_status = owner.account_status;
   if (Array.isArray(owner.grade_ids) && owner.grade_ids.length) {
     patch.grade_ids = owner.grade_ids;
@@ -250,7 +231,7 @@ function buildOwnerPatch(owner, ownerEnabled) {
   return Object.keys(patch).length ? patch : undefined;
 }
 
-function appendAdminTenantEditFields(fd, { tenant, sub, landingPayload, settings, ownerPatch }) {
+function appendAdminTenantEditFields(fd, { tenant, sub, settings, ownerPatch }) {
   if (sub) fd.append("subdomain", sub);
   if (tenant.display_name?.trim()) fd.append("display_name", tenant.display_name.trim());
   if (tenant.specialty?.trim()) fd.append("specialty", tenant.specialty.trim());
@@ -263,8 +244,6 @@ function appendAdminTenantEditFields(fd, { tenant, sub, landingPayload, settings
   if (tenant.avatar_url?.trim()) fd.append("avatar_url", tenant.avatar_url.trim());
   if (tenant.favicon_url?.trim()) fd.append("favicon_url", tenant.favicon_url.trim());
   if (tenant.og_image_url?.trim()) fd.append("og_image_url", tenant.og_image_url.trim());
-  fd.append("landing", JSON.stringify(landingPayload));
-  fd.append("merge_landing", "true");
   if (settings !== undefined) {
     fd.append("settings", JSON.stringify(settings));
     fd.append("merge_settings", "true");
@@ -272,10 +251,8 @@ function appendAdminTenantEditFields(fd, { tenant, sub, landingPayload, settings
   if (ownerPatch) fd.append("owner", JSON.stringify(ownerPatch));
 }
 
-function buildAdminTenantEditJson({ tenant, sub, landingPayload, settings, ownerPatch }) {
+function buildAdminTenantEditJson({ tenant, sub, settings, ownerPatch }) {
   const body = {
-    landing: landingPayload,
-    merge_landing: true,
     merge_settings: true,
     is_active: tenant.is_active,
   };
@@ -450,30 +427,9 @@ const AddTeacher = () => {
   });
 
   const [ownerEnabled, setOwnerEnabled] = useState(true);
-  const [owner, setOwner] = useState({
-    name: "",
-    email: "",
-    password: "",
-    description: "",
-    subject: "",
-    phone: "",
-    facebook_url: "",
-    account_status: "active",
-    grade_ids: [],
-  });
+  const [owner, setOwner] = useState(() => emptyOwnerState());
   const [availableGrades, setAvailableGrades] = useState([]);
   const [gradesLoading, setGradesLoading] = useState(false);
-
-  const [landing, setLanding] = useState({
-    hero: emptyHero(),
-    theme: emptyTheme(),
-    services: [],
-    about: emptyAbout(),
-    statistics: emptyStatistics(),
-    testimonials: [],
-    faq: [],
-    contact: emptyContact(),
-  });
 
   const [settingsJson, setSettingsJson] = useState("");
   const [mediaFiles, setMediaFiles] = useState(emptyMediaFiles);
@@ -482,7 +438,6 @@ const AddTeacher = () => {
     avatar: null,
     favicon: null,
     og_image: null,
-    hero_image: null,
   });
   const [uploadKey, setUploadKey] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -567,100 +522,6 @@ const AddTeacher = () => {
     };
   }, []);
 
-  const setHero = (field, value) => {
-    setLanding((prev) => ({
-      ...prev,
-      hero: { ...prev.hero, [field]: value },
-    }));
-  };
-
-  const setAboutField = (field, value) => {
-    setLanding((prev) => ({
-      ...prev,
-      about: { ...prev.about, [field]: value },
-    }));
-  };
-
-  const setStatField = (field, value) => {
-    setLanding((prev) => ({
-      ...prev,
-      statistics: { ...prev.statistics, [field]: value },
-    }));
-  };
-
-  const setContactField = (field, value) => {
-    setLanding((prev) => ({
-      ...prev,
-      contact: { ...prev.contact, [field]: value },
-    }));
-  };
-
-  const addService = () => {
-    setLanding((prev) => ({
-      ...prev,
-      services: [...prev.services, { title: "", description: "" }],
-    }));
-  };
-
-  const updateService = (index, field, value) => {
-    setLanding((prev) => {
-      const next = [...prev.services];
-      next[index] = { ...next[index], [field]: value };
-      return { ...prev, services: next };
-    });
-  };
-
-  const removeService = (index) => {
-    setLanding((prev) => ({
-      ...prev,
-      services: prev.services.filter((_, i) => i !== index),
-    }));
-  };
-
-  const addTestimonial = () => {
-    setLanding((prev) => ({
-      ...prev,
-      testimonials: [...prev.testimonials, { name: "", text: "", rating: 5 }],
-    }));
-  };
-
-  const updateTestimonial = (index, field, value) => {
-    setLanding((prev) => {
-      const next = [...prev.testimonials];
-      next[index] = { ...next[index], [field]: value };
-      return { ...prev, testimonials: next };
-    });
-  };
-
-  const removeTestimonial = (index) => {
-    setLanding((prev) => ({
-      ...prev,
-      testimonials: prev.testimonials.filter((_, i) => i !== index),
-    }));
-  };
-
-  const addFaq = () => {
-    setLanding((prev) => ({
-      ...prev,
-      faq: [...prev.faq, { question: "", answer: "" }],
-    }));
-  };
-
-  const updateFaq = (index, field, value) => {
-    setLanding((prev) => {
-      const next = [...prev.faq];
-      next[index] = { ...next[index], [field]: value };
-      return { ...prev, faq: next };
-    });
-  };
-
-  const removeFaq = (index) => {
-    setLanding((prev) => ({
-      ...prev,
-      faq: prev.faq.filter((_, i) => i !== index),
-    }));
-  };
-
   const resetForm = () => {
     setTenant({
       subdomain: "",
@@ -674,35 +535,15 @@ const AddTeacher = () => {
       favicon_url: "",
       og_image_url: "",
     });
-    setOwner({
-      name: "",
-      email: "",
-      password: "",
-      description: "",
-      subject: "",
-      phone: "",
-      facebook_url: "",
-      account_status: "active",
-      grade_ids: [],
-    });
+    setOwner(emptyOwnerState());
     setOwnerEnabled(true);
-    setLanding({
-      hero: emptyHero(),
-      theme: emptyTheme(),
-      services: [],
-      about: emptyAbout(),
-      statistics: emptyStatistics(),
-      testimonials: [],
-      faq: [],
-      contact: emptyContact(),
-    });
     setSettingsJson("");
     setMediaFiles(emptyMediaFiles());
-    ["avatar", "favicon", "og_image", "hero_image"].forEach((k) => {
+    ["avatar", "favicon", "og_image"].forEach((k) => {
       const u = mediaPreview[k];
       if (u && u.startsWith("blob:")) URL.revokeObjectURL(u);
     });
-    setMediaPreview({ avatar: null, favicon: null, og_image: null, hero_image: null });
+    setMediaPreview({ avatar: null, favicon: null, og_image: null });
     setUploadKey((k) => k + 1);
     setTargetTenantId("");
   };
@@ -737,11 +578,6 @@ const AddTeacher = () => {
       setSettingsJson(JSON.stringify(tenantData.settings, null, 2));
     }
 
-    const mappedLanding = mapLandingFromApi(tenantData.landing);
-    if (mappedLanding) {
-      setLanding(mappedLanding);
-    }
-
     if (tenantData.owner) {
       setOwnerEnabled(true);
       setOwner({
@@ -750,22 +586,24 @@ const AddTeacher = () => {
         password: "",
         description: tenantData.owner.description || "",
         subject: tenantData.owner.subject || "",
-        phone: tenantData.owner.phone || "",
-        facebook_url: tenantData.owner.facebook_url || "",
-        account_status: tenantData.owner.account_status || "active",
         grade_ids: Array.isArray(tenantData.owner.grade_ids)
           ? tenantData.owner.grade_ids
           : [],
+        facebook_url: tenantData.owner.facebook_url || "",
+        instagram_url: tenantData.owner.instagram_url || "",
+        youtube_url: tenantData.owner.youtube_url || "",
+        tiktok_url: tenantData.owner.tiktok_url || "",
+        whatsapp_number:
+          tenantData.owner.whatsapp_number || tenantData.owner.phone || "",
+        account_status: tenantData.owner.account_status || "active",
       });
     }
 
-    const heroImageUrl = tenantData.landing?.hero?.image_url || null;
     setMediaPreview((prev) => ({
       ...prev,
       avatar: tenantData.avatar_url || prev.avatar,
       favicon: tenantData.favicon_url || prev.favicon,
       og_image: tenantData.og_image_url || prev.og_image,
-      hero_image: heroImageUrl || prev.hero_image,
     }));
   }, []);
 
@@ -966,7 +804,6 @@ const AddTeacher = () => {
       return;
     }
 
-    const landingPayload = buildLandingPayload(landing);
     const ownerPatch = buildOwnerPatch(owner, ownerEnabled);
     const useMultipart = hasAnyUpload(mediaFiles);
 
@@ -980,20 +817,17 @@ const AddTeacher = () => {
           appendAdminTenantEditFields(fd, {
             tenant,
             sub,
-            landingPayload,
             settings,
             ownerPatch,
           });
           if (uploadFiles.avatar) fd.append("avatar", uploadFiles.avatar);
           if (uploadFiles.favicon) fd.append("favicon", uploadFiles.favicon);
           if (uploadFiles.og_image) fd.append("og_image", uploadFiles.og_image);
-          if (uploadFiles.hero_image) fd.append("hero_image", uploadFiles.hero_image);
           response = await patchAdminTenantMultipart(tenantId, fd, token);
         } else {
           const body = buildAdminTenantEditJson({
             tenant,
             sub,
-            landingPayload,
             settings,
             ownerPatch,
           });
@@ -1001,76 +835,28 @@ const AddTeacher = () => {
         }
       } else if (useMultipart) {
         const fd = new FormData();
-        if (sub) fd.append("subdomain", sub);
-        if (tenant.display_name.trim()) fd.append("display_name", tenant.display_name.trim());
-        if (tenant.specialty.trim()) fd.append("specialty", tenant.specialty.trim());
-        if (tenant.bio.trim()) fd.append("bio", tenant.bio.trim());
-        if (tenant.avatar_url.trim()) fd.append("avatar_url", tenant.avatar_url.trim());
-        if (tenant.favicon_url.trim()) fd.append("favicon_url", tenant.favicon_url.trim());
-        if (tenant.og_image_url.trim()) fd.append("og_image_url", tenant.og_image_url.trim());
-        if (tenant.seo_title.trim()) fd.append("seo_title", tenant.seo_title.trim());
-        if (tenant.seo_meta_description.trim()) {
-          fd.append("seo_meta_description", tenant.seo_meta_description.trim());
-        }
-        if (tenant.is_active === false || !isEditMode) {
-          fd.append("is_active", tenant.is_active ? "true" : "false");
-        }
-
-        if (mediaFiles.avatar) fd.append("avatar", uploadFiles.avatar);
-        if (mediaFiles.favicon) fd.append("favicon", uploadFiles.favicon);
-        if (mediaFiles.og_image) fd.append("og_image", uploadFiles.og_image);
-        if (mediaFiles.hero_image) fd.append("hero_image", uploadFiles.hero_image);
-
-        fd.append("landing", JSON.stringify(landingPayload));
-        if (settings !== undefined) fd.append("settings", JSON.stringify(settings));
-
-        if (ownerEnabled) {
-          if (owner.name.trim()) fd.append("owner_name", owner.name.trim());
-          if (owner.email.trim()) fd.append("owner_email", owner.email.trim());
-          if (owner.password) fd.append("owner_password", owner.password);
-          if (owner.description.trim()) fd.append("owner_description", owner.description.trim());
-          if (owner.subject.trim()) fd.append("owner_subject", owner.subject.trim());
-          if (Array.isArray(owner.grade_ids) && owner.grade_ids.length) {
-            fd.append("owner_grade_ids", owner.grade_ids.join(","));
-          }
-        }
-
-        response =
-          await baseUrl.post("/api/super/tenants", fd, {
-                headers: multipartSuperHeaders(token),
-              });
+        appendCreateTenantMultipart(fd, {
+          tenant,
+          sub,
+          settings,
+          ownerEnabled,
+          owner,
+          mediaFiles: uploadFiles,
+        });
+        response = await baseUrl.post("/api/super/tenants", fd, {
+          headers: multipartSuperHeaders(token),
+        });
       } else {
-        const body = { landing: landingPayload };
-        if (sub) body.subdomain = sub;
-        if (tenant.display_name.trim()) body.display_name = tenant.display_name.trim();
-        if (tenant.specialty.trim()) body.specialty = tenant.specialty.trim();
-        if (tenant.bio.trim()) body.bio = tenant.bio.trim();
-        if (tenant.avatar_url.trim()) body.avatar_url = tenant.avatar_url.trim();
-        if (tenant.is_active === false) body.is_active = false;
-        if (tenant.seo_title.trim()) body.seo_title = tenant.seo_title.trim();
-        if (tenant.seo_meta_description.trim()) {
-          body.seo_meta_description = tenant.seo_meta_description.trim();
-        }
-        if (tenant.favicon_url.trim()) body.favicon_url = tenant.favicon_url.trim();
-        if (tenant.og_image_url.trim()) body.og_image_url = tenant.og_image_url.trim();
-
-        if (ownerEnabled) {
-          body.owner = {};
-          if (owner.name.trim()) body.owner.name = owner.name.trim();
-          if (owner.email.trim()) body.owner.email = owner.email.trim();
-          if (owner.password) body.owner.password = owner.password;
-          if (owner.description.trim()) body.owner.description = owner.description.trim();
-          if (owner.subject.trim()) body.owner.subject = owner.subject.trim();
-          if (Array.isArray(owner.grade_ids) && owner.grade_ids.length) {
-            body.owner.grade_ids = owner.grade_ids;
-          }
-          if (!Object.keys(body.owner).length) delete body.owner;
-        }
-        if (settings !== undefined) body.settings = settings;
-
+        const body = buildCreateTenantJsonBody({
+          tenant,
+          sub,
+          settings,
+          ownerEnabled,
+          owner,
+        });
         response = await baseUrl.post("/api/super/tenants", body, {
-                headers: jsonSuperHeaders(token),
-              });
+          headers: jsonSuperHeaders(token),
+        });
       }
 
       const t = response.data?.data ?? response.data?.tenant;
@@ -1392,17 +1178,6 @@ const AddTeacher = () => {
                     mutedColor={mutedColor}
                     uploadKey={uploadKey}
                   />
-                  <FileDropSlot
-                    label="رفع صورة الواجهة البارزة"
-                    hint="صورة الهيرو — PNG شفاف حتى 4MB بجودة عالية."
-                    fieldKey="hero_image"
-                    previewUrl={mediaPreview.hero_image}
-                    onFile={(f) => setMediaFile("hero_image", f)}
-                    onClear={() => clearMediaFile("hero_image")}
-                    borderColor={borderColor}
-                    mutedColor={mutedColor}
-                    uploadKey={uploadKey}
-                  />
                 </SimpleGrid>
               </SectionCard>
 
@@ -1457,12 +1232,12 @@ const AddTeacher = () => {
               <SectionCard
                 step="٣ · المالك"
                 title="حساب مالك المنصة"
-                subtitle="اختياري — مستخدم «مدرّس» مرتبط بهذه المنصة. عند رفع ملفات يُرسل الاسم والبريد وكلمة المرور مع النموذج متعدد الأجزاء."
+                subtitle="اختياري — لكن مطلوب لإنشاء منصة بمدرس. الإلزامي داخل المالك: الاسم، البريد، وكلمة المرور (6 أحرف على الأقل)."
                 accent="green"
               >
                 <HStack justify="space-between" mb={5} flexWrap="wrap" gap={3}>
                   <Text fontSize="sm" color={mutedColor}>
-                    تعطيل الخيار ينشئ منصة بدون حساب مالك.
+                    تعطيل الخيار ينشئ منصة بدون حساب مالك. مع الملفات تُرسل حقول owner_* مسطّحة.
                   </Text>
                   <Switch
                     isChecked={ownerEnabled}
@@ -1511,7 +1286,7 @@ const AddTeacher = () => {
                       <Input
                         {...inputProps}
                         type="password"
-                        placeholder={formMode === "edit" ? "اتركه فارغاً إن لم تُرد تغييره" : ""}
+                        placeholder={formMode === "edit" ? "اتركه فارغاً إن لم تُرد تغييره" : "6 أحرف على الأقل"}
                         value={owner.password}
                         onChange={(e) => setOwnerField("password", e.target.value)}
                       />
@@ -1531,19 +1306,19 @@ const AddTeacher = () => {
                     </FormControl>
                     <FormControl>
                       <FormLabel fontWeight="semibold" color={textColor}>
-                        رقم الهاتف
+                        واتساب (whatsapp_number)
                       </FormLabel>
                       <Input
                         {...inputProps}
                         dir="ltr"
-                        value={owner.phone}
-                        onChange={(e) => setOwnerField("phone", e.target.value)}
-                        placeholder="+201234567890"
+                        value={owner.whatsapp_number}
+                        onChange={(e) => setOwnerField("whatsapp_number", e.target.value)}
+                        placeholder="201012345678"
                       />
                     </FormControl>
                     <FormControl>
                       <FormLabel fontWeight="semibold" color={textColor}>
-                        رابط فيسبوك
+                        فيسبوك
                       </FormLabel>
                       <Input
                         {...inputProps}
@@ -1551,6 +1326,42 @@ const AddTeacher = () => {
                         value={owner.facebook_url}
                         onChange={(e) => setOwnerField("facebook_url", e.target.value)}
                         placeholder="https://facebook.com/..."
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel fontWeight="semibold" color={textColor}>
+                        إنستغرام
+                      </FormLabel>
+                      <Input
+                        {...inputProps}
+                        dir="ltr"
+                        value={owner.instagram_url}
+                        onChange={(e) => setOwnerField("instagram_url", e.target.value)}
+                        placeholder="https://instagram.com/..."
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel fontWeight="semibold" color={textColor}>
+                        يوتيوب
+                      </FormLabel>
+                      <Input
+                        {...inputProps}
+                        dir="ltr"
+                        value={owner.youtube_url}
+                        onChange={(e) => setOwnerField("youtube_url", e.target.value)}
+                        placeholder="https://youtube.com/@..."
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel fontWeight="semibold" color={textColor}>
+                        تيك توك
+                      </FormLabel>
+                      <Input
+                        {...inputProps}
+                        dir="ltr"
+                        value={owner.tiktok_url}
+                        onChange={(e) => setOwnerField("tiktok_url", e.target.value)}
+                        placeholder="https://tiktok.com/@..."
                       />
                     </FormControl>
                     {formMode === "edit" && (
@@ -1622,259 +1433,8 @@ const AddTeacher = () => {
                 ) : null}
               </SectionCard>
 
-                            <SectionCard
-                step="٤ · اللاندينج"
-                title="محرّك صفحة الهبوط (Landing Builder)"
-                subtitle="تخصيص هوية بصرية كاملة مع معاينة حية — تُحفظ ضمن كائن landing في الطلب."
-                accent="cyan"
-              >
-                <LandingPageBuilder
-                  landing={landing}
-                  setLanding={setLanding}
-                  setHero={setHero}
-                  heroImageLocked={!!mediaFiles.hero_image}
-                  subdomainDraft={tenant.subdomain}
-                  toast={toast}
-                />
-                <Divider my={10} borderColor={borderColor} />
-                <Heading size="sm" fontWeight="800" mb={4} color={textColor}>
-                  محتوى إضافي للصفحة
-                </Heading>
-                <Tabs colorScheme="blue" variant="soft-rounded">
-                  <TabList flexWrap="wrap" gap={2} mb={6}>
-                    <Tab fontWeight="600">الخدمات</Tab>
-                    <Tab fontWeight="600">عن المدرس</Tab>
-                    <Tab fontWeight="600">الإحصائيات</Tab>
-                    <Tab fontWeight="600">آراء الطلاب</Tab>
-                    <Tab fontWeight="600">الأسئلة الشائعة</Tab>
-                    <Tab fontWeight="600">التواصل</Tab>
-                  </TabList>
-                  <TabPanels>
-                    <TabPanel px={0}>
-                      <VStack align="stretch" spacing={4}>
-                        {landing.services.map((s, i) => (
-                          <Card key={i} variant="outline" borderRadius="xl" borderColor={borderColor}>
-                            <CardBody>
-                              <HStack justify="flex-end" mb={2}>
-                                <IconButton
-                                  aria-label="حذف"
-                                  icon={<FaTrash />}
-                                  size="sm"
-                                  colorScheme="red"
-                                  variant="ghost"
-                                  onClick={() => removeService(i)}
-                                />
-                              </HStack>
-                              <FormControl>
-                                <FormLabel fontSize="sm">عنوان الخدمة</FormLabel>
-                                <Input
-                                  {...inputProps}
-                                  size="md"
-                                  value={s.title}
-                                  onChange={(e) => updateService(i, "title", e.target.value)}
-                                />
-                              </FormControl>
-                              <FormControl mt={3}>
-                                <FormLabel fontSize="sm">وصف الخدمة</FormLabel>
-                                <Textarea
-                                  {...inputProps}
-                                  size="md"
-                                  value={s.description}
-                                  onChange={(e) =>
-                                    updateService(i, "description", e.target.value)
-                                  }
-                                />
-                              </FormControl>
-                            </CardBody>
-                          </Card>
-                        ))}
-                        <Button
-                          leftIcon={<FaPlus />}
-                          variant="outline"
-                          borderRadius="xl"
-                          onClick={addService}
-                        >
-                          إضافة خدمة
-                        </Button>
-                      </VStack>
-                    </TabPanel>
-                    <TabPanel px={0}>
-                      <VStack align="stretch" spacing={4}>
-                        {[
-                          ["bio", "نبذة"],
-                          ["experience", "الخبرات"],
-                          ["qualifications", "المؤهلات"],
-                          ["achievements", "الإنجازات"],
-                        ].map(([key, label]) => (
-                          <FormControl key={key}>
-                            <FormLabel fontSize="sm" fontWeight="medium" color={textColor}>
-                              {label}
-                            </FormLabel>
-                            <Textarea
-                              {...inputProps}
-                              size="md"
-                              value={landing.about[key] || ""}
-                              onChange={(e) => setAboutField(key, e.target.value)}
-                              rows={key === "bio" ? 4 : 2}
-                            />
-                          </FormControl>
-                        ))}
-                      </VStack>
-                    </TabPanel>
-                    <TabPanel px={0}>
-                      <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
-                        {[
-                          ["students_count", "عدد الطلاب"],
-                          ["courses_count", "عدد الدورات"],
-                          ["years_experience", "سنوات الخبرة"],
-                        ].map(([key, shortLabel]) => (
-                          <FormControl key={key}>
-                            <FormLabel fontSize="sm">{shortLabel}</FormLabel>
-                            <NumberInput
-                              value={landing.statistics[key]}
-                              onChange={(_, v) => setStatField(key, v === "" ? "" : v)}
-                              min={0}
-                            >
-                              <NumberInputField {...inputProps} size="md" />
-                            </NumberInput>
-                          </FormControl>
-                        ))}
-                      </SimpleGrid>
-                    </TabPanel>
-                    <TabPanel px={0}>
-                      <VStack align="stretch" spacing={4}>
-                        {landing.testimonials.map((t, i) => (
-                          <Card key={i} variant="outline" borderRadius="xl" borderColor={borderColor}>
-                            <CardBody>
-                              <HStack justify="flex-end" mb={2}>
-                                <IconButton
-                                  aria-label="حذف"
-                                  icon={<FaTrash />}
-                                  size="sm"
-                                  colorScheme="red"
-                                  variant="ghost"
-                                  onClick={() => removeTestimonial(i)}
-                                />
-                              </HStack>
-                              <FormControl>
-                                <FormLabel fontSize="sm">اسم صاحب الرأي</FormLabel>
-                                <Input
-                                  {...inputProps}
-                                  size="md"
-                                  value={t.name}
-                                  onChange={(e) =>
-                                    updateTestimonial(i, "name", e.target.value)
-                                  }
-                                />
-                              </FormControl>
-                              <FormControl mt={3}>
-                                <FormLabel fontSize="sm">نص الرأي</FormLabel>
-                                <Textarea
-                                  {...inputProps}
-                                  size="md"
-                                  value={t.text}
-                                  onChange={(e) =>
-                                    updateTestimonial(i, "text", e.target.value)
-                                  }
-                                />
-                              </FormControl>
-                              <FormControl mt={3}>
-                                <FormLabel fontSize="sm">التقييم (من 1 إلى 5)</FormLabel>
-                                <NumberInput
-                                  value={t.rating}
-                                  onChange={(_, v) =>
-                                    updateTestimonial(i, "rating", v === "" ? 5 : v)
-                                  }
-                                  min={1}
-                                  max={5}
-                                >
-                                  <NumberInputField {...inputProps} size="md" />
-                                </NumberInput>
-                              </FormControl>
-                            </CardBody>
-                          </Card>
-                        ))}
-                        <Button
-                          leftIcon={<FaPlus />}
-                          variant="outline"
-                          borderRadius="xl"
-                          onClick={addTestimonial}
-                        >
-                          إضافة رأي
-                        </Button>
-                      </VStack>
-                    </TabPanel>
-                    <TabPanel px={0}>
-                      <VStack align="stretch" spacing={4}>
-                        {landing.faq.map((f, i) => (
-                          <Card key={i} variant="outline" borderRadius="xl" borderColor={borderColor}>
-                            <CardBody>
-                              <HStack justify="flex-end" mb={2}>
-                                <IconButton
-                                  aria-label="حذف"
-                                  icon={<FaTrash />}
-                                  size="sm"
-                                  colorScheme="red"
-                                  variant="ghost"
-                                  onClick={() => removeFaq(i)}
-                                />
-                              </HStack>
-                              <FormControl>
-                                <FormLabel fontSize="sm">السؤال</FormLabel>
-                                <Input
-                                  {...inputProps}
-                                  size="md"
-                                  value={f.question}
-                                  onChange={(e) => updateFaq(i, "question", e.target.value)}
-                                />
-                              </FormControl>
-                              <FormControl mt={3}>
-                                <FormLabel fontSize="sm">الإجابة</FormLabel>
-                                <Textarea
-                                  {...inputProps}
-                                  size="md"
-                                  value={f.answer}
-                                  onChange={(e) => updateFaq(i, "answer", e.target.value)}
-                                />
-                              </FormControl>
-                            </CardBody>
-                          </Card>
-                        ))}
-                        <Button leftIcon={<FaPlus />} variant="outline" borderRadius="xl" onClick={addFaq}>
-                          إضافة سؤال
-                        </Button>
-                      </VStack>
-                    </TabPanel>
-                    <TabPanel px={0}>
-                      <VStack align="stretch" spacing={4}>
-                        {[
-                          ["whatsapp", "رابط واتساب"],
-                          ["telegram", "رابط تيليجرام"],
-                          ["facebook", "رابط فيسبوك"],
-                          ["instagram", "رابط إنستغرام"],
-                        ].map(([key, label]) => (
-                          <FormControl key={key}>
-                            <FormLabel fontSize="sm" fontWeight="medium" color={textColor}>
-                              {label}
-                            </FormLabel>
-                            <Input
-                              {...inputProps}
-                              size="md"
-                              dir="ltr"
-                              placeholder="الصق الرابط الكامل (https://…)"
-                              value={landing.contact[key] || ""}
-                              onChange={(e) => setContactField(key, e.target.value)}
-                            />
-                          </FormControl>
-                        ))}
-                      </VStack>
-                    </TabPanel>
-                  </TabPanels>
-                </Tabs>
-              </SectionCard>
-
-<SectionCard
-                step="٥ · إعدادات"
+              <SectionCard
+                step="٤ · إعدادات"
                 title="إعدادات المنصة الإضافية"
                 subtitle="اختياري — كائن بصيغة JSON يُخزَّن مع إعدادات المستأجر."
                 accent="gray"

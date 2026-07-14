@@ -45,8 +45,10 @@ const NavLinkItem = ({ to, Icon: LinkIcon, label, onClick, isSidebarOpen }) => {
   const activeColor = useColorModeValue("blue.700", "blue.200");
   const hoverBg = useColorModeValue("gray.50", "whiteAlpha.50");
   const textColor = useColorModeValue("gray.600", "gray.300");
+  const hoverTextColor = useColorModeValue("gray.800", "white");
   const iconWrapIdle = useColorModeValue("gray.100", "whiteAlpha.100");
   const iconWrapActive = useColorModeValue("blue.500", "blue.400");
+  const iconIdleColor = useColorModeValue("blue.500", "blue.300");
   const accentBar = useColorModeValue("blue.500", "blue.300");
 
   const content = (
@@ -62,7 +64,7 @@ const NavLinkItem = ({ to, Icon: LinkIcon, label, onClick, isSidebarOpen }) => {
       overflow="hidden"
       _hover={{
         bg: isActive ? activeBg : hoverBg,
-        color: isActive ? activeColor : useColorModeValue("gray.800", "white"),
+        color: isActive ? activeColor : hoverTextColor,
       }}
       transition="all 0.2s ease"
       w="full"
@@ -91,7 +93,7 @@ const NavLinkItem = ({ to, Icon: LinkIcon, label, onClick, isSidebarOpen }) => {
         justify="center"
         borderRadius="lg"
         bg={isActive ? iconWrapActive : iconWrapIdle}
-        color={isActive ? "white" : useColorModeValue("blue.500", "blue.300")}
+        color={isActive ? "white" : iconIdleColor}
         transition="all 0.2s ease"
         _groupHover={{
           transform: isSidebarOpen ? "scale(1.04)" : "none",

@@ -50,8 +50,6 @@ import {
 } from "../../api/scientificChatbotApi";
 import TeacherStudentChatsPanel from "../../components/scientificChat/TeacherStudentChatsPanel";
 
-const MAX_FILE_SIZE_MB = 10;
-
 const ScientificTeacherFilesPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") === "chats" ? 1 : 0;
@@ -120,15 +118,6 @@ const ScientificTeacherFilesPage = () => {
       toast({
         title: "نوع ملف غير مدعوم",
         description: "المسموح: .txt أو .md أو .pdf",
-        status: "warning",
-        isClosable: true,
-      });
-      return;
-    }
-    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-      toast({
-        title: "حجم الملف كبير",
-        description: `الحد الأقصى ${MAX_FILE_SIZE_MB} ميجابايت`,
         status: "warning",
         isClosable: true,
       });

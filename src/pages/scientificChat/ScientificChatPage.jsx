@@ -36,9 +36,11 @@ const ScientificChatPage = () => {
 
   const enrolledCourses = useMemo(() => {
     const list = [];
-    (myTeachers || []).forEach((t) => {
+    const teachersRaw = myTeachers?.teachers ?? myTeachers;
+    const teachersList = Array.isArray(teachersRaw) ? teachersRaw : [];
+    teachersList.forEach((t) => {
       const teacherId = t?.teacher_id ?? t?.id;
-      (t?.courses || []).forEach((c) => {
+      (Array.isArray(t?.courses) ? t.courses : []).forEach((c) => {
         if (c?.is_enrolled || c?.enrolled) {
           list.push({
             courseId: c.id,

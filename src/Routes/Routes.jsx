@@ -65,7 +65,6 @@ import StudentDetailsPage from "../pages/centerMgmt/StudentDetailsPage";
 import AttendancePage from "../pages/centerMgmt/AttendancePage";
 import SubscriptionsPage from "../pages/centerMgmt/SubscriptionsPage";
 import PaymentsPage from "../pages/centerMgmt/PaymentsPage";
-import FinancePage from "../pages/centerMgmt/FinancePage";
 
 // Exam Components
 import Exam from "../pages/exam/Exam";
@@ -90,6 +89,7 @@ import SubjectPage from "../pages/Question Bank/SubjectPage";
 import QuestionsPage from "../pages/Question Bank/QuestionsPage";
 import QuestionBankDashboard from "../pages/Question Bank/QuestionBankDashboard";
 import QuestionLibraryPage from "../pages/Question Bank/QuestionLibraryPage";
+import QuestionLibraryLessonPage from "../pages/Question Bank/QuestionLibraryLessonPage";
 import Lesson from "../pages/Question Bank/Lesson";
 import TeacherSubject from "../pages/Question Bank/TeacherSubject";
 
@@ -420,6 +420,10 @@ const AppRouter = () => {
           <Route path="question-bank-dashboard" element={<QuestionBankDashboard />} />
           <Route path="dashboard" element={<QuestionBankDashboard />} />
           <Route path="QuestionLibraryPage" element={<QuestionLibraryPage />} />
+          <Route
+            path="QuestionLibraryPage/lesson/:lessonId"
+            element={<QuestionLibraryLessonPage />}
+          />
 
           {/* Exams */}
           <Route path="Platform_exams" element={<PlatformExams />} />
@@ -506,7 +510,6 @@ const AppRouter = () => {
             <Route path="attendance" element={<AttendancePage />} />
             <Route path="subscriptions" element={<SubscriptionsPage />} />
             <Route path="payments" element={<PaymentsPage />} />
-            <Route path="finance" element={<FinancePage />} />
           </Route>
           <Route path="teacher-students/:studentId" element={<StudentReport />} />
           <Route path="platform-students" element={<PlatformStudents />} />

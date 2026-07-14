@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { motion, useScroll, useTransform } from 'framer-motion'
-import logo from "../../../public/2 (5).png";
-import logo2 from "../../../public/logooo.png";
+const logo = "/2%20(5).png";
+const logo2 = "/logooo.png";
 import { Link } from 'react-router-dom';
 import { Button } from '@chakra-ui/react';
 

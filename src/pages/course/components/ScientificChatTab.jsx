@@ -44,8 +44,6 @@ import {
   uploadCourseFile,
 } from "../../../api/scientificChatbotApi";
 
-const MAX_FILE_SIZE_MB = 10;
-
 const ScientificChatTab = ({ courseId, token }) => {
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -106,15 +104,6 @@ const ScientificChatTab = ({ courseId, token }) => {
       toast({
         title: "نوع ملف غير مدعوم",
         description: "المسموح: .txt أو .md أو .pdf",
-        status: "warning",
-        isClosable: true,
-      });
-      return;
-    }
-    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-      toast({
-        title: "حجم الملف كبير",
-        description: `الحد الأقصى ${MAX_FILE_SIZE_MB} ميجابايت`,
         status: "warning",
         isClosable: true,
       });

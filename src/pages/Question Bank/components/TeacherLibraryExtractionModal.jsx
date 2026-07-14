@@ -658,7 +658,7 @@ export default function TeacherLibraryExtractionModal({
                 </FormControl>
               </HStack>
               <Text fontSize="xs" color={subTextColor} mb={3}>
-                نطاق الصفحات اختياري ويُطبَّق على ملف PDF واحد فقط (حد أقصى 50 صفحة)
+                نطاق الصفحات اختياري ويُطبَّق على ملف PDF واحد فقط — بدون حد أقصى لعدد الصفحات
               </Text>
               <Input
                 ref={fileInputRef}

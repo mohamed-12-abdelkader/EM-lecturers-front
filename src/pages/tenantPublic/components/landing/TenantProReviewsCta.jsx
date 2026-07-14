@@ -1,6 +1,12 @@
 import { motion } from "framer-motion";
 import { FaArrowLeft, FaQuoteRight, FaStar } from "react-icons/fa";
-import { Reveal, StaggerGrid, StaggerItem } from "../../tenantLandingMotion";
+import {
+  MotionCard,
+  Reveal,
+  ShimmerCTA,
+  StaggerGrid,
+  StaggerItem,
+} from "../../tenantLandingMotion";
 import {
   tlBtnOutline,
   tlBtnPrimary,
@@ -14,24 +20,34 @@ import {
 function ReviewCard({ item }) {
   const rating = Number(item.rating) || 5;
   return (
-    <article className={`${tlCard} relative h-full p-5 text-right md:p-6`} dir="rtl">
-      <FaQuoteRight className="absolute right-4 top-4 text-2xl text-blue-100 dark:text-slate-800" aria-hidden />
-      <div className="mb-3 flex justify-start gap-0.5 text-orange-400">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <FaStar key={i} className={`text-sm ${i < rating ? "opacity-100" : "opacity-20"}`} />
-        ))}
-      </div>
-      <p className="relative text-sm leading-8 text-slate-600 dark:text-slate-300">"{item.text}"</p>
-      <div className="mt-4 flex items-center justify-start gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-500 text-sm font-bold text-white">
-          {(item.name || "ط").slice(0, 1)}
-        </span>
-        <div className="text-right">
-          <p className="text-sm font-bold text-slate-900 dark:text-white">{item.name}</p>
-          <p className="text-xs text-slate-500">طالب</p>
+    <MotionCard lift className="h-full">
+      <article className={`${tlCard} relative h-full p-5 text-right md:p-6`} dir="rtl">
+        <FaQuoteRight className="absolute right-4 top-4 text-2xl text-blue-100 dark:text-slate-800" aria-hidden />
+        <div className="mb-3 flex justify-start gap-0.5 text-orange-400">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <motion.span
+              key={i}
+              initial={{ opacity: 0, scale: 0.6 }}
+              whileInView={{ opacity: i < rating ? 1 : 0.2, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.08 * i, type: "spring", stiffness: 400, damping: 18 }}
+            >
+              <FaStar className="text-sm" />
+            </motion.span>
+          ))}
         </div>
-      </div>
-    </article>
+        <p className="relative text-sm leading-8 text-slate-600 dark:text-slate-300">"{item.text}"</p>
+        <div className="mt-4 flex items-center justify-start gap-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-500 text-sm font-bold text-white">
+            {(item.name || "ط").slice(0, 1)}
+          </span>
+          <div className="text-right">
+            <p className="text-sm font-bold text-slate-900 dark:text-white">{item.name}</p>
+            <p className="text-xs text-slate-500">طالب</p>
+          </div>
+        </div>
+      </article>
+    </MotionCard>
   );
 }
 
@@ -44,7 +60,11 @@ export function TenantProReviews({ testimonials }) {
         <Reveal variant="blurUp" className="text-right">
           <span className={tlEyebrowOrange}>آراء الطلاب</span>
           <h2 className={`${tlHeading} mt-3`}>ماذا يقول طلابنا؟</h2>
-          <div className="mt-4 inline-flex items-center gap-3 rounded-xl border border-orange-100 bg-orange-50 px-5 py-2.5 dark:border-orange-900/40 dark:bg-orange-950/30">
+          <motion.div
+            className="mt-4 inline-flex items-center gap-3 rounded-xl border border-orange-100 bg-orange-50 px-5 py-2.5 dark:border-orange-900/40 dark:bg-orange-950/30"
+            whileHover={{ scale: 1.03 }}
+            transition={{ type: "spring", stiffness: 360, damping: 20 }}
+          >
             <span className="font-heading text-2xl font-bold text-orange-500">4.9</span>
             <div className="text-right">
               <div className="flex justify-start gap-0.5 text-orange-400">
@@ -54,7 +74,7 @@ export function TenantProReviews({ testimonials }) {
               </div>
               <p className="text-[10px] text-slate-500">تقييم الطلاب</p>
             </div>
-          </div>
+          </motion.div>
         </Reveal>
 
         <StaggerGrid className="mt-8 grid gap-4 md:grid-cols-3">
@@ -71,8 +91,21 @@ export function TenantProReviews({ testimonials }) {
 
 export function TenantProCta({ signupHref, loginHref }) {
   return (
-    <section id="cta" className="bg-blue-500 py-16 md:py-20" dir="rtl">
-      <div className={tlContainer}>
+    <section id="cta" className="relative overflow-hidden bg-blue-500 py-16 md:py-20" dir="rtl">
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute -left-16 top-0 h-56 w-56 rounded-full bg-white/10 blur-2xl"
+        animate={{ x: [0, 24, 0], y: [0, 12, 0] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute -right-10 bottom-0 h-48 w-48 rounded-full bg-orange-400/20 blur-2xl"
+        animate={{ x: [0, -18, 0], y: [0, -10, 0] }}
+        transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 0.8 }}
+      />
+
+      <div className={`${tlContainer} relative`}>
         <Reveal variant="scaleIn">
           <div className="relative overflow-hidden rounded-2xl bg-white p-8 shadow-xl dark:bg-slate-900 md:p-12">
             <div className="pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-orange-500/10 blur-2xl" aria-hidden />
@@ -85,11 +118,16 @@ export function TenantProCta({ signupHref, loginHref }) {
                   انضم الآن واستفد من الشرح المنظم والمتابعة المستمرة.
                 </p>
                 <div className="mt-6 flex flex-wrap gap-3">
-                  <a href={signupHref} className={tlBtnPrimary}>
-                    سجّل الآن
-                    <FaArrowLeft className="text-xs" />
-                  </a>
-                  <a href={loginHref} className={`${tlBtnOutline} !border-blue-500 !text-blue-500 !bg-transparent hover:!bg-blue-50 dark:hover:!bg-blue-950/30`}>
+                  <ShimmerCTA>
+                    <a href={signupHref} className={tlBtnPrimary}>
+                      سجّل الآن
+                      <FaArrowLeft className="text-xs" />
+                    </a>
+                  </ShimmerCTA>
+                  <a
+                    href={loginHref}
+                    className={`${tlBtnOutline} !border-blue-500 !text-blue-500 !bg-transparent hover:!bg-blue-50 dark:hover:!bg-blue-950/30`}
+                  >
                     تسجيل الدخول
                   </a>
                 </div>
@@ -100,12 +138,15 @@ export function TenantProCta({ signupHref, loginHref }) {
                   { label: "متابعة", value: "مستمرة", color: "text-orange-500" },
                   { label: "اختبارات", value: "فورية", color: "text-blue-500" },
                   { label: "دعم", value: "سريع", color: "text-orange-500" },
-                ].map((chip) => (
+                ].map((chip, i) => (
                   <motion.div
                     key={chip.label}
                     className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3 text-center dark:border-slate-700 dark:bg-slate-800"
-                    whileHover={{ y: -2 }}
-                    transition={{ duration: 0.2 }}
+                    initial={{ opacity: 0, y: 12 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.08 * i, duration: 0.4 }}
+                    whileHover={{ y: -4, scale: 1.03 }}
                   >
                     <p className={`font-heading text-base font-bold ${chip.color}`}>{chip.value}</p>
                     <p className="mt-0.5 text-[10px] text-slate-500">{chip.label}</p>

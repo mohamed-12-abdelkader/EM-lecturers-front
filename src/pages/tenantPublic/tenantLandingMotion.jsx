@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   motion,
   useInView,
@@ -477,5 +477,90 @@ export function AnimatedUnderline({ className = "", color = "#A16207" }) {
       animate={isInView || reduceMotion ? { scaleX: 1 } : { scaleX: 0 }}
       transition={{ duration: 0.55, ease: EASE_OUT, delay: 0.15 }}
     />
+  );
+}
+
+/** حلقة نبض حول أيقونة — للاستخدام في الخطوات والـ CTA */
+export function PulseRing({ className = "", colorClass = "bg-blue-400/40", delay = 0 }) {
+  const reduceMotion = useReducedMotion();
+  if (reduceMotion) return null;
+  return (
+    <motion.span
+      aria-hidden
+      className={`pointer-events-none absolute inset-0 rounded-full ${colorClass} ${className}`}
+      initial={{ scale: 1, opacity: 0.45 }}
+      animate={{ scale: [1, 1.45, 1.45], opacity: [0.4, 0.12, 0] }}
+      transition={{ duration: 2.2, repeat: Infinity, delay, ease: "easeOut" }}
+    />
+  );
+}
+
+/** خط يُرسم عند الظهور (مثل مسار الرحلة) */
+export function DrawLine({ className = "", delay = 0.2 }) {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-20%" });
+  const reduceMotion = useReducedMotion();
+
+  return (
+    <motion.div
+      ref={ref}
+      aria-hidden
+      className={className}
+      style={{ originX: 0 }}
+      initial={{ scaleX: reduceMotion ? 1 : 0, opacity: reduceMotion ? 1 : 0.4 }}
+      animate={
+        isInView || reduceMotion
+          ? { scaleX: 1, opacity: 1 }
+          : { scaleX: 0, opacity: 0.4 }
+      }
+      transition={{ duration: 1.1, ease: EASE_OUT, delay }}
+    />
+  );
+}
+
+/** عدّاد يظهر عند الدخول للشاشة */
+export function CountUp({ value, className = "", duration = 1.2 }) {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-40px" });
+  const reduceMotion = useReducedMotion();
+  const raw = String(value ?? "");
+  const match = raw.match(/^([^\d]*)([\d.,]+)(.*)$/);
+  const prefix = match?.[1] ?? "";
+  const numericPart = match?.[2] ?? "";
+  const suffix = match?.[3] ?? "";
+  const target = Number(String(numericPart).replace(/,/g, "")) || 0;
+  const hasNumber = Boolean(match && numericPart);
+
+  const mv = useMotionValue(0);
+  const spring = useSpring(mv, { stiffness: 70, damping: 22 });
+  const [display, setDisplay] = useState(reduceMotion || !hasNumber ? raw : `${prefix}0${suffix}`);
+
+  useEffect(() => {
+    if (!hasNumber) {
+      setDisplay(raw);
+      return undefined;
+    }
+    if (reduceMotion) {
+      setDisplay(raw);
+      return undefined;
+    }
+    if (!isInView) return undefined;
+    mv.set(0);
+    const unsub = spring.on("change", (v) => {
+      const n = Math.round(v);
+      setDisplay(`${prefix}${n.toLocaleString("ar-EG")}${suffix}`);
+    });
+    mv.set(target);
+    const t = setTimeout(() => setDisplay(raw), duration * 1000 + 120);
+    return () => {
+      unsub();
+      clearTimeout(t);
+    };
+  }, [isInView, reduceMotion, hasNumber, raw, prefix, suffix, target, mv, spring, duration]);
+
+  return (
+    <span ref={ref} className={className}>
+      {display}
+    </span>
   );
 }

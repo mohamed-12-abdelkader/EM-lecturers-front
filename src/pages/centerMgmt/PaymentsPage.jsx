@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Badge,
   Button,
   Flex,
   FormControl,
@@ -29,11 +28,12 @@ import {
   useDisclosure,
   useToast,
   VStack,
+  HStack,
 } from "@chakra-ui/react";
 import { FaPlus } from "react-icons/fa";
 import {
+  useBillingMonth,
   useGroups,
-  useMonthSubscriptions,
   usePaymentMutations,
   usePayments,
   useStudents,
@@ -48,7 +48,19 @@ import {
   formatMoney,
   studentName,
 } from "./centerMgmtUtils";
-import { EmptyState, LoadingBlock, PageHeader, Surface } from "./components/UiBits";
+import {
+  DesktopOnly,
+  EmptyState,
+  FilterBar,
+  ListCard,
+  LoadingBlock,
+  MobileOnly,
+  PageHeader,
+  PaginationBar,
+  PrimaryButton,
+  StatusBadge,
+  Surface,
+} from "./components/UiBits";
 
 export default function PaymentsPage() {
   const toast = useToast();
@@ -61,9 +73,9 @@ export default function PaymentsPage() {
   const [page, setPage] = useState(1);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [form, setForm] = useState({
-    studentId: "",
-    groupId: "",
-    subscriptionId: "",
+    student_id: "",
+    group_id: "",
+    subscription_id: "",
     amount: "",
     month: String(now.month),
     year: String(now.year),
@@ -80,34 +92,38 @@ export default function PaymentsPage() {
     () => ({
       month: month || undefined,
       year: year || undefined,
-      groupId: groupId || undefined,
-      search: debounced || undefined,
+      group_id: groupId || undefined,
       page,
       limit: 20,
     }),
-    [month, year, groupId, debounced, page]
+    [month, year, groupId, page]
   );
 
   const { data, isLoading } = usePayments(params);
-  const items = data?.items || [];
-  const { data: studentsData } = useStudents({ limit: 100, search: debounced || undefined });
+  const items = (data?.items || []).filter((p) => {
+    if (!debounced) return true;
+    const q = debounced.toLowerCase();
+    return String(studentName(p) || field(p, "student_name") || "")
+      .toLowerCase()
+      .includes(q);
+  });
+  const { data: studentsData } = useStudents({ limit: 100 });
   const students = studentsData?.items || [];
   const { data: groupsData } = useGroups({ limit: 100 });
   const groups = groupsData?.items || [];
-  const { data: subsData } = useMonthSubscriptions(form.year, form.month, {
-    groupId: form.groupId || undefined,
-    limit: 100,
+  const { data: billingData } = useBillingMonth(form.year, form.month, {
+    group_id: form.group_id || undefined,
   });
-  const subscriptions = (subsData?.items || []).filter(
-    (s) => !form.studentId || String(field(s, "student_id", "studentId")) === form.studentId
+  const subscriptions = (billingData?.subscriptions || []).filter(
+    (s) => !form.student_id || String(field(s, "student_id", "studentId")) === form.student_id
   );
   const { createPayment } = usePaymentMutations();
 
   const openCreate = () => {
     setForm({
-      studentId: "",
-      groupId: groupId || "",
-      subscriptionId: "",
+      student_id: "",
+      group_id: groupId || "",
+      subscription_id: "",
       amount: "",
       month,
       year,
@@ -118,20 +134,20 @@ export default function PaymentsPage() {
   };
 
   const handleSave = async () => {
-    if (!form.studentId || !form.amount) {
+    if (!form.student_id || !form.amount) {
       toast({ title: "الطالب والمبلغ مطلوبان", status: "warning", duration: 2500 });
       return;
     }
     try {
       await createPayment.mutateAsync({
-        studentId: Number(form.studentId),
-        groupId: form.groupId ? Number(form.groupId) : undefined,
-        subscriptionId: form.subscriptionId ? Number(form.subscriptionId) : undefined,
+        student_id: Number(form.student_id),
+        group_id: form.group_id ? Number(form.group_id) : undefined,
+        subscription_id: form.subscription_id ? Number(form.subscription_id) : undefined,
         year: Number(form.year),
         month: Number(form.month),
         amount: Number(form.amount),
         method: form.method,
-        notes: form.notes || undefined,
+        notes: form.notes || null,
       });
       toast({ title: "تم تسجيل الدفعة", status: "success", duration: 2000 });
       onClose();
@@ -144,126 +160,159 @@ export default function PaymentsPage() {
     <>
       <PageHeader
         title="المدفوعات"
-        description="سجّل الدفعات واربطها بالاشتراك الشهري تلقائياً."
+        description="سجّل الدفعات واربطها بالاشتراك ليُحدَّث المتبقي تلقائياً."
         actions={
-          <Button leftIcon={<FaPlus />} colorScheme="blue" borderRadius="xl" onClick={openCreate}>
+          <PrimaryButton
+            leftIcon={<FaPlus />}
+            onClick={openCreate}
+            size={{ base: "sm", md: "md" }}
+          >
             دفعة جديدة
-          </Button>
+          </PrimaryButton>
         }
       />
 
-      <Surface mb={5}>
+      <FilterBar>
         <SimpleGrid columns={{ base: 1, md: 4 }} spacing={3}>
-          <Select value={month} onChange={(e) => setMonth(e.target.value)} borderRadius="xl">
+          <Select
+            value={month}
+            onChange={(e) => {
+              setMonth(e.target.value);
+              setPage(1);
+            }}
+            borderRadius="xl"
+          >
             {MONTH_NAMES.slice(1).map((name, idx) => (
-              <option key={name} value={idx + 1}>
-                {name}
-              </option>
+              <option key={name} value={idx + 1}>{name}</option>
             ))}
           </Select>
-          <Select value={year} onChange={(e) => setYear(e.target.value)} borderRadius="xl">
+          <Select
+            value={year}
+            onChange={(e) => {
+              setYear(e.target.value);
+              setPage(1);
+            }}
+            borderRadius="xl"
+          >
             {[now.year - 1, now.year, now.year + 1].map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
+              <option key={y} value={y}>{y}</option>
             ))}
           </Select>
           <Select
             placeholder="كل المجموعات"
             value={groupId}
-            onChange={(e) => setGroupId(e.target.value)}
+            onChange={(e) => {
+              setGroupId(e.target.value);
+              setPage(1);
+            }}
             borderRadius="xl"
           >
             {groups.map((g) => (
-              <option key={g.id} value={g.id}>
-                {field(g, "name")}
-              </option>
+              <option key={g.id} value={g.id}>{field(g, "name")}</option>
             ))}
           </Select>
           <Input
             placeholder="بحث..."
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => setSearch(e.target.value)}
             borderRadius="xl"
           />
         </SimpleGrid>
-      </Surface>
+      </FilterBar>
 
       {isLoading ? (
         <LoadingBlock />
       ) : items.length === 0 ? (
         <EmptyState
           title="لا توجد مدفوعات"
-          description="سجّل أول دفعة لهذا الشهر."
           action={
-            <Button colorScheme="blue" borderRadius="xl" onClick={openCreate}>
-              تسجيل دفعة
-            </Button>
+            <PrimaryButton onClick={openCreate}>تسجيل دفعة</PrimaryButton>
           }
         />
       ) : (
-        <Surface p={0} overflow="hidden">
-          <TableContainer>
-            <Table size="sm">
-              <Thead>
-                <Tr>
-                  <Th>التاريخ</Th>
-                  <Th>الطالب</Th>
-                  <Th>المبلغ</Th>
-                  <Th>الطريقة</Th>
-                  <Th>الشهر</Th>
-                  <Th>ملاحظات</Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                {items.map((p) => (
-                  <Tr key={p.id}>
-                    <Td>{formatDate(field(p, "created_at", "createdAt", "paid_at"))}</Td>
-                    <Td fontWeight="medium">
-                      {studentName(p) || field(p, "student_name")}
-                    </Td>
-                    <Td>{formatMoney(field(p, "amount"))}</Td>
-                    <Td>
-                      <Badge>
-                        {PAYMENT_METHOD_LABELS[field(p, "method")] || field(p, "method") || "—"}
-                      </Badge>
-                    </Td>
-                    <Td>
+        <>
+          <MobileOnly>
+            <VStack spacing={3} align="stretch">
+              {items.map((p) => (
+                <ListCard key={p.id}>
+                  <Flex justify="space-between" align="flex-start" gap={2} mb={2}>
+                    <VStack align="flex-start" spacing={0.5} minW={0}>
+                      <Text fontWeight="black" noOfLines={1}>
+                        {studentName(p) || field(p, "student_name")}
+                      </Text>
+                      <Text fontSize="xs" color="gray.500">
+                        {formatDate(field(p, "created_at", "createdAt", "paid_at"))}
+                      </Text>
+                    </VStack>
+                    <Text fontWeight="black" color="blue.600" flexShrink={0}>
+                      {formatMoney(field(p, "amount"))}
+                    </Text>
+                  </Flex>
+                  <HStack spacing={3} fontSize="sm" color="gray.600" flexWrap="wrap">
+                    <StatusBadge>
+                      {PAYMENT_METHOD_LABELS[field(p, "method")] || field(p, "method") || "—"}
+                    </StatusBadge>
+                    <Text>
                       {field(p, "month")}/{field(p, "year")}
-                    </Td>
-                    <Td>{field(p, "notes") || "—"}</Td>
-                  </Tr>
-                ))}
-              </Tbody>
-            </Table>
-          </TableContainer>
-        </Surface>
+                    </Text>
+                    {field(p, "notes") ? (
+                      <Text noOfLines={1} color="gray.500">
+                        {field(p, "notes")}
+                      </Text>
+                    ) : null}
+                  </HStack>
+                </ListCard>
+              ))}
+            </VStack>
+          </MobileOnly>
+
+          <DesktopOnly>
+            <Surface p={0} overflow="hidden">
+              <TableContainer>
+                <Table size="sm">
+                  <Thead>
+                    <Tr>
+                      <Th>التاريخ</Th>
+                      <Th>الطالب</Th>
+                      <Th>المبلغ</Th>
+                      <Th>الطريقة</Th>
+                      <Th>الشهر</Th>
+                      <Th>ملاحظات</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {items.map((p) => (
+                      <Tr key={p.id}>
+                        <Td>{formatDate(field(p, "created_at", "createdAt", "paid_at"))}</Td>
+                        <Td fontWeight="medium">{studentName(p) || field(p, "student_name")}</Td>
+                        <Td>{formatMoney(field(p, "amount"))}</Td>
+                        <Td>
+                          <StatusBadge>
+                            {PAYMENT_METHOD_LABELS[field(p, "method")] || field(p, "method") || "—"}
+                          </StatusBadge>
+                        </Td>
+                        <Td>{field(p, "month")}/{field(p, "year")}</Td>
+                        <Td>{field(p, "notes") || "—"}</Td>
+                      </Tr>
+                    ))}
+                  </Tbody>
+                </Table>
+              </TableContainer>
+            </Surface>
+          </DesktopOnly>
+        </>
       )}
 
-      {(data?.totalPages || 1) > 1 && (
-        <Flex justify="center" gap={2} mt={5}>
-          <Button size="sm" isDisabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-            السابق
-          </Button>
-          <Text fontSize="sm" alignSelf="center">
-            {page} / {data.totalPages}
-          </Text>
-          <Button
-            size="sm"
-            isDisabled={page >= data.totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            التالي
-          </Button>
-        </Flex>
-      )}
+      <PaginationBar
+        page={page}
+        totalPages={data?.totalPages || 1}
+        onPrev={() => setPage((p) => p - 1)}
+        onNext={() => setPage((p) => p + 1)}
+      />
 
-      <Modal isOpen={isOpen} onClose={onClose} isCentered size="lg">
-        <ModalOverlay />
-        <ModalContent dir="rtl" borderRadius="2xl">
+      <Modal isOpen={isOpen} onClose={onClose} isCentered size={{ base: "full", md: "lg" }}>
+        <ModalOverlay backdropFilter="blur(4px)" />
+        <ModalContent dir="rtl" borderRadius={{ base: "none", md: "2xl" }} m={0}>
           <ModalHeader>تسجيل دفعة</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
@@ -272,30 +321,26 @@ export default function PaymentsPage() {
                 <FormLabel>الطالب</FormLabel>
                 <Select
                   placeholder="اختر الطالب"
-                  value={form.studentId}
-                  onChange={(e) => setForm((f) => ({ ...f, studentId: e.target.value }))}
+                  value={form.student_id}
+                  onChange={(e) => setForm((f) => ({ ...f, student_id: e.target.value }))}
                   borderRadius="xl"
                 >
                   {students.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {studentName(s)}
-                    </option>
+                    <option key={s.id} value={s.id}>{studentName(s)}</option>
                   ))}
                 </Select>
               </FormControl>
-              <SimpleGrid columns={2} spacing={3}>
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
                 <FormControl>
                   <FormLabel>المجموعة</FormLabel>
                   <Select
                     placeholder="اختياري"
-                    value={form.groupId}
-                    onChange={(e) => setForm((f) => ({ ...f, groupId: e.target.value }))}
+                    value={form.group_id}
+                    onChange={(e) => setForm((f) => ({ ...f, group_id: e.target.value }))}
                     borderRadius="xl"
                   >
                     {groups.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {field(g, "name")}
-                      </option>
+                      <option key={g.id} value={g.id}>{field(g, "name")}</option>
                     ))}
                   </Select>
                 </FormControl>
@@ -303,10 +348,8 @@ export default function PaymentsPage() {
                   <FormLabel>الاشتراك</FormLabel>
                   <Select
                     placeholder="اختياري"
-                    value={form.subscriptionId}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, subscriptionId: e.target.value }))
-                    }
+                    value={form.subscription_id}
+                    onChange={(e) => setForm((f) => ({ ...f, subscription_id: e.target.value }))}
                     borderRadius="xl"
                   >
                     {subscriptions.map((s) => (
@@ -317,7 +360,7 @@ export default function PaymentsPage() {
                   </Select>
                 </FormControl>
               </SimpleGrid>
-              <SimpleGrid columns={3} spacing={3}>
+              <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3}>
                 <FormControl isRequired>
                   <FormLabel>المبلغ</FormLabel>
                   <NumberInput
@@ -338,9 +381,7 @@ export default function PaymentsPage() {
                     borderRadius="xl"
                   >
                     {MONTH_NAMES.slice(1).map((name, idx) => (
-                      <option key={name} value={idx + 1}>
-                        {name}
-                      </option>
+                      <option key={name} value={idx + 1}>{name}</option>
                     ))}
                   </Select>
                 </FormControl>
@@ -352,9 +393,7 @@ export default function PaymentsPage() {
                     borderRadius="xl"
                   >
                     {[now.year - 1, now.year, now.year + 1].map((y) => (
-                      <option key={y} value={y}>
-                        {y}
-                      </option>
+                      <option key={y} value={y}>{y}</option>
                     ))}
                   </Select>
                 </FormControl>
@@ -367,9 +406,7 @@ export default function PaymentsPage() {
                   borderRadius="xl"
                 >
                   {Object.entries(PAYMENT_METHOD_LABELS).map(([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
+                    <option key={key} value={key}>{label}</option>
                   ))}
                 </Select>
               </FormControl>
@@ -384,18 +421,22 @@ export default function PaymentsPage() {
               </FormControl>
             </VStack>
           </ModalBody>
-          <ModalFooter gap={2}>
-            <Button variant="ghost" onClick={onClose} borderRadius="xl">
+          <ModalFooter gap={2} flexDir={{ base: "column-reverse", md: "row" }}>
+            <Button
+              variant="ghost"
+              onClick={onClose}
+              borderRadius="xl"
+              w={{ base: "full", md: "auto" }}
+            >
               إلغاء
             </Button>
-            <Button
-              colorScheme="blue"
-              borderRadius="xl"
+            <PrimaryButton
               onClick={handleSave}
               isLoading={createPayment.isPending}
+              w={{ base: "full", md: "auto" }}
             >
               حفظ
-            </Button>
+            </PrimaryButton>
           </ModalFooter>
         </ModalContent>
       </Modal>

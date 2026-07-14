@@ -1,8 +1,9 @@
 import baseUrl from "./baseUrl";
 
 export const OCR_API = "/api/ocr";
-export const MAX_OCR_IMAGE_FILES = 20;
-export const MAX_PDF_PAGES_PER_REQUEST = 50;
+/** No client-side file-size cap — accept any size. */
+export const MAX_OCR_IMAGE_FILES = 100;
+export const MAX_PDF_PAGES_PER_REQUEST = null;
 
 export const SUPPORTED_OCR_MIME_TYPES = [
   "application/pdf",
@@ -86,7 +87,10 @@ export function validatePdfPageRange(startPage, endPage) {
   if (end < start) {
     return "رقم الصفحة الأخيرة يجب أن يكون أكبر من أو يساوي الأولى";
   }
-  if (end - start + 1 > MAX_PDF_PAGES_PER_REQUEST) {
+  if (
+    MAX_PDF_PAGES_PER_REQUEST != null &&
+    end - start + 1 > MAX_PDF_PAGES_PER_REQUEST
+  ) {
     return `الحد الأقصى ${MAX_PDF_PAGES_PER_REQUEST} صفحة في طلب واحد`;
   }
   return null;
@@ -336,7 +340,7 @@ function buildBulkTextFromDrafts(drafts) {
 }
 
 /**
- * @param {File|File[]} source — ملف واحد (PDF أو صورة) أو حتى 20 صورة
+ * @param {File|File[]} source — ملف واحد (PDF أو صورة) أو عدة صور
  * @param {{
  *   inferCorrectAnswer?: boolean,
  *   includeQuestionImages?: boolean,
@@ -393,6 +397,10 @@ export async function extractQuestions(
 
   const { data } = await baseUrl.post(`${OCR_API}/extract-questions`, formData, {
     headers: authHeaders(token),
+    // Large PDFs / image batches can take a long time — no client size cap.
+    timeout: 0,
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
   });
 
   if (!data?.success) {

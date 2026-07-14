@@ -37,6 +37,8 @@ import {
   Icon,
   Flex,
   Switch,
+  Checkbox,
+  CheckboxGroup,
   AlertDialog,
   AlertDialogBody,
   AlertDialogFooter,
@@ -200,10 +202,40 @@ function isCourseFree(course) {
   return !Number.isNaN(price) && price === 0;
 }
 
-function validateCourseForm({ title, description, grade_id, is_free, price }) {
+function normalizeGradeIds(value) {
+  if (!Array.isArray(value)) return [];
+  return [
+    ...new Set(
+      value
+        .map((v) => Number(v))
+        .filter((n) => Number.isFinite(n) && n > 0),
+    ),
+  ];
+}
+
+function getCourseGradeIds(course) {
+  if (!course) return [];
+  if (Array.isArray(course.grade_ids) && course.grade_ids.length) {
+    return normalizeGradeIds(course.grade_ids);
+  }
+  if (Array.isArray(course.grades) && course.grades.length) {
+    return normalizeGradeIds(course.grades.map((g) => g?.id));
+  }
+  const single = course.grade_id ?? course.grade?.id;
+  return single != null && single !== "" ? normalizeGradeIds([single]) : [];
+}
+
+function getCourseGradeLabel(course) {
+  if (Array.isArray(course?.grades) && course.grades.length) {
+    return course.grades.map((g) => g?.name).filter(Boolean).join(" · ") || "بدون صف";
+  }
+  return course?.grade?.name || "بدون صف";
+}
+
+function validateCourseForm({ title, description, grade_ids, is_free, price }) {
   if (!String(title || "").trim()) return "عنوان الكورس مطلوب";
   if (!String(description || "").trim()) return "وصف الكورس مطلوب";
-  if (!grade_id) return "المرحلة الدراسية مطلوبة";
+  if (!normalizeGradeIds(grade_ids).length) return "اختر صفًا دراسيًا واحدًا على الأقل";
   if (!is_free) {
     const priceNum = Number(price);
     if (!Number.isFinite(priceNum) || priceNum <= 0) {
@@ -219,6 +251,14 @@ function appendCoursePricingFields(formData, { is_free, price }) {
     formData.append("price", "0");
   } else {
     formData.append("price", String(Math.round(Number(price))));
+  }
+}
+
+function appendCourseGradeIds(formData, grade_ids) {
+  const ids = normalizeGradeIds(grade_ids);
+  formData.append("grade_ids", ids.join(","));
+  if (ids.length === 1) {
+    formData.append("grade_id", String(ids[0]));
   }
 }
 
@@ -280,7 +320,7 @@ const TeacherDashboardHome = () => {
     title: "",
     price: 0,
     description: "",
-    grade_id: "",
+    grade_ids: [],
     is_free: false,
   });
   const [courseAvatar, setCourseAvatar] = useState(null);
@@ -290,7 +330,7 @@ const TeacherDashboardHome = () => {
     title: "",
     price: 0,
     description: "",
-    grade_id: "",
+    grade_ids: [],
     avatar: null,
     is_free: false,
   });
@@ -534,18 +574,6 @@ const TeacherDashboardHome = () => {
         return;
       }
 
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        toast({
-          title: "خطأ في حجم الملف",
-          description: "حجم الملف يجب أن يكون أقل من 5 ميجابايت",
-          status: "error",
-          duration: 3000,
-          isClosable: true,
-        });
-        return;
-      }
-
       setCourseAvatar(file);
 
       // Create preview URL
@@ -599,7 +627,7 @@ const TeacherDashboardHome = () => {
       const formDataToSend = new FormData();
       formDataToSend.append("title", formData.title.trim());
       formDataToSend.append("description", formData.description.trim());
-      formDataToSend.append("grade_id", String(parseInt(formData.grade_id, 10)));
+      appendCourseGradeIds(formDataToSend, formData.grade_ids);
       appendCoursePricingFields(formDataToSend, formData);
 
       if (courseAvatar) {
@@ -623,7 +651,7 @@ const TeacherDashboardHome = () => {
         isClosable: true,
       });
 
-      setFormData({ title: "", price: 0, description: "", grade_id: "", is_free: false });
+      setFormData({ title: "", price: 0, description: "", grade_ids: [], is_free: false });
       clearAvatar();
       onClose();
       fetchCourses();
@@ -650,7 +678,7 @@ const TeacherDashboardHome = () => {
       title: course.title,
       price: free ? 0 : parseFloat(course.price) || 0,
       description: course.description,
-      grade_id: course.grade_id?.toString?.() ?? String(course.grade?.id ?? course.grade_id ?? ""),
+      grade_ids: getCourseGradeIds(course),
       avatar: null,
       is_free: free,
     });
@@ -679,7 +707,7 @@ const TeacherDashboardHome = () => {
       const payload = new FormData();
       payload.append("title", editData.title.trim());
       payload.append("description", editData.description.trim());
-      payload.append("grade_id", String(editData.grade_id));
+      appendCourseGradeIds(payload, editData.grade_ids);
       appendCoursePricingFields(payload, editData);
 
       if (editData.avatar) {
@@ -710,7 +738,7 @@ const TeacherDashboardHome = () => {
         title: "",
         price: 0,
         description: "",
-        grade_id: "",
+        grade_ids: [],
         avatar: null,
         is_free: false,
       });
@@ -775,7 +803,9 @@ const TeacherDashboardHome = () => {
 
   // Filter courses by grade
   const filteredCourses = selectedGrade
-    ? courses.filter((course) => course.grade_id === parseInt(selectedGrade))
+    ? courses.filter((course) =>
+        getCourseGradeIds(course).includes(parseInt(selectedGrade, 10)),
+      )
     : courses;
 
   const handleRefreshDashboard = async () => {
@@ -1239,8 +1269,8 @@ const TeacherDashboardHome = () => {
                       </Flex>
                     </Box>
                     <Box p={4}>
-                      <Badge colorScheme="blue" borderRadius="md" fontSize="xs" mb={2} fontWeight="700">
-                        {course?.grade?.name || "بدون صف"}
+                      <Badge colorScheme="blue" borderRadius="md" fontSize="xs" mb={2} fontWeight="700" whiteSpace="normal" textAlign="right">
+                        {getCourseGradeLabel(course)}
                       </Badge>
                       <Heading size="sm" color={headingColor} noOfLines={2} mb={1} lineHeight="1.4" fontWeight="800">
                         {course.title}
@@ -1373,8 +1403,8 @@ const TeacherDashboardHome = () => {
                 </CreateCourseModalSection>
 
                 <CreateCourseModalSection
-                  title="التسعير والصف"
-                  subtitle="اختر نوع الكورس والمرحلة الدراسية المناسبة"
+                  title="التسعير والصفوف"
+                  subtitle="اختر نوع الكورس والصفوف الدراسية المرتبطة به"
                 >
                   <Box>
                     <Text fontSize="xs" fontWeight="semibold" color={mutedTextColor} mb={2}>
@@ -1466,25 +1496,41 @@ const TeacherDashboardHome = () => {
                         </Text>
                       </Flex>
                     )}
-
-                    <FormControl isRequired flex={1}>
-                      <FormLabel fontSize="sm" fontWeight="semibold" color={headingColor} mb={1.5}>
-                        المرحلة الدراسية
-                      </FormLabel>
-                      <Select
-                        placeholder="اختر الصف"
-                        value={formData.grade_id}
-                        onChange={(e) => handleInputChange("grade_id", e.target.value)}
-                        {...modalInputProps}
-                      >
-                        {grades.map((grade) => (
-                          <option key={grade.id} value={grade.id}>
-                            {grade.name}
-                          </option>
-                        ))}
-                      </Select>
-                    </FormControl>
                   </Flex>
+
+                  <FormControl isRequired>
+                    <FormLabel fontSize="sm" fontWeight="semibold" color={headingColor} mb={1.5}>
+                      الصفوف الدراسية
+                    </FormLabel>
+                    <Text fontSize="xs" color={mutedTextColor} mb={3}>
+                      يمكن اختيار صف واحد أو أكثر لنفس الكورس
+                    </Text>
+                    {grades.length ? (
+                      <CheckboxGroup
+                        value={(formData.grade_ids || []).map((id) => String(id))}
+                        onChange={(values) =>
+                          handleInputChange("grade_ids", normalizeGradeIds(values))
+                        }
+                      >
+                        <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={2}>
+                          {grades.map((grade) => (
+                            <Checkbox
+                              key={grade.id}
+                              value={String(grade.id)}
+                              colorScheme="blue"
+                              borderColor={inputBorderColor}
+                            >
+                              {grade.name}
+                            </Checkbox>
+                          ))}
+                        </SimpleGrid>
+                      </CheckboxGroup>
+                    ) : (
+                      <Text fontSize="sm" color={mutedTextColor}>
+                        لا توجد صفوف متاحة حالياً.
+                      </Text>
+                    )}
+                  </FormControl>
                 </CreateCourseModalSection>
               </VStack>
 
@@ -1575,7 +1621,7 @@ const TeacherDashboardHome = () => {
                         اسحب الصورة أو انقر للرفع
                       </Text>
                       <Text fontSize="xs" color={mutedTextColor} mt={2}>
-                        PNG أو JPG — حد أقصى 5 ميجابايت
+                        PNG أو JPG
                       </Text>
                     </Flex>
                   )}
@@ -1753,7 +1799,7 @@ const TeacherDashboardHome = () => {
                   </Box>
 
                   <Text fontSize="xs" color={mutedTextColor} textAlign="center">
-                    الصور المقبولة: JPG, PNG, GIF (حد أقصى 5MB)
+                    الصور المقبولة: JPG, PNG, GIF
                   </Text>
 
                   {!editAvatarPreview && (
@@ -1898,36 +1944,45 @@ const TeacherDashboardHome = () => {
                     </Text>
                   </Box>
                 )}
+              </Flex>
 
-                <FormControl isRequired flex={1}>
+              <FormControl isRequired>
                   <FormLabel
                     fontWeight="bold"
                     color={headingColor}
                     fontSize={{ base: "sm", md: "md" }}
                   >
-                    المرحلة الدراسية
+                    الصفوف الدراسية
                   </FormLabel>
-                  <Select
-                    placeholder="اختر المرحلة"
-                    value={editData.grade_id}
-                    onChange={(e) =>
-                      handleEditChange("grade_id", e.target.value)
-                    }
-                    borderRadius="xl"
-                    border="2px solid"
-                    borderColor={inputBorderColor}
-                    bg={cardBg}
-                    _focus={{ borderColor: "blue.500" }}
-                    size={{ base: "sm", md: "md" }}
-                  >
-                    {grades.map((grade) => (
-                      <option key={grade.id} value={grade.id}>
-                        {grade.name}
-                      </option>
-                    ))}
-                  </Select>
+                  <Text fontSize="xs" color={mutedTextColor} mb={3}>
+                    يمكن اختيار صف واحد أو أكثر لنفس الكورس
+                  </Text>
+                  {grades.length ? (
+                    <CheckboxGroup
+                      value={(editData.grade_ids || []).map((id) => String(id))}
+                      onChange={(values) =>
+                        handleEditChange("grade_ids", normalizeGradeIds(values))
+                      }
+                    >
+                      <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={2}>
+                        {grades.map((grade) => (
+                          <Checkbox
+                            key={grade.id}
+                            value={String(grade.id)}
+                            colorScheme="blue"
+                            borderColor={inputBorderColor}
+                          >
+                            {grade.name}
+                          </Checkbox>
+                        ))}
+                      </SimpleGrid>
+                    </CheckboxGroup>
+                  ) : (
+                    <Text fontSize="sm" color={mutedTextColor}>
+                      لا توجد صفوف متاحة حالياً.
+                    </Text>
+                  )}
                 </FormControl>
-              </Flex>
             </VStack>
           </ModalBody>
           <ModalFooter

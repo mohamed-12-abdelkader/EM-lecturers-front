@@ -13,14 +13,15 @@ import {
   Modal,
   ModalOverlay,
   ModalContent,
-  ModalHeader,
   ModalBody,
   ModalCloseButton,
   Button,
   Spinner,
   Badge,
   Divider,
+  Progress,
   useDisclosure,
+  Circle,
 } from "@chakra-ui/react";
 import {
   MdAssignment,
@@ -29,43 +30,56 @@ import {
   MdSchedule,
   MdReceiptLong,
   MdVisibility,
+  MdQuiz,
+  MdTrendingUp,
+  MdPlayArrow,
 } from "react-icons/md";
-import { FaPlay } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import baseUrl from "../../api/baseUrl";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
+
+const FILTERS = [
+  { id: "all", label: "الكل" },
+  { id: "passed", label: "مجتاز" },
+  { id: "failed", label: "غير مجتاز" },
+  { id: "pending", label: "قيد الانتظار" },
+];
 
 const ExamGrades = () => {
   const [exams, setExams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [filter, setFilter] = useState("all");
 
   const [reportData, setReportData] = useState(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState(null);
   const { isOpen: isReportOpen, onOpen: onReportOpen, onClose: onReportClose } = useDisclosure();
 
-  const bgColor = useColorModeValue("gray.50", "gray.900");
-  const cardBg = useColorModeValue("white", "gray.800");
-  const textColor = useColorModeValue("gray.800", "white");
-  const secondaryColor = useColorModeValue("gray.600", "gray.400");
-  const borderColor = useColorModeValue("gray.200", "gray.600");
+  const pageBg = useColorModeValue("#F4F7FB", "gray.950");
+  const cardBg = useColorModeValue("white", "gray.900");
+  const textColor = useColorModeValue("slate.800", "white");
+  const muted = useColorModeValue("slate.500", "gray.400");
+  const borderColor = useColorModeValue("blackAlpha.100", "whiteAlpha.100");
+  const softBlue = useColorModeValue("blue.50", "blue.950");
+  const chipIdleBg = useColorModeValue("white", "gray.800");
+  const chipIdleBorder = useColorModeValue("gray.200", "gray.700");
 
   const submittedExams = useMemo(
     () => exams.filter((exam) => exam.status === "submitted"),
-    [exams]
+    [exams],
   );
   const pendingExams = useMemo(
     () => exams.filter((exam) => exam.status !== "submitted"),
-    [exams]
+    [exams],
   );
   const passedCount = useMemo(
     () => submittedExams.filter((exam) => exam.passed).length,
-    [submittedExams]
+    [submittedExams],
   );
   const failedCount = useMemo(
     () => submittedExams.filter((exam) => !exam.passed).length,
-    [submittedExams]
+    [submittedExams],
   );
   const averageGrade = useMemo(() => {
     if (!submittedExams.length) return 0;
@@ -77,6 +91,23 @@ const ExamGrades = () => {
     return Math.round(total / submittedExams.length);
   }, [submittedExams]);
 
+  const filteredExams = useMemo(() => {
+    if (filter === "passed") return exams.filter((e) => e.status === "submitted" && e.passed);
+    if (filter === "failed") return exams.filter((e) => e.status === "submitted" && !e.passed);
+    if (filter === "pending") return exams.filter((e) => e.status !== "submitted");
+    return exams;
+  }, [exams, filter]);
+
+  const heroMessage = useMemo(() => {
+    if (!submittedExams.length && pendingExams.length) {
+      return "لديك امتحانات جاهزة — ابدأ الآن وحقق أفضل نتيجة.";
+    }
+    if (!exams.length) return "سجّل نتائجك هنا بمجرد أداء أول امتحان.";
+    if (averageGrade >= 85) return "أداؤك ممتاز — استمر بنفس القوة.";
+    if (averageGrade >= 65) return "مستواك جيد، ومع المراجعة ستصل للأفضل.";
+    return "كل محاولة فرصة للتقدّم — راجع التقارير وحسّن نتيجتك.";
+  }, [averageGrade, exams.length, pendingExams.length, submittedExams.length]);
+
   useEffect(() => {
     const fetchGrades = async () => {
       try {
@@ -85,10 +116,10 @@ const ExamGrades = () => {
         const token = localStorage.getItem("token");
         const res = await baseUrl.get(
           "/api/course/my-exam-grades",
-          token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+          token ? { headers: { Authorization: `Bearer ${token}` } } : {},
         );
         setExams(res.data.exams || []);
-      } catch (err) {
+      } catch {
         setError("حدث خطأ أثناء تحميل الدرجات");
       } finally {
         setLoading(false);
@@ -97,27 +128,30 @@ const ExamGrades = () => {
     fetchGrades();
   }, []);
 
-  const openReport = useCallback(async (examId) => {
-    setReportData(null);
-    setReportError(null);
-    onReportOpen();
-    setReportLoading(true);
-    try {
-      const token = localStorage.getItem("token");
-      const res = await baseUrl.get(`/api/exams/${examId}/my-report`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setReportData(res.data);
-    } catch (err) {
-      const status = err?.response?.status;
-      const msg = err?.response?.data?.message || err?.message;
-      if (status === 403) setReportError("غير مسموح بعرض التقرير في هذا التوقيت.");
-      else if (status === 404) setReportError("التقرير غير متوفر.");
-      else setReportError(msg || "حدث خطأ أثناء تحميل التقرير.");
-    } finally {
-      setReportLoading(false);
-    }
-  }, [onReportOpen]);
+  const openReport = useCallback(
+    async (examId) => {
+      setReportData(null);
+      setReportError(null);
+      onReportOpen();
+      setReportLoading(true);
+      try {
+        const token = localStorage.getItem("token");
+        const res = await baseUrl.get(`/api/exams/${examId}/my-report`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setReportData(res.data);
+      } catch (err) {
+        const status = err?.response?.status;
+        const msg = err?.response?.data?.message || err?.message;
+        if (status === 403) setReportError("غير مسموح بعرض التقرير في هذا التوقيت.");
+        else if (status === 404) setReportError("التقرير غير متوفر.");
+        else setReportError(msg || "حدث خطأ أثناء تحميل التقرير.");
+      } finally {
+        setReportLoading(false);
+      }
+    },
+    [onReportOpen],
+  );
 
   const closeReport = useCallback(() => {
     onReportClose();
@@ -131,6 +165,7 @@ const ExamGrades = () => {
       return new Date(value).toLocaleDateString("ar-EG", {
         month: "short",
         day: "numeric",
+        year: "numeric",
       });
     } catch {
       return value;
@@ -167,34 +202,33 @@ const ExamGrades = () => {
     }
   };
 
-  if (loading) {
-    return <BrandLoadingScreen />;
-  }
+  if (loading) return <BrandLoadingScreen />;
 
   if (error) {
     return (
-      <Box minH="100vh" bg={bgColor} pt="100px" pb={12} dir="rtl">
-        <Container maxW="container.lg">
-          <Center minH="60vh">
+      <Box minH="100vh" bg={pageBg} pt="100px" pb={12} dir="rtl">
+        <Container maxW="container.md">
+          <Center minH="50vh">
             <VStack
-              spacing={4}
-              p={8}
+              spacing={5}
+              p={10}
               bg={cardBg}
-              borderRadius="2xl"
+              borderRadius="3xl"
               borderWidth="1px"
-              boxShadow="lg"
+              borderColor={borderColor}
+              boxShadow="xl"
+              maxW="420px"
+              w="full"
             >
-              <Text color="red.500" fontWeight="bold" fontSize="lg">
+              <Circle size="64px" bg="red.50" color="red.500">
+                <Icon as={MdCancel} boxSize={8} />
+              </Circle>
+              <Text color={textColor} fontWeight="bold" fontSize="lg" textAlign="center">
                 {error}
               </Text>
-              <Box
-                as="button"
-                onClick={() => window.location.reload()}
-                color="blue.500"
-                fontWeight="600"
-              >
+              <Button colorScheme="blue" borderRadius="xl" onClick={() => window.location.reload()}>
                 إعادة المحاولة
-              </Box>
+              </Button>
             </VStack>
           </Center>
         </Container>
@@ -203,134 +237,259 @@ const ExamGrades = () => {
   }
 
   return (
-    <Box minH="100vh" bg={bgColor} pb={12} dir="rtl" className="mb-[100px]">
-      {/* 1. Hero - لوحة الإنجازات */}
-      <Box
-        h="100px"
-        mb={5}
-        overflow="hidden"
-        borderBottomLeftRadius="30px"
-        borderBottomRightRadius="30px"
-        boxShadow="0 4px 15px rgba(79, 70, 229, 0.3)"
-        bgGradient="linear(to-br, #4F46E5, #6a97faff)"
-      >
-        <Flex h="full" px={6} align="center" justify="space-between">
-          <VStack align="flex-end" spacing={0}>
-            <Text fontSize="24px" fontWeight="bold" color="white">
-              لوحة الإنجازات 🏆
-            </Text>
-            <Text fontSize="14px" color="rgba(255,255,255,0.85)">
-              مستواك العام ممتاز، استمر!
-            </Text>
-          </VStack>
+    <Box minH="100vh" bg={pageBg} pb={{ base: 28, lg: 12 }} dir="rtl">
+      {/* Hero */}
+      <Box position="relative" overflow="hidden" mb={6}>
+        <Box
+          position="absolute"
+          inset={0}
+          bgGradient="linear(135deg, #1D4ED8 0%, #2563EB 42%, #0EA5E9 100%)"
+        />
+        <Box
+          position="absolute"
+          top="-40px"
+          left="-30px"
+          w="220px"
+          h="220px"
+          borderRadius="full"
+          bg="whiteAlpha.200"
+          filter="blur(2px)"
+          pointerEvents="none"
+        />
+        <Box
+          position="absolute"
+          bottom="-60px"
+          right="-20px"
+          w="260px"
+          h="260px"
+          borderRadius="full"
+          bg="orange.400"
+          opacity={0.18}
+          pointerEvents="none"
+        />
+
+        <Container maxW="container.xl" position="relative" py={{ base: 8, md: 10 }} px={{ base: 4, md: 6 }}>
           <Flex
-            w="90px"
-            h="90px"
-            borderRadius="full"
-            bg="rgba(255,255,255,0.2)"
-            borderWidth="1px"
-            borderColor="rgba(255,255,255,0.4)"
-            align="center"
-            justify="center"
+            direction={{ base: "column", md: "row" }}
+            align={{ base: "stretch", md: "center" }}
+            justify="space-between"
+            gap={6}
           >
-            <VStack spacing={0}>
-              <Text color="white" fontSize="26px" fontWeight="bold">
-                {averageGrade}%
+            <VStack align="flex-start" spacing={3} flex={1}>
+              <HStack
+                spacing={2}
+                bg="whiteAlpha.200"
+                px={3}
+                py={1}
+                borderRadius="full"
+                backdropFilter="blur(8px)"
+              >
+                <Icon as={MdQuiz} color="white" boxSize={4} />
+                <Text fontSize="xs" fontWeight="bold" color="white">
+                  امتحاناتي
+                </Text>
+              </HStack>
+              <Text
+                fontSize={{ base: "2xl", md: "3xl" }}
+                fontWeight="black"
+                color="white"
+                letterSpacing="-0.02em"
+                lineHeight="1.25"
+              >
+                لوحة درجاتك الأكاديمية
               </Text>
-              <Text color="rgba(255,255,255,0.9)" fontSize="12px">
-                المعدل
+              <Text fontSize={{ base: "sm", md: "md" }} color="whiteAlpha.850" maxW="520px" lineHeight="1.8">
+                {heroMessage}
               </Text>
             </VStack>
+
+            <Flex
+              align="center"
+              gap={4}
+              bg="whiteAlpha.15"
+              borderWidth="1px"
+              borderColor="whiteAlpha.300"
+              borderRadius="2xl"
+              px={{ base: 4, md: 5 }}
+              py={4}
+              backdropFilter="blur(12px)"
+              minW={{ md: "240px" }}
+            >
+              <Box position="relative" boxSize="84px">
+                <svg viewBox="0 0 36 36" width="84" height="84" style={{ transform: "rotate(-90deg)" }}>
+                  <path
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    fill="none"
+                    stroke="rgba(255,255,255,0.22)"
+                    strokeWidth="3"
+                  />
+                  <path
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    fill="none"
+                    stroke="#FDBA74"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeDasharray={`${averageGrade}, 100`}
+                  />
+                </svg>
+                <VStack
+                  position="absolute"
+                  inset={0}
+                  spacing={0}
+                  align="center"
+                  justify="center"
+                  style={{ transform: "none" }}
+                >
+                  <Text color="white" fontSize="xl" fontWeight="black" lineHeight="1">
+                    {averageGrade}%
+                  </Text>
+                  <Text color="whiteAlpha.800" fontSize="10px" fontWeight="semibold">
+                    المعدل
+                  </Text>
+                </VStack>
+              </Box>
+              <VStack align="flex-start" spacing={1}>
+                <HStack spacing={1.5}>
+                  <Icon as={MdTrendingUp} color="orange.200" />
+                  <Text color="white" fontSize="sm" fontWeight="bold">
+                    متوسط أدائك
+                  </Text>
+                </HStack>
+                <Text color="whiteAlpha.800" fontSize="xs" lineHeight="1.6">
+                  من {submittedExams.length} امتحان مُسلَّم
+                </Text>
+              </VStack>
+            </Flex>
           </Flex>
-        </Flex>
+        </Container>
       </Box>
 
-      <Container maxW="container.xl" px={{ base: 4, md: 5 }}>
-        {/* 2. Stat Cards - Horizontal */}
-        <Flex
-          gap={3}
-          mb={6}
-          overflowX="auto"
-          pb={2}
-          sx={{
-            "&::-webkit-scrollbar": { height: "6px" },
-            "&::-webkit-scrollbar-thumb": { bg: "gray.300", borderRadius: 3 },
-          }}
-        >
+      <Container maxW="container.xl" px={{ base: 4, md: 6 }}>
+        {/* Stats */}
+        <SimpleGrid columns={{ base: 2, md: 4 }} spacing={{ base: 3, md: 4 }} mb={6}>
           <StatCard
             label="إجمالي الامتحانات"
             value={exams.length}
             icon={MdAssignment}
-            gradient={["#3B82F6", "#2563EB"]}
-            bg={cardBg}
+            accent="blue"
+            cardBg={cardBg}
+            borderColor={borderColor}
             textColor={textColor}
-            secondaryColor={secondaryColor}
+            muted={muted}
           />
           <StatCard
-            label="الامتحانات المجتازة"
+            label="المجتازة"
             value={passedCount}
             icon={MdCheckCircle}
-            gradient={["#10B981", "#059669"]}
-            bg={cardBg}
+            accent="green"
+            cardBg={cardBg}
+            borderColor={borderColor}
             textColor={textColor}
-            secondaryColor={secondaryColor}
+            muted={muted}
           />
           <StatCard
-            label="لم تنجح"
+            label="غير مجتازة"
             value={failedCount}
             icon={MdCancel}
-            gradient={["#EF4444", "#DC2626"]}
-            bg={cardBg}
+            accent="red"
+            cardBg={cardBg}
+            borderColor={borderColor}
             textColor={textColor}
-            secondaryColor={secondaryColor}
+            muted={muted}
           />
           <StatCard
             label="قيد الانتظار"
             value={pendingExams.length}
             icon={MdSchedule}
-            gradient={["#F59E0B", "#D97706"]}
-            bg={cardBg}
+            accent="orange"
+            cardBg={cardBg}
+            borderColor={borderColor}
             textColor={textColor}
-            secondaryColor={secondaryColor}
+            muted={muted}
           />
+        </SimpleGrid>
+
+        {/* Filters + list header */}
+        <Flex
+          align={{ base: "stretch", sm: "center" }}
+          justify="space-between"
+          direction={{ base: "column", sm: "row" }}
+          gap={3}
+          mb={4}
+        >
+          <VStack align="flex-start" spacing={0}>
+            <Text fontSize="lg" fontWeight="black" color={textColor}>
+              سجل النتائج
+            </Text>
+            <Text fontSize="sm" color={muted}>
+              {filteredExams.length} نتيجة معروضة
+            </Text>
+          </VStack>
+
+          <HStack
+            spacing={2}
+            overflowX="auto"
+            pb={1}
+            sx={{
+              "&::-webkit-scrollbar": { display: "none" },
+            }}
+          >
+            {FILTERS.map((item) => {
+              const active = filter === item.id;
+              return (
+                <Button
+                  key={item.id}
+                  size="sm"
+                  borderRadius="full"
+                  fontWeight="bold"
+                  px={4}
+                  flexShrink={0}
+                  variant={active ? "solid" : "outline"}
+                  colorScheme={active ? "blue" : "gray"}
+                  bg={active ? undefined : chipIdleBg}
+                  borderColor={active ? undefined : chipIdleBorder}
+                  onClick={() => setFilter(item.id)}
+                >
+                  {item.label}
+                </Button>
+              );
+            })}
+          </HStack>
         </Flex>
 
-        {/* 3. Section Title */}
-        <Text
-          fontSize="18px"
-          fontWeight="bold"
-          color={textColor}
-          mb={4}
-          textAlign="right"
-        >
-          سجل النتائج
-        </Text>
-
-        {/* 4. Exam Tickets */}
-        <VStack spacing={4} align="stretch">
-          {exams.length === 0 ? (
-            <Center py={16}>
+        {/* Exam list */}
+        <VStack spacing={3.5} align="stretch">
+          {filteredExams.length === 0 ? (
+            <Center
+              py={16}
+              bg={cardBg}
+              borderRadius="2xl"
+              borderWidth="1px"
+              borderColor={borderColor}
+              borderStyle="dashed"
+            >
               <VStack spacing={3}>
-                <Icon
-                  as={MdReceiptLong}
-                  boxSize={16}
-                  color={secondaryColor}
-                  opacity={0.5}
-                />
-                <Text color={secondaryColor} fontSize="md">
-                  لا توجد امتحانات حتى الآن
+                <Circle size="72px" bg={softBlue} color="blue.500">
+                  <Icon as={MdReceiptLong} boxSize={8} />
+                </Circle>
+                <Text color={textColor} fontWeight="bold">
+                  لا توجد نتائج في هذا التصنيف
+                </Text>
+                <Text color={muted} fontSize="sm">
+                  جرّب تصنيفاً آخر أو انتظر ظهور امتحانات جديدة.
                 </Text>
               </VStack>
             </Center>
           ) : (
-            exams.map((exam) => (
-              <ExamTicket
+            filteredExams.map((exam) => (
+              <ExamCard
                 key={exam.exam_id}
                 exam={exam}
                 cardBg={cardBg}
                 textColor={textColor}
-                secondaryColor={secondaryColor}
-                bgColor={bgColor}
+                muted={muted}
+                borderColor={borderColor}
+                softBlue={softBlue}
                 formatDate={formatDate}
                 getExamTypeLabel={getExamTypeLabel}
                 onViewReport={openReport}
@@ -339,39 +498,68 @@ const ExamGrades = () => {
           )}
         </VStack>
 
-        {/* مودال تقرير الامتحان */}
-        <Modal isOpen={isReportOpen} onClose={closeReport} size="2xl" scrollBehavior="inside">
-          <ModalOverlay />
-          <ModalContent bg={cardBg} maxH="90vh" dir="rtl">
-            <ModalHeader>
-              تقرير الامتحان
-              {reportData?.exam?.title && (
-                <Text as="span" fontWeight="normal" fontSize="md" color={secondaryColor} mr={2}>
-                  — {reportData.exam.title}
-                </Text>
-              )}
-            </ModalHeader>
-            <ModalCloseButton />
-            <ModalBody pb={6}>
+        {/* Report modal */}
+        <Modal
+          isOpen={isReportOpen}
+          onClose={closeReport}
+          size={{ base: "full", md: "2xl" }}
+          scrollBehavior="inside"
+        >
+          <ModalOverlay bg="blackAlpha.500" backdropFilter="blur(6px)" />
+          <ModalContent
+            bg={cardBg}
+            maxH={{ base: "100dvh", md: "90vh" }}
+            borderRadius={{ base: 0, md: "2xl" }}
+            dir="rtl"
+            overflow="hidden"
+          >
+            <Box
+              bgGradient="linear(to-l, blue.600, blue.500)"
+              color="white"
+              px={6}
+              py={4}
+            >
+              <Flex align="center" justify="space-between" gap={3}>
+                <VStack align="flex-start" spacing={0}>
+                  <Text fontSize="xs" fontWeight="bold" opacity={0.85}>
+                    تقرير مفصّل
+                  </Text>
+                  <Text fontSize="lg" fontWeight="black" noOfLines={1}>
+                    {reportData?.exam?.title || "تقرير الامتحان"}
+                  </Text>
+                </VStack>
+                <ModalCloseButton position="static" color="white" />
+              </Flex>
+            </Box>
+            <ModalBody pb={6} pt={5}>
               {reportLoading && (
-                <Center py={12}>
-                  <Spinner size="lg" color="blue.500" />
+                <Center py={14}>
+                  <VStack spacing={3}>
+                    <Spinner size="lg" color="blue.500" thickness="3px" />
+                    <Text color={muted} fontSize="sm">
+                      جاري تحميل التقرير…
+                    </Text>
+                  </VStack>
                 </Center>
               )}
               {reportError && !reportLoading && (
-                <VStack py={8} spacing={3}>
-                  <Icon as={MdCancel} boxSize={12} color="red.500" />
-                  <Text color={textColor}>{reportError}</Text>
+                <VStack py={10} spacing={3}>
+                  <Circle size="64px" bg="red.50" color="red.500">
+                    <Icon as={MdCancel} boxSize={8} />
+                  </Circle>
+                  <Text color={textColor} fontWeight="semibold" textAlign="center">
+                    {reportError}
+                  </Text>
                 </VStack>
               )}
               {reportData && !reportLoading && (
                 <ExamReportBody
                   report={reportData}
                   formatDateTime={formatDateTime}
-                  cardBg={cardBg}
                   textColor={textColor}
-                  secondaryColor={secondaryColor}
+                  muted={muted}
                   borderColor={borderColor}
+                  cardBg={cardBg}
                 />
               )}
             </ModalBody>
@@ -382,127 +570,61 @@ const ExamGrades = () => {
   );
 };
 
-function StatCard({
-  label,
-  value,
-  icon: IconComp,
-  gradient,
-  bg,
-  textColor,
-  secondaryColor,
-}) {
+function StatCard({ label, value, icon: IconComp, accent, cardBg, borderColor, textColor, muted }) {
+  const tones = {
+    blue: { bg: "blue.50", color: "blue.500", darkBg: "blue.900" },
+    green: { bg: "green.50", color: "green.500", darkBg: "green.900" },
+    red: { bg: "red.50", color: "red.500", darkBg: "red.900" },
+    orange: { bg: "orange.50", color: "orange.500", darkBg: "orange.900" },
+  };
+  const tone = tones[accent] || tones.blue;
+  const iconBg = useColorModeValue(tone.bg, tone.darkBg);
+  const shadow = useColorModeValue("sm", "none");
+
   return (
-    <Flex
-      minW="140px"
-      flexShrink={0}
-      direction="column"
-      align="center"
-      p={4}
-      borderRadius="20px"
-      bg={bg}
-      boxShadow="md"
+    <Box
+      bg={cardBg}
+      borderWidth="1px"
+      borderColor={borderColor}
+      borderRadius="2xl"
+      p={{ base: 3.5, md: 4 }}
+      boxShadow={shadow}
+      transition="all 0.2s"
+      _hover={{ transform: "translateY(-2px)", boxShadow: "md" }}
     >
-      <Flex
-        w="44px"
-        h="44px"
-        borderRadius="14px"
-        bgGradient={`linear(to-br, ${gradient[0]}, ${gradient[1]})`}
-        align="center"
-        justify="center"
-        mb={2}
-      >
-        <Icon as={IconComp} color="white" boxSize={5} />
-      </Flex>
-      <Text fontSize="20px" fontWeight="bold" color={textColor} mb={0}>
-        {value}
-      </Text>
-      <Text fontSize="12px" color={secondaryColor}>
-        {label}
-      </Text>
-    </Flex>
-  );
-}
-
-function ExamReportBody({ report, formatDateTime, cardBg, textColor, secondaryColor, borderColor }) {
-  const { examType, exam, attempt, questions = [] } = report;
-  const isLecture = examType === "lecture";
-
-  return (
-    <VStack align="stretch" spacing={5}>
-      <Flex justify="space-between" align="center" flexWrap="wrap" gap={2}>
-        <Text fontSize="lg" fontWeight="bold" color={textColor}>
-          {exam?.title}
-        </Text>
-        <Badge colorScheme={attempt?.passed ? "green" : "red"} fontSize="sm">
-          {attempt?.passed ? "ناجح" : "راسب"}
-        </Badge>
-      </Flex>
-      <HStack spacing={4} flexWrap="wrap">
-        <Text fontSize="sm" color={secondaryColor}>
-          الدرجة: <Text as="span" fontWeight="700" color={textColor}>{attempt?.obtainedGrade} / {attempt?.totalGrade}</Text>
-        </Text>
-        <Text fontSize="sm" color={secondaryColor}>
-          تاريخ التسليم: {formatDateTime(attempt?.submittedAt)}
-        </Text>
+      <HStack spacing={3} align="center">
+        <Flex
+          w="42px"
+          h="42px"
+          borderRadius="xl"
+          bg={iconBg}
+          color={tone.color}
+          align="center"
+          justify="center"
+          flexShrink={0}
+        >
+          <Icon as={IconComp} boxSize={5} />
+        </Flex>
+        <VStack align="flex-start" spacing={0} minW={0}>
+          <Text fontSize={{ base: "xl", md: "2xl" }} fontWeight="black" color={textColor} lineHeight="1.1">
+            {value}
+          </Text>
+          <Text fontSize="xs" color={muted} fontWeight="medium" noOfLines={1}>
+            {label}
+          </Text>
+        </VStack>
       </HStack>
-      <Divider borderColor={borderColor} />
-      <Text fontWeight="bold" color={textColor} fontSize="md">
-        الأسئلة والإجابات
-      </Text>
-      <VStack align="stretch" spacing={4}>
-        {questions.map((q, i) => (
-          <Box
-            key={q.questionId || i}
-            p={4}
-            borderRadius="lg"
-            bg={cardBg}
-            borderWidth="1px"
-            borderColor={q.isCorrect ? "green.200" : "red.200"}
-            borderLeftWidth="4px"
-            borderLeftColor={q.isCorrect ? "green.500" : "red.500"}
-          >
-            <Text fontWeight="600" color={textColor} mb={2}>
-              {i + 1}. {q.questionText}
-            </Text>
-            {q.questionImage && (
-              <Box as="img" src={q.questionImage} alt="" maxW="200px" borderRadius="md" mb={2} />
-            )}
-            <VStack align="stretch" spacing={1} fontSize="sm">
-              <HStack justify="space-between">
-                <Text color={secondaryColor}>إجابتك:</Text>
-                <Text fontWeight="medium" color={textColor}>
-                  {isLecture
-                    ? (q.yourAnswer?.text ?? q.yourAnswer?.letter ?? "—")
-                    : (q.yourAnswer ?? "—")}
-                </Text>
-              </HStack>
-              <HStack justify="space-between">
-                <Text color={secondaryColor}>الإجابة الصحيحة:</Text>
-                <Text fontWeight="medium" color="green.600">
-                  {isLecture
-                    ? (q.correctAnswer?.text ?? q.correctAnswer?.letter ?? "—")
-                    : (q.correctAnswer ?? "—")}
-                </Text>
-              </HStack>
-              {!isLecture && (q.optionA ?? q.optionB ?? q.optionC ?? q.optionD) && (
-                <Text fontSize="xs" color={secondaryColor} mt={1}>
-                  الخيارات: أ: {q.optionA ?? "—"} | ب: {q.optionB ?? "—"} | ج: {q.optionC ?? "—"} | د: {q.optionD ?? "—"}
-                </Text>
-              )}
-            </VStack>
-          </Box>
-        ))}
-      </VStack>
-    </VStack>
+    </Box>
   );
 }
 
-function ExamTicket({
+function ExamCard({
   exam,
   cardBg,
   textColor,
-  secondaryColor,
-  bgColor,
+  muted,
+  borderColor,
+  softBlue,
   formatDate,
   getExamTypeLabel,
   onViewReport,
@@ -512,176 +634,275 @@ function ExamTicket({
   const studentGrade = exam.student_grade ?? 0;
   const totalGrade = exam.total_grade ?? 100;
   const percentage =
-    isSubmitted && totalGrade
-      ? Math.round((studentGrade / totalGrade) * 100)
-      : 0;
+    isSubmitted && totalGrade ? Math.round((studentGrade / totalGrade) * 100) : 0;
 
-  const ticketGradient = isSubmitted
-    ? isPassed
-      ? ["#10B981", "#34D399"]
-      : ["#EF4444", "#F87171"]
-    : ["#3B82F6", "#60A5FA"];
+  const statusColor = !isSubmitted ? "blue" : isPassed ? "green" : "red";
+  const statusLabel = !isSubmitted ? "جاهز للبدء" : isPassed ? "ناجح" : "غير مجتاز";
+  const progressColorScheme = !isSubmitted ? "blue" : isPassed ? "green" : "red";
+  const cardShadow = useColorModeValue("0 8px 24px rgba(15,23,42,0.04)", "none");
+  const hoverBorder = useColorModeValue("blue.200", "blue.700");
+  const hoverShadow = useColorModeValue("0 14px 32px rgba(37,99,235,0.1)", "lg");
+  const progressTrack = useColorModeValue("gray.100", "gray.800");
 
   const examUrl =
     exam.exam_type === "course"
       ? `/exam/${exam.exam_id}`
       : `/ComprehensiveExam/${exam.exam_id}`;
 
-  const content = (
-    <Flex
-      direction="row-reverse"
-      h="110px"
-      borderRadius="16px"
-      overflow="hidden"
+  const body = (
+    <Box
       bg={cardBg}
-      boxShadow="md"
-      _hover={!isSubmitted ? { boxShadow: "lg" } : {}}
+      borderWidth="1px"
+      borderColor={borderColor}
+      borderRadius="2xl"
+      overflow="hidden"
+      boxShadow={cardShadow}
+      transition="all 0.2s ease"
+      _hover={{
+        borderColor: hoverBorder,
+        transform: "translateY(-2px)",
+        boxShadow: hoverShadow,
+      }}
       cursor={!isSubmitted ? "pointer" : "default"}
     >
-      {/* Stub - نسبة أو أيقونة تشغيل */}
+      <Box h="3px" bg={`${statusColor}.400`} />
       <Flex
-        w="90px"
-        flexShrink={0}
-        bgGradient={`linear(to-br, ${ticketGradient[0]}, ${ticketGradient[1]})`}
-        align="center"
-        justify="center"
-        position="relative"
+        direction={{ base: "column", md: "row" }}
+        align={{ base: "stretch", md: "center" }}
+        gap={{ base: 4, md: 5 }}
+        p={{ base: 4, md: 5 }}
       >
-        {isSubmitted ? (
-          <VStack spacing={0}>
-            <Text color="white" fontSize="22px" fontWeight="bold">
-              {percentage}%
-            </Text>
-            <Text
-              color="rgba(255,255,255,0.9)"
-              fontSize="12px"
-              fontWeight="600"
-            >
-              {isPassed ? "ناجح" : "راسب"}
-            </Text>
-          </VStack>
-        ) : (
-          <Icon as={FaPlay} color="white" boxSize={8} />
-        )}
-        <Box
-          position="absolute"
-          left="-10px"
-          top="-10px"
-          w="20px"
-          h="20px"
-          borderRadius="full"
-          bg={bgColor}
-          zIndex={2}
-        />
-        <Box
-          position="absolute"
-          left="-10px"
-          bottom="-10px"
-          w="20px"
-          h="20px"
-          borderRadius="full"
-          bg={bgColor}
-          zIndex={2}
-        />
-      </Flex>
-
-      {/* Dotted line */}
-      <Flex
-        w="1px"
-        align="center"
-        justify="space-between"
-        py="10%"
-        px="2px"
-        flexDirection="column"
-        alignSelf="center"
-      >
-        {Array.from({ length: 8 }).map((_, i) => (
-          <Box
-            key={i}
-            w="2px"
-            h="4px"
-            borderRadius="1px"
-            bg={secondaryColor}
-            opacity={0.4}
-          />
-        ))}
-      </Flex>
-
-      {/* Content */}
-      <Flex flex={1} p={4} direction="column" justify="space-between" minW={0}>
-        <Flex justify="space-between" align="center">
-          <Text
-            fontSize="16px"
-            fontWeight="bold"
-            color={textColor}
-            noOfLines={1}
-            textAlign="right"
-            ml={2}
-          >
-            {exam.exam_title}
-          </Text>
-          <Box color={ticketGradient[0]}>
-            {isSubmitted ? (
-              isPassed ? (
-                <Icon as={MdCheckCircle} boxSize={5} />
-              ) : (
-                <Icon as={MdCancel} boxSize={5} />
-              )
-            ) : (
-              <Icon as={MdSchedule} boxSize={5} />
-            )}
-          </Box>
-        </Flex>
-        <Text
-          fontSize="13px"
-          color={secondaryColor}
-          noOfLines={1}
-          textAlign="right"
+        <Flex
+          w={{ base: "full", md: "88px" }}
+          h={{ base: "auto", md: "88px" }}
+          minH={{ base: "72px", md: "88px" }}
+          borderRadius="2xl"
+          bg={softBlue}
+          color={`${statusColor}.500`}
+          align="center"
+          justify="center"
+          flexShrink={0}
+          direction="column"
+          gap={0.5}
         >
-          {exam.course_title || "عام"} • {getExamTypeLabel(exam.exam_type)}
-        </Text>
-        <Flex justify="space-between" align="center" direction="row-reverse" flexWrap="wrap" gap={2}>
           {isSubmitted ? (
             <>
-              <HStack spacing={2} flexWrap="wrap">
-                <Text fontSize="12px" color={secondaryColor}>
-                  {formatDate(exam.submitted_at)}
-                </Text>
-                {onViewReport && (
-                  <Button
-                    size="xs"
-                    leftIcon={<Icon as={MdVisibility} />}
-                    colorScheme="blue"
-                    variant="outline"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      onViewReport(exam.exam_id);
-                    }}
-                  >
-                    عرض التقرير
-                  </Button>
-                )}
-              </HStack>
-              <Text fontSize="14px" fontWeight="700" color={textColor}>
-                {studentGrade} / {totalGrade}
+              <Text fontSize="2xl" fontWeight="black" lineHeight="1" color={textColor}>
+                {percentage}%
+              </Text>
+              <Text fontSize="11px" fontWeight="bold" color={`${statusColor}.500`}>
+                {statusLabel}
               </Text>
             </>
           ) : (
-            <Text fontSize="13px" fontWeight="600" color="#3B82F6">
-              جاهز للبدء
-            </Text>
+            <>
+              <Circle size="40px" bg="blue.500" color="white">
+                <Icon as={MdPlayArrow} boxSize={6} />
+              </Circle>
+              <Text fontSize="11px" fontWeight="bold" color="blue.500" mt={1}>
+                ابدأ الآن
+              </Text>
+            </>
           )}
         </Flex>
+
+        <VStack align="stretch" spacing={3} flex={1} minW={0}>
+          <Flex justify="space-between" align="flex-start" gap={3}>
+            <VStack align="flex-start" spacing={1.5} minW={0} flex={1}>
+              <Text fontSize={{ base: "md", md: "lg" }} fontWeight="bold" color={textColor} noOfLines={2}>
+                {exam.exam_title}
+              </Text>
+              <HStack spacing={2} flexWrap="wrap">
+                <Badge
+                  borderRadius="full"
+                  px={2.5}
+                  py={0.5}
+                  colorScheme="blue"
+                  variant="subtle"
+                  fontSize="10px"
+                >
+                  {getExamTypeLabel(exam.exam_type)}
+                </Badge>
+                <Text fontSize="xs" color={muted} noOfLines={1}>
+                  {exam.course_title || "عام"}
+                </Text>
+              </HStack>
+            </VStack>
+            <Badge
+              colorScheme={statusColor}
+              borderRadius="full"
+              px={2.5}
+              py={1}
+              fontSize="10px"
+              flexShrink={0}
+            >
+              {statusLabel}
+            </Badge>
+          </Flex>
+
+          {isSubmitted ? (
+            <Box>
+              <Flex justify="space-between" mb={1.5}>
+                <Text fontSize="xs" color={muted}>
+                  الدرجة
+                </Text>
+                <Text fontSize="sm" fontWeight="bold" color={textColor}>
+                  {studentGrade} / {totalGrade}
+                </Text>
+              </Flex>
+              <Progress
+                value={percentage}
+                size="sm"
+                borderRadius="full"
+                colorScheme={progressColorScheme}
+                bg={progressTrack}
+              />
+            </Box>
+          ) : (
+            <Text fontSize="sm" color={muted}>
+              الامتحان متاح الآن — اضغط للبدء.
+            </Text>
+          )}
+
+          <Flex justify="space-between" align="center" gap={3} flexWrap="wrap">
+            <Text fontSize="xs" color={muted}>
+              {isSubmitted ? `تاريخ التسليم: ${formatDate(exam.submitted_at)}` : "لم يُسلَّم بعد"}
+            </Text>
+            {isSubmitted && onViewReport ? (
+              <Button
+                size="sm"
+                leftIcon={<Icon as={MdVisibility} />}
+                colorScheme="blue"
+                variant="ghost"
+                borderRadius="lg"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onViewReport(exam.exam_id);
+                }}
+              >
+                عرض التقرير
+              </Button>
+            ) : null}
+          </Flex>
+        </VStack>
       </Flex>
-    </Flex>
+    </Box>
   );
 
-  if (isSubmitted) return content;
+  if (isSubmitted) return body;
   return (
-    <Link to={examUrl} style={{ textDecoration: "none" }}>
-      {content}
+    <Link to={examUrl} style={{ textDecoration: "none", display: "block" }}>
+      {body}
     </Link>
+  );
+}
+
+function ExamReportBody({ report, formatDateTime, textColor, muted, borderColor, cardBg }) {
+  const { examType, exam, attempt, questions = [] } = report;
+  const isLecture = examType === "lecture";
+  const obtained = attempt?.obtainedGrade ?? 0;
+  const total = attempt?.totalGrade ?? 100;
+  const pct = total > 0 ? Math.round((obtained / total) * 100) : 0;
+  const softBg = useColorModeValue("gray.50", "gray.800");
+  const answerBg = useColorModeValue("gray.50", "gray.800");
+  const correctBg = useColorModeValue("green.50", "green.950");
+
+  return (
+    <VStack align="stretch" spacing={5}>
+      <SimpleGrid columns={{ base: 1, sm: 3 }} spacing={3}>
+        <Box p={4} borderRadius="xl" borderWidth="1px" borderColor={borderColor} bg={softBg}>
+          <Text fontSize="xs" color={muted} mb={1}>
+            النتيجة
+          </Text>
+          <Badge colorScheme={attempt?.passed ? "green" : "red"} borderRadius="full" px={3} py={1}>
+            {attempt?.passed ? "ناجح" : "راسب"}
+          </Badge>
+        </Box>
+        <Box p={4} borderRadius="xl" borderWidth="1px" borderColor={borderColor}>
+          <Text fontSize="xs" color={muted} mb={1}>
+            الدرجة
+          </Text>
+          <Text fontWeight="black" color={textColor} fontSize="lg">
+            {obtained} / {total}
+            <Text as="span" fontSize="sm" color={muted} fontWeight="medium" mr={2}>
+              ({pct}%)
+            </Text>
+          </Text>
+        </Box>
+        <Box p={4} borderRadius="xl" borderWidth="1px" borderColor={borderColor}>
+          <Text fontSize="xs" color={muted} mb={1}>
+            تاريخ التسليم
+          </Text>
+          <Text fontWeight="semibold" color={textColor} fontSize="sm">
+            {formatDateTime(attempt?.submittedAt)}
+          </Text>
+        </Box>
+      </SimpleGrid>
+
+      {exam?.title ? (
+        <Text fontSize="sm" color={muted}>
+          الامتحان: <Text as="span" color={textColor} fontWeight="bold">{exam.title}</Text>
+        </Text>
+      ) : null}
+
+      <Divider borderColor={borderColor} />
+
+      <Text fontWeight="black" color={textColor}>
+        الأسئلة والإجابات ({questions.length})
+      </Text>
+
+      <VStack align="stretch" spacing={3}>
+        {questions.map((q, i) => (
+          <Box
+            key={q.questionId || i}
+            p={4}
+            borderRadius="xl"
+            bg={cardBg}
+            borderWidth="1px"
+            borderColor={q.isCorrect ? "green.200" : "red.200"}
+            borderRightWidth="4px"
+            borderRightColor={q.isCorrect ? "green.400" : "red.400"}
+          >
+            <HStack justify="space-between" mb={2} align="flex-start">
+              <Text fontWeight="bold" color={textColor} flex={1}>
+                {i + 1}. {q.questionText}
+              </Text>
+              <Badge colorScheme={q.isCorrect ? "green" : "red"} borderRadius="full">
+                {q.isCorrect ? "صحيح" : "خطأ"}
+              </Badge>
+            </HStack>
+            {q.questionImage ? (
+              <Box as="img" src={q.questionImage} alt="" maxW="220px" borderRadius="lg" mb={3} />
+            ) : null}
+            <VStack align="stretch" spacing={2} fontSize="sm">
+              <Flex justify="space-between" gap={3} p={2.5} borderRadius="lg" bg={answerBg}>
+                <Text color={muted}>إجابتك</Text>
+                <Text fontWeight="bold" color={textColor} textAlign="left">
+                  {isLecture
+                    ? q.yourAnswer?.text ?? q.yourAnswer?.letter ?? "—"
+                    : q.yourAnswer ?? "—"}
+                </Text>
+              </Flex>
+              <Flex justify="space-between" gap={3} p={2.5} borderRadius="lg" bg={correctBg}>
+                <Text color={muted}>الإجابة الصحيحة</Text>
+                <Text fontWeight="bold" color="green.600" textAlign="left">
+                  {isLecture
+                    ? q.correctAnswer?.text ?? q.correctAnswer?.letter ?? "—"
+                    : q.correctAnswer ?? "—"}
+                </Text>
+              </Flex>
+              {!isLecture && (q.optionA ?? q.optionB ?? q.optionC ?? q.optionD) ? (
+                <Text fontSize="xs" color={muted} pt={1}>
+                  الخيارات: أ: {q.optionA ?? "—"} | ب: {q.optionB ?? "—"} | ج: {q.optionC ?? "—"} | د:{" "}
+                  {q.optionD ?? "—"}
+                </Text>
+              ) : null}
+            </VStack>
+          </Box>
+        ))}
+      </VStack>
+    </VStack>
   );
 }
 

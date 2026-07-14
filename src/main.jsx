@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import "./index.css";
-import { ChakraProvider, useBreakpointValue, useColorMode } from "@chakra-ui/react";
+import { ChakraProvider, useBreakpointValue, useColorMode, Box } from "@chakra-ui/react";
 import { BrowserRouter as Router, useLocation } from "react-router-dom";
 import Footer from "./components/Footer/Footer.jsx";
 import "react-toastify/dist/ReactToastify.css";
@@ -63,14 +63,26 @@ const RootContent = () => {
     location.pathname !== "/landing" &&
     !location.pathname.startsWith("/video/");
   const hasUser = Boolean(userData);
-  const showBottomNav = userData && location.pathname.toLowerCase() !== "/teacherchat";
+  const path = location.pathname.toLowerCase();
+  const hideStudentBottomNav =
+    path === "/landing" ||
+    path === "/login" ||
+    path === "/signup" ||
+    path === "/teacherchat" ||
+    path.startsWith("/video/") ||
+    path.startsWith("/exam/") ||
+    path.startsWith("/essay-exam/");
+  const showStudentBottomNav = Boolean(student) && hasUser && !hideStudentBottomNav;
 
   return (
     <NotificationProvider>
       <SyncTheme />
       <div id="overlay" className="overlay"></div>
       {showSidebar && <SidebarWithHeader />}
-      <App />
+      <Box pb={showStudentBottomNav ? { base: "76px", lg: 0 } : 0}>
+        <App />
+      </Box>
+      {showStudentBottomNav ? <BottomNavItems /> : null}
       {!tenantSubdomain && <WhatsButton />}
     </NotificationProvider>
   );

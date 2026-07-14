@@ -1,4 +1,16 @@
-export const ACCENT = "#0056b3";
+import {
+  FaChartPie,
+  FaUsers,
+  FaUserGraduate,
+  FaQrcode,
+  FaCalendarAlt,
+  FaMoneyBillWave,
+} from "react-icons/fa";
+
+/** Brand — aligned with teacher dashboard */
+export const ACCENT = "#3182CE";
+export const ACCENT_HOVER = "#2B6CB0";
+export const BRAND_ORANGE = "#DD6B20";
 
 export const WEEK_DAYS = [
   "السبت",
@@ -25,7 +37,7 @@ export const SUBSCRIPTION_LABELS = {
 };
 
 export const PAYMENT_METHOD_LABELS = {
-  cash: "كاش",
+  cash: "نقدي",
   transfer: "تحويل بنكي",
   vodafone_cash: "فودافون كاش",
   other: "أخرى",
@@ -48,13 +60,12 @@ export const MONTH_NAMES = [
 ];
 
 export const CENTER_NAV = [
-  { to: "", label: "لوحة التحكم", end: true },
-  { to: "groups", label: "المجموعات" },
-  { to: "students", label: "الطلاب" },
-  { to: "attendance", label: "الحضور" },
-  { to: "subscriptions", label: "الاشتراكات" },
-  { to: "payments", label: "المدفوعات" },
-  { to: "finance", label: "التقرير المالي" },
+  { to: "", label: "اللوحة", fullLabel: "لوحة التحكم", end: true, icon: FaChartPie },
+  { to: "groups", label: "المجموعات", fullLabel: "المجموعات", icon: FaUsers },
+  { to: "students", label: "الطلاب", fullLabel: "الطلاب", icon: FaUserGraduate },
+  { to: "attendance", label: "الحضور", fullLabel: "الحضور", icon: FaQrcode },
+  { to: "subscriptions", label: "المالي", fullLabel: "الشهر المالي", icon: FaCalendarAlt },
+  { to: "payments", label: "المدفوعات", fullLabel: "المدفوعات", icon: FaMoneyBillWave },
 ];
 
 export function formatMoney(value, currency = "ج.م") {
@@ -105,14 +116,26 @@ export function parseQrScan(text) {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
-    if (parsed?.token || parsed?.qrToken) {
+    const token =
+      parsed?.qr_token || parsed?.qrToken || parsed?.token || null;
+    if (token || parsed?.type === "tc_student") {
       return {
-        qrToken: parsed.token || parsed.qrToken,
-        qrPayload: parsed,
+        qr_token: token,
+        qr_payload: typeof text === "string" ? raw : JSON.stringify(parsed),
+        parsed,
       };
     }
   } catch {
     // plain token
   }
-  return { qrToken: raw };
+  return { qr_token: raw };
+}
+
+export function monthFirstLast(year, month) {
+  const y = Number(year);
+  const m = Number(month);
+  const from = `${y}-${String(m).padStart(2, "0")}-01`;
+  const last = new Date(y, m, 0).getDate();
+  const to = `${y}-${String(m).padStart(2, "0")}-${String(last).padStart(2, "0")}`;
+  return { from, to };
 }

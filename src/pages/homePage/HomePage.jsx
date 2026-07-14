@@ -62,6 +62,8 @@ import MyTeacher from "../myTeacher/MyTeacher";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import ScientificChatPanel from "../../components/scientificChat/ScientificChatPanel";
 import HomeProHero from "./components/HomeProHero";
+import HomeProStats from "./components/HomeProStats";
+import HomeProQuickActions from "./components/HomeProQuickActions";
 
 const MotionBox = motion(Box);
 const MotionCard = motion(Card);
@@ -844,16 +846,17 @@ const HomePage = () => {
   const errorIconColor = useColorModeValue("red.500", "red.400");
   const errorTextColor = useColorModeValue("red.600", "red.300");
   const enrolledCount = availableCourses.filter((c) => c?.is_enrolled).length;
+  const availableToJoin = availableCourses.filter((c) => !c?.is_enrolled).length;
   const studentId =
     user?.id ?? userData?.id ?? user?.student_id ?? userData?.student_id ?? null;
-  const pageBgColor = useColorModeValue("#f0f4fa", "gray.900");
+  const pageBgColor = useColorModeValue("#F4F7FB", "gray.950");
   const courseCardShadow = useColorModeValue(
-    "0 10px 30px rgba(15,23,42,0.08)",
+    "0 10px 30px rgba(15,23,42,0.06)",
     "0 12px 32px rgba(0,0,0,0.35)",
   );
-  const courseCardBorder = useColorModeValue("gray.300", "gray.700");
+  const courseCardBorder = useColorModeValue("blackAlpha.100", "whiteAlpha.100");
   const courseCardHoverShadow = useColorModeValue(
-    "0 16px 36px rgba(37,99,235,0.2)",
+    "0 16px 36px rgba(37,99,235,0.14)",
     "0 16px 38px rgba(30,64,175,0.45)",
   );
   const courseImageBg = useColorModeValue("gray.100", "gray.700");
@@ -869,97 +872,100 @@ const HomePage = () => {
   );
   const supportChatCourseBarBg = useColorModeValue("blue.50", "gray.900");
   const supportChatCourseBarBorder = useColorModeValue("blue.100", "gray.700");
+  const liveBannerBg = useColorModeValue("orange.50", "orange.900");
+  const liveBannerBorder = useColorModeValue("orange.300", "orange.500");
+  const liveBannerShadow = useColorModeValue(
+    "0 12px 30px rgba(251,146,60,0.22)",
+    "0 14px 32px rgba(0,0,0,0.4)",
+  );
+  const liveIconBg = useColorModeValue("orange.500", "orange.400");
+  const liveTitleColor = useColorModeValue("orange.800", "orange.100");
+  const liveHeadlineColor = useColorModeValue("orange.900", "orange.50");
+  const liveMsgColor = useColorModeValue("orange.800", "orange.200");
+  const liveMetaColor = useColorModeValue("orange.700", "orange.300");
+  const liveDismissHover = useColorModeValue("orange.100", "orange.800");
+  const sectionCardBg = useColorModeValue("white", "gray.900");
+  const sectionBorder = useColorModeValue("blackAlpha.100", "whiteAlpha.100");
 
   return (
-    <Box bg={pageBgColor} minH="calc(100vh - 80px)" p={{ base: 3, md: 4 }}>
-      <VStack spacing={4} align="stretch">
+    <Box bg={pageBgColor} minH="calc(100vh - 80px)" pb={{ base: 28, lg: 10 }}>
+      <VStack spacing={5} align="stretch">
         {liveBannerNotification ? (
-          <Card
-            bg={useColorModeValue("orange.50", "orange.900")}
-            borderWidth="1px"
-            borderColor={useColorModeValue("orange.300", "orange.500")}
-            borderRadius="xl"
-            boxShadow={useColorModeValue(
-              "0 12px 30px rgba(251,146,60,0.28)",
-              "0 14px 32px rgba(0,0,0,0.4)",
-            )}
-            w="100%"
-            maxW="100%"
-            alignSelf="stretch"
-          >
-            <CardBody py={3} px={{ base: 3, md: 4 }}>
-              <Flex align="center" justify="space-between" gap={3} wrap="wrap">
-                <HStack align="start" spacing={3} flex={1}>
-                  <Box
-                    mt={0.5}
-                    w="38px"
-                    h="38px"
-                    borderRadius="full"
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                    bg={useColorModeValue("orange.500", "orange.400")}
-                    color="white"
-                    boxShadow={useColorModeValue("0 10px 20px rgba(249,115,22,0.4)", "none")}
-                  >
-                    <Icon as={FaBell} boxSize={4} />
-                  </Box>
-                  <VStack align="start" spacing={0.5}>
-                    <HStack spacing={2}>
-                      <Text fontSize="xs" fontWeight="black" color={useColorModeValue("orange.800", "orange.100")}>
-                        تنبيه مباشر
+          <Box px={{ base: 3, md: 4 }} pt={3}>
+            <Card
+              bg={liveBannerBg}
+              borderWidth="1px"
+              borderColor={liveBannerBorder}
+              borderRadius="2xl"
+              boxShadow={liveBannerShadow}
+              w="100%"
+            >
+              <CardBody py={3.5} px={{ base: 3, md: 4 }}>
+                <Flex align="center" justify="space-between" gap={3} wrap="wrap">
+                  <HStack align="start" spacing={3} flex={1}>
+                    <Box
+                      mt={0.5}
+                      w="40px"
+                      h="40px"
+                      borderRadius="xl"
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="center"
+                      bg={liveIconBg}
+                      color="white"
+                    >
+                      <Icon as={FaBell} boxSize={4} />
+                    </Box>
+                    <VStack align="start" spacing={0.5}>
+                      <HStack spacing={2}>
+                        <Text fontSize="xs" fontWeight="black" color={liveTitleColor}>
+                          تنبيه مباشر
+                        </Text>
+                        <Badge bg="red.500" color="white" borderRadius="full" px={2} py={0.5} fontSize="10px" fontWeight="black">
+                          LIVE
+                        </Badge>
+                      </HStack>
+                      <Text fontSize="sm" fontWeight="black" color={liveHeadlineColor}>
+                        {liveBannerNotification.title || "بث مباشر جديد"}
                       </Text>
-                      <Badge
-                        bg={useColorModeValue("red.500", "red.400")}
-                        color="white"
-                        borderRadius="full"
-                        px={2}
-                        py={0.5}
-                        fontSize="10px"
-                        fontWeight="black"
-                      >
-                        LIVE
-                      </Badge>
-                    </HStack>
-                    <Text fontSize="sm" fontWeight="black" color={useColorModeValue("orange.900", "orange.50")}>
-                      {liveBannerNotification.title || "بث مباشر جديد"}
-                    </Text>
-                    <Text fontSize="xs" color={useColorModeValue("orange.800", "orange.200")} lineHeight="1.6">
-                      {liveBannerNotification.message}
-                    </Text>
-                    <Text fontSize="11px" color={useColorModeValue("orange.700", "orange.300")} fontWeight="bold">
-                      {formatDateTime(liveBannerNotification.created_at)}
-                    </Text>
-                  </VStack>
-                </HStack>
-                <HStack spacing={2} ms="auto">
-                  <Button
-                    size="sm"
-                    bg="blue.500"
-                    color="white"
-                    _hover={{ bg: "blue.600" }}
-                    onClick={handleEnterLiveStream}
-                    fontWeight="black"
-                  >
-                    دخول إلى البث
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    borderColor={useColorModeValue("orange.300", "orange.400")}
-                    color={useColorModeValue("orange.700", "orange.200")}
-                    _hover={{ bg: useColorModeValue("orange.100", "orange.800") }}
-                    onClick={() => setLiveBannerNotification(null)}
-                  >
-                    إخفاء
-                  </Button>
-                </HStack>
-              </Flex>
-            </CardBody>
-          </Card>
+                      <Text fontSize="xs" color={liveMsgColor} lineHeight="1.6">
+                        {liveBannerNotification.message}
+                      </Text>
+                      <Text fontSize="11px" color={liveMetaColor} fontWeight="bold">
+                        {formatDateTime(liveBannerNotification.created_at)}
+                      </Text>
+                    </VStack>
+                  </HStack>
+                  <HStack spacing={2} ms="auto">
+                    <Button
+                      size="sm"
+                      bg="blue.500"
+                      color="white"
+                      borderRadius="lg"
+                      _hover={{ bg: "blue.600" }}
+                      onClick={handleEnterLiveStream}
+                      fontWeight="black"
+                    >
+                      دخول إلى البث
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      borderRadius="lg"
+                      borderColor={liveBannerBorder}
+                      color={liveMetaColor}
+                      _hover={{ bg: liveDismissHover }}
+                      onClick={() => setLiveBannerNotification(null)}
+                    >
+                      إخفاء
+                    </Button>
+                  </HStack>
+                </Flex>
+              </CardBody>
+            </Card>
+          </Box>
         ) : null}
 
-        {/* Welcome Section */}
         <HomeProHero
           studentName={user?.name}
           studentId={studentId}
@@ -970,282 +976,308 @@ const HomePage = () => {
           onActivateWithQr={() => setIsQrScannerOpen(true)}
         />
 
-        {/* Header Stats */}
-        <SimpleGrid
-          columns={{ base: 1, md: 3 }}
-          spacing={3}
-          sx={{
-            "@media screen and (min-width: 750px) and (max-width: 850px)": {
-              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-            },
-          }}
-        >
-          {[
-            
-          ].map((item) => (
-            <Card
-              key={item.title}
-              bg="blue.500"
-              borderRadius="md"
-              borderWidth="1px"
-              borderColor="blue.600"
-              color="white"
-              boxShadow="0 8px 24px rgba(66, 153, 225, 0.35)"
-              w="100%"
-              maxW="100%"
-              alignSelf="stretch"
-              sx={{
-                "@media (max-width: 48em)": {
-                  width: "100% !important",
-                  maxWidth: "100% !important",
-                },
-              }}
+        <HomeProStats
+          enrolledCount={enrolledCount}
+          coursesCount={availableCourses.length}
+          availableToJoin={availableToJoin}
+        />
+
+        <HomeProQuickActions onActivateWithQr={() => setIsQrScannerOpen(true)} />
+
+        {/* My Courses */}
+        <Box px={{ base: 4, md: 6 }} maxW="7xl" w="full" mx="auto">
+          <Box
+            bg={sectionCardBg}
+            borderWidth="1px"
+            borderColor={sectionBorder}
+            borderRadius="2xl"
+            overflow="hidden"
+            boxShadow="sm"
+          >
+            <Flex
+              align="center"
+              justify="space-between"
+              gap={3}
+              px={{ base: 4, md: 5 }}
+              py={4}
+              borderBottomWidth="1px"
+              borderColor={sectionBorder}
             >
-              <CardBody py={2} px={4}>
-                <Flex align="center" justify="space-between">
-                  <Text fontSize="xs" fontWeight="semibold" opacity={0.95}>
-                    {item.title}
-                  </Text>
-                  <Text fontSize="xl" lineHeight="1" fontWeight="black">
-                    {item.value}
-                  </Text>
-                </Flex>
-              </CardBody>
-            </Card>
-          ))}
-        </SimpleGrid>
+              <VStack align="flex-start" spacing={0}>
+                <Text fontWeight="black" fontSize="lg" color={headingColor}>
+                  كورساتي
+                </Text>
+                <Text fontSize="sm" color={subtextColor}>
+                  المحتوى الذي اشتركت به
+                </Text>
+              </VStack>
+              <Button
+                as={Link}
+                to="/my-courses"
+                size="sm"
+                variant="ghost"
+                colorScheme="blue"
+                borderRadius="lg"
+                rightIcon={<Icon as={FaChevronLeft} />}
+              >
+                عرض الكل
+              </Button>
+            </Flex>
+            <Box px={{ base: 2, md: 3 }} py={3}>
+              <MyCourses embedded />
+            </Box>
+          </Box>
+        </Box>
 
-        {/* My Courses Section */}
-        <div
-        >
-          
-            <MyCourses embedded />
-        
-        </div>
-
-        {/* Courses Section */}
-        <Card 
-        className="mb-[100px]"
-          bg={cardBg}
-          borderWidth="1px"
-          borderColor={cardBorder}
-          borderRadius="md"
-          boxShadow={cardShadow}
-          overflow="hidden"
-          w="100%"
-          maxW="100%"
-          alignSelf="stretch"
-          sx={{
-            "@media (max-width: 48em)": {
-              width: "100% !important",
-              maxWidth: "100% !important",
-            },
-            "@media screen and (min-width: 750px) and (max-width: 850px)": {
-              width: "100% !important",
-              maxWidth: "100% !important",
-              minWidth: "100% !important",
-              flexBasis: "100% !important",
-            },
-          }}
-        >
-          <CardBody p={{ base: 2, md: 3 }}>
-            <Flex align="center" justify="space-between" mb={3} gap={3}>
-              <Text fontWeight="bold" color={headingColor}>
-                الكورسات المتوفرة
-              </Text>
+        {/* Available courses */}
+        <Box px={{ base: 4, md: 6 }} maxW="7xl" w="full" mx="auto" pb={2}>
+          <Box
+            bg={sectionCardBg}
+            borderWidth="1px"
+            borderColor={sectionBorder}
+            borderRadius="2xl"
+            overflow="hidden"
+            boxShadow="sm"
+          >
+            <Flex
+              align="center"
+              justify="space-between"
+              gap={3}
+              px={{ base: 4, md: 5 }}
+              py={4}
+              borderBottomWidth="1px"
+              borderColor={sectionBorder}
+            >
+              <VStack align="flex-start" spacing={0}>
+                <Text fontWeight="black" fontSize="lg" color={headingColor}>
+                  كورسات المنصة
+                </Text>
+                <Text fontSize="sm" color={subtextColor}>
+                  اكتشف المحتوى المتاح للاشتراك
+                </Text>
+              </VStack>
               {coursesLoading ? (
                 <HStack spacing={2} color={subtextColor}>
                   <Spinner size="sm" color="blue.500" thickness="3px" />
                   <Text fontSize="xs" fontWeight="medium">
-                    جاري تحميل الكورسات...
+                    جاري التحميل...
                   </Text>
                 </HStack>
-              ) : null}
+              ) : (
+                <Badge colorScheme="blue" borderRadius="full" px={3} py={1}>
+                  {availableCourses.length} كورس
+                </Badge>
+              )}
             </Flex>
-            {coursesLoading ? (
-              <SimpleGrid columns={{ base: 1, md: 3 }} spacing={{ base: 3, md: 4 }}>
-                {[0, 1, 2].map((i) => (
-                  <Card
-                    key={`course-skeleton-${i}`}
-                    bg={cardBg}
-                    borderWidth="1px"
-                    borderColor={courseCardBorder}
-                    borderRadius="xl"
-                    overflow="hidden"
-                    boxShadow={courseCardShadow}
-                  >
-                    <Skeleton h={{ base: "130px", md: "140px" }} startColor="gray.100" endColor="gray.200" />
-                    <Box p={3}>
-                      <Skeleton height="14px" mb={2} borderRadius="md" />
-                      <Skeleton height="12px" width="70%" mb={3} borderRadius="md" />
-                      <Skeleton height="12px" width="50%" mb={4} borderRadius="md" />
-                      <Skeleton height="36px" borderRadius="lg" />
-                    </Box>
-                  </Card>
-                ))}
-              </SimpleGrid>
-            ) : (
-            <SimpleGrid columns={{ base: 1, md: 3 }} spacing={{ base: 3, md: 4 }}>
-              {availableCourses.map((course) => (
-                <Card
-                  key={course.id}
-                  bg={cardBg}
-                  borderWidth="1px"
-                  borderColor={courseCardBorder}
-                  borderRadius="xl"
-                  overflow="hidden"
-                  boxShadow={courseCardShadow}
-                  w="100%"
-                  maxW="100%"
-                  h="full"
-                  display="flex"
-                  flexDirection="column"
-                  transition="all 0.2s ease"
-                  _hover={{
-                    transform: "translateY(-2px)",
-                    boxShadow: courseCardHoverShadow,
-                    borderColor: "blue.200",
-                  }}
-                >
-                  <Box
-                    position="relative"
-                    flexShrink={0}
-                    w="full"
-                    aspectRatio={16 / 9}
-                    maxH={{ base: "130px", md: "140px" }}
-                    overflow="hidden"
-                    bg={courseImageBg}
-                  >
-                    <Box
-                      as="img"
-                      src={
-                        course.avatar ||
-                        "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200&q=80"
-                      }
-                      alt={course.title}
-                      w="full"
-                      h="full"
-                      objectFit="cover"
-                    />
-                    <Box
-                      position="absolute"
-                      inset={0}
-                      bgGradient="linear(to-t, blackAlpha.600, transparent)"
-                    />
-                    <Badge
-                      position="absolute"
-                      top={2.5}
-                      left={2.5}
-                      bg={courseBadgeBg}
-                      color={courseBadgeColor}
-                      borderRadius="full"
-                      px={2.5}
-                      py={1}
-                      fontSize="0.67rem"
-                      fontWeight="black"
+
+            <Box p={{ base: 3, md: 4 }}>
+              {coursesLoading ? (
+                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={{ base: 3, md: 4 }}>
+                  {[0, 1, 2].map((i) => (
+                    <Card
+                      key={`course-skeleton-${i}`}
+                      bg={cardBg}
+                      borderWidth="1px"
+                      borderColor={courseCardBorder}
+                      borderRadius="2xl"
+                      overflow="hidden"
+                      boxShadow={courseCardShadow}
                     >
-                      {course?.grade?.name || "عام"}
-                    </Badge>
-                  </Box>
-                  <Box
-                    p={3}
-                    flex="1"
-                    display="flex"
-                    flexDirection="column"
-                    gap={2}
-                    minH={{ base: "148px", md: "152px" }}
-                  >
-                    <Flex justify="space-between" align="start" gap={2}>
-                      <Text
-                        fontSize="sm"
-                        fontWeight="bold"
-                        color={headingColor}
-                        noOfLines={2}
-                        flex={1}
-                        lineHeight="1.45"
-                        minH="2.5rem"
+                      <Skeleton h="168px" startColor="gray.100" endColor="gray.200" />
+                      <Box p={4}>
+                        <Skeleton height="16px" mb={3} borderRadius="md" />
+                        <Skeleton height="12px" width="60%" mb={4} borderRadius="md" />
+                        <Skeleton height="40px" borderRadius="xl" />
+                      </Box>
+                    </Card>
+                  ))}
+                </SimpleGrid>
+              ) : (
+                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={{ base: 3, md: 4 }}>
+                  {availableCourses.map((course) => {
+                    const free = isCourseFree(course);
+                    const enrolled = !!course.is_enrolled;
+                    return (
+                      <Card
+                        key={course.id}
+                        bg={cardBg}
+                        borderWidth="1px"
+                        borderColor={courseCardBorder}
+                        borderRadius="2xl"
+                        overflow="hidden"
+                        boxShadow={courseCardShadow}
+                        w="100%"
+                        h="full"
+                        display="flex"
+                        flexDirection="column"
+                        transition="all 0.22s ease"
+                        _hover={{
+                          transform: "translateY(-4px)",
+                          boxShadow: courseCardHoverShadow,
+                          borderColor: "blue.200",
+                        }}
                       >
-                        {course.title}
-                      </Text>
-                      {course.is_enrolled ? (
-                        <Badge colorScheme="green" borderRadius="full" px={2} fontSize="0.65rem" flexShrink={0}>
-                          مشترك
-                        </Badge>
-                      ) : isCourseFree(course) ? (
-                        <Badge colorScheme="green" variant="subtle" borderRadius="full" px={2} fontSize="0.65rem" flexShrink={0}>
-                          مجاني
-                        </Badge>
-                      ) : (
-                        <Badge colorScheme="orange" borderRadius="full" px={2} fontSize="0.65rem" flexShrink={0}>
-                          متاح
-                        </Badge>
-                      )}
-                    </Flex>
-                    <HStack justify="space-between" fontSize="xs" color={subtextColor}>
-                      <Text noOfLines={1}>{teacherDisplayName || "مستر"}</Text>
-                      <Text fontWeight="bold" color={isCourseFree(course) ? "green.500" : "orange.500"}>
-                        {isCourseFree(course) ? "مجاني" : `${course.price} جنيه`}
-                      </Text>
-                    </HStack>
-                    {course.description ? (
-                      <Text fontSize="xs" color={subtextColor} noOfLines={1} lineHeight="1.6">
-                        {course.description}
-                      </Text>
-                    ) : (
-                      <Box flex="1" />
-                    )}
-                    <Box mt="auto" pt={1}>
-                      {course.is_enrolled || isCourseFree(course) ? (
-                        <Button
-                          size="sm"
+                        <Box
+                          position="relative"
+                          flexShrink={0}
                           w="full"
-                          h="36px"
-                          bg="blue.500"
-                          color="white"
-                          _hover={{ bg: "blue.600" }}
-                          borderRadius="lg"
-                          fontSize="sm"
-                          fontWeight="bold"
-                          onClick={() => navigate(`/CourseDetailsPage/${course.id}`)}
+                          h={{ base: "150px", md: "168px" }}
+                          overflow="hidden"
+                          bg={courseImageBg}
                         >
-                          دخول للكورس
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          w="full"
-                          h="36px"
-                          bg="orange.500"
-                          color="white"
-                          _hover={{ bg: "orange.600" }}
-                          borderRadius="lg"
-                          fontSize="sm"
-                          fontWeight="bold"
-                          onClick={() => openCourseActivationModal(course)}
+                          <Box
+                            as="img"
+                            src={
+                              course.avatar ||
+                              "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200&q=80"
+                            }
+                            alt={course.title}
+                            w="full"
+                            h="full"
+                            objectFit="cover"
+                          />
+                          <Box
+                            position="absolute"
+                            inset={0}
+                            bgGradient="linear(to-t, blackAlpha.700 0%, transparent 55%)"
+                          />
+                          <Badge
+                            position="absolute"
+                            top={3}
+                            left={3}
+                            bg={courseBadgeBg}
+                            color={courseBadgeColor}
+                            borderRadius="full"
+                            px={2.5}
+                            py={1}
+                            fontSize="10px"
+                            fontWeight="black"
+                          >
+                            {course?.grade?.name || "عام"}
+                          </Badge>
+                          <Badge
+                            position="absolute"
+                            top={3}
+                            right={3}
+                            colorScheme={enrolled ? "green" : free ? "green" : "orange"}
+                            variant={enrolled || free ? "solid" : "subtle"}
+                            borderRadius="full"
+                            px={2.5}
+                            py={1}
+                            fontSize="10px"
+                            fontWeight="bold"
+                          >
+                            {enrolled ? "مشترك" : free ? "مجاني" : "متاح"}
+                          </Badge>
+                          <Box position="absolute" bottom={3} right={3} left={3}>
+                            <Text
+                              color="white"
+                              fontSize="md"
+                              fontWeight="black"
+                              noOfLines={2}
+                              lineHeight="1.35"
+                              textShadow="0 2px 8px rgba(0,0,0,0.45)"
+                            >
+                              {course.title}
+                            </Text>
+                          </Box>
+                        </Box>
+
+                        <Box
+                          p={4}
+                          flex="1"
+                          display="flex"
+                          flexDirection="column"
+                          gap={3}
                         >
-                          اشترك الآن
-                        </Button>
-                      )}
-                    </Box>
-                  </Box>
-                </Card>
-              ))}
-            </SimpleGrid>
-            )}
-            {!coursesLoading && availableCourses.length === 0 ? (
-              <Text mt={3} fontSize="sm" color={subtextColor}>
-                لا توجد كورسات متاحة حالياً في منصة المستر.
-              </Text>
-            ) : null}
-          </CardBody>
-        </Card>
+                          <HStack justify="space-between" fontSize="xs" color={subtextColor}>
+                            <HStack spacing={2} minW={0}>
+                              <Text noOfLines={1} fontWeight="medium">
+                                {teacherDisplayName || "مستر"}
+                              </Text>
+                            </HStack>
+                            <Text fontWeight="black" color={free ? "green.500" : "orange.500"}>
+                              {free ? "مجاني" : `${course.price} جنيه`}
+                            </Text>
+                          </HStack>
+
+                          {course.description ? (
+                            <Text fontSize="sm" color={subtextColor} noOfLines={2} lineHeight="1.7">
+                              {course.description}
+                            </Text>
+                          ) : (
+                            <Box flex="1" />
+                          )}
+
+                          <Box mt="auto">
+                            {enrolled || free ? (
+                              <Button
+                                size="sm"
+                                w="full"
+                                h="40px"
+                                bg="blue.500"
+                                color="white"
+                                _hover={{ bg: "blue.600" }}
+                                borderRadius="xl"
+                                fontSize="sm"
+                                fontWeight="bold"
+                                rightIcon={<Icon as={FaChevronLeft} boxSize={3} />}
+                                onClick={() => navigate(`/CourseDetailsPage/${course.id}`)}
+                              >
+                                دخول للكورس
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                w="full"
+                                h="40px"
+                                bg="orange.500"
+                                color="white"
+                                _hover={{ bg: "orange.600" }}
+                                borderRadius="xl"
+                                fontSize="sm"
+                                fontWeight="bold"
+                                onClick={() => openCourseActivationModal(course)}
+                              >
+                                اشترك الآن
+                              </Button>
+                            )}
+                          </Box>
+                        </Box>
+                      </Card>
+                    );
+                  })}
+                </SimpleGrid>
+              )}
+              {!coursesLoading && availableCourses.length === 0 ? (
+                <Center
+                  py={12}
+                  borderRadius="2xl"
+                  borderWidth="1px"
+                  borderStyle="dashed"
+                  borderColor={courseCardBorder}
+                >
+                  <VStack spacing={2}>
+                    <Text fontWeight="black" color={headingColor}>
+                      لا توجد كورسات متاحة حالياً
+                    </Text>
+                    <Text fontSize="sm" color={subtextColor}>
+                      تابع المنصة لاحقاً لظهور محتوى جديد.
+                    </Text>
+                  </VStack>
+                </Center>
+              ) : null}
+            </Box>
+          </Box>
+        </Box>
       </VStack>
 
-      {/* Floating scientific support chat */}
+      {/* Floating scientific support chat — desktop only; mobile/tablet use bottom nav */}
       <Box
+        display={{ base: "none", lg: "block" }}
         position="fixed"
-        bottom={{ base: "max(14px, env(safe-area-inset-bottom))", md: "20px" }}
-        left={{ base: "max(10px, env(safe-area-inset-left))", md: "16px" }}
+        bottom="20px"
+        left="16px"
         zIndex={30}
         dir="ltr"
       >

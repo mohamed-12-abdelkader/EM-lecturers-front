@@ -1,4 +1,4 @@
-import { FaFacebook, FaInstagram, FaTelegram, FaWhatsapp } from "react-icons/fa";
+import { FaFacebook, FaInstagram, FaTelegram, FaTiktok, FaWhatsapp, FaYoutube } from "react-icons/fa";
 import { motion } from "framer-motion";
 import { Reveal, StaggerGrid, StaggerItem } from "../../tenantLandingMotion";
 import { tlContainer } from "../../tenantLandingTheme";
@@ -27,8 +27,22 @@ export default function TenantProFooter({
   loginHref,
   signupHref,
   joinHref,
-  contact,
+  contact = {},
+  quickLinks = [
+    ["#home", "الرئيسية"],
+    ["#services", "لماذا نحن"],
+    ["#videos", "محاضرات مجانية"],
+    ["#courses", "الكورسات"],
+  ],
 }) {
+  const hasSocial =
+    contact.facebook ||
+    contact.instagram ||
+    contact.youtube ||
+    contact.tiktok ||
+    contact.telegram ||
+    contact.whatsapp;
+
   return (
     <footer id="contact" className="border-t border-slate-200 bg-white py-12 dark:border-slate-800 dark:bg-slate-950" dir="rtl">
       <div className={tlContainer}>
@@ -50,12 +64,7 @@ export default function TenantProFooter({
           <StaggerItem>
             <p className="text-sm font-bold text-slate-900 dark:text-white">روابط سريعة</p>
             <ul className="mt-4 space-y-2.5 text-sm text-slate-600 dark:text-slate-400">
-              {[
-                ["#home", "الرئيسية"],
-                ["#services", "لماذا نحن"],
-                ["#videos", "محاضرات مجانية"],
-                ["#courses", "الكورسات"],
-              ].map(([href, label]) => (
+              {quickLinks.map(([href, label]) => (
                 <li key={href}>
                   <a href={href} className="cursor-pointer transition-colors duration-200 hover:text-blue-500">
                     {label}
@@ -87,21 +96,31 @@ export default function TenantProFooter({
           </StaggerItem>
 
           <StaggerItem>
-            <p className="text-sm font-bold text-slate-900 dark:text-white">تابعنا</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <SocialLink href={contact.facebook} label="Facebook">
-                <FaFacebook />
-              </SocialLink>
-              <SocialLink href={contact.instagram} label="Instagram">
-                <FaInstagram />
-              </SocialLink>
-              <SocialLink href={contact.telegram} label="Telegram">
-                <FaTelegram />
-              </SocialLink>
-              <SocialLink href={contact.whatsapp} label="WhatsApp">
-                <FaWhatsapp />
-              </SocialLink>
-            </div>
+            <p className="text-sm font-bold text-slate-900 dark:text-white">تواصل معنا</p>
+            {hasSocial ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <SocialLink href={contact.facebook} label="Facebook">
+                  <FaFacebook />
+                </SocialLink>
+                <SocialLink href={contact.instagram} label="Instagram">
+                  <FaInstagram />
+                </SocialLink>
+                <SocialLink href={contact.youtube} label="YouTube">
+                  <FaYoutube />
+                </SocialLink>
+                <SocialLink href={contact.tiktok} label="TikTok">
+                  <FaTiktok />
+                </SocialLink>
+                <SocialLink href={contact.telegram} label="Telegram">
+                  <FaTelegram />
+                </SocialLink>
+                <SocialLink href={contact.whatsapp} label="WhatsApp">
+                  <FaWhatsapp />
+                </SocialLink>
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">لا توجد روابط تواصل حالياً.</p>
+            )}
           </StaggerItem>
         </StaggerGrid>
 

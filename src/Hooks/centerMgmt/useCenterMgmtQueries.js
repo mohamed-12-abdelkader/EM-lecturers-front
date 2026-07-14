@@ -2,10 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as api from "../../api/centerMgmtApi";
 
 export const centerMgmtKeys = {
-  all: ["center-mgmt"],
+  all: ["teacher-center"],
   dashboard: (params) => [...centerMgmtKeys.all, "dashboard", params],
-  finance: (params) => [...centerMgmtKeys.all, "finance", params],
-  activity: (params) => [...centerMgmtKeys.all, "activity", params],
   grades: () => [...centerMgmtKeys.all, "grades"],
   groups: (params) => [...centerMgmtKeys.all, "groups", params],
   group: (groupId) => [...centerMgmtKeys.all, "group", String(groupId)],
@@ -19,11 +17,23 @@ export const centerMgmtKeys = {
     String(studentId),
     params,
   ],
-  attendanceToday: (params) => [...centerMgmtKeys.all, "attendance-today", params],
-  months: () => [...centerMgmtKeys.all, "months"],
-  subscriptions: (year, month, params) => [
+  studentAttendanceReport: (studentId, params) => [
     ...centerMgmtKeys.all,
-    "subscriptions",
+    "student-attendance-report",
+    String(studentId),
+    params,
+  ],
+  groupAttendanceReport: (groupId, params) => [
+    ...centerMgmtKeys.all,
+    "group-attendance-report",
+    String(groupId),
+    params,
+  ],
+  attendance: (params) => [...centerMgmtKeys.all, "attendance", params],
+  months: () => [...centerMgmtKeys.all, "months"],
+  billingMonth: (year, month, params) => [
+    ...centerMgmtKeys.all,
+    "billing-month",
     String(year),
     String(month),
     params,
@@ -46,20 +56,6 @@ export function useDashboard(params = {}) {
   return useQuery({
     queryKey: centerMgmtKeys.dashboard(params),
     queryFn: () => api.fetchDashboard(params),
-  });
-}
-
-export function useFinanceReport(params = {}) {
-  return useQuery({
-    queryKey: centerMgmtKeys.finance(params),
-    queryFn: () => api.fetchFinanceReport(params),
-  });
-}
-
-export function useActivityLogs(params = { limit: 20 }) {
-  return useQuery({
-    queryKey: centerMgmtKeys.activity(params),
-    queryFn: () => api.fetchActivityLogs(params),
   });
 }
 
@@ -111,16 +107,25 @@ export function useStudentQr(studentId) {
 
 export function useStudentAttendanceReport(studentId, params = {}) {
   return useQuery({
-    queryKey: centerMgmtKeys.studentAttendance(studentId, params),
+    queryKey: centerMgmtKeys.studentAttendanceReport(studentId, params),
     queryFn: () => api.fetchStudentAttendanceReport(studentId, params),
     enabled: Boolean(studentId),
   });
 }
 
-export function useTodayAttendance(params = {}) {
+export function useGroupAttendanceReport(groupId, params = {}) {
   return useQuery({
-    queryKey: centerMgmtKeys.attendanceToday(params),
-    queryFn: () => api.fetchTodayAttendance(params),
+    queryKey: centerMgmtKeys.groupAttendanceReport(groupId, params),
+    queryFn: () => api.fetchGroupAttendanceReport(groupId, params),
+    enabled: Boolean(groupId),
+  });
+}
+
+export function useAttendance(params = {}) {
+  return useQuery({
+    queryKey: centerMgmtKeys.attendance(params),
+    queryFn: () => api.fetchAttendance(params),
+    enabled: Boolean(params.group_id || params.groupId),
   });
 }
 
@@ -131,10 +136,10 @@ export function useBillingMonths() {
   });
 }
 
-export function useMonthSubscriptions(year, month, params = {}) {
+export function useBillingMonth(year, month, params = {}) {
   return useQuery({
-    queryKey: centerMgmtKeys.subscriptions(year, month, params),
-    queryFn: () => api.fetchMonthSubscriptions(year, month, params),
+    queryKey: centerMgmtKeys.billingMonth(year, month, params),
+    queryFn: () => api.fetchBillingMonth(year, month, params),
     enabled: Boolean(year && month),
   });
 }
@@ -167,8 +172,8 @@ export function useGroupMutations() {
 export function useStudentMutations() {
   const qc = useQueryClient();
   return {
-    createStudent: useMutation({
-      mutationFn: api.createStudent,
+    addStudentToGroup: useMutation({
+      mutationFn: ({ groupId, payload }) => api.addStudentToGroup(groupId, payload),
       onSuccess: () => invalidateCore(qc),
     }),
     updateStudent: useMutation({
@@ -180,11 +185,11 @@ export function useStudentMutations() {
       onSuccess: () => invalidateCore(qc),
     }),
     enrollStudent: useMutation({
-      mutationFn: ({ studentId, payload }) => api.enrollStudent(studentId, payload),
+      mutationFn: ({ studentId, groupId }) => api.enrollStudent(studentId, groupId),
       onSuccess: () => invalidateCore(qc),
     }),
     unenrollStudent: useMutation({
-      mutationFn: ({ studentId, payload }) => api.unenrollStudent(studentId, payload),
+      mutationFn: ({ studentId, groupId }) => api.unenrollStudent(studentId, groupId),
       onSuccess: () => invalidateCore(qc),
     }),
   };
@@ -193,10 +198,11 @@ export function useStudentMutations() {
 export function useAttendanceMutations() {
   const qc = useQueryClient();
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "attendance-today"] });
+    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "attendance"] });
     qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "dashboard"] });
     qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "student-attendance"] });
-    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "activity"] });
+    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "student-attendance-report"] });
+    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "group-attendance-report"] });
   };
 
   return {
@@ -205,7 +211,7 @@ export function useAttendanceMutations() {
       onSuccess: invalidate,
     }),
     record: useMutation({
-      mutationFn: api.recordAttendance,
+      mutationFn: api.recordManualAttendance,
       onSuccess: invalidate,
     }),
     bulk: useMutation({
@@ -215,13 +221,12 @@ export function useAttendanceMutations() {
   };
 }
 
-export function useSubscriptionMutations() {
+export function useBillingMutations() {
   const qc = useQueryClient();
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "subscriptions"] });
+    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "billing-month"] });
     qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "months"] });
     qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "dashboard"] });
-    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "finance"] });
     qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "payments"] });
   };
 
@@ -235,6 +240,10 @@ export function useSubscriptionMutations() {
         api.updateSubscription(subscriptionId, payload),
       onSuccess: invalidate,
     }),
+    bulkUpdate: useMutation({
+      mutationFn: api.bulkUpdateSubscriptions,
+      onSuccess: invalidate,
+    }),
   };
 }
 
@@ -245,8 +254,7 @@ export function usePaymentMutations() {
       mutationFn: api.createPayment,
       onSuccess: () => {
         qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "payments"] });
-        qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "subscriptions"] });
-        qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "finance"] });
+        qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "billing-month"] });
         qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "dashboard"] });
       },
     }),

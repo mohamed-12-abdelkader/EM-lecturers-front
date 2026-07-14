@@ -31,12 +31,11 @@ export const ALLOWED_EXTENSIONS = [
   "webp",
 ];
 
-export const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024;
+export const MAX_FILE_SIZE_BYTES = Number.POSITIVE_INFINITY;
 export const MAX_BULK_FILES = 20;
 
 export function validateTeacherFile(file) {
   if (!file) return "لم يتم اختيار ملف";
-  if (file.size > MAX_FILE_SIZE_BYTES) return "الحد الأقصى لحجم الملف 100 ميجابايت";
   const ext = (file.name || "").split(".").pop()?.toLowerCase();
   if (!ext || !ALLOWED_EXTENSIONS.includes(ext)) {
     return "نوع الملف غير مدعوم";

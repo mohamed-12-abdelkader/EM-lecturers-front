@@ -190,16 +190,6 @@ const GeneralCourses = () => {
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast({
-          title: 'خطأ',
-          description: 'حجم الصورة يجب أن يكون أقل من 5MB',
-          status: 'error',
-          duration: 3000,
-          isClosable: true,
-        });
-        return;
-      }
       setFormData({ ...formData, image: file });
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -950,7 +940,7 @@ const GeneralCourses = () => {
                         اضغط لرفع صورة الغلاف
                       </Text>
                       <Text fontSize="xs" color={subTextColor} mt={1} textAlign="center" lineHeight="1.6">
-                        JPG · PNG · GIF · WebP — حتى 5MB
+                        JPG · PNG · GIF · WebP
                       </Text>
                     </Center>
                   )}
@@ -1130,7 +1120,7 @@ const GeneralCourses = () => {
                       اضغط لاختيار صورة جديدة أو اسحبها هنا
                     </Text>
                     <Text fontSize="xs" color={subTextColor} fontWeight="medium">
-                      الحد الأقصى: 5MB (JPG, PNG, GIF, WebP)
+                      الصيغ المقبولة: JPG, PNG, GIF, WebP
                     </Text>
                   </VStack>
                 </Box>

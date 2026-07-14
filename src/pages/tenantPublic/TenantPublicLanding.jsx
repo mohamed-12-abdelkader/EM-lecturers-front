@@ -12,6 +12,7 @@ import TenantProBentoWall from "./components/landing/TenantProBentoWall";
 import TenantProVideoStrip from "./components/landing/TenantProVideoStrip";
 import TenantProCoursesBento from "./components/landing/TenantProCoursesBento";
 import { TenantProReviews, TenantProCta } from "./components/landing/TenantProReviewsCta";
+import TenantProHowItWorks from "./components/landing/TenantProHowItWorks";
 import TenantProFooter from "./components/landing/TenantProFooter";
 import { TL_ACCENT, TL_PRIMARY, TL_SECONDARY, TL_BORDER } from "./tenantLandingTheme";
 import {
@@ -76,6 +77,32 @@ const DEFAULT_TESTIMONIALS = [
   { name: "سارة علي", text: "المحتوى منظم جداً وساعدني أحسن درجاتي بشكل ملحوظ.", rating: 5 },
   { name: "محمود حسن", text: "تجربة تعليمية رائعة مع متابعة مستمرة ودعم سريع.", rating: 5 },
 ];
+
+function buildWhatsAppHref(numberOrUrl) {
+  if (!numberOrUrl) return null;
+  const raw = String(numberOrUrl).trim();
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw) || raw.startsWith("wa.me/") || raw.startsWith("api.whatsapp.com/")) {
+    return raw.startsWith("http") ? raw : `https://${raw}`;
+  }
+  const digits = raw.replace(/[^0-9]/g, "");
+  return digits ? `https://wa.me/${digits}` : null;
+}
+
+/** Social links from teacher payload (+ optional landing.contact fallback). */
+function buildTeacherSocialLinks(teacher, landingContact = {}) {
+  return {
+    facebook: teacher?.facebook_url || landingContact.facebook || null,
+    instagram: teacher?.instagram_url || landingContact.instagram || null,
+    youtube: teacher?.youtube_url || null,
+    tiktok: teacher?.tiktok_url || null,
+    telegram: landingContact.telegram || null,
+    whatsapp:
+      buildWhatsAppHref(teacher?.whatsapp_number) ||
+      buildWhatsAppHref(landingContact.whatsapp) ||
+      null,
+  };
+}
 
 export default function TenantPublicLanding({ subdomain }) {
   const { isDarkMode, toggleTheme } = useTenantPublicTheme();
@@ -198,11 +225,11 @@ export default function TenantPublicLanding({ subdomain }) {
   const stats = landing?.statistics || {};
   const services = Array.isArray(landing?.services) ? landing.services : [];
   const testimonials = Array.isArray(landing?.testimonials) ? landing.testimonials : [];
-  const contact = landing?.contact || {};
+  const socialLinks = buildTeacherSocialLinks(teacher, landing?.contact || {});
 
   const brandName = tenant.display_name || tenant.subdomain || subdomain;
-  const teacherName = payload?.teacher?.name || brandName;
-  const specialty = tenant?.specialty || payload?.teacher?.subject || "";
+  const teacherName = teacher?.name || brandName;
+  const specialty = tenant?.specialty || teacher?.subject || "";
   const heroTitle =
     (hero.title && hero.title.trim()) ||
     (specialty ? `احترف ${specialty} مع ${teacherName}` : `تعلّم مع ${teacherName}`);
@@ -210,7 +237,7 @@ export default function TenantPublicLanding({ subdomain }) {
   const bioText =
     about.bio ||
     tenant.bio ||
-    payload?.teacher?.description ||
+    teacher?.description ||
     "شرح منظم، متابعة مستمرة، وتدريب مكثف يساعدك تحقق أفضل النتائج.";
 
   const placeholderPhoto =
@@ -256,7 +283,25 @@ export default function TenantPublicLanding({ subdomain }) {
   const siteOrigin = typeof window !== "undefined" ? window.location.origin : "";
   const loginHref = `${siteOrigin}/login`;
   const signupHref = `${siteOrigin}/signup`;
-  const joinHref = contact.whatsapp || contact.telegram || "#cta";
+  const joinHref = socialLinks.whatsapp || socialLinks.telegram || "#contact";
+  const whatsappHref = socialLinks.whatsapp;
+
+  const showFreeLectures = !freeLecturesLoading && freeLectures.length > 0;
+  const showCourses = !coursesLoading && courses.length > 0;
+
+  const landingNavLinks = TENANT_NAV_LINKS.filter(([, label]) => {
+    if (label === "محاضرات مجانية") return showFreeLectures;
+    if (label === "الكورسات") return showCourses;
+    return true;
+  });
+
+  const footerQuickLinks = [
+    ["#home", "الرئيسية"],
+    ["#services", "لماذا نحن"],
+    ["#how-it-works", "كيف تبدأ"],
+    ...(showFreeLectures ? [["#videos", "محاضرات مجانية"]] : []),
+    ...(showCourses ? [["#courses", "الكورسات"]] : []),
+  ];
 
   const bioSnippet = (tenant.bio || about.bio || "منصة تعليمية متكاملة تساعدك تحقق أفضل النتائج.").slice(0, 140);
   const bioSuffix = (tenant.bio || about.bio || "").length > 140 ? "…" : "";
@@ -304,7 +349,7 @@ export default function TenantPublicLanding({ subdomain }) {
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         navScrolled={navScrolled}
         brandHref="#home"
-        navLinks={TENANT_NAV_LINKS}
+        navLinks={landingNavLinks}
       />
 
       <main>
@@ -315,6 +360,8 @@ export default function TenantPublicLanding({ subdomain }) {
           bioText={bioText}
           signupHref={signupHref}
           loginHref={loginHref}
+          whatsappHref={whatsappHref}
+          showFreeVideos={showFreeLectures}
           heroStats={heroStats}
           teacherImageUrl={teacherPortraitUrl}
         />
@@ -327,20 +374,30 @@ export default function TenantPublicLanding({ subdomain }) {
           teacherImageUrl={teacherPortraitUrl}
         />
 
-        <TenantProVideoStrip
-          lectures={freeLectures}
-          loading={freeLecturesLoading}
-          fallbackImage={courseFallbackImage}
-          onPlay={setActiveFreeLecture}
-        />
-
-        <TenantProCoursesBento
-          courses={courses}
-          loading={coursesLoading}
-          fallbackImage={courseFallbackImage}
-          loginHref={loginHref}
+        <TenantProHowItWorks
+          teacherName={teacherName}
+          specialty={specialty}
           signupHref={signupHref}
         />
+
+        {showFreeLectures ? (
+          <TenantProVideoStrip
+            lectures={freeLectures}
+            loading={freeLecturesLoading}
+            fallbackImage={courseFallbackImage}
+            onPlay={setActiveFreeLecture}
+          />
+        ) : null}
+
+        {showCourses ? (
+          <TenantProCoursesBento
+            courses={courses}
+            loading={coursesLoading}
+            fallbackImage={courseFallbackImage}
+            loginHref={loginHref}
+            signupHref={signupHref}
+          />
+        ) : null}
 
         <TenantProReviews testimonials={displayTestimonials} />
 
@@ -354,7 +411,8 @@ export default function TenantPublicLanding({ subdomain }) {
         loginHref={loginHref}
         signupHref={signupHref}
         joinHref={joinHref}
-        contact={contact}
+        contact={socialLinks}
+        quickLinks={footerQuickLinks}
       />
 
       <FreeLecturePlayerModal lecture={activeFreeLecture} onClose={() => setActiveFreeLecture(null)} />

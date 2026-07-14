@@ -1,4 +1,3 @@
-import { useMemo, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import {
   Box,
@@ -6,11 +5,11 @@ import {
   Flex,
   SimpleGrid,
   Text,
+  Badge,
+  Icon,
+  useColorModeValue,
   VStack,
   HStack,
-  Badge,
-  Select,
-  useColorModeValue,
 } from "@chakra-ui/react";
 import {
   FaUsers,
@@ -19,44 +18,27 @@ import {
   FaUserTimes,
   FaMoneyBillWave,
   FaExclamationTriangle,
-  FaClock,
   FaUserClock,
+  FaChevronLeft,
 } from "react-icons/fa";
-import { useActivityLogs, useDashboard } from "../../Hooks/centerMgmt/useCenterMgmtQueries";
-import {
-  currentMonthYear,
-  field,
-  formatDate,
-  formatMoney,
-  MONTH_NAMES,
-} from "./centerMgmtUtils";
-import { EmptyState, KpiCard, LoadingBlock, PageHeader, Surface } from "./components/UiBits";
+import { useDashboard } from "../../Hooks/centerMgmt/useCenterMgmtQueries";
+import { ACCENT, BRAND_ORANGE, field, formatMoney, MONTH_NAMES } from "./centerMgmtUtils";
+import { EmptyState, KpiCard, LoadingBlock, PageHeader, Surface, StatusBadge } from "./components/UiBits";
 
 const QUICK = [
-  { to: "students", label: "الطلاب", desc: "إضافة ومتابعة و QR" },
-  { to: "attendance", label: "الحضور", desc: "مسح QR أو تسجيل يدوي" },
-  { to: "subscriptions", label: "الاشتراكات", desc: "فتح شهر ومتابعة الدفع" },
-  { to: "payments", label: "المدفوعات", desc: "تسجيل التحصيل" },
-  { to: "groups", label: "المجموعات", desc: "الجداول والرسوم" },
-  { to: "finance", label: "التقرير المالي", desc: "مطلوب / محصّل / متبقي" },
+  { to: "groups", label: "المجموعات", desc: "إنشاء مجموعة بأيام ورسوم", color: "teal" },
+  { to: "students", label: "الطلاب", desc: "عرض كل طلاب السنتر", color: "blue" },
+  { to: "attendance", label: "الحضور", desc: "مسح QR أو تسجيل يدوي", color: "orange" },
+  { to: "subscriptions", label: "الشهر المالي", desc: "فتح شهر وتحديد المجددين", color: "purple" },
+  { to: "payments", label: "المدفوعات", desc: "تسجيل دفعات جزئية/كاملة", color: "green" },
 ];
 
 export default function CenterDashboardPage() {
-  const now = currentMonthYear();
-  const [month, setMonth] = useState(String(now.month));
-  const [year, setYear] = useState(String(now.year));
-  const params = useMemo(
-    () => ({ year: Number(year), month: Number(month) }),
-    [year, month]
-  );
-
-  const { data, isLoading, isError, error } = useDashboard(params);
-  const { data: activityData } = useActivityLogs({ limit: 15 });
-  const activity = activityData?.items || [];
-
-  const muted = useColorModeValue("gray.600", "gray.400");
-  const softBg = useColorModeValue("gray.50", "gray.700");
+  const { data, isLoading, isError, error } = useDashboard();
+  const muted = useColorModeValue("gray.500", "gray.400");
   const outlineBorder = useColorModeValue("gray.200", "gray.600");
+  const hoverBg = useColorModeValue("blue.50", "whiteAlpha.100");
+  const statusTileBg = useColorModeValue("gray.50", "whiteAlpha.50");
 
   if (isLoading) return <LoadingBlock label="جاري تحميل لوحة التحكم..." />;
   if (isError) {
@@ -65,199 +47,162 @@ export default function CenterDashboardPage() {
     );
   }
 
-  const years = [now.year - 1, now.year, now.year + 1];
+  const finances = data?.finances || {};
+  const today = data?.today_attendance || data?.todayAttendance || {};
+  const current = data?.current_month || data?.currentMonth || {};
+  const monthLabel = current.month
+    ? `${MONTH_NAMES[Number(current.month)] || current.month} ${current.year || ""}`
+    : "الشهر الحالي";
+
+  const statusItems = [
+    { label: "مدفوع", value: finances.paid_count ?? finances.paidCount ?? 0, scheme: "green" },
+    { label: "غير مدفوع", value: finances.unpaid_count ?? finances.unpaidCount ?? 0, scheme: "orange" },
+    { label: "جزئي", value: finances.partial_count ?? finances.partialCount ?? 0, scheme: "yellow" },
+    { label: "معفى", value: finances.exempt_count ?? finances.exemptCount ?? 0, scheme: "purple" },
+  ];
 
   return (
     <Box>
       <PageHeader
         title="لوحة التحكم"
-        description={`نظرة على ${MONTH_NAMES[Number(month)] || ""} ${year}`}
-        actions={
-          <HStack spacing={2}>
-            <Select
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              borderRadius="xl"
-              w="140px"
-              size="sm"
-            >
-              {MONTH_NAMES.slice(1).map((name, idx) => (
-                <option key={name} value={idx + 1}>
-                  {name}
-                </option>
-              ))}
-            </Select>
-            <Select
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-              borderRadius="xl"
-              w="100px"
-              size="sm"
-            >
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </Select>
-          </HStack>
-        }
+        description={`ملخص سنتر المدرس · ${monthLabel}`}
       />
 
-      <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4} mb={6}>
-        <KpiCard label="الطلاب" value={data?.studentsCount ?? 0} icon={FaUsers} color="blue" />
+      <SimpleGrid columns={{ base: 2, md: 4 }} spacing={{ base: 2.5, md: 4 }} mb={{ base: 4, md: 6 }}>
         <KpiCard
           label="المجموعات"
-          value={data?.groupsCount ?? 0}
+          value={field(data, "groups_count", "groupsCount") ?? 0}
           icon={FaLayerGroup}
           color="teal"
         />
         <KpiCard
-          label="حضور اليوم"
-          value={data?.todayPresent ?? 0}
+          label="الطلاب"
+          value={field(data, "students_count", "studentsCount") ?? 0}
+          icon={FaUsers}
+          color="blue"
+          sub={`نشط: ${field(data, "active_students_count", "activeStudentsCount") ?? 0}`}
+        />
+        <KpiCard
+          label="المتوقّع"
+          value={formatMoney(finances.expected)}
+          icon={FaMoneyBillWave}
+          color="purple"
+        />
+        <KpiCard
+          label="المحصّل"
+          value={formatMoney(finances.collected)}
           icon={FaUserCheck}
           color="green"
         />
         <KpiCard
-          label="غياب اليوم"
-          value={data?.todayAbsent ?? 0}
-          icon={FaUserTimes}
-          color="red"
-        />
-        <KpiCard
-          label="متأخر اليوم"
-          value={data?.todayLate ?? 0}
-          icon={FaUserClock}
-          color="orange"
-        />
-        <KpiCard
-          label="محصّل الشهر"
-          value={formatMoney(data?.monthCollected ?? data?.monthTotalPaid)}
-          icon={FaMoneyBillWave}
-          color="green"
-        />
-        <KpiCard
-          label="متبقي الشهر"
-          value={formatMoney(data?.monthRemaining)}
-          icon={FaClock}
-          color="orange"
-        />
-        <KpiCard
-          label="غير مسدّد"
-          value={data?.unpaidRenewals ?? 0}
+          label="المتبقي"
+          value={formatMoney(finances.remaining)}
           icon={FaExclamationTriangle}
-          color="red"
+          color="orange"
         />
+        <KpiCard label="حضور اليوم" value={today.present ?? 0} icon={FaUserCheck} color="green" />
+        <KpiCard label="غياب اليوم" value={today.absent ?? 0} icon={FaUserTimes} color="red" />
+        <KpiCard label="متأخر اليوم" value={today.late ?? 0} icon={FaUserClock} color="orange" />
       </SimpleGrid>
 
-      <SimpleGrid columns={{ base: 1, lg: 3 }} spacing={5}>
-        <Box gridColumn={{ lg: "span 2" }}>
-          <Surface>
-            <Text fontWeight="bold" mb={4}>
-              اختصارات سريعة
-            </Text>
-            <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={3}>
-              {QUICK.map((item) => (
-                <Button
-                  key={item.to}
-                  as={RouterLink}
-                  to={`/center-mgmt/${item.to}`}
-                  variant="outline"
-                  justifyContent="flex-start"
-                  h="auto"
-                  py={4}
-                  px={4}
-                  borderRadius="xl"
-                  borderColor={outlineBorder}
-                >
-                  <Box textAlign="right">
-                    <Text fontWeight="bold">{item.label}</Text>
-                    <Text fontSize="xs" color={muted} fontWeight="normal">
-                      {item.desc}
-                    </Text>
-                  </Box>
-                </Button>
-              ))}
-            </SimpleGrid>
-          </Surface>
+      <Surface mb={{ base: 4, md: 6 }} p={{ base: 3, md: 4 }}>
+        <Text fontSize="sm" fontWeight="bold" mb={3}>
+          حالة الاشتراكات
+        </Text>
+        <SimpleGrid columns={{ base: 2, sm: 4 }} spacing={2.5}>
+          {statusItems.map((item) => (
+            <Flex
+              key={item.label}
+              direction="column"
+              align="flex-start"
+              gap={1}
+              p={3}
+              borderRadius="xl"
+              bg={statusTileBg}
+              borderWidth="1px"
+              borderColor={outlineBorder}
+            >
+              <StatusBadge scheme={item.scheme}>{item.label}</StatusBadge>
+              <Text fontWeight="black" fontSize="xl" lineHeight="1.2">
+                {item.value}
+              </Text>
+            </Flex>
+          ))}
+        </SimpleGrid>
+      </Surface>
 
-          {(data?.recentPayments?.length > 0 || data?.recentAttendance?.length > 0) && (
-            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mt={5}>
-              <Surface>
-                <Text fontWeight="bold" mb={3}>
-                  آخر المدفوعات
+      <Surface>
+        <Flex justify="space-between" align="center" mb={4} gap={2}>
+          <Text fontWeight="black">اختصارات سريعة</Text>
+          <Badge
+            borderRadius="full"
+            px={2.5}
+            bg="blue.50"
+            color={ACCENT}
+            _dark={{ bg: "whiteAlpha.100" }}
+          >
+            سنتر المدرس
+          </Badge>
+        </Flex>
+        <VStack spacing={2.5} align="stretch" display={{ base: "flex", sm: "none" }}>
+          {QUICK.map((item) => (
+            <Button
+              key={item.to}
+              as={RouterLink}
+              to={`/center-mgmt/${item.to}`}
+              variant="outline"
+              justifyContent="space-between"
+              h="auto"
+              py={3.5}
+              px={4}
+              borderRadius="xl"
+              borderColor={outlineBorder}
+              _hover={{ bg: hoverBg, borderColor: "blue.200" }}
+              rightIcon={<Icon as={FaChevronLeft} boxSize={3} color="gray.400" />}
+            >
+              <Box textAlign="right">
+                <Text fontWeight="bold" fontSize="sm">{item.label}</Text>
+                <Text fontSize="xs" color={muted} fontWeight="normal" mt={0.5}>
+                  {item.desc}
                 </Text>
-                <VStack align="stretch" spacing={2}>
-                  {(data?.recentPayments || []).slice(0, 5).map((p, idx) => (
-                    <Flex
-                      key={p.id || idx}
-                      justify="space-between"
-                      gap={2}
-                      p={2}
-                      borderRadius="lg"
-                      bg={softBg}
-                    >
-                      <Text fontSize="sm" noOfLines={1}>
-                        {field(p, "student_name", "studentName", "full_name") || "دفعة"}
-                      </Text>
-                      <Text fontSize="sm" fontWeight="bold">
-                        {formatMoney(field(p, "amount"))}
-                      </Text>
-                    </Flex>
-                  ))}
-                </VStack>
-              </Surface>
-              <Surface>
-                <Text fontWeight="bold" mb={3}>
-                  آخر الحضور
-                </Text>
-                <VStack align="stretch" spacing={2}>
-                  {(data?.recentAttendance || []).slice(0, 5).map((a, idx) => (
-                    <Flex
-                      key={a.id || idx}
-                      justify="space-between"
-                      gap={2}
-                      p={2}
-                      borderRadius="lg"
-                      bg={softBg}
-                    >
-                      <Text fontSize="sm" noOfLines={1}>
-                        {field(a, "student_name", "studentName", "full_name") || "حضور"}
-                      </Text>
-                      <Badge>{field(a, "status") || "—"}</Badge>
-                    </Flex>
-                  ))}
-                </VStack>
-              </Surface>
-            </SimpleGrid>
-          )}
-        </Box>
-
-        <Surface>
-          <Flex justify="space-between" align="center" mb={4}>
-            <Text fontWeight="bold">سجل النشاط</Text>
-            <Badge colorScheme="blue">{activity.length}</Badge>
-          </Flex>
-          {activity.length === 0 ? (
-            <Text fontSize="sm" color={muted}>
-              لا يوجد نشاط حديث
-            </Text>
-          ) : (
-            <VStack align="stretch" spacing={3} maxH="420px" overflowY="auto">
-              {activity.map((item, idx) => (
-                <Box key={item.id || idx} p={3} borderRadius="lg" bg={softBg}>
-                  <Text fontSize="sm" fontWeight="medium" noOfLines={2}>
-                    {field(item, "action", "message", "description", "event") || "نشاط"}
-                  </Text>
-                  <Text fontSize="xs" color={muted} mt={1}>
-                    {formatDate(field(item, "created_at", "createdAt"))}
+              </Box>
+            </Button>
+          ))}
+        </VStack>
+        <SimpleGrid columns={{ base: 1, sm: 2, md: 3 }} spacing={3} display={{ base: "none", sm: "grid" }}>
+          {QUICK.map((item) => (
+            <Button
+              key={item.to}
+              as={RouterLink}
+              to={`/center-mgmt/${item.to}`}
+              variant="outline"
+              justifyContent="flex-start"
+              h="auto"
+              py={4}
+              px={4}
+              borderRadius="xl"
+              borderColor={outlineBorder}
+              _hover={{ bg: hoverBg, borderColor: "blue.200" }}
+            >
+              <HStack spacing={3} align="flex-start" w="full">
+                <Box
+                  w={1}
+                  alignSelf="stretch"
+                  borderRadius="full"
+                  bg={item.color === "orange" ? BRAND_ORANGE : ACCENT}
+                  opacity={0.85}
+                />
+                <Box textAlign="right">
+                  <Text fontWeight="bold">{item.label}</Text>
+                  <Text fontSize="xs" color={muted} fontWeight="normal" mt={0.5}>
+                    {item.desc}
                   </Text>
                 </Box>
-              ))}
-            </VStack>
-          )}
-        </Surface>
-      </SimpleGrid>
+              </HStack>
+            </Button>
+          ))}
+        </SimpleGrid>
+      </Surface>
     </Box>
   );
 }

@@ -10,8 +10,9 @@ import {
   Collapse,
   Checkbox,
   useColorModeValue,
+  Icon,
 } from "@chakra-ui/react";
-import { FaBookOpen } from "react-icons/fa";
+import { FaBookOpen, FaChevronDown, FaChevronUp } from "react-icons/fa";
 import { renderFormattedExamText } from "../../../utils/renderFormattedExamText";
 import LibraryQuestionCard from "./LibraryQuestionCard";
 
@@ -43,20 +44,26 @@ export default function LibraryPassagePanel({
 }) {
   const cardBg = useColorModeValue("white", "gray.800");
   const borderColor = useColorModeValue("gray.200", "gray.700");
-  const headerBg = useColorModeValue("orange.50", "whiteAlpha.100");
-  const passageBg = useColorModeValue("gray.50", "gray.700");
+  const headerBg = useColorModeValue(
+    "linear-gradient(135deg, #FFFAF0 0%, #FEEBC8 100%)",
+    "whiteAlpha.100",
+  );
+  const passageBg = useColorModeValue("orange.50", "gray.700");
   const textColor = useColorModeValue("gray.800", "gray.100");
   const muted = useColorModeValue("gray.600", "gray.400");
   const questions = passage.questions || [];
+  const selectedCount = questions.filter((q) => selectedQuestionIds?.includes(q.id)).length;
 
   return (
     <Box
       bg={cardBg}
       borderWidth="1px"
       borderColor={borderColor}
-      borderRadius="xl"
+      borderRadius="2xl"
       overflow="hidden"
       boxShadow="sm"
+      transition="box-shadow 0.15s"
+      _hover={{ boxShadow: "md" }}
     >
       <Flex
         p={4}
@@ -78,47 +85,59 @@ export default function LibraryPassagePanel({
               }}
               onClick={(e) => e.stopPropagation()}
               colorScheme="orange"
+              size="lg"
             />
           ) : null}
           <Flex
-            w={9}
-            h={9}
-            borderRadius="lg"
-            bg="orange.500"
+            w={10}
+            h={10}
+            borderRadius="xl"
+            bgGradient="linear(to-br, orange.400, orange.600)"
             color="white"
             align="center"
             justify="center"
             flexShrink={0}
+            shadow="sm"
           >
-            <FaBookOpen size={14} />
+            <FaBookOpen size={15} />
           </Flex>
           <Box minW={0}>
-            <Text fontWeight="semibold" fontSize="sm" color={textColor} noOfLines={2}>
+            <Text fontWeight="bold" fontSize="sm" color={textColor} noOfLines={2}>
               {passage.title || `قطعة ${passageIndex + 1}`}
             </Text>
-            <Text fontSize="xs" color={muted} mt={0.5}>
-              {questions.length} {questions.length === 1 ? "سؤال" : "أسئلة"}
-            </Text>
+            <HStack spacing={2} mt={1} flexWrap="wrap">
+              <Text fontSize="xs" color={muted}>
+                {questions.length} {questions.length === 1 ? "سؤال" : "أسئلة"}
+              </Text>
+              {showSelect && selectedCount > 0 ? (
+                <Badge colorScheme="blue" borderRadius="full" fontSize="xs">
+                  {selectedCount} محدد
+                </Badge>
+              ) : null}
+            </HStack>
           </Box>
         </HStack>
-        <Badge colorScheme="orange" borderRadius="md" flexShrink={0}>
-          {isExpanded ? "إخفاء" : "عرض"}
-        </Badge>
+        <HStack spacing={2} flexShrink={0}>
+          <Badge colorScheme="orange" borderRadius="full" px={2}>
+            {isExpanded ? "إخفاء" : "عرض"}
+          </Badge>
+          <Icon as={isExpanded ? FaChevronUp : FaChevronDown} color="orange.500" boxSize={3} />
+        </HStack>
       </Flex>
 
       <Collapse in={isExpanded} animateOpacity>
-        <Box p={4}>
+        <Box p={{ base: 3, md: 4 }}>
           <Box
             p={4}
             mb={4}
-            borderRadius="lg"
+            borderRadius="xl"
             bg={passageBg}
             borderWidth="1px"
             borderColor={borderColor}
-            borderRightWidth="3px"
+            borderRightWidth="4px"
             borderRightColor="orange.400"
           >
-            <Text fontSize="xs" fontWeight="semibold" color={muted} mb={2}>
+            <Text fontSize="xs" fontWeight="bold" color={muted} mb={2} letterSpacing="wide">
               نص القطعة
             </Text>
             <FormattedPassageText content={passage.content} />
