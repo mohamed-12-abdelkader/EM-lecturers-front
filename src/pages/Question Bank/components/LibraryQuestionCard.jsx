@@ -18,7 +18,7 @@ import { renderFormattedExamText } from "../../../utils/renderFormattedExamText"
 import { ExamQuestionImage } from "../../exam/components/ExamQuestionDisplay";
 import { isPassageStatementQuestion } from "../utils/teacherLibraryQuestionUtils";
 
-const CHOICE_LETTERS = ["أ", "ب", "ج", "د"];
+const CHOICE_LETTERS = ["أ", "ب", "ج", "د", "هـ", "و"];
 
 function FormattedText({ value, fontSize = "sm", fontWeight, color, lineHeight = "1.9", ...rest }) {
   if (!value) return null;

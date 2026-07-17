@@ -46,13 +46,15 @@ import {
   AiOutlineCloseCircle,
   AiFillStar,
   AiFillPicture,
-  AiOutlineRobot,
 } from "react-icons/ai";
 import { FaBookOpen } from "react-icons/fa";
 import AiQuestionExtractionModal from "./components/AiQuestionExtractionModal";
 import ExamReadyScreen from "./components/ExamReadyScreen";
 import ExamStudentProgress from "./components/ExamStudentProgress";
 import ExamResultPanel from "./components/ExamResultPanel";
+import TeacherExamShell, {
+  TeacherExamEmptyState,
+} from "./components/TeacherExamShell";
 import {
   TeacherQuestionCard,
   StudentQuestionPanel,
@@ -137,12 +139,13 @@ const ComprehensiveExam = () => {
   const [imageZoomOpen, setImageZoomOpen] = useState(false);
   const [imageZoomSrc, setImageZoomSrc] = useState(null);
 
-  // ألوان البراند (أزرق / برتقالي) + دعم الوضع الداكن
-  const pageBg = useColorModeValue("gray.50", "gray.900");
-  const cardBg = useColorModeValue("white", "gray.800");
-  const cardBorder = useColorModeValue("gray.200", "gray.700");
-  const headingColor = useColorModeValue("gray.800", "white");
-  const subtextColor = useColorModeValue("gray.600", "gray.400");
+  // ألوان الصفحة
+  const pageBg = useColorModeValue("#E8EEF5", "gray.950");
+  const cardBg = useColorModeValue("white", "gray.900");
+  const cardBorder = useColorModeValue("rgba(15,23,42,0.08)", "whiteAlpha.120");
+  const headingColor = useColorModeValue("gray.900", "white");
+  const subtextColor = useColorModeValue("gray.500", "gray.400");
+  const isStaff = Boolean(isTeacher || isAdmin);
 
   // جلب درجات الطلاب
   const fetchGrades = async () => {
@@ -1686,50 +1689,92 @@ const ComprehensiveExam = () => {
   }
 
   return (
+    <>
+      {isStaff ? (
+        <TeacherExamShell
+          examTitle={examData?.title}
+          questionsCount={questions.length}
+          onGrades={fetchGrades}
+          onReport={fetchExamReport}
+          reportLoading={reportLoading}
+          onAddImages={openAddImageModal}
+          onBulkText={() => setBulkTextModalOpen(true)}
+          onPassage={() => setPassageModalOpen(true)}
+          onAiExtract={() => setAiExtractionModalOpen(true)}
+          onReload={fetchExamData}
+          loading={loading}
+        >
+          {questions.length > 0 ? (
+            <VStack spacing={4} align="stretch" w="full">
+              {questions.map((q, idx) => {
+                const isPassageSub = q.type === "passage_sub";
+                const displayId = isPassageSub ? q.sub_question.id : q.id;
+                const displayText = isPassageSub ? q.sub_question.text : q.text;
+                const displayImage = isPassageSub ? q.sub_question.image : q.image;
+                const displayChoices = isPassageSub
+                  ? q.sub_question.choices
+                  : q.choices;
+                const passageContent = isPassageSub
+                  ? q.passage?.content
+                  : q.passage?.content;
+                return (
+                  <TeacherQuestionCard
+                    key={displayId}
+                    index={idx}
+                    displayId={displayId}
+                    displayText={displayText}
+                    displayImage={displayImage}
+                    displayChoices={displayChoices}
+                    passageContent={passageContent}
+                    questionRef={isPassageSub ? { ...q.sub_question } : q}
+                    pendingCorrect={pendingCorrect}
+                    onZoomImage={(src) => {
+                      setImageZoomSrc(src);
+                      setImageZoomOpen(true);
+                    }}
+                    onAddImage={openAddQuestionImageModal}
+                    onEdit={openEditModal}
+                    onDelete={(qid) => setDeleteModal({ open: true, qid })}
+                    onSetCorrect={handleSetCorrect}
+                  />
+                );
+              })}
+            </VStack>
+          ) : (
+            <TeacherExamEmptyState
+              onAiExtract={() => setAiExtractionModalOpen(true)}
+              onBulkText={() => setBulkTextModalOpen(true)}
+              onReload={fetchExamData}
+              loading={loading}
+            />
+          )}
+        </TeacherExamShell>
+      ) : (
     <Box
       minH="100vh"
       bg={pageBg}
       pt="100px"
       pb={10}
       dir="rtl"
-      style={{ fontFamily: "'Changa', sans-serif" }}
+      style={{ fontFamily: "'Noto Sans Arabic', 'Segoe UI', sans-serif" }}
     >
-      <Container
-        maxW={student && !isTeacher && !isAdmin ? "container.md" : "container.xl"}
-        px={{ base: 4, md: 6 }}
-      >
-        <Box
-          borderRadius="2xl"
-          bg={cardBg}
-          borderWidth="1px"
-          borderColor={cardBorder}
-          boxShadow="lg"
-          overflow="hidden"
-          mb={8}
-        >
-          <Box h="1" w="100%" bgGradient="linear(to-r, blue.500, orange.500)" />
-          <Box px={{ base: 4, md: 6 }} py={6}>
-            <style>
-              {`
-          @keyframes pulse {
-            0%, 100% { opacity: 0.3; transform: scale(1); }
-            50% { opacity: 0.6; transform: scale(1.05); }
-          }
-          @keyframes slideIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-          }
-        `}
-            </style>
+      <Container maxW="container.md" px={{ base: 4, md: 6 }}>
+          <Box
+              borderRadius="2xl"
+              bg={cardBg}
+              borderWidth="1px"
+              borderColor={cardBorder}
+              boxShadow="lg"
+              overflow="hidden"
+              mb={8}
+            >
+              <Box h="1" w="100%" bgGradient="linear(to-r, blue.500, orange.500)" />
+              <Box px={{ base: 4, md: 6 }} py={6}>
             <VStack
               spacing={{ base: 4, sm: 5, md: 6 }}
-              mb={{ base: 6, sm: 7, md: 8 }}
+              mb={{ base: 4, sm: 5, md: 6 }}
             >
-              {!isTeacher && !isAdmin && student && !submitResult && (
+              {student && !submitResult && (
                 <Text
                   color={subtextColor}
                   textAlign="center"
@@ -1740,126 +1785,11 @@ const ComprehensiveExam = () => {
                 </Text>
               )}
             </VStack>
-            {/* أزرار المدرس — براند أزرق / برتقالي */}
-            {isTeacher && (
-              <HStack
-                spacing={4}
-                mb={{ base: 6, sm: 7, md: 8 }}
-                justify="center"
-                flexWrap="wrap"
-              >
-                <Button
-                  bg="blue.500"
-                  color="white"
-                  onClick={fetchGrades}
-                  size={{ base: "sm", sm: "md", md: "lg" }}
-                  px={{ base: 5, sm: 6, md: 8 }}
-                  h={{ base: "40px", sm: "44px", md: "48px" }}
-                  borderRadius="xl"
-                  _hover={{
-                    bg: "blue.400",
-                    transform: "translateY(-2px)",
-                    boxShadow: "md",
-                  }}
-                  transition="all 0.2s"
-                  fontWeight="bold"
-                >
-                  عرض درجات الطلاب
-                </Button>
-                <Button
-                  bg="orange.500"
-                  color="white"
-                  onClick={fetchExamReport}
-                  isLoading={reportLoading}
-                  size={{ base: "sm", sm: "md", md: "lg" }}
-                  px={{ base: 5, sm: 6, md: 8 }}
-                  h={{ base: "40px", sm: "44px", md: "48px" }}
-                  borderRadius="xl"
-                  leftIcon={<Icon as={AiFillStar} boxSize={4} />}
-                  _hover={{
-                    bg: "orange.400",
-                    transform: "translateY(-2px)",
-                    boxShadow: "md",
-                  }}
-                  transition="all 0.2s"
-                  fontWeight="bold"
-                >
-                  تقارير الامتحان
-                </Button>
-                <Button
-                  variant="outline"
-                  borderColor="blue.500"
-                  color="blue.500"
-                  onClick={openAddImageModal}
-                  size={{ base: "sm", sm: "md", md: "lg" }}
-                  px={{ base: 5, sm: 6, md: 8 }}
-                  h={{ base: "40px", sm: "44px", md: "48px" }}
-                  borderRadius="xl"
-                  leftIcon={<Icon as={AiFillPicture} boxSize={4} />}
-                  _hover={{ bg: "blue.50", borderColor: "blue.400" }}
-                  transition="all 0.2s"
-                  fontWeight="bold"
-                >
-                  إضافة أسئلة كصور
-                </Button>
-                <Button
-                  variant="outline"
-                  borderColor="green.500"
-                  color="green.600"
-                  onClick={() => setBulkTextModalOpen(true)}
-                  size={{ base: "sm", sm: "md", md: "lg" }}
-                  px={{ base: 5, sm: 6, md: 8 }}
-                  h={{ base: "40px", sm: "44px", md: "48px" }}
-                  borderRadius="xl"
-                  leftIcon={<Icon as={FaBookOpen} boxSize={4} />}
-                  _hover={{ bg: "green.50", borderColor: "green.400" }}
-                  transition="all 0.2s"
-                  fontWeight="bold"
-                >
-                  إضافة أسئلة كنص
-                </Button>
-                <Button
-                  variant="outline"
-                  borderColor="teal.500"
-                  color="teal.600"
-                  onClick={() => setPassageModalOpen(true)}
-                  size={{ base: "sm", sm: "md", md: "lg" }}
-                  px={{ base: 5, sm: 6, md: 8 }}
-                  h={{ base: "40px", sm: "44px", md: "48px" }}
-                  borderRadius="xl"
-                  leftIcon={<Icon as={FaBookOpen} boxSize={4} />}
-                  _hover={{ bg: "teal.50", borderColor: "teal.400" }}
-                  transition="all 0.2s"
-                  fontWeight="bold"
-                >
-                  إضافة أسئلة من قطعة
-                </Button>
-                <Button
-                  variant="outline"
-                  borderColor="purple.500"
-                  color="purple.600"
-                  onClick={() => setAiExtractionModalOpen(true)}
-                  size={{ base: "sm", sm: "md", md: "lg" }}
-                  px={{ base: 5, sm: 6, md: 8 }}
-                  h={{ base: "40px", sm: "44px", md: "48px" }}
-                  borderRadius="xl"
-                  leftIcon={<Icon as={AiOutlineRobot} boxSize={4} />}
-                  _hover={{ bg: "purple.50", borderColor: "purple.400" }}
-                  transition="all 0.2s"
-                  fontWeight="bold"
-                >
-                  استخراج بالذكاء الاصطناعي
-                </Button>
-              </HStack>
-            )}
-            <VStack spacing={{ base: 6, sm: 7, md: 8 }} align="stretch">
-              {/* إذا الطالب سلّم الامتحان أو كان هناك feedback، اعرض النتيجة والأخطاء */}
+            <VStack spacing={{ base: 5, sm: 6, md: 6 }} align="stretch">
               {(submitResult ||
                 (feedback &&
                   feedback.wrongQuestions &&
                   feedback.wrongQuestions.length > 0)) &&
-              !isTeacher &&
-              !isAdmin &&
               student ? (
                 <ExamResultPanel
                   submitResult={submitResult}
@@ -1872,82 +1802,8 @@ const ComprehensiveExam = () => {
                   }}
                 />
               ) : (
-                // الوضع العادي: عرض الأسئلة
                 <>
-                  {/* للمدرسين: عرض جميع الأسئلة */}
-                  {isTeacher || isAdmin ? (
-                    <>
-                      {questions.length > 0 ? (
-                        <SimpleGrid columns={{ base: 1, xl: 2 }} spacing={4} w="full">
-                        {questions.map((q, idx) => {
-                          const isPassageSub = q.type === "passage_sub";
-                          const displayId = isPassageSub
-                            ? q.sub_question.id
-                            : q.id;
-                          const displayText = isPassageSub
-                            ? q.sub_question.text
-                            : q.text;
-                          const displayImage = isPassageSub
-                            ? q.sub_question.image
-                            : q.image;
-                          const displayChoices = isPassageSub
-                            ? q.sub_question.choices
-                            : q.choices;
-                          const passageContent = isPassageSub
-                            ? q.passage?.content
-                            : q.passage?.content;
-                          return (
-                            <TeacherQuestionCard
-                              key={displayId}
-                              index={idx}
-                              displayId={displayId}
-                              displayText={displayText}
-                              displayImage={displayImage}
-                              displayChoices={displayChoices}
-                              passageContent={passageContent}
-                              questionRef={isPassageSub ? { ...q.sub_question } : q}
-                              pendingCorrect={pendingCorrect}
-                              onZoomImage={(src) => {
-                                setImageZoomSrc(src);
-                                setImageZoomOpen(true);
-                              }}
-                              onAddImage={openAddQuestionImageModal}
-                              onEdit={openEditModal}
-                              onDelete={(qid) =>
-                                setDeleteModal({ open: true, qid })
-                              }
-                              onSetCorrect={handleSetCorrect}
-                            />
-                          );
-                        })}
-                        </SimpleGrid>
-                      ) : (
-                        <Center minH="40vh">
-                          <Alert status="info" borderRadius="md" maxW="md">
-                            <AlertIcon />
-                            <VStack spacing={3} align="start">
-                              <Text fontWeight="bold" fontSize="lg">
-                                لا توجد أسئلة
-                              </Text>
-                              <Text>
-                                لم يتم العثور على أسئلة في هذا الامتحان.
-                              </Text>
-                              <Button
-                                colorScheme="blue"
-                                size="sm"
-                                onClick={fetchExamData}
-                                isLoading={loading}
-                              >
-                                إعادة تحميل
-                              </Button>
-                            </VStack>
-                          </Alert>
-                        </Center>
-                      )}
-                    </>
-                  ) : (
-                    // للطلاب: عرض سؤال واحد مع التنقل
-                    questions.length > 0 &&
+                  {questions.length > 0 &&
                     (() => {
                       const currentItem = questions[currentQuestionIndex];
                       const isPassageSub = currentItem?.type === "passage_sub";
@@ -1998,7 +1854,6 @@ const ComprehensiveExam = () => {
                             headingColor={headingColor}
                             subtextColor={subtextColor}
                             cardBg={cardBg}
-                            cardBorder={cardBorder}
                           />
 
                           <HStack
@@ -2045,11 +1900,15 @@ const ComprehensiveExam = () => {
                           </HStack>
                         </>
                       );
-                    })()
-                  )}
+                    })()}
                 </>
               )}
             </VStack>
+              </Box>
+            </Box>
+      </Container>
+    </Box>
+      )}
 
             {/* Edit Modal */}
             <Modal
@@ -3141,10 +3000,7 @@ const ComprehensiveExam = () => {
                 </ModalFooter>
               </ModalContent>
             </Modal>
-          </Box>
-        </Box>
-      </Container>
-    </Box>
+    </>
   );
 };
 

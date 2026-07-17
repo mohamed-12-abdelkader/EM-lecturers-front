@@ -5,45 +5,43 @@ import { fetchTenantPublic } from "../../../api/tenantPublicApi";
 import { getTenantSubdomain } from "../../../utils/tenantHost";
 import { field, studentCode, studentName } from "../centerMgmtUtils";
 
-/** 12 cards per A4 landscape — 3 cols × 4 rows */
-const CARD_W = 300;
-const CARD_H = 158;
-const CARDS_PER_PAGE = 12;
+/**
+ * 12 كارت في صفحة A4 أفقي (3×4)
+ * النسبة مضبوطة على 297×210 عشان تملأ الورقة بدون فراغ على الأجناب أو فوق/تحت
+ */
+const A4_RATIO = 297 / 210;
+const PAGE_RENDER_W = 1188; // ~4px/mm × 297
+const PAGE_RENDER_H = Math.round(PAGE_RENDER_W / A4_RATIO); // ~840
 const GRID_COLS = 3;
 const GRID_ROWS = 4;
+const CARDS_PER_PAGE = 12;
 const GRID_GAP = 10;
-const PAGE_PAD = 10;
+const PAGE_PAD = 8;
 
-const BLUE = "#1565A8";
-const ORANGE = "#E86A12";
-const BORDER = "#7EB8E0";
+const CARD_W = Math.floor(
+  (PAGE_RENDER_W - PAGE_PAD * 2 - GRID_GAP * GRID_COLS) / GRID_COLS
+);
+const CARD_H = Math.floor(
+  (PAGE_RENDER_H - PAGE_PAD * 2 - GRID_GAP * GRID_ROWS) / GRID_ROWS
+);
+
+const QR_SIZE = 86;
+const QR_BOX = 92;
+
+/** Professional navy / slate palette */
+const NAVY = "#0F2744";
+const NAVY_SOFT = "#1A3A5C";
+const INK = "#14233A";
+const MUTED = "#64748B";
+const ACCENT = "#C4782A";
+const SURFACE = "#F7F9FC";
+const LINE = "#E2E8F0";
+const BORDER = "#CBD5E1";
 
 /**
  * Tahoma + Cairo: Tahoma أولوية لـ html2canvas لأنه يثبت تشكيل العربي.
- * (overflow+ellipsis مع Cairo كانت سبب تقطيع الحروف في الـ PDF)
  */
 const FONT = "Tahoma,'Cairo','Segoe UI',Arial,sans-serif";
-
-async function toDataUrl(url) {
-  if (!url) return null;
-  if (String(url).startsWith("data:")) return url;
-  try {
-    const absolute = url.startsWith("http")
-      ? url
-      : `${window.location.origin}${url.startsWith("/") ? "" : "/"}${url}`;
-    const res = await fetch(absolute, { mode: "cors", credentials: "omit" });
-    if (!res.ok) return absolute;
-    const blob = await res.blob();
-    return await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return url.startsWith("http") ? url : `${window.location.origin}${url}`;
-  }
-}
 
 function normalizeQrSrc(qrData, student) {
   const raw =
@@ -58,8 +56,6 @@ export async function fetchCenterCardBranding() {
   const subdomain = getTenantSubdomain();
 
   let teacherName = user.name || user.full_name || "المدرس";
-  let teacherPhoto =
-    user.avatar || user.avatar_url || user.photo || user.image || null;
 
   if (subdomain) {
     try {
@@ -67,23 +63,12 @@ export async function fetchCenterCardBranding() {
       const tenant = res?.data?.tenant;
       const teacher = res?.data?.teacher;
       teacherName = teacher?.name || tenant?.display_name || teacherName;
-      teacherPhoto =
-        teacher?.avatar ||
-        teacher?.avatar_url ||
-        teacher?.photo ||
-        tenant?.avatar_url ||
-        teacherPhoto;
     } catch {
       // keep fallbacks
     }
   }
 
-  const photoData = await toDataUrl(teacherPhoto);
-
-  return {
-    teacherName,
-    teacherPhoto: photoData || teacherPhoto || null,
-  };
+  return { teacherName };
 }
 
 function escapeHtml(value) {
@@ -100,24 +85,6 @@ function truncate(text, max = 24) {
   return `${s.slice(0, max - 1)}…`;
 }
 
-function avatarFallbackSvg() {
-  return `
-    <svg width="48" height="48" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <circle cx="32" cy="32" r="32" fill="#D6E9F8"/>
-      <circle cx="32" cy="23" r="12" fill="${BLUE}"/>
-      <path d="M10 58c2.5-12 10.5-18 22-18s19.5 6 22 18" fill="${BLUE}"/>
-    </svg>`;
-}
-
-function idIconSvg() {
-  return `
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style="flex-shrink:0;">
-      <rect x="2.5" y="5" width="19" height="14" rx="2" stroke="${BLUE}" stroke-width="1.8"/>
-      <circle cx="8.5" cy="12" r="2.2" stroke="${BLUE}" stroke-width="1.6"/>
-      <path d="M13.2 10h5.2M13.2 14h4" stroke="${BLUE}" stroke-width="1.6" stroke-linecap="round"/>
-    </svg>`;
-}
-
 function buildCardHtml({
   studentName: name,
   studentId,
@@ -126,20 +93,29 @@ function buildCardHtml({
   qrSrc,
   branding,
 }) {
-  const grade = escapeHtml(truncate(gradeName || "—", 26));
-  const safeName = escapeHtml(truncate(name, 28));
-  const headerGroup = escapeHtml(truncate(groupName || "—", 20));
+  const grade = escapeHtml(truncate(gradeName || "—", 24));
+  const safeName = escapeHtml(truncate(name, 24));
+  const headerGroup = escapeHtml(truncate(groupName || "—", 18));
   const safeId = escapeHtml(String(studentId ?? "—"));
-  const teacher = escapeHtml(truncate(branding.teacherName || "المدرس", 14));
-  const teacherPhoto = branding.teacherPhoto;
-
-  const teacherPhotoBlock = teacherPhoto
-    ? `<img src="${teacherPhoto}" alt="" crossorigin="anonymous" width="48" height="48" style="width:48px;height:48px;object-fit:cover;display:block;border-radius:50%;" />`
-    : avatarFallbackSvg();
+  const teacher = escapeHtml(truncate(branding.teacherName || "المدرس", 20));
 
   const qrBlock = qrSrc
-    ? `<img src="${qrSrc}" alt="QR" width="64" height="64" style="width:64px;height:64px;object-fit:contain;display:block;" />`
-    : `<div style="width:64px;height:64px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#64748b;font-family:${FONT};">لا QR</div>`;
+    ? `<img
+        src="${qrSrc}"
+        alt="QR"
+        width="${QR_SIZE}"
+        height="${QR_SIZE}"
+        style="
+          width:${QR_SIZE}px;
+          height:${QR_SIZE}px;
+          object-fit:contain;
+          display:block;
+          image-rendering:-webkit-optimize-contrast;
+          image-rendering:crisp-edges;
+          image-rendering:pixelated;
+        "
+      />`
+    : `<div style="width:${QR_SIZE}px;height:${QR_SIZE}px;display:flex;align-items:center;justify-content:center;font-size:10px;color:${MUTED};font-family:${FONT};">لا QR</div>`;
 
   // ملاحظة: ممنوع overflow:hidden + text-overflow:ellipsis على العربي مع html2canvas
   return `
@@ -148,107 +124,151 @@ function buildCardHtml({
   height:${CARD_H}px;
   border-collapse:separate;
   border-spacing:0;
-  border-radius:14px;
+  border-radius:10px;
   overflow:hidden;
-  border:2px solid ${BORDER};
+  border:1px solid ${BORDER};
   background:#ffffff;
   font-family:${FONT};
   table-layout:fixed;
 ">
   <tr>
-    <td colspan="3" style="
-      background:${BLUE};
+    <td colspan="2" style="
+      background:${NAVY};
       padding:7px 12px;
       vertical-align:middle;
+      height:30px;
     ">
       <table dir="rtl" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-family:${FONT};">
         <tr>
           <td style="
-            color:#ffffff;
+            color:#FFFFFF;
             font-size:11px;
             font-weight:700;
             font-family:${FONT};
-            line-height:1.35;
+            line-height:1.25;
             text-align:right;
             white-space:nowrap;
+            vertical-align:middle;
           ">${grade}</td>
           <td style="
-            color:#ffffff;
-            font-size:11px;
-            font-weight:700;
-            font-family:${FONT};
-            line-height:1.35;
             text-align:left;
             white-space:nowrap;
+            vertical-align:middle;
             width:48%;
           ">
-            <span style="color:${ORANGE};">●</span>
-            &nbsp;${headerGroup}&nbsp;
-            <span style="color:${ORANGE};">●</span>
+            <span style="
+              display:inline-block;
+              background:${NAVY_SOFT};
+              color:#FFFFFF;
+              font-size:10px;
+              font-weight:700;
+              font-family:${FONT};
+              line-height:1.25;
+              padding:3px 10px;
+              border-radius:999px;
+              border:1px solid rgba(255,255,255,0.18);
+            ">${headerGroup}</span>
           </td>
         </tr>
       </table>
     </td>
   </tr>
+  <tr>
+    <td colspan="2" style="height:3px;background:${ACCENT};padding:0;font-size:0;line-height:0;">&nbsp;</td>
+  </tr>
 
   <tr>
-    <td style="width:72px;padding:8px 6px 6px 4px;vertical-align:middle;text-align:center;background:#fff;">
+    <td style="
+      padding:10px 12px 10px 10px;
+      vertical-align:middle;
+      background:${SURFACE};
+      border-left:1px solid ${LINE};
+    ">
       <div style="
-        width:52px;
-        height:52px;
-        margin:0 auto 5px;
-        border:2.5px solid ${BLUE};
-        border-radius:50%;
-        overflow:hidden;
-        background:#D6E9F8;
-        line-height:0;
-      ">${teacherPhotoBlock}</div>
-      <div style="
-        color:${BLUE};
-        font-size:10px;
+        color:${MUTED};
+        font-size:9px;
         font-weight:700;
         font-family:${FONT};
-        line-height:1.3;
-        text-align:center;
-      ">${teacher}</div>
-    </td>
-
-    <td style="padding:8px 4px 6px;vertical-align:middle;background:#fff;">
+        line-height:1.15;
+        margin-bottom:2px;
+        text-align:right;
+        white-space:nowrap;
+      ">المدرس</div>
       <div style="
-        color:${BLUE};
+        color:${INK};
         font-size:13px;
         font-weight:700;
         font-family:${FONT};
-        line-height:1.3;
-        margin-bottom:7px;
+        line-height:1.25;
+        margin-bottom:8px;
+        text-align:right;
+        white-space:nowrap;
+      ">${teacher}</div>
+
+      <div style="height:1px;background:${LINE};margin:0 0 8px;line-height:0;font-size:0;">&nbsp;</div>
+
+      <div style="
+        color:${MUTED};
+        font-size:9px;
+        font-weight:700;
+        font-family:${FONT};
+        line-height:1.15;
+        margin-bottom:2px;
+        text-align:right;
+        white-space:nowrap;
+      ">اسم الطالب</div>
+      <div style="
+        color:${NAVY};
+        font-size:16px;
+        font-weight:700;
+        font-family:${FONT};
+        line-height:1.25;
+        margin-bottom:8px;
         text-align:right;
         white-space:nowrap;
       ">${safeName}</div>
+
       <div style="
-        color:${BLUE};
+        display:inline-block;
+        background:#FFFFFF;
+        border:1px solid ${LINE};
+        border-radius:7px;
+        padding:4px 10px;
+        color:${INK};
         font-size:12px;
         font-weight:700;
         font-family:${FONT};
-        line-height:1.35;
-        text-align:right;
+        line-height:1.25;
         white-space:nowrap;
-      ">
-        ${idIconSvg()}
-        <span style="vertical-align:middle;">&nbsp;الكود : ${safeId}</span>
-      </div>
+      ">الكود&nbsp;&nbsp;<span style="color:${ACCENT};">${safeId}</span></div>
     </td>
 
-    <td style="width:80px;padding:8px 8px 6px 6px;vertical-align:middle;text-align:center;background:#fff;">
+    <td style="
+      width:112px;
+      padding:10px 12px;
+      vertical-align:middle;
+      text-align:center;
+      background:#FFFFFF;
+    ">
       <div style="
-        width:70px;
-        height:70px;
+        width:${QR_BOX}px;
+        height:${QR_BOX}px;
         margin:0 auto;
-        border:2.5px solid ${ORANGE};
+        border:1px solid ${BORDER};
         border-radius:8px;
-        padding:3px;
-        background:#fff;
+        padding:2px;
+        background:#FFFFFF;
         box-sizing:border-box;
+        line-height:0;
       ">${qrBlock}</div>
+      <div style="
+        margin-top:5px;
+        color:${MUTED};
+        font-size:8px;
+        font-weight:700;
+        font-family:${FONT};
+        white-space:nowrap;
+      ">SCAN QR</div>
     </td>
   </tr>
 </table>`;
@@ -290,35 +310,49 @@ async function loadStudentCards(students) {
 }
 
 function buildPageHtml(cardHtmlList) {
-  const pageW = GRID_COLS * CARD_W + (GRID_COLS - 1) * GRID_GAP + PAGE_PAD * 2;
   const slots = Array.from({ length: CARDS_PER_PAGE }, (_, i) => cardHtmlList[i] || "");
   const filled = slots.filter(Boolean).length;
   const rows = Math.min(GRID_ROWS, Math.ceil(filled / GRID_COLS) || 1);
+  const halfGap = GRID_GAP / 2;
 
-  const cardsHtml = slots
-    .map((card) => {
-      if (!card) {
-        return `<div style="width:${CARD_W}px;height:${CARD_H}px;"></div>`;
-      }
-      return `<div style="width:${CARD_W}px;height:${CARD_H}px;">${card}</div>`;
-    })
-    .join("");
+  const rowHtml = Array.from({ length: rows }, (_, rowIdx) => {
+    const cells = Array.from({ length: GRID_COLS }, (_, colIdx) => {
+      const card = slots[rowIdx * GRID_COLS + colIdx] || "";
+      return `<td style="
+        width:${CARD_W + GRID_GAP}px;
+        height:${CARD_H + GRID_GAP}px;
+        padding:${halfGap}px;
+        vertical-align:top;
+        box-sizing:border-box;
+      "><div style="width:${CARD_W}px;height:${CARD_H}px;overflow:hidden;">${card || ""}</div></td>`;
+    }).join("");
+    return `<tr>${cells}</tr>`;
+  }).join("");
+
+  // استخدم مقاس ثابت بنفس نسبة A4 حتى لو عدد الصفوف أقل من 4
+  const pageW = PAGE_RENDER_W;
+  const pageH =
+    rows === GRID_ROWS
+      ? PAGE_RENDER_H
+      : PAGE_PAD * 2 + rows * (CARD_H + GRID_GAP);
 
   return `
     <div id="pdf-page" style="
       width:${pageW}px;
+      height:${pageH}px;
       padding:${PAGE_PAD}px;
       background:#ffffff;
       box-sizing:border-box;
       font-family:${FONT};
-      display:grid;
-      grid-template-columns:repeat(${GRID_COLS}, ${CARD_W}px);
-      grid-template-rows:repeat(${rows}, ${CARD_H}px);
-      gap:${GRID_GAP}px;
-      align-content:start;
-      justify-content:start;
+      overflow:hidden;
     ">
-      ${cardsHtml}
+      <table dir="ltr" cellpadding="0" cellspacing="0" style="
+        border-collapse:collapse;
+        width:${GRID_COLS * (CARD_W + GRID_GAP)}px;
+        table-layout:fixed;
+      ">
+        ${rowHtml}
+      </table>
     </div>
   `;
 }
@@ -341,6 +375,11 @@ function buildIsolatedDocument(pageInnerHtml) {
     }
     table { border-collapse: separate; }
     img { max-width: none; }
+    img[alt="QR"] {
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
+      image-rendering: pixelated;
+    }
   </style>
 </head>
 <body>${pageInnerHtml}</body>
@@ -389,7 +428,7 @@ async function renderPageInIsolatedFrame(pageInnerHtml) {
   await new Promise((resolve) => setTimeout(resolve, 300));
 
   const canvas = await html2canvas(pageEl, {
-    scale: 3,
+    scale: 4,
     useCORS: true,
     allowTaint: true,
     backgroundColor: "#ffffff",
@@ -397,6 +436,7 @@ async function renderPageInIsolatedFrame(pageInnerHtml) {
     height: pageEl.scrollHeight,
     logging: false,
     letterRendering: true,
+    imageTimeout: 15000,
   });
 
   document.body.removeChild(iframe);
@@ -421,7 +461,7 @@ export async function generateGroupStudentCardsPdf({
   const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageW = 297;
   const pageH = 210;
-  const margin = 6;
+  const margin = 2;
 
   const totalPages = Math.ceil(cards.length / CARDS_PER_PAGE);
 
@@ -449,18 +489,11 @@ export async function generateGroupStudentCardsPdf({
     const canvas = await renderPageInIsolatedFrame(buildPageHtml(cardHtmlList));
 
     const imgData = canvas.toDataURL("image/png");
-    const imgRatio = canvas.width / canvas.height;
-    let drawW = pageW - margin * 2;
-    let drawH = drawW / imgRatio;
-    if (drawH > pageH - margin * 2) {
-      drawH = pageH - margin * 2;
-      drawW = drawH * imgRatio;
-    }
-    const x = (pageW - drawW) / 2;
-    const y = (pageH - drawH) / 2;
+    const drawW = pageW - margin * 2;
+    const drawH = pageH - margin * 2;
 
     if (pageIdx > 0) pdf.addPage();
-    pdf.addImage(imgData, "PNG", x, y, drawW, drawH, undefined, "FAST");
+    pdf.addImage(imgData, "PNG", margin, margin, drawW, drawH, undefined, "NONE");
   }
 
   const safeName = String(groupName || "group")

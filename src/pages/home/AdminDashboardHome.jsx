@@ -125,6 +125,21 @@ const AdminDashboardHome = () => {
             <HStack spacing={2} flexWrap="wrap">
               <Button
                 as={RouterLink}
+                to="/admin/students"
+                size="sm"
+                variant="outline"
+                borderColor={AD_BLUE}
+                color={AD_BLUE}
+                borderRadius="lg"
+                leftIcon={<MdPeople />}
+                fontWeight="700"
+                cursor="pointer"
+                _hover={{ bg: "blue.50" }}
+              >
+                كل الطلاب
+              </Button>
+              <Button
+                as={RouterLink}
                 to="/admin/addteacher"
                 size="sm"
                 bg={AD_ORANGE}

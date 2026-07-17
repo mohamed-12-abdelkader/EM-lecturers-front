@@ -16,21 +16,18 @@ import {
   FormLabel,
   Switch,
   Badge,
-  Image,
   Alert,
   AlertIcon,
   Icon,
   useToast,
   Input,
   Textarea,
-  Select,
-  IconButton,
   Flex,
   Heading,
   Spinner,
   useColorModeValue,
 } from "@chakra-ui/react";
-import { FaPlus, FaTrash, FaUpload, FaFilePdf, FaImage } from "react-icons/fa";
+import { FaPlus, FaUpload, FaFilePdf, FaImage } from "react-icons/fa";
 import {
   emptyDraftQuestion,
   mapOcrQuestionToDraft,
@@ -44,6 +41,7 @@ import {
   mapExtractionResponseMeta,
   formatOcrApiError,
 } from "../../../api/ocrQuestionExtractionApi";
+import ExtractionDraftQuestionCard from "../../../components/question/ExtractionDraftQuestionCard";
 import ExtractionMathPreview from "../../../components/question/ExtractionMathPreview";
 
 export default function TeacherLibraryExtractionModal({
@@ -348,232 +346,14 @@ export default function TeacherLibraryExtractionModal({
   const standaloneDraftQuestions = draftQuestionsByPassage.__standalone__ || [];
 
   const renderDraftQuestionCard = (draft, index) => (
-    <Box
+    <ExtractionDraftQuestionCard
       key={draft.id}
-      p={4}
-      borderRadius="xl"
-      borderWidth="1px"
-      borderColor={borderColor}
-      bg={cardBg}
-      boxShadow="sm"
-    >
-      <Flex justify="space-between" align="center" mb={3}>
-        <HStack>
-          <Badge colorScheme="blue">سؤال {index + 1}</Badge>
-          {draft.passage_id && (
-            <Badge colorScheme="blue" variant="subtle">
-              سؤال قطعة
-            </Badge>
-          )}
-        </HStack>
-        <HStack>
-          {draft.answerInferred && (
-            <Badge colorScheme="orange" fontSize="xs">
-              إجابة مُستنتجة
-            </Badge>
-          )}
-          {draft.question_type === "text_with_image" && (
-            <Badge colorScheme="orange" fontSize="xs">
-              سؤال بصورة
-            </Badge>
-          )}
-          <IconButton
-            icon={<FaTrash />}
-            aria-label="حذف"
-            size="sm"
-            colorScheme="red"
-            variant="ghost"
-            onClick={() => removeDraftQuestion(draft.id)}
-          />
-        </HStack>
-      </Flex>
-
-      <FormControl mb={3}>
-        <FormLabel fontSize="sm">نوع السؤال</FormLabel>
-        <Select
-          value={draft.question_type}
-          onChange={(e) => {
-            const type = e.target.value;
-            updateDraftQuestion(draft.id, {
-              question_type: type,
-              choices:
-                type === "choice"
-                  ? draft.choices.length === 4
-                    ? draft.choices
-                    : ["", "", "", ""]
-                  : ["", "", "", ""],
-              answer: type === "choice" ? draft.answer : "",
-              correctAnswerIndex: type === "choice" ? draft.correctAnswerIndex : null,
-            });
-          }}
-          dir="rtl"
-        >
-          <option value="choice">اختيار من متعدد (4 خيارات)</option>
-          <option value="text_with_image">سؤال بصورة (بدون اختيارات)</option>
-        </Select>
-      </FormControl>
-
-      <FormControl mb={3}>
-        <FormLabel fontSize="sm">نص السؤال</FormLabel>
-        <Textarea
-          value={draft.question_text}
-          onChange={(e) =>
-            updateDraftQuestion(draft.id, { question_text: e.target.value })
-          }
-          rows={2}
-          dir="rtl"
-          placeholder="نص السؤال — يدعم LaTeX مثل $x^2$ أو \frac{1}{2}"
-        />
-        <ExtractionMathPreview value={draft.question_text} />
-      </FormControl>
-
-      <FormControl mb={3}>
-        <FormLabel fontSize="sm">صور السؤال المستخرجة (اختياري)</FormLabel>
-        {draft.questionImages?.length > 0 ? (
-          <VStack align="stretch" spacing={3}>
-            {draft.questionImages.map((image, imageIndex) => (
-              <Box key={image.image_id || image.image_url || imageIndex}>
-                <Image
-                  src={image.image_url}
-                  alt={image.short_description || `صورة السؤال ${index + 1}`}
-                  maxH="160px"
-                  objectFit="contain"
-                  borderRadius="md"
-                  borderWidth="1px"
-                  borderColor={borderColor}
-                  bg="gray.50"
-                />
-                {image.short_description && (
-                  <Text fontSize="sm" color={subTextColor} mt={1}>
-                    {image.short_description}
-                  </Text>
-                )}
-              </Box>
-            ))}
-            <Button
-              size="sm"
-              colorScheme="red"
-              variant="ghost"
-              alignSelf="flex-start"
-              onClick={() =>
-                updateDraftQuestion(draft.id, {
-                  image_url: null,
-                  imageDescription: "",
-                  questionImages: [],
-                })
-              }
-            >
-              إزالة الصور
-            </Button>
-          </VStack>
-        ) : draft.image_url ? (
-          <VStack align="stretch" spacing={2}>
-            <Image
-              src={draft.image_url}
-              alt={`صورة السؤال ${index + 1}`}
-              maxH="140px"
-              objectFit="contain"
-              borderRadius="md"
-              borderWidth="1px"
-              borderColor={borderColor}
-              bg="gray.50"
-            />
-            {draft.imageDescription && (
-              <Text fontSize="sm" color={subTextColor}>
-                {draft.imageDescription}
-              </Text>
-            )}
-            <Button
-              size="sm"
-              colorScheme="red"
-              variant="ghost"
-              alignSelf="flex-start"
-              onClick={() =>
-                updateDraftQuestion(draft.id, {
-                  image_url: null,
-                  imageDescription: "",
-                })
-              }
-            >
-              إزالة
-            </Button>
-          </VStack>
-        ) : (
-          <Text fontSize="sm" color={subTextColor}>
-            لا توجد صورة مستخرجة لهذا السؤال
-          </Text>
-        )}
-      </FormControl>
-
-      {draft.question_type === "choice" && (
-        <>
-          <FormControl mb={3}>
-            <FormLabel fontSize="sm">الاختيارات (4 خيارات مطلوبة)</FormLabel>
-            <VStack align="stretch" spacing={2}>
-              {draft.choices.map((choice, cIdx) => (
-                <Box key={cIdx}>
-                  <HStack>
-                    <Badge minW="28px" textAlign="center">
-                      {String.fromCharCode(65 + cIdx)}
-                    </Badge>
-                    <Input
-                      value={choice}
-                      onChange={(e) => {
-                        const next = [...draft.choices];
-                        const oldVal = next[cIdx];
-                        next[cIdx] = e.target.value;
-                        const patch = { choices: next };
-                        if (draft.answer === oldVal) {
-                          patch.answer = e.target.value;
-                        }
-                        updateDraftQuestion(draft.id, patch);
-                      }}
-                      dir="rtl"
-                      placeholder={`اختيار ${cIdx + 1} — يدعم الكسور والرموز`}
-                    />
-                  </HStack>
-                      <ExtractionMathPreview
-                        value={choice}
-                        label={`معاينة ${String.fromCharCode(65 + cIdx)}`}
-                        fontSize="xs"
-                        lineHeight="1.65"
-                      />
-                </Box>
-              ))}
-            </VStack>
-          </FormControl>
-
-          <FormControl>
-            <FormLabel fontSize="sm">الإجابة الصحيحة</FormLabel>
-            <Select
-              placeholder="لا توجد إجابة محددة"
-              value={
-                Number.isInteger(draft.correctAnswerIndex)
-                  ? String(draft.correctAnswerIndex)
-                  : ""
-              }
-              onChange={(e) => {
-                const nextIndex = e.target.value === "" ? null : Number(e.target.value);
-                updateDraftQuestion(draft.id, {
-                  correctAnswerIndex: nextIndex,
-                  answer: nextIndex == null ? "" : draft.choices[nextIndex] || "",
-                  answerInferred: false,
-                });
-              }}
-              dir="rtl"
-            >
-              {draft.choices
-                .map((c) => c.trim())
-                .map((c, cIdx) => (
-                  <option key={`${cIdx}-${c}`} value={cIdx} disabled={!c}>
-                    {c || `اختيار ${cIdx + 1}`}
-                  </option>
-                ))}
-            </Select>
-          </FormControl>
-        </>
-      )}
-    </Box>
+      draft={draft}
+      index={index}
+      accentScheme="blue"
+      onUpdate={updateDraftQuestion}
+      onRemove={removeDraftQuestion}
+    />
   );
 
   return (

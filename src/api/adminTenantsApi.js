@@ -94,6 +94,111 @@ export async function fetchAdminTenantById(tenantId, token) {
 }
 
 /**
+ * GET /api/admin/tenants/:id/students
+ * @param {number|string} tenantId
+ * @param {{
+ *   limit?: number,
+ *   offset?: number,
+ *   search?: string,
+ *   is_subscribed?: boolean | "",
+ *   account_status?: string,
+ * }} params
+ * @param {string} token
+ */
+export async function fetchAdminTenantStudents(tenantId, params = {}, token) {
+  const id = Number(tenantId);
+  if (!id) {
+    const err = new Error("معرف المنصة غير صالح");
+    throw err;
+  }
+
+  const limit = Math.min(200, Math.max(1, Number(params.limit) || 50));
+  const offset = Math.max(0, Number(params.offset) || 0);
+  const query = new URLSearchParams();
+  query.set("limit", String(limit));
+  query.set("offset", String(offset));
+
+  if (params.search?.trim()) query.set("search", params.search.trim());
+  if (params.is_subscribed === true || params.is_subscribed === false) {
+    query.set("is_subscribed", String(params.is_subscribed));
+  }
+  if (params.account_status?.trim()) {
+    query.set("account_status", params.account_status.trim());
+  }
+
+  const { data } = await baseUrl.get(`${ADMIN_TENANTS_API}/${id}/students?${query}`, {
+    headers: adminHeaders(token),
+  });
+
+  if (!data?.success) {
+    const err = new Error(data?.message || "فشل تحميل طلاب المنصة");
+    err.response = { data };
+    throw err;
+  }
+
+  const payload = data.data || {};
+  const students = Array.isArray(payload.students) ? payload.students : [];
+  const summary = payload.summary || { total: 0, subscribed: 0, not_subscribed: 0 };
+  let total = Number(payload.total) || 0;
+  const summaryTotal = Number(summary.total) || 0;
+  const noFilters =
+    !params.search?.trim() &&
+    params.is_subscribed !== true &&
+    params.is_subscribed !== false &&
+    !params.account_status?.trim();
+  // بعض الردود تضع total = حجم الصفحة؛ نرجع لـ summary.total عند عدم وجود فلاتر
+  if (noFilters && total > 0 && total <= limit && summaryTotal > total && offset === 0) {
+    total = summaryTotal;
+  }
+
+  return {
+    tenant: payload.tenant || null,
+    summary,
+    students,
+    total: total || summaryTotal || students.length,
+    limit: Number(payload.limit) || limit,
+    offset: Number(payload.offset) || offset,
+  };
+}
+
+/**
+ * PATCH /api/admin/tenants/:id/students/:studentId/password
+ * @param {number|string} tenantId
+ * @param {number|string} studentId
+ * @param {{ new_password: string, must_change_password?: boolean }} body
+ * @param {string} token
+ */
+export async function patchAdminStudentPassword(tenantId, studentId, body, token) {
+  const tid = Number(tenantId);
+  const sid = Number(studentId);
+  if (!tid || !sid) {
+    throw new Error("معرف المنصة أو الطالب غير صالح");
+  }
+
+  const newPassword = String(body?.new_password || "");
+  if (newPassword.length < 6) {
+    throw new Error("كلمة المرور يجب أن تكون 6 أحرف على الأقل");
+  }
+
+  const { data } = await baseUrl.patch(
+    `${ADMIN_TENANTS_API}/${tid}/students/${sid}/password`,
+    {
+      new_password: newPassword,
+      must_change_password: body?.must_change_password === true,
+    },
+    { headers: adminHeaders(token, "application/json") },
+  );
+
+  if (!data?.success) {
+    const err = new Error(data?.message || "فشل تغيير كلمة السر");
+    err.response = { data };
+    throw err;
+  }
+
+  return data;
+}
+
+/**
  * PATCH /api/admin/tenants/:id — JSON
  * @param {number|string} tenantId
  * @param {object} payload

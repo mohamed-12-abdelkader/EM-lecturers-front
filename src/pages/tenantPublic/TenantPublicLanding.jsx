@@ -17,7 +17,6 @@ import TenantProFooter from "./components/landing/TenantProFooter";
 import { TL_ACCENT, TL_PRIMARY, TL_SECONDARY, TL_BORDER } from "./tenantLandingTheme";
 import {
   TenantPublicNavbar,
-  TENANT_NAV_LINKS,
   useTenantPublicTheme,
 } from "./components/TenantPublicNavbar";
 import { motion, ScrollProgress } from "./tenantLandingMotion";
@@ -289,11 +288,13 @@ export default function TenantPublicLanding({ subdomain }) {
   const showFreeLectures = !freeLecturesLoading && freeLectures.length > 0;
   const showCourses = !coursesLoading && courses.length > 0;
 
-  const landingNavLinks = TENANT_NAV_LINKS.filter(([, label]) => {
-    if (label === "محاضرات مجانية") return showFreeLectures;
-    if (label === "الكورسات") return showCourses;
-    return true;
-  });
+  const landingNavLinks = [
+    ["#home", "الرئيسية"],
+    ["#services", "لماذا نحن"],
+    ["#how-it-works", "كيف تبدأ"],
+    ...(showFreeLectures ? [["#videos", "محاضرات مجانية"]] : []),
+    ...(showCourses ? [["#courses", "الكورسات"]] : []),
+  ];
 
   const footerQuickLinks = [
     ["#home", "الرئيسية"],

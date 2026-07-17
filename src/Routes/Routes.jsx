@@ -130,6 +130,7 @@ import PlatfourmLeagues from "../pages/league/PlatfourmLeagues";
 import League from "../pages/league/League";
 import LecturesSchedule from "../pages/lecturesSchedule/LecturesSchedule";
 import FinanceManagementPage from "../pages/finance/FinanceManagementPage";
+import AdminAllStudentsPage from "../pages/Admin/AdminAllStudentsPage";
 import TeacherInvoicesPage from "../pages/teacher/TeacherInvoicesPage";
 import AdminDashboardHome from "../pages/home/AdminDashboardHome";
 import TeacherDashboardHome from "../pages/home/TeacherDashboardHome";
@@ -310,6 +311,28 @@ const AppRouter = () => {
           <Route index element={<FinanceManagementPage />} />
         </Route>
 
+        {/* كل طلاب المنصات */}
+        <Route
+          path="/admin/students"
+          element={
+            <ProtectedRoute auth={isAdmin}>
+              <HomeLogin />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<AdminAllStudentsPage />} />
+        </Route>
+
+        {/* إنشاء/تعديل منصة مدرس — صفحة مستقلة خارج لياوت الأدمن */}
+        <Route
+          path="/admin/addteacher"
+          element={
+            <ProtectedRoute auth={isAdmin}>
+              <AddTeacher />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Admin Panel Routes */}
         <Route
           path="/admin/*"
@@ -324,7 +347,6 @@ const AppRouter = () => {
             <Route path="management" element={<AdminMange />} />
             <Route path="add_employees" element={<AddEmployees />} />
             <Route path="mange_employees" element={<MangeEmployees />} />
-            <Route path="addteacher" element={<AddTeacher />} />
             <Route path="create_code" element={<AdminCreateCode />} />
             <Route path="cridet" element={<AdminTeacherBalances />} />
             <Route path="open_phone" element={<OpenPhone />} />

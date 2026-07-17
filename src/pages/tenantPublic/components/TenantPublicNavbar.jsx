@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { FaBars, FaMoon, FaSun, FaTimes } from "react-icons/fa";
+import { FaArrowLeft, FaBars, FaMoon, FaSun, FaTimes } from "react-icons/fa";
 import { fetchTenantPublic } from "../../../api/tenantPublicApi";
 import { getTenantSubdomain } from "../../../utils/tenantHost";
 import {
@@ -8,6 +8,7 @@ import {
   motion,
   slideDown,
 } from "../tenantLandingMotion";
+import { TL_BLUE, TL_ORANGE } from "../tenantLandingTheme";
 
 const TENANT_FONT_LINK_ID = "tenant-public-arabic-fonts";
 
@@ -65,34 +66,41 @@ export function useTenantPublicTheme() {
   return { isDarkMode, toggleTheme };
 }
 
-function ThemeToggle({ isDark, onToggle, onDark = false }) {
+function ThemeToggle({ isDark, onToggle, solidNav }) {
   return (
     <button
       type="button"
       onClick={onToggle}
       aria-label={isDark ? "تفعيل الوضع الفاتح" : "تفعيل الوضع الداكن"}
-      className={`relative flex h-9 w-[4.5rem] shrink-0 items-center rounded-full p-1 transition-colors ${
-        onDark ? "bg-white/15 ring-1 ring-white/20" : "bg-slate-100 dark:bg-slate-700"
+      className={`relative flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl transition-all duration-200 ${
+        solidNav
+          ? "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+          : "bg-white/10 text-white hover:bg-white/18"
       }`}
     >
-      <FaSun
-        className={`pointer-events-none absolute left-2.5 text-xs transition-colors ${
-          !isDark ? "text-[#A16207]" : "text-slate-400"
-        }`}
-        aria-hidden
-      />
-      <FaMoon
-        className={`pointer-events-none absolute right-2.5 text-xs transition-colors ${
-          isDark ? "text-blue-400" : "text-slate-300"
-        }`}
-        aria-hidden
-      />
-      <span
-        className={`absolute top-1 h-7 w-7 rounded-full bg-white shadow transition-all duration-300 ease-out dark:bg-slate-200 ${
-          isDark ? "left-[calc(100%-2rem)]" : "left-1"
-        }`}
-      />
+      {isDark ? <FaSun className="text-sm text-orange-400" /> : <FaMoon className="text-sm" />}
     </button>
+  );
+}
+
+function NavLinkItem({ href, label, solidNav, onClick }) {
+  return (
+    <a
+      href={href}
+      onClick={onClick}
+      className={`group relative cursor-pointer px-3.5 py-2 text-sm font-semibold tracking-wide transition-colors duration-200 ${
+        solidNav
+          ? "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+          : "text-white/80 hover:text-white"
+      }`}
+    >
+      {label}
+      <span
+        className="absolute inset-x-3 -bottom-0.5 h-[2px] origin-right scale-x-0 rounded-full transition-transform duration-300 group-hover:origin-left group-hover:scale-x-100"
+        style={{ background: `linear-gradient(90deg, ${TL_ORANGE}, ${TL_BLUE})` }}
+        aria-hidden
+      />
+    </a>
   );
 }
 
@@ -116,158 +124,203 @@ export function TenantPublicNavbar({
   const handleToggleTheme = onToggleTheme || toggleTheme;
   const solidNav = alwaysSolid || navScrolled || isMobileMenuOpen;
 
-  const linkClass = solidNav
-    ? "cursor-pointer text-slate-600 transition-colors duration-200 hover:bg-slate-100 hover:text-[#1E3A5F] dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-blue-300"
-    : "cursor-pointer text-white/90 transition-colors duration-200 hover:bg-white/10 hover:text-white";
-
-  const loginClass = solidNav
-    ? "cursor-pointer border-slate-200 text-slate-700 transition-colors duration-200 hover:border-[#2563EB]/40 hover:bg-[#E9EEF5] hover:text-[#1E3A5F] dark:border-slate-600 dark:text-slate-200 dark:hover:border-blue-500/40 dark:hover:bg-blue-500/10"
-    : "cursor-pointer border-white/30 text-white transition-colors duration-200 hover:border-white/50 hover:bg-white/10";
-
-  const menuBtnClass = solidNav
-    ? "cursor-pointer border-slate-200 text-slate-700 transition-colors duration-200 hover:border-[#2563EB]/40 hover:bg-[#E9EEF5] dark:border-slate-600 dark:text-slate-200"
-    : "cursor-pointer border-white/30 text-white transition-colors duration-200 hover:bg-white/10";
-
   return (
     <motion.header
       initial="hidden"
       animate="visible"
       variants={slideDown}
-      className={`fixed inset-x-0 top-0 z-50 font-[family-name:var(--tenant-nav-font,'Noto_Sans_Arabic','Segoe_UI',Tahoma,sans-serif)] transition-all duration-300 ${
-        solidNav
-          ? "border-b border-slate-200/90 bg-white/95 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/95"
-          : "border-b border-white/10 bg-slate-950/35 backdrop-blur-md"
-      }`}
+      className="pointer-events-none fixed inset-x-0 top-0 z-50 px-3 pt-3 md:px-5"
+      dir="rtl"
     >
-      <div className="mx-auto flex h-[4.25rem] max-w-[1200px] items-center gap-3 px-4 md:px-6">
-        <a href={brandHref} className="flex min-w-0 flex-1 items-center gap-3 min-[901px]:flex-none">
-          {tenantAvatar ? (
-            <img
-              src={tenantAvatar}
-              alt=""
-              className={`h-10 w-10 shrink-0 rounded-full object-cover ring-2 ${
-                solidNav ? "ring-blue-100 dark:ring-blue-900/50" : "ring-white/30"
-              }`}
-            />
-          ) : (
-            <span
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${
-                solidNav ? "bg-[#1E3A5F]" : "bg-[#1E3A5F] ring-2 ring-white/25"
-              }`}
-            >
-              {brandName.slice(0, 1)}
+      <div
+        className={`pointer-events-auto mx-auto max-w-[1200px] overflow-hidden rounded-2xl transition-all duration-400 ${
+          solidNav
+            ? "border border-slate-200/90 bg-white/90 shadow-[0_12px_40px_-12px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:border-slate-700/80 dark:bg-slate-950/90 dark:shadow-black/40"
+            : "border border-white/15 bg-slate-950/40 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.35)] backdrop-blur-xl"
+        }`}
+      >
+        {/* Accent hairline */}
+        <div
+          className="h-[2px] w-full"
+          style={{
+            background: solidNav
+              ? `linear-gradient(90deg, ${TL_BLUE}, ${TL_ORANGE}, transparent)`
+              : `linear-gradient(90deg, ${TL_ORANGE}, ${TL_BLUE}, transparent)`,
+          }}
+          aria-hidden
+        />
+
+        <div className="flex h-[3.85rem] items-center gap-3 px-3.5 sm:px-4 md:h-16 md:gap-4 md:px-5">
+          {/* Brand */}
+          <a
+            href={brandHref}
+            className="group flex min-w-0 flex-1 items-center gap-2.5 min-[920px]:flex-none min-[920px]:max-w-[280px]"
+          >
+            <span className="relative shrink-0">
+              {tenantAvatar ? (
+                <img
+                  src={tenantAvatar}
+                  alt=""
+                  className={`h-10 w-10 rounded-xl object-cover transition-transform duration-300 group-hover:scale-[1.03] ${
+                    solidNav
+                      ? "ring-2 ring-blue-100 dark:ring-blue-900/40"
+                      : "ring-2 ring-white/25"
+                  }`}
+                />
+              ) : (
+                <span
+                  className="flex h-10 w-10 items-center justify-center rounded-xl text-sm font-black text-white shadow-sm"
+                  style={{
+                    background: `linear-gradient(145deg, ${TL_BLUE}, #1A4F8C)`,
+                  }}
+                >
+                  {(brandName || "م").slice(0, 1)}
+                </span>
+              )}
+              <span
+                className="absolute -bottom-0.5 -left-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-slate-950"
+                style={{ background: TL_ORANGE }}
+                aria-hidden
+              />
             </span>
-          )}
-          <div className="min-w-0 text-right leading-tight">
-            <p
-              className={`truncate font-[family-name:var(--tenant-nav-heading,'Noto_Naskh_Arabic','Noto_Sans_Arabic',sans-serif)] text-base font-bold ${
-                solidNav ? "text-slate-900 dark:text-slate-100" : "text-white"
-              }`}
-            >
-              {brandName}
-            </p>
-            {specialty ? (
+            <div className="min-w-0 text-right leading-tight">
               <p
-                className={`truncate text-xs ${
-                  solidNav ? "text-slate-500 dark:text-slate-400" : "text-white/75"
+                className={`truncate font-heading text-[0.95rem] font-extrabold tracking-tight md:text-base ${
+                  solidNav ? "text-slate-900 dark:text-white" : "text-white"
                 }`}
               >
-                {specialty}
+                {brandName}
               </p>
-            ) : null}
-          </div>
-        </a>
-
-        <nav
-          className={`hidden items-center gap-0.5 rounded-full border px-1 py-1 min-[901px]:flex ${
-            solidNav
-              ? "border-slate-200 bg-slate-50/80 dark:border-slate-700 dark:bg-slate-900/60"
-              : "border-white/15 bg-white/5"
-          }`}
-          aria-label="التنقل الرئيسي"
-        >
-          {navLinks.map(([href, label]) => (
-            <a
-              key={href}
-              href={href}
-              className={`rounded-full px-3.5 py-2 text-sm font-medium transition ${linkClass}`}
-            >
-              {label}
-            </a>
-          ))}
-        </nav>
-
-        {extraNav}
-
-        <div className="flex shrink-0 items-center gap-2">
-          <ThemeToggle isDark={isDarkMode} onToggle={handleToggleTheme} onDark={!solidNav} />
-          <div className="hidden items-center gap-2 min-[901px]:flex">
-            <a
-              href={loginHref}
-              className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${loginClass}`}
-            >
-              تسجيل الدخول
-            </a>
-            <a
-              href={signupHref}
-              className="cursor-pointer rounded-lg bg-[#A16207] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors duration-200 hover:bg-[#854D0E]"
-            >
-              حساب جديد
-            </a>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-            className={`inline-flex h-10 w-10 items-center justify-center rounded-lg border transition min-[901px]:hidden ${menuBtnClass}`}
-            aria-expanded={isMobileMenuOpen}
-            aria-label={isMobileMenuOpen ? "إغلاق القائمة" : "فتح القائمة"}
-          >
-            {isMobileMenuOpen ? <FaTimes /> : <FaBars />}
-          </button>
-        </div>
-      </div>
-
-      <AnimatePresence>
-        {isMobileMenuOpen ? (
-          <motion.div
-            key="mobile-nav"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-            className="overflow-hidden border-t border-slate-200 bg-white px-4 py-4 shadow-lg dark:border-slate-800 dark:bg-slate-950 min-[901px]:hidden"
-          >
-            <nav className="grid gap-1" aria-label="قائمة الجوال">
-              {navLinks.map(([href, label]) => (
-                <a
-                  key={href}
-                  href={href}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="cursor-pointer rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 transition-colors duration-200 hover:bg-[#E9EEF5] hover:text-[#1E3A5F] dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-blue-300"
+              {specialty ? (
+                <p
+                  className={`truncate text-[11px] font-medium tracking-wide ${
+                    solidNav ? "text-slate-500 dark:text-slate-400" : "text-white/65"
+                  }`}
                 >
-                  {label}
-                </a>
-              ))}
-            </nav>
-            <div className="mt-4 grid grid-cols-2 gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+                  {specialty}
+                </p>
+              ) : null}
+            </div>
+          </a>
+
+          {/* Desktop links — centered cluster */}
+          <nav
+            className="mx-auto hidden items-center gap-0.5 min-[920px]:flex"
+            aria-label="التنقل الرئيسي"
+          >
+            {navLinks.map(([href, label]) => (
+              <NavLinkItem key={href} href={href} label={label} solidNav={solidNav} />
+            ))}
+          </nav>
+
+          {extraNav}
+
+          {/* Actions */}
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <ThemeToggle
+              isDark={isDarkMode}
+              onToggle={handleToggleTheme}
+              solidNav={solidNav}
+            />
+
+            <div className="hidden items-center gap-2 min-[920px]:flex">
               <a
                 href={loginHref}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 text-sm font-medium text-slate-700 dark:border-slate-600 dark:text-slate-200"
+                className={`cursor-pointer rounded-xl px-3.5 py-2 text-sm font-semibold transition-colors duration-200 ${
+                  solidNav
+                    ? "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
+                    : "text-white/85 hover:bg-white/10 hover:text-white"
+                }`}
               >
-                تسجيل الدخول
+                دخول
               </a>
               <a
                 href={signupHref}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="inline-flex h-11 cursor-pointer items-center justify-center rounded-lg bg-[#A16207] text-sm font-semibold text-white transition-colors duration-200 hover:bg-[#854D0E]"
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-bold text-white shadow-[0_8px_20px_-8px_rgba(221,107,32,0.65)] transition-[filter,transform] duration-200 hover:brightness-105 active:scale-[0.98]"
+                style={{ background: TL_ORANGE }}
               >
-                حساب جديد
+                ابدأ الآن
+                <FaArrowLeft className="text-[9px] opacity-90" />
               </a>
             </div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+              className={`inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl transition-colors duration-200 min-[920px]:hidden ${
+                solidNav
+                  ? "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200"
+                  : "bg-white/10 text-white hover:bg-white/18"
+              }`}
+              aria-expanded={isMobileMenuOpen}
+              aria-label={isMobileMenuOpen ? "إغلاق القائمة" : "فتح القائمة"}
+            >
+              {isMobileMenuOpen ? <FaTimes /> : <FaBars />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile panel */}
+        <AnimatePresence>
+          {isMobileMenuOpen ? (
+            <motion.div
+              key="mobile-nav"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+              className={`overflow-hidden border-t min-[920px]:hidden ${
+                solidNav
+                  ? "border-slate-200/80 bg-white/95 dark:border-slate-700 dark:bg-slate-950/95"
+                  : "border-white/10 bg-slate-950/50"
+              }`}
+            >
+              <nav className="grid gap-0.5 px-3 py-3" aria-label="قائمة الجوال">
+                {navLinks.map(([href, label], i) => (
+                  <motion.a
+                    key={href}
+                    href={href}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    initial={{ opacity: 0, x: 12 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.04, duration: 0.25 }}
+                    className={`cursor-pointer rounded-xl px-3.5 py-3 text-sm font-semibold transition-colors ${
+                      solidNav
+                        ? "text-slate-700 hover:bg-blue-50 hover:text-blue-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                        : "text-white/90 hover:bg-white/10"
+                    }`}
+                  >
+                    {label}
+                  </motion.a>
+                ))}
+              </nav>
+
+              <div className="grid grid-cols-2 gap-2 border-t border-slate-200/70 px-3 py-3 dark:border-slate-700/70">
+                <a
+                  href={loginHref}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`inline-flex h-11 cursor-pointer items-center justify-center rounded-xl border text-sm font-semibold transition-colors ${
+                    solidNav
+                      ? "border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200"
+                      : "border-white/25 text-white hover:bg-white/10"
+                  }`}
+                >
+                  دخول
+                </a>
+                <a
+                  href={signupHref}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="inline-flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl text-sm font-bold text-white"
+                  style={{ background: TL_ORANGE }}
+                >
+                  ابدأ الآن
+                  <FaArrowLeft className="text-[9px]" />
+                </a>
+              </div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </div>
     </motion.header>
   );
 }
@@ -297,7 +350,7 @@ export function TenantPublicNavbarShell({
 
   useEffect(() => {
     if (isAuth) return undefined;
-    const onScroll = () => setNavScrolled(window.scrollY > 32);
+    const onScroll = () => setNavScrolled(window.scrollY > 24);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);

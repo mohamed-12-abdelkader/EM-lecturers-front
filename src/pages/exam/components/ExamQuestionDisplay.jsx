@@ -328,59 +328,69 @@ function ExamChoicesSection({
     return (
       <Flex
         key={choice.id}
-        direction="column"
-        gap={2}
-        p={2.5}
-        borderRadius="xl"
-        borderWidth={isCorrect ? "2px" : "1px"}
+        as="button"
+        type="button"
+        w="full"
+        align="flex-start"
+        gap={3}
+        px={3.5}
+        py={3}
+        borderRadius="lg"
+        borderWidth="1px"
         borderColor={isCorrect ? correctBorder : border}
         bg={isCorrect ? correctBg : cardBg}
-        h="full"
+        textAlign="right"
+        transition="0.12s ease"
+        _hover={{
+          borderColor: isCorrect ? correctBorder : "blue.300",
+          bg: isCorrect ? correctBg : hoverBg,
+        }}
+        cursor={isCorrect || isPending ? "default" : "pointer"}
+        onClick={() => {
+          if (!isPending && !isCorrect) onSetCorrect?.(displayId, choice.id);
+        }}
+        disabled={isPending}
       >
-        <Flex align="center" justify="space-between" gap={2}>
-          <Flex
-            w={7}
-            h={7}
-            borderRadius="md"
-            bg={isCorrect ? "green.500" : letterBg}
-            color={isCorrect ? "white" : letterColor}
-            align="center"
-            justify="center"
-            fontSize="xs"
-            fontWeight="bold"
-            flexShrink={0}
-          >
-            {letter}
-          </Flex>
-          {isCorrect && (
-            <Badge colorScheme="green" fontSize="9px" borderRadius="md">
-              صحيحة
-            </Badge>
-          )}
-          <IconButton
-            aria-label="تعيين كإجابة صحيحة"
-            size="xs"
-            ml="auto"
-            colorScheme={isPending || isCorrect ? "green" : "gray"}
-            variant={isPending || isCorrect ? "solid" : "outline"}
-            icon={<AiFillCheckCircle />}
-            onClick={() => onSetCorrect?.(displayId, choice.id)}
-            isDisabled={isPending || isCorrect}
-          />
-        </Flex>
-        {choice.text && (
-          <Text fontSize="sm" fontWeight={isCorrect ? "semibold" : "medium"} color={headingColor} lineHeight="1.65">
-            {renderFormattedExamText(choice.text)}
-          </Text>
-        )}
-        {choice.image && (
-          <ChoiceImageFrame
-            src={choice.image}
-            alt={`الخيار ${letter}`}
-            onZoom={onZoomImage}
-            maxH={choice.isImageOnly ? "180px" : "120px"}
-          />
-        )}
+        <Text
+          minW="28px"
+          fontSize="sm"
+          fontWeight="black"
+          color={isCorrect ? "green.600" : "blue.500"}
+          lineHeight="1.7"
+          flexShrink={0}
+        >
+          {letter})
+        </Text>
+        <Box flex={1} minW={0}>
+          {choice.text ? (
+            <Text
+              fontSize="sm"
+              fontWeight={isCorrect ? "semibold" : "normal"}
+              color={headingColor}
+              lineHeight="1.75"
+              dir="auto"
+            >
+              {renderFormattedExamText(choice.text)}
+            </Text>
+          ) : null}
+          {choice.image ? (
+            <Box mt={choice.text ? 2 : 0}>
+              <ChoiceImageFrame
+                src={choice.image}
+                alt={`الخيار ${letter}`}
+                onZoom={onZoomImage}
+                maxH={choice.isImageOnly ? "140px" : "90px"}
+              />
+            </Box>
+          ) : null}
+        </Box>
+        {isCorrect ? (
+          <Badge colorScheme="green" fontSize="10px" borderRadius="md" mt={0.5} flexShrink={0}>
+            صحيحة
+          </Badge>
+        ) : isPending ? (
+          <Spinner size="xs" mt={1} flexShrink={0} />
+        ) : null}
       </Flex>
     );
   };
@@ -462,9 +472,9 @@ function ExamChoicesSection({
   }
 
   return (
-    <Box mt={4}>
-      <Text fontSize="xs" fontWeight="semibold" color={muted} mb={2}>
-        {mode === "student" ? "اختر الإجابة الصحيحة" : "الاختيارات"}
+    <Box mt={mode === "student" ? 4 : 0}>
+      <Text fontSize="xs" fontWeight="bold" color={muted} mb={2.5}>
+        {mode === "student" ? "اختر الإجابة الصحيحة" : "الاختيارات — اضغط لتعيين الصحيحة"}
       </Text>
 
       {mode === "student" ? (
@@ -477,7 +487,7 @@ function ExamChoicesSection({
           </SimpleGrid>
         </RadioGroup>
       ) : (
-        <SimpleGrid columns={imageGrid ? { base: 2, lg: 4 } : { base: 1, md: 2 }} spacing={2.5}>
+        <SimpleGrid columns={imageGrid ? 1 : { base: 1, md: 2 }} spacing={2}>
           {normalized.map((choice, cidx) => renderTeacherChoice(choice, cidx))}
         </SimpleGrid>
       )}
@@ -500,84 +510,117 @@ export function TeacherQuestionCard({
   onDelete,
   onSetCorrect,
 }) {
-  const cardBg = useColorModeValue("white", "gray.800");
+  const cardBg = useColorModeValue("white", "gray.900");
   const borderColor = useColorModeValue("gray.200", "gray.700");
-  const headerBg = useColorModeValue("gray.50", "gray.700");
   const textColor = useColorModeValue("gray.800", "white");
   const muted = useColorModeValue("gray.500", "gray.400");
 
   return (
     <Box
-      borderRadius="xl"
-      overflow="hidden"
       bg={cardBg}
       borderWidth="1px"
       borderColor={borderColor}
-      boxShadow="sm"
+      borderRadius="xl"
+      p={{ base: 4, md: 5 }}
     >
-      <Flex
-        align="center"
-        justify="space-between"
-        px={3}
-        py={2}
-        bg={headerBg}
-        borderBottomWidth="1px"
-        borderColor={borderColor}
-      >
+      {/* رأس السؤال: رقم + أزرار */}
+      <Flex align="center" justify="space-between" gap={3} mb={3}>
         <HStack spacing={2}>
-          <Text fontSize="xs" fontWeight="black" color="blue.500" minW="18px">
+          <Flex
+            minW="32px"
+            h="32px"
+            px={2}
+            borderRadius="md"
+            bg="blue.500"
+            color="white"
+            align="center"
+            justify="center"
+            fontSize="sm"
+            fontWeight="black"
+          >
             {index + 1}
-          </Text>
-          <Badge variant="subtle" colorScheme="blue" fontSize="9px">
+          </Flex>
+          <Text fontSize="xs" color={muted}>
             {displayChoices?.length || 0} اختيارات
-          </Badge>
+          </Text>
         </HStack>
-        <HStack spacing={0}>
-          <IconButton aria-label="إضافة صورة" size="xs" variant="ghost" colorScheme="purple" icon={<AiFillPicture />} onClick={() => onAddImage(displayId)} />
-          <IconButton aria-label="تعديل" size="xs" variant="ghost" colorScheme="yellow" icon={<AiFillEdit />} onClick={() => onEdit(questionRef)} />
-          <IconButton aria-label="حذف" size="xs" variant="ghost" colorScheme="red" icon={<AiFillDelete />} onClick={() => onDelete(displayId)} />
+
+        <HStack spacing={1}>
+          <IconButton
+            aria-label="إضافة صورة"
+            size="sm"
+            variant="outline"
+            borderColor={borderColor}
+            icon={<AiFillPicture />}
+            onClick={() => onAddImage(displayId)}
+          />
+          <IconButton
+            aria-label="تعديل"
+            size="sm"
+            variant="outline"
+            borderColor={borderColor}
+            icon={<AiFillEdit />}
+            onClick={() => onEdit(questionRef)}
+          />
+          <IconButton
+            aria-label="حذف"
+            size="sm"
+            variant="outline"
+            borderColor="red.200"
+            colorScheme="red"
+            icon={<AiFillDelete />}
+            onClick={() => onDelete(displayId)}
+          />
         </HStack>
       </Flex>
 
-      <Box p={{ base: 3, md: 4 }}>
-        {passageContent && <ExamPassageBlock content={passageContent} variant="teacher" />}
+      {passageContent ? (
+        <Box mb={4}>
+          <ExamPassageBlock content={passageContent} variant="teacher" />
+        </Box>
+      ) : null}
 
-        <Grid
-          templateColumns={displayImage && displayText ? { base: "1fr", md: "1fr 1fr" } : "1fr"}
-          gap={3}
-          mb={displayChoices?.length ? 0 : 0}
-          alignItems="start"
+      {/* نص السؤال */}
+      {displayText ? (
+        <Text
+          fontSize={{ base: "md", md: "md" }}
+          fontWeight="semibold"
+          color={textColor}
+          lineHeight="1.9"
+          dir="auto"
+          mb={displayImage || displayChoices?.length ? 4 : 0}
+          whiteSpace="pre-wrap"
         >
-          {displayText && (
-            <Text fontSize="sm" fontWeight="semibold" color={textColor} lineHeight="1.75">
-              {renderFormattedExamText(displayText)}
-            </Text>
-          )}
-          {displayImage && (
-            <ExamQuestionImage
-              src={displayImage}
-              onZoom={onZoomImage}
-              maxH={{ base: "260px", md: displayText ? "240px" : "360px" }}
-              compact={!!displayText}
-            />
-          )}
-          {!displayText && !displayImage && (
-            <Text fontSize="sm" color={muted}>
-              سؤال {index + 1}
-            </Text>
-          )}
-        </Grid>
+          {renderFormattedExamText(displayText)}
+        </Text>
+      ) : null}
 
-        <ExamChoicesSection
-          choices={displayChoices}
-          mode="teacher"
-          displayId={displayId}
-          pendingCorrect={pendingCorrect}
-          onSetCorrect={onSetCorrect}
-          onZoomImage={onZoomImage}
-          headingColor={textColor}
-        />
-      </Box>
+      {displayImage ? (
+        <Box mb={displayChoices?.length ? 4 : 0}>
+          <ExamQuestionImage
+            src={displayImage}
+            onZoom={onZoomImage}
+            maxH={{ base: "260px", md: "320px" }}
+            compact={!!displayText}
+          />
+        </Box>
+      ) : null}
+
+      {!displayText && !displayImage ? (
+        <Text fontSize="sm" color={muted} mb={4}>
+          سؤال بدون نص
+        </Text>
+      ) : null}
+
+      <ExamChoicesSection
+        choices={displayChoices}
+        mode="teacher"
+        displayId={displayId}
+        pendingCorrect={pendingCorrect}
+        onSetCorrect={onSetCorrect}
+        onZoomImage={onZoomImage}
+        headingColor={textColor}
+      />
     </Box>
   );
 }

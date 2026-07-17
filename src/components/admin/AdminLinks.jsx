@@ -2,7 +2,7 @@ import { useLocation, NavLink } from "react-router-dom";
 import { useEffect, useState } from "react";
 import UserType from "../../Hooks/auth/userType";
 // أيقونات من react-icons
-import { MdDashboard, MdPersonAdd, MdCode, MdAccountBalanceWallet, MdPhoneIphone, MdDateRange, MdOndemandVideo, MdPictureAsPdf, MdGroupAdd, MdPersonAddAlt, MdQuiz, MdListAlt, MdAssignment, MdQuestionAnswer, MdCheckCircle, MdViewList, MdBook } from "react-icons/md";
+import { MdDashboard, MdPersonAdd, MdCode, MdAccountBalanceWallet, MdPhoneIphone, MdDateRange, MdOndemandVideo, MdPictureAsPdf, MdGroupAdd, MdPersonAddAlt, MdQuiz, MdListAlt, MdAssignment, MdQuestionAnswer, MdCheckCircle, MdViewList, MdBook, MdPeople } from "react-icons/md";
 
 const AdminLinks = ({ currentLink, setCurrentLink }) => {
   const location = useLocation();
@@ -33,6 +33,12 @@ const AdminLinks = ({ currentLink, setCurrentLink }) => {
       link: "اضافة مدرس جديد",
       path: "/admin/addteacher",
       icon: <MdPersonAdd size={22} />,
+    },
+    {
+      id: Math.random(),
+      link: "كل الطلاب",
+      path: "/admin/students",
+      icon: <MdPeople size={22} />,
     },
     {
       id: Math.random(),

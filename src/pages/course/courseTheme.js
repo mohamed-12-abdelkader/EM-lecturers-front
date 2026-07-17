@@ -85,10 +85,10 @@ export function crTabClass(isSelected, colorKey = "blue") {
 
 /** LectureCard typography — Noto Naskh (headings) + Noto Sans (body) */
 export const lcRoot = "font-sans antialiased";
-export const lcTitle = "font-heading text-[1.125rem] font-bold leading-[1.5] tracking-tight text-slate-900 dark:text-white md:text-xl";
-export const lcTitleSm = "font-heading text-[0.9375rem] font-semibold leading-snug text-slate-900 dark:text-white";
-export const lcBody = "font-sans text-[0.9375rem] leading-[1.75] text-slate-600 dark:text-slate-400";
-export const lcBodySm = "font-sans text-sm leading-7 text-slate-600 dark:text-slate-400";
+export const lcTitle = "font-heading text-base font-bold leading-[1.5] tracking-tight text-slate-900 dark:text-white sm:text-[1.125rem] md:text-xl";
+export const lcTitleSm = "font-heading text-sm font-semibold leading-snug text-slate-900 dark:text-white sm:text-[0.9375rem]";
+export const lcBody = "font-sans text-sm leading-[1.75] text-slate-600 dark:text-slate-400 sm:text-[0.9375rem]";
+export const lcBodySm = "font-sans text-[13px] leading-7 text-slate-600 dark:text-slate-400 sm:text-sm";
 export const lcLabel = "font-sans text-xs font-medium text-slate-500 dark:text-slate-400";
 export const lcCaption = "font-sans text-[11px] leading-relaxed text-slate-500 dark:text-slate-500";
 export const lcStatValue = "font-heading text-sm font-bold tabular-nums text-slate-900 dark:text-white";

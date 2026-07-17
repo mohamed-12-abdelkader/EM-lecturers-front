@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import {
   Box,
   VStack,
@@ -6,23 +6,16 @@ import {
   FormControl,
   FormLabel,
   FormHelperText,
+  FormErrorMessage,
   Input,
   Select,
   Textarea,
   Button,
   Spinner,
   useToast,
-  Card,
-  CardBody,
-  CardHeader,
-  Heading,
   Text,
   Icon,
   useColorModeValue,
-  Alert,
-  AlertIcon,
-  AlertTitle,
-  AlertDescription,
   Switch,
   IconButton,
   SimpleGrid,
@@ -35,8 +28,6 @@ import {
   AccordionPanel,
   AccordionIcon,
   Image,
-  Wrap,
-  WrapItem,
   Checkbox,
   CheckboxGroup,
 } from "@chakra-ui/react";
@@ -50,18 +41,23 @@ import {
   FaCloudUploadAlt,
   FaIdCard,
   FaCog,
+  FaArrowRight,
+  FaHome,
 } from "react-icons/fa";
-import { useSearchParams, useLocation } from "react-router-dom";
+import { useSearchParams, useLocation, useNavigate, Link as RouterLink } from "react-router-dom";
 import baseUrl from "../../api/baseUrl";
-import { fetchAdminTenantById, patchAdminTenant, patchAdminTenantMultipart } from "../../api/adminTenantsApi";
+import { fetchAdminTenantById, fetchAdminTenants, patchAdminTenant, patchAdminTenantMultipart } from "../../api/adminTenantsApi";
 import { compressImage, TENANT_MEDIA_COMPRESS } from "../../utils/compressImage";
 
 const SUBDOMAIN_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const BRAND_BLUE = "#3182CE";
+const BRAND_ORANGE = "#DD6B20";
 
 const emptyMediaFiles = () => ({
   avatar: null,
   favicon: null,
   og_image: null,
+  hero_image: null,
 });
 
 function defaultTenantHeaders() {
@@ -95,7 +91,17 @@ function multipartSuperHeaders(token) {
 }
 
 function hasAnyUpload(files) {
-  return !!(files.avatar || files.favicon || files.og_image);
+  return !!(files.avatar || files.favicon || files.og_image || files.hero_image);
+}
+
+/** صورة الهيرو تُرسل داخل landing.hero.image_url (أو عبر ملف hero_image) */
+function buildLandingPayload(heroImageUrl, hasHeroFile = false) {
+  const image_url = String(heroImageUrl || "").trim();
+  if (hasHeroFile) {
+    return image_url ? { hero: { image_url } } : { hero: {} };
+  }
+  if (!image_url) return null;
+  return { hero: { image_url } };
 }
 
 function emptyOwnerState() {
@@ -159,7 +165,7 @@ function appendOwnerCreateMultipart(fd, owner) {
   }
 }
 
-function buildCreateTenantJsonBody({ tenant, sub, settings, ownerEnabled, owner }) {
+function buildCreateTenantJsonBody({ tenant, sub, settings, ownerEnabled, owner, landingPayload }) {
   const body = {
     subdomain: sub,
     display_name: tenant.display_name.trim(),
@@ -172,7 +178,7 @@ function buildCreateTenantJsonBody({ tenant, sub, settings, ownerEnabled, owner 
     favicon_url: tenant.favicon_url.trim() || null,
     og_image_url: tenant.og_image_url.trim() || null,
     settings: settings && typeof settings === "object" ? settings : {},
-    landing: {},
+    landing: landingPayload || {},
   };
 
   if (ownerEnabled) {
@@ -182,7 +188,7 @@ function buildCreateTenantJsonBody({ tenant, sub, settings, ownerEnabled, owner 
   return body;
 }
 
-function appendCreateTenantMultipart(fd, { tenant, sub, settings, ownerEnabled, owner, mediaFiles }) {
+function appendCreateTenantMultipart(fd, { tenant, sub, settings, ownerEnabled, owner, mediaFiles, landingPayload }) {
   fd.append("subdomain", sub);
   fd.append("display_name", tenant.display_name.trim());
   if (tenant.specialty.trim()) fd.append("specialty", tenant.specialty.trim());
@@ -195,12 +201,13 @@ function appendCreateTenantMultipart(fd, { tenant, sub, settings, ownerEnabled, 
     fd.append("seo_meta_description", tenant.seo_meta_description.trim());
   }
   fd.append("is_active", tenant.is_active !== false ? "true" : "false");
-  fd.append("landing", JSON.stringify({}));
+  fd.append("landing", JSON.stringify(landingPayload || {}));
   fd.append("settings", JSON.stringify(settings && typeof settings === "object" ? settings : {}));
 
   if (mediaFiles.avatar) fd.append("avatar", mediaFiles.avatar);
   if (mediaFiles.favicon) fd.append("favicon", mediaFiles.favicon);
   if (mediaFiles.og_image) fd.append("og_image", mediaFiles.og_image);
+  if (mediaFiles.hero_image) fd.append("hero_image", mediaFiles.hero_image);
 
   if (ownerEnabled) {
     appendOwnerCreateMultipart(fd, owner);
@@ -231,7 +238,7 @@ function buildOwnerPatch(owner, ownerEnabled) {
   return Object.keys(patch).length ? patch : undefined;
 }
 
-function appendAdminTenantEditFields(fd, { tenant, sub, settings, ownerPatch }) {
+function appendAdminTenantEditFields(fd, { tenant, sub, settings, ownerPatch, landingPayload }) {
   if (sub) fd.append("subdomain", sub);
   if (tenant.display_name?.trim()) fd.append("display_name", tenant.display_name.trim());
   if (tenant.specialty?.trim()) fd.append("specialty", tenant.specialty.trim());
@@ -244,6 +251,10 @@ function appendAdminTenantEditFields(fd, { tenant, sub, settings, ownerPatch }) 
   if (tenant.avatar_url?.trim()) fd.append("avatar_url", tenant.avatar_url.trim());
   if (tenant.favicon_url?.trim()) fd.append("favicon_url", tenant.favicon_url.trim());
   if (tenant.og_image_url?.trim()) fd.append("og_image_url", tenant.og_image_url.trim());
+  if (landingPayload) {
+    fd.append("landing", JSON.stringify(landingPayload));
+    fd.append("merge_landing", "true");
+  }
   if (settings !== undefined) {
     fd.append("settings", JSON.stringify(settings));
     fd.append("merge_settings", "true");
@@ -251,7 +262,7 @@ function appendAdminTenantEditFields(fd, { tenant, sub, settings, ownerPatch }) 
   if (ownerPatch) fd.append("owner", JSON.stringify(ownerPatch));
 }
 
-function buildAdminTenantEditJson({ tenant, sub, settings, ownerPatch }) {
+function buildAdminTenantEditJson({ tenant, sub, settings, ownerPatch, landingPayload }) {
   const body = {
     merge_settings: true,
     is_active: tenant.is_active,
@@ -268,6 +279,10 @@ function buildAdminTenantEditJson({ tenant, sub, settings, ownerPatch }) {
   if (tenant.avatar_url?.trim()) body.avatar_url = tenant.avatar_url.trim();
   if (tenant.favicon_url?.trim()) body.favicon_url = tenant.favicon_url.trim();
   if (tenant.og_image_url?.trim()) body.og_image_url = tenant.og_image_url.trim();
+  if (landingPayload) {
+    body.landing = landingPayload;
+    body.merge_landing = true;
+  }
   if (settings !== undefined) body.settings = settings;
   if (ownerPatch) body.owner = ownerPatch;
 
@@ -275,51 +290,59 @@ function buildAdminTenantEditJson({ tenant, sub, settings, ownerPatch }) {
 }
 
 function SectionCard({ step, title, subtitle, accent = "blue", children }) {
-  const headerBg = useColorModeValue(`${accent}.50`, "whiteAlpha.50");
-  const muted = useColorModeValue("gray.600", "gray.400");
+  const muted = useColorModeValue("gray.500", "gray.400");
+  const cardBg = useColorModeValue("white", "gray.900");
+  const border = useColorModeValue("gray.200", "gray.700");
+  const accentColor = accent === "orange" ? BRAND_ORANGE : BRAND_BLUE;
+
   return (
-    <Card
-      overflow="hidden"
-      borderRadius="2xl"
-      shadow="lg"
+    <Box
+      as="section"
+      bg={cardBg}
       borderWidth="1px"
-      borderColor={useColorModeValue("gray.100", "gray.700")}
+      borderColor={border}
+      borderRadius="2xl"
+      overflow="hidden"
+      boxShadow="sm"
     >
-      <CardHeader
+      <Flex
+        align="flex-start"
+        gap={4}
+        px={{ base: 4, md: 6 }}
         py={5}
-        px={{ base: 4, md: 8 }}
-        bg={headerBg}
         borderBottomWidth="1px"
-        borderColor={useColorModeValue("blackAlpha.50", "whiteAlpha.100")}
+        borderColor={border}
+        bg={useColorModeValue("gray.50", "whiteAlpha.50")}
       >
-        <HStack align="flex-start" spacing={4}>
-          <Badge
-            colorScheme={accent}
-            fontSize="0.7rem"
-            px={2}
-            py={1}
-            borderRadius="md"
-            textTransform="none"
-            fontWeight="bold"
-          >
-            {step}
-          </Badge>
-          <VStack align="start" spacing={0.5} flex={1}>
-            <Heading size="md" fontWeight="700" letterSpacing="-0.02em">
-              {title}
-            </Heading>
-            {subtitle ? (
-              <Text fontSize="sm" color={muted} lineHeight="tall">
-                {subtitle}
-              </Text>
-            ) : null}
-          </VStack>
-        </HStack>
-      </CardHeader>
-      <CardBody px={{ base: 4, md: 8 }} py={6}>
+        <Flex
+          w="36px"
+          h="36px"
+          borderRadius="lg"
+          align="center"
+          justify="center"
+          flexShrink={0}
+          bg={useColorModeValue(`${accent === "orange" ? "orange" : "blue"}.50`, "whiteAlpha.100")}
+          color={accentColor}
+          fontSize="sm"
+          fontWeight="800"
+        >
+          {step}
+        </Flex>
+        <Box minW={0}>
+          <Text fontWeight="800" fontSize={{ base: "md", md: "lg" }} letterSpacing="-0.02em">
+            {title}
+          </Text>
+          {subtitle ? (
+            <Text fontSize="sm" color={muted} mt={1} lineHeight="tall">
+              {subtitle}
+            </Text>
+          ) : null}
+        </Box>
+      </Flex>
+      <Box px={{ base: 4, md: 6 }} py={6}>
         {children}
-      </CardBody>
-    </Card>
+      </Box>
+    </Box>
   );
 }
 
@@ -340,21 +363,25 @@ function FileDropSlot({
 
   return (
     <FormControl>
-      <FormLabel fontWeight="semibold" fontSize="sm">
+      <FormLabel fontWeight="600" fontSize="sm" mb={2}>
         {label}
       </FormLabel>
       <Box
         position="relative"
-        borderWidth="2px"
+        borderWidth="1.5px"
         borderStyle="dashed"
-        borderColor={previewUrl ? "blue.400" : dashed}
+        borderColor={previewUrl ? BRAND_BLUE : dashed}
         borderRadius="xl"
         p={4}
         transition="all 0.2s ease"
-        _hover={{ bg: hoverBg, borderColor: "blue.400" }}
+        _hover={{ bg: hoverBg, borderColor: BRAND_BLUE }}
         cursor="pointer"
         onClick={() => inputRef.current?.click()}
         role="group"
+        minH="140px"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
       >
         <Input
           key={`${fieldKey}-${uploadKey}`}
@@ -369,8 +396,8 @@ function FileDropSlot({
           }}
         />
         <VStack spacing={3}>
-          <Icon as={FaCloudUploadAlt} boxSize={8} color="blue.400" opacity={0.9} />
-          <Text fontSize="sm" textAlign="center" color={mutedColor}>
+          <Icon as={FaCloudUploadAlt} boxSize={7} color={BRAND_BLUE} opacity={0.85} />
+          <Text fontSize="sm" textAlign="center" color={mutedColor} maxW="220px">
             {hint}
           </Text>
           {previewUrl ? (
@@ -385,7 +412,7 @@ function FileDropSlot({
                 <Image
                   src={previewUrl}
                   alt="معاينة الصورة"
-                  maxH="120px"
+                  maxH="100px"
                   maxW="100%"
                   objectFit="contain"
                   bg="transparent"
@@ -430,6 +457,9 @@ const AddTeacher = () => {
   const [owner, setOwner] = useState(() => emptyOwnerState());
   const [availableGrades, setAvailableGrades] = useState([]);
   const [gradesLoading, setGradesLoading] = useState(false);
+  /** Map subdomain → { id, display_name, is_active } من نفس API لوحة الأدمن */
+  const [existingSubdomains, setExistingSubdomains] = useState(() => new Map());
+  const [subdomainsLoading, setSubdomainsLoading] = useState(false);
 
   const [settingsJson, setSettingsJson] = useState("");
   const [mediaFiles, setMediaFiles] = useState(emptyMediaFiles);
@@ -438,23 +468,29 @@ const AddTeacher = () => {
     avatar: null,
     favicon: null,
     og_image: null,
+    hero_image: null,
   });
+  const [heroImageUrl, setHeroImageUrl] = useState("");
   const [uploadKey, setUploadKey] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadingTenant, setLoadingTenant] = useState(false);
   const toast = useToast();
   const [searchParams] = useSearchParams();
   const location = useLocation();
+  const navigate = useNavigate();
 
-  const pageBg = useColorModeValue("gray.50", "gray.950");
-  const heroGradient = useColorModeValue(
-    "linear(135deg, #1e3a8a 0%, #3b82f6 45%, #0ea5e9 100%)",
-    "linear(135deg, #0f172a 0%, #1e40af 50%, #0369a1 100%)",
-  );
+  const pageBg = useColorModeValue("#F4F7FB", "gray.950");
+  const headerBg = useColorModeValue("white", "gray.900");
   const textColor = useColorModeValue("gray.800", "gray.100");
-  const borderColor = useColorModeValue("gray.200", "gray.600");
-  const mutedColor = useColorModeValue("gray.600", "gray.400");
+  const borderColor = useColorModeValue("gray.200", "gray.700");
+  const mutedColor = useColorModeValue("gray.500", "gray.400");
   const inputBg = useColorModeValue("white", "gray.800");
+  const footerBg = useColorModeValue("white", "gray.900");
+  const badgeBlueBg = useColorModeValue("blue.50", "whiteAlpha.100");
+  const badgeGrayBg = useColorModeValue("gray.100", "whiteAlpha.100");
+  const tipBg = useColorModeValue("blue.50", "whiteAlpha.50");
+  const tipBorder = useColorModeValue("blue.100", "blue.800");
+  const btnGhostHover = useColorModeValue("gray.100", "whiteAlpha.100");
 
   const setTenantField = useCallback((field, value) => {
     setTenant((prev) => ({ ...prev, [field]: value }));
@@ -539,21 +575,25 @@ const AddTeacher = () => {
     setOwnerEnabled(true);
     setSettingsJson("");
     setMediaFiles(emptyMediaFiles());
-    ["avatar", "favicon", "og_image"].forEach((k) => {
+    setHeroImageUrl("");
+    ["avatar", "favicon", "og_image", "hero_image"].forEach((k) => {
       const u = mediaPreview[k];
       if (u && u.startsWith("blob:")) URL.revokeObjectURL(u);
     });
-    setMediaPreview({ avatar: null, favicon: null, og_image: null });
+    setMediaPreview({ avatar: null, favicon: null, og_image: null, hero_image: null });
     setUploadKey((k) => k + 1);
     setTargetTenantId("");
   };
 
   const inputProps = {
-    size: "lg",
-    borderRadius: "xl",
+    size: "md",
+    borderRadius: "lg",
     borderColor,
     bg: inputBg,
-    _focus: { borderColor: "blue.400", boxShadow: "0 0 0 1px var(--chakra-colors-blue-400)" },
+    _focus: {
+      borderColor: BRAND_BLUE,
+      boxShadow: `0 0 0 1px ${BRAND_BLUE}`,
+    },
   };
 
   const applyTenantForEdit = useCallback((tenantData) => {
@@ -599,11 +639,15 @@ const AddTeacher = () => {
       });
     }
 
+    const heroUrl = tenantData.landing?.hero?.image_url || "";
+    setHeroImageUrl(heroUrl);
+
     setMediaPreview((prev) => ({
       ...prev,
       avatar: tenantData.avatar_url || prev.avatar,
       favicon: tenantData.favicon_url || prev.favicon,
       og_image: tenantData.og_image_url || prev.og_image,
+      hero_image: heroUrl || prev.hero_image,
     }));
   }, []);
 
@@ -690,6 +734,78 @@ const AddTeacher = () => {
     };
   }, [toast]);
 
+  /** نفس مصدر المنصات في الصفحة الرئيسية للأدمن */
+  useEffect(() => {
+    let mounted = true;
+    const loadExistingSubdomains = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      setSubdomainsLoading(true);
+      try {
+        const map = new Map();
+        let offset = 0;
+        const limit = 200;
+        let safety = 0;
+
+        while (mounted && safety < 50) {
+          safety += 1;
+          const result = await fetchAdminTenants(
+            {
+              limit,
+              offset,
+              include_default: true,
+              include_deleted: false,
+            },
+            token,
+          );
+
+          for (const t of result.tenants) {
+            const key = String(t.subdomain || "")
+              .trim()
+              .toLowerCase();
+            if (!key) continue;
+            map.set(key, {
+              id: t.id,
+              display_name: t.display_name || t.subdomain,
+              is_active: t.is_active !== false,
+              subdomain: t.subdomain,
+            });
+          }
+
+          offset += result.tenants.length;
+          if (!result.tenants.length || offset >= result.total) break;
+        }
+
+        if (mounted) setExistingSubdomains(map);
+      } catch {
+        if (mounted) setExistingSubdomains(new Map());
+      } finally {
+        if (mounted) setSubdomainsLoading(false);
+      }
+    };
+
+    loadExistingSubdomains();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const subdomainConflict = useMemo(() => {
+    const sub = String(tenant.subdomain || "")
+      .trim()
+      .toLowerCase();
+    if (sub.length < 2) return null;
+
+    const hit = existingSubdomains.get(sub);
+    if (!hit) return null;
+
+    if (formMode === "edit" && targetTenantId && String(hit.id) === String(targetTenantId)) {
+      return null;
+    }
+    return hit;
+  }, [tenant.subdomain, existingSubdomains, formMode, targetTenantId]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -721,6 +837,17 @@ const AddTeacher = () => {
       toast({
         title: "صيغة النطاق الفرعي",
         description: "استخدم أحرفاً إنجليزية صغيرة وأرقاماً وشرطة فقط (مثل ahmed-math).",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    if (subdomainConflict) {
+      toast({
+        title: "النطاق الفرعي مستخدم",
+        description: `«${sub}» مسجّل لمنصة «${subdomainConflict.display_name}» — اختر معرّفاً مختلفاً.`,
         status: "error",
         duration: 5000,
         isClosable: true,
@@ -805,6 +932,9 @@ const AddTeacher = () => {
     }
 
     const ownerPatch = buildOwnerPatch(owner, ownerEnabled);
+    const landingPayload =
+      buildLandingPayload(heroImageUrl, !!mediaFiles.hero_image) ||
+      (formMode === "create" ? {} : null);
     const useMultipart = hasAnyUpload(mediaFiles);
 
     setLoading(true);
@@ -819,10 +949,12 @@ const AddTeacher = () => {
             sub,
             settings,
             ownerPatch,
+            landingPayload,
           });
           if (uploadFiles.avatar) fd.append("avatar", uploadFiles.avatar);
           if (uploadFiles.favicon) fd.append("favicon", uploadFiles.favicon);
           if (uploadFiles.og_image) fd.append("og_image", uploadFiles.og_image);
+          if (uploadFiles.hero_image) fd.append("hero_image", uploadFiles.hero_image);
           response = await patchAdminTenantMultipart(tenantId, fd, token);
         } else {
           const body = buildAdminTenantEditJson({
@@ -830,6 +962,7 @@ const AddTeacher = () => {
             sub,
             settings,
             ownerPatch,
+            landingPayload,
           });
           response = await patchAdminTenant(tenantId, body, token);
         }
@@ -842,6 +975,7 @@ const AddTeacher = () => {
           ownerEnabled,
           owner,
           mediaFiles: uploadFiles,
+          landingPayload,
         });
         response = await baseUrl.post("/api/super/tenants", fd, {
           headers: multipartSuperHeaders(token),
@@ -853,6 +987,7 @@ const AddTeacher = () => {
           settings,
           ownerEnabled,
           owner,
+          landingPayload,
         });
         response = await baseUrl.post("/api/super/tenants", body, {
           headers: jsonSuperHeaders(token),
@@ -860,6 +995,19 @@ const AddTeacher = () => {
       }
 
       const t = response.data?.data ?? response.data?.tenant;
+      if (t?.subdomain) {
+        const key = String(t.subdomain).trim().toLowerCase();
+        setExistingSubdomains((prev) => {
+          const next = new Map(prev);
+          next.set(key, {
+            id: t.id,
+            display_name: t.display_name || t.subdomain,
+            is_active: t.is_active !== false,
+            subdomain: t.subdomain,
+          });
+          return next;
+        });
+      }
       const extra =
         t?.subdomain != null
           ? ` النطاق: ${t.subdomain}${t.id != null ? ` — المعرف: ${t.id}` : ""}`
@@ -904,101 +1052,141 @@ const AddTeacher = () => {
   };
 
   const multipart = hasAnyUpload(mediaFiles);
+  const isEditMode = formMode === "edit";
 
   return (
-    <Box as="main" minH="100vh" bg={pageBg} pb={16}>
-      <Box bgGradient={heroGradient} color="white" pt={10} pb={14} px={4} mb={-8}>
-        <Container maxW="1100px">
-          <VStack align="stretch" spacing={4}>
-            <HStack flexWrap="wrap" spacing={3}>
-              <Badge
-                bg="whiteAlpha.200"
-                color="white"
-                fontSize="xs"
-                px={3}
-                py={1}
-                borderRadius="full"
-                textTransform="none"
-                borderWidth="1px"
-                borderColor="whiteAlpha.400"
+    <Box
+      as="main"
+      minH="100vh"
+      bg={pageBg}
+      dir="rtl"
+      fontFamily="'IBM Plex Sans Arabic', 'Noto Sans Arabic', system-ui, sans-serif"
+      pb={{ base: "110px", md: "120px" }}
+    >
+      {/* Standalone top bar */}
+      <Box
+        as="header"
+        position="sticky"
+        top={0}
+        zIndex={30}
+        bg={headerBg}
+        borderBottomWidth="1px"
+        borderColor={borderColor}
+        boxShadow="sm"
+      >
+        <Box h="3px" bg={`linear-gradient(90deg, ${BRAND_BLUE}, ${BRAND_ORANGE})`} />
+        <Container maxW="1080px" py={3.5} px={{ base: 4, md: 6 }}>
+          <Flex align="center" justify="space-between" gap={3} flexWrap="wrap">
+            <HStack spacing={3} minW={0}>
+              <Button
+                as={RouterLink}
+                to="/home"
+                variant="ghost"
+                size="sm"
+                leftIcon={<FaArrowRight />}
+                color={mutedColor}
+                fontWeight="600"
+                borderRadius="lg"
+                cursor="pointer"
+                _hover={{ bg: btnGhostHover, color: textColor }}
               >
-                مسؤول أعلى · {formMode === "edit" ? "تعديل منصة مدرس" : "إنشاء منصة مدرس"}
-              </Badge>
-              <Badge
-                bg={multipart ? "orange.400" : "whiteAlpha.200"}
-                color="white"
-                fontSize="xs"
-                px={3}
-                py={1}
-                borderRadius="full"
-                textTransform="none"
-              >
-                {multipart
-                  ? "إرسال مع رفع صور (نموذج متعدد الأجزاء)"
-                  : "إرسال نصي (بيانات JSON)"}
-              </Badge>
+                العودة
+              </Button>
+              <Box
+                w="1px"
+                h="28px"
+                bg={borderColor}
+                display={{ base: "none", sm: "block" }}
+              />
+              <Box minW={0}>
+                <Text fontWeight="800" fontSize={{ base: "md", md: "lg" }} noOfLines={1}>
+                  {isEditMode ? "تعديل منصة مدرس" : "إنشاء منصة مدرس"}
+                </Text>
+                <Text fontSize="xs" color={mutedColor} display={{ base: "none", sm: "block" }}>
+                  مسؤول النظام · صفحة مستقلة
+                </Text>
+              </Box>
             </HStack>
-            <Heading
-              size="xl"
-              fontWeight="800"
-              letterSpacing="-0.03em"
-              lineHeight="shorter"
-              maxW="lg"
-            >
-              {formMode === "edit"
-                ? "تعديل منصة مدرس متعددة المستأجرين"
-                : "إنشاء منصة مدرس متعددة المستأجرين"}
-            </Heading>
-            <Text fontSize="md" opacity={0.92} maxW="2xl" lineHeight="tall">
-              يمكنك إدخال كل البيانات كنص، أو رفع صور من جهازك (الصورة الشخصية، أيقونة الموقع، صورة
-              المشاركة الاجتماعية، صورة الواجهة البارزة) مع الحقول النصية وبيانات صفحة الهبوط والإعدادات
-              وحساب المالك وفق دليل الواجهة البرمجية.
-            </Text>
-          </VStack>
+
+            <HStack spacing={2}>
+              <Badge
+                bg={badgeBlueBg}
+                color={BRAND_BLUE}
+                px={3}
+                py={1}
+                borderRadius="full"
+                fontSize="xs"
+                fontWeight="700"
+                textTransform="none"
+              >
+                {isEditMode ? "تعديل" : "إنشاء"}
+              </Badge>
+              <Badge
+                bg={multipart ? "orange.50" : badgeGrayBg}
+                color={multipart ? BRAND_ORANGE : mutedColor}
+                px={3}
+                py={1}
+                borderRadius="full"
+                fontSize="xs"
+                fontWeight="700"
+                textTransform="none"
+              >
+                {multipart ? "مع رفع صور" : "JSON"}
+              </Badge>
+              <IconButton
+                as={RouterLink}
+                to="/home"
+                aria-label="الرئيسية"
+                icon={<FaHome />}
+                size="sm"
+                variant="outline"
+                borderRadius="lg"
+                borderColor={borderColor}
+                display={{ base: "none", md: "inline-flex" }}
+              />
+            </HStack>
+          </Flex>
         </Container>
       </Box>
 
-      <Container maxW="1100px" position="relative" zIndex={1}>
-        <VStack spacing={6} align="stretch">
-          <Alert
-            status="info"
-            variant="left-accent"
+      <Container maxW="1080px" px={{ base: 4, md: 6 }} pt={{ base: 6, md: 8 }}>
+        <VStack spacing={5} align="stretch">
+          <Box
             borderRadius="xl"
-            bg={useColorModeValue("white", "gray.800")}
-            boxShadow="md"
+            borderWidth="1px"
+            borderColor={tipBorder}
+            bg={tipBg}
+            px={4}
+            py={3}
           >
-            <AlertIcon />
-            <Box>
-              <AlertTitle fontSize="sm">متطلبات الوصول</AlertTitle>
-              <AlertDescription fontSize="sm" mt={1}>
-                يتطلب الأمر حساباً بدور <strong>مسؤول النظام</strong> مع رمز دخول صالح. تُنفَّذ
-                العملية في سياق <strong>المستأجر الافتراضي</strong> للمنصة. على الجهاز المحلي تُضاف
-                تلقائياً الترويسة{" "}
-                <Text as="span" dir="ltr" fontFamily="mono" fontSize="xs">
-                  X-Tenant-Subdomain: default
-                </Text>
-                . عند رفع ملف صورة يُستبدل الرابط النصي لنفس الحقل بما يُرفع إلى التخزين السحابي.
-              </AlertDescription>
-            </Box>
-          </Alert>
+            <Text fontSize="sm" color={mutedColor} lineHeight="tall">
+              يتطلب حساب <strong style={{ color: textColor }}>مسؤول النظام</strong>. على localhost تُضاف
+              تلقائياً ترويسة{" "}
+              <Text as="span" dir="ltr" fontFamily="mono" fontSize="xs" color={BRAND_BLUE}>
+                X-Tenant-Subdomain: default
+              </Text>
+              . رفع صورة يستبدل الرابط النصي لنفس الحقل.
+            </Text>
+          </Box>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} id="add-teacher-form">
             {loadingTenant && (
-              <Flex justify="center" align="center" py={8} mb={4} direction="column" gap={3}>
-                <Spinner size="lg" color="blue.500" />
-                <Text color={mutedColor}>جاري تحميل بيانات المنصة للتعديل...</Text>
+              <Flex justify="center" align="center" py={10} direction="column" gap={3}>
+                <Spinner size="lg" color={BRAND_BLUE} />
+                <Text color={mutedColor}>جاري تحميل بيانات المنصة...</Text>
               </Flex>
             )}
-            <VStack spacing={6} align="stretch">
+
+            <VStack spacing={5} align="stretch">
               <SectionCard
-                step="١ · الهوية"
+                step="1"
                 title="المنصة والنطاق"
-                subtitle="معرّف الرابط الفرعي واسم العرض إلزاميان؛ باقي الحقول اختيارية."
+                subtitle="معرّف الرابط الفرعي واسم العرض إلزاميان عند الإنشاء."
                 accent="blue"
               >
                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={5} mb={5}>
                   <FormControl>
-                    <FormLabel fontWeight="semibold" color={textColor}>
+                    <FormLabel fontWeight="600" color={textColor} fontSize="sm">
                       وضع العملية
                     </FormLabel>
                     <Select
@@ -1010,10 +1198,10 @@ const AddTeacher = () => {
                       <option value="edit">تعديل منصة موجودة</option>
                     </Select>
                   </FormControl>
-                  {formMode === "edit" ? (
-                    <FormControl isRequired={formMode !== "edit"}>
-                      <FormLabel fontWeight="semibold" color={textColor}>
-                        Tenant ID للتعديل
+                  {isEditMode ? (
+                    <FormControl>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">
+                        Tenant ID
                       </FormLabel>
                       <Input
                         {...inputProps}
@@ -1029,37 +1217,56 @@ const AddTeacher = () => {
                   )}
                 </SimpleGrid>
                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={5}>
-                  <FormControl isRequired={formMode !== "edit"}>
-                    <FormLabel fontWeight="semibold" color={textColor}>
+                  <FormControl isRequired={!isEditMode} isInvalid={!!subdomainConflict}>
+                    <FormLabel fontWeight="600" color={textColor} fontSize="sm">
                       معرّف الرابط الفرعي
                     </FormLabel>
                     <Input
                       {...inputProps}
-                      placeholder="مثال: ahmed-math"
+                      placeholder="ahmed-math"
                       value={tenant.subdomain}
                       onChange={(e) =>
                         setTenantField("subdomain", e.target.value.toLowerCase())
                       }
                       dir="ltr"
                       fontFamily="mono"
+                      borderColor={subdomainConflict ? "red.400" : borderColor}
+                      _focus={
+                        subdomainConflict
+                          ? {
+                              borderColor: "red.400",
+                              boxShadow: "0 0 0 1px var(--chakra-colors-red-400)",
+                            }
+                          : inputProps._focus
+                      }
                     />
-                    <FormHelperText>
-                      أحرف إنجليزية صغيرة وأرقام وشرطة، بين 2 و 63 حرفاً.
-                    </FormHelperText>
+                    {subdomainConflict ? (
+                      <FormErrorMessage fontSize="sm" mt={2}>
+                        النطاق «{subdomainConflict.subdomain}» مستخدم بالفعل لمنصة «
+                        {subdomainConflict.display_name}»
+                        {subdomainConflict.is_active ? " (نشطة)" : " (موقوفة)"} — اختر معرّفاً
+                        مختلفاً.
+                      </FormErrorMessage>
+                    ) : (
+                      <FormHelperText>
+                        أحرف إنجليزية صغيرة وأرقام وشرطة (2–63).
+                        {subdomainsLoading ? " جاري مطابقة المنصات الموجودة…" : ""}
+                      </FormHelperText>
+                    )}
                   </FormControl>
-                  <FormControl isRequired={formMode !== "edit"}>
-                    <FormLabel fontWeight="semibold" color={textColor}>
-                      اسم العرض على المنصة
+                  <FormControl isRequired={!isEditMode}>
+                    <FormLabel fontWeight="600" color={textColor} fontSize="sm">
+                      اسم العرض
                     </FormLabel>
                     <Input
                       {...inputProps}
-                      placeholder="اسم المدرس أو العلامة الظاهرة"
+                      placeholder="اسم المدرس أو العلامة"
                       value={tenant.display_name}
                       onChange={(e) => setTenantField("display_name", e.target.value)}
                     />
                   </FormControl>
                   <FormControl>
-                    <FormLabel fontWeight="semibold" color={textColor}>
+                    <FormLabel fontWeight="600" color={textColor} fontSize="sm">
                       التخصص
                     </FormLabel>
                     <Input
@@ -1069,7 +1276,7 @@ const AddTeacher = () => {
                     />
                   </FormControl>
                   <FormControl display="flex" alignItems="center" justifyContent="space-between">
-                    <FormLabel mb={0} fontWeight="semibold" color={textColor}>
+                    <FormLabel mb={0} fontWeight="600" color={textColor} fontSize="sm">
                       المنصة نشطة
                     </FormLabel>
                     <Switch
@@ -1081,12 +1288,12 @@ const AddTeacher = () => {
                   </FormControl>
                 </SimpleGrid>
                 <FormControl mt={5}>
-                  <FormLabel fontWeight="semibold" color={textColor}>
-                    نبذة عن المنصة أو المدرس
+                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">
+                    نبذة
                   </FormLabel>
                   <Textarea
                     {...inputProps}
-                    rows={4}
+                    rows={3}
                     value={tenant.bio}
                     onChange={(e) => setTenantField("bio", e.target.value)}
                   />
@@ -1094,60 +1301,73 @@ const AddTeacher = () => {
               </SectionCard>
 
               <SectionCard
-                step="٢ · الوسائط"
+                step="2"
                 title="الصور والروابط"
-                subtitle="أدخل روابط الصور كنص، أو ارفع ملفات من جهازك؛ الملف المرفوع يتغلب على الرابط لنفس الحقل. صورة الواجهة البارزة تُدمج في محتوى صفحة الهبوط."
-                accent="purple"
+                subtitle="رابط نصي أو رفع ملف — الملف المرفوع يتغلب على الرابط."
+                accent="orange"
               >
                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={5} mb={6}>
                   <FormControl>
-                    <FormLabel fontWeight="semibold" color={textColor}>
+                    <FormLabel fontWeight="600" color={textColor} fontSize="sm">
                       رابط الصورة الرئيسية
                     </FormLabel>
                     <Input
                       {...inputProps}
                       dir="ltr"
-                      placeholder="الصق رابط الصورة الكامل"
+                      placeholder="https://..."
                       value={tenant.avatar_url}
                       onChange={(e) => setTenantField("avatar_url", e.target.value)}
                       isDisabled={!!mediaFiles.avatar}
                     />
-                    <FormHelperText>
-                      {mediaFiles.avatar ? "معطّل أثناء اختيار ملف للرفع." : null}
-                    </FormHelperText>
                   </FormControl>
                   <FormControl>
-                    <FormLabel fontWeight="semibold" color={textColor}>
+                    <FormLabel fontWeight="600" color={textColor} fontSize="sm">
                       رابط أيقونة الموقع
                     </FormLabel>
                     <Input
                       {...inputProps}
                       dir="ltr"
-                      placeholder="الصق رابط الأيقونة الكامل"
+                      placeholder="https://..."
                       value={tenant.favicon_url}
                       onChange={(e) => setTenantField("favicon_url", e.target.value)}
                       isDisabled={!!mediaFiles.favicon}
                     />
                   </FormControl>
-                  <FormControl gridColumn={{ md: "1 / -1" }}>
-                    <FormLabel fontWeight="semibold" color={textColor}>
-                      رابط صورة المشاركة الاجتماعية
+                  <FormControl>
+                    <FormLabel fontWeight="600" color={textColor} fontSize="sm">
+                      رابط صورة المشاركة (OG)
                     </FormLabel>
                     <Input
                       {...inputProps}
                       dir="ltr"
-                      placeholder="الصق رابط صورة المشاركة الكامل"
+                      placeholder="https://..."
                       value={tenant.og_image_url}
                       onChange={(e) => setTenantField("og_image_url", e.target.value)}
                       isDisabled={!!mediaFiles.og_image}
                     />
                   </FormControl>
+                  <FormControl>
+                    <FormLabel fontWeight="600" color={textColor} fontSize="sm">
+                      رابط صورة الهيرو
+                    </FormLabel>
+                    <Input
+                      {...inputProps}
+                      dir="ltr"
+                      placeholder="https://..."
+                      value={heroImageUrl}
+                      onChange={(e) => setHeroImageUrl(e.target.value)}
+                      isDisabled={!!mediaFiles.hero_image}
+                    />
+                    <FormHelperText>
+                      تظهر في قسم الهيرو بصفحة الهبوط العامة للمنصة.
+                    </FormHelperText>
+                  </FormControl>
                 </SimpleGrid>
 
-                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={5}>
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
                   <FileDropSlot
                     label="رفع الصورة الرئيسية"
-                    hint="PNG شفاف مدعوم — تُرفع بجودتها الأصلية إن كان الحجم مناسباً."
+                    hint="PNG شفاف مدعوم"
                     fieldKey="avatar"
                     previewUrl={mediaPreview.avatar}
                     onFile={(f) => setMediaFile("avatar", f)}
@@ -1157,8 +1377,8 @@ const AddTeacher = () => {
                     uploadKey={uploadKey}
                   />
                   <FileDropSlot
-                    label="رفع أيقونة الموقع"
-                    hint="يفضّل PNG صغير. الشفافية تُحفظ."
+                    label="رفع الأيقونة"
+                    hint="PNG صغير مفضّل"
                     fieldKey="favicon"
                     previewUrl={mediaPreview.favicon}
                     onFile={(f) => setMediaFile("favicon", f)}
@@ -1168,8 +1388,8 @@ const AddTeacher = () => {
                     uploadKey={uploadKey}
                   />
                   <FileDropSlot
-                    label="ملف og_image → og_image_url"
-                    hint="PNG أو JPG — جودة عالية، الشفافية محفوظة."
+                    label="رفع صورة OG"
+                    hint="PNG أو JPG"
                     fieldKey="og_image"
                     previewUrl={mediaPreview.og_image}
                     onFile={(f) => setMediaFile("og_image", f)}
@@ -1178,19 +1398,30 @@ const AddTeacher = () => {
                     mutedColor={mutedColor}
                     uploadKey={uploadKey}
                   />
+                  <FileDropSlot
+                    label="رفع صورة الهيرو"
+                    hint="صورة الواجهة البارزة — PNG شفاف حتى 4MB"
+                    fieldKey="hero_image"
+                    previewUrl={mediaPreview.hero_image}
+                    onFile={(f) => setMediaFile("hero_image", f)}
+                    onClear={() => clearMediaFile("hero_image")}
+                    borderColor={borderColor}
+                    mutedColor={mutedColor}
+                    uploadKey={uploadKey}
+                  />
                 </SimpleGrid>
               </SectionCard>
 
-              <Accordion allowToggle borderRadius="2xl" overflow="hidden" boxShadow="md">
-                <AccordionItem border="none" bg={useColorModeValue("white", "gray.800")}>
+              <Accordion allowToggle borderRadius="2xl" overflow="hidden" borderWidth="1px" borderColor={borderColor}>
+                <AccordionItem border="none" bg={headerBg}>
                   <h2>
-                    <AccordionButton py={4} px={{ base: 4, md: 6 }}>
+                    <AccordionButton py={4} px={{ base: 4, md: 6 }} _hover={{ bg: "transparent" }}>
                       <HStack flex="1" textAlign="start" spacing={3}>
-                        <Icon as={FaIdCard} color="teal.500" />
+                        <Icon as={FaIdCard} color={BRAND_BLUE} />
                         <Box>
-                          <Text fontWeight="bold">تحسين الظهور في محركات البحث</Text>
+                          <Text fontWeight="700">تحسين الظهور (SEO)</Text>
                           <Text fontSize="sm" color={mutedColor}>
-                            اختياري — إن تُرك عنوان البحث فارغاً يُستخدم اسم العرض على المنصة.
+                            اختياري — إن تُرك فارغاً يُستخدم اسم العرض
                           </Text>
                         </Box>
                       </HStack>
@@ -1200,23 +1431,21 @@ const AddTeacher = () => {
                   <AccordionPanel pb={6} px={{ base: 4, md: 6 }} pt={0}>
                     <SimpleGrid columns={{ base: 1, md: 2 }} spacing={5}>
                       <FormControl>
-                        <FormLabel fontSize="sm" fontWeight="semibold">
-                          عنوان الصفحة في نتائج البحث
+                        <FormLabel fontSize="sm" fontWeight="600">
+                          عنوان نتائج البحث
                         </FormLabel>
                         <Input
                           {...inputProps}
-                          size="md"
                           value={tenant.seo_title}
                           onChange={(e) => setTenantField("seo_title", e.target.value)}
                         />
                       </FormControl>
                       <FormControl gridColumn={{ md: "1 / -1" }}>
-                        <FormLabel fontSize="sm" fontWeight="semibold">
-                          وصف مختصر لصفحة البحث
+                        <FormLabel fontSize="sm" fontWeight="600">
+                          وصف مختصر
                         </FormLabel>
                         <Textarea
                           {...inputProps}
-                          size="md"
                           rows={3}
                           value={tenant.seo_meta_description}
                           onChange={(e) =>
@@ -1230,28 +1459,28 @@ const AddTeacher = () => {
               </Accordion>
 
               <SectionCard
-                step="٣ · المالك"
+                step="3"
                 title="حساب مالك المنصة"
-                subtitle="اختياري — لكن مطلوب لإنشاء منصة بمدرس. الإلزامي داخل المالك: الاسم، البريد، وكلمة المرور (6 أحرف على الأقل)."
-                accent="green"
+                subtitle="مطلوب عند الإنشاء بمدرس: الاسم، البريد، وكلمة المرور (6 أحرف على الأقل)."
+                accent="blue"
               >
                 <HStack justify="space-between" mb={5} flexWrap="wrap" gap={3}>
                   <Text fontSize="sm" color={mutedColor}>
-                    تعطيل الخيار ينشئ منصة بدون حساب مالك. مع الملفات تُرسل حقول owner_* مسطّحة.
+                    عطّل الخيار لإنشاء منصة بدون حساب مالك.
                   </Text>
                   <Switch
                     isChecked={ownerEnabled}
                     onChange={(e) => setOwnerEnabled(e.target.checked)}
-                    colorScheme="green"
+                    colorScheme="blue"
                     size="lg"
                   />
                 </HStack>
                 {ownerEnabled ? (
                   <SimpleGrid columns={{ base: 1, md: 2 }} spacing={5}>
-                    <FormControl isRequired={formMode !== "edit"}>
-                      <FormLabel fontWeight="semibold" color={textColor}>
+                    <FormControl isRequired={!isEditMode}>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">
                         <HStack spacing={2}>
-                          <Icon as={FaUserTie} color="green.500" />
+                          <Icon as={FaUserTie} color={BRAND_BLUE} />
                           <Text>الاسم</Text>
                         </HStack>
                       </FormLabel>
@@ -1261,10 +1490,10 @@ const AddTeacher = () => {
                         onChange={(e) => setOwnerField("name", e.target.value)}
                       />
                     </FormControl>
-                    <FormControl isRequired={formMode !== "edit"}>
-                      <FormLabel fontWeight="semibold" color={textColor}>
+                    <FormControl isRequired={!isEditMode}>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">
                         <HStack spacing={2}>
-                          <Icon as={FaEnvelope} color="green.500" />
+                          <Icon as={FaEnvelope} color={BRAND_BLUE} />
                           <Text>البريد</Text>
                         </HStack>
                       </FormLabel>
@@ -1276,25 +1505,25 @@ const AddTeacher = () => {
                         onChange={(e) => setOwnerField("email", e.target.value)}
                       />
                     </FormControl>
-                    <FormControl isRequired={formMode !== "edit"}>
-                      <FormLabel fontWeight="semibold" color={textColor}>
+                    <FormControl isRequired={!isEditMode}>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">
                         <HStack spacing={2}>
-                          <Icon as={FaLock} color="green.500" />
+                          <Icon as={FaLock} color={BRAND_BLUE} />
                           <Text>كلمة المرور</Text>
                         </HStack>
                       </FormLabel>
                       <Input
                         {...inputProps}
                         type="password"
-                        placeholder={formMode === "edit" ? "اتركه فارغاً إن لم تُرد تغييره" : "6 أحرف على الأقل"}
+                        placeholder={isEditMode ? "اتركه فارغاً إن لم تُرد تغييره" : "6 أحرف على الأقل"}
                         value={owner.password}
                         onChange={(e) => setOwnerField("password", e.target.value)}
                       />
                     </FormControl>
                     <FormControl>
-                      <FormLabel fontWeight="semibold" color={textColor}>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">
                         <HStack spacing={2}>
-                          <Icon as={FaBook} color="green.500" />
+                          <Icon as={FaBook} color={BRAND_ORANGE} />
                           <Text>المادة الدراسية</Text>
                         </HStack>
                       </FormLabel>
@@ -1305,8 +1534,8 @@ const AddTeacher = () => {
                       />
                     </FormControl>
                     <FormControl>
-                      <FormLabel fontWeight="semibold" color={textColor}>
-                        واتساب (whatsapp_number)
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">
+                        واتساب
                       </FormLabel>
                       <Input
                         {...inputProps}
@@ -1317,7 +1546,7 @@ const AddTeacher = () => {
                       />
                     </FormControl>
                     <FormControl>
-                      <FormLabel fontWeight="semibold" color={textColor}>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">
                         فيسبوك
                       </FormLabel>
                       <Input
@@ -1329,7 +1558,7 @@ const AddTeacher = () => {
                       />
                     </FormControl>
                     <FormControl>
-                      <FormLabel fontWeight="semibold" color={textColor}>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">
                         إنستغرام
                       </FormLabel>
                       <Input
@@ -1341,7 +1570,7 @@ const AddTeacher = () => {
                       />
                     </FormControl>
                     <FormControl>
-                      <FormLabel fontWeight="semibold" color={textColor}>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">
                         يوتيوب
                       </FormLabel>
                       <Input
@@ -1353,7 +1582,7 @@ const AddTeacher = () => {
                       />
                     </FormControl>
                     <FormControl>
-                      <FormLabel fontWeight="semibold" color={textColor}>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">
                         تيك توك
                       </FormLabel>
                       <Input
@@ -1364,9 +1593,9 @@ const AddTeacher = () => {
                         placeholder="https://tiktok.com/@..."
                       />
                     </FormControl>
-                    {formMode === "edit" && (
+                    {isEditMode && (
                       <FormControl>
-                        <FormLabel fontWeight="semibold" color={textColor}>
+                        <FormLabel fontWeight="600" color={textColor} fontSize="sm">
                           حالة الحساب
                         </FormLabel>
                         <Select
@@ -1381,7 +1610,7 @@ const AddTeacher = () => {
                       </FormControl>
                     )}
                     <FormControl gridColumn={{ md: "1 / -1" }}>
-                      <FormLabel fontWeight="semibold" color={textColor}>
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">
                         الوصف التعريفي
                       </FormLabel>
                       <Textarea
@@ -1392,11 +1621,11 @@ const AddTeacher = () => {
                       />
                     </FormControl>
                     <FormControl gridColumn={{ md: "1 / -1" }}>
-                      <FormLabel fontWeight="semibold" color={textColor}>
-                        الصفوف الدراسية (اختياري)
+                      <FormLabel fontWeight="600" color={textColor} fontSize="sm">
+                        الصفوف الدراسية
                       </FormLabel>
                       <Text fontSize="sm" color={mutedColor} mb={3}>
-                        تحدد الصفوف المرتبطة بالمدرس عند الإنشاء (grade_ids).
+                        تحدد الصفوف المرتبطة بالمدرس عند الإنشاء.
                       </Text>
                       {gradesLoading ? (
                         <HStack color={mutedColor}>
@@ -1417,7 +1646,7 @@ const AddTeacher = () => {
                         >
                           <SimpleGrid columns={{ base: 1, md: 2 }} spacing={2}>
                             {availableGrades.map((grade) => (
-                              <Checkbox key={grade.id} value={String(grade.id)} colorScheme="green">
+                              <Checkbox key={grade.id} value={String(grade.id)} colorScheme="blue">
                                 {grade.name}
                               </Checkbox>
                             ))}
@@ -1434,86 +1663,119 @@ const AddTeacher = () => {
               </SectionCard>
 
               <SectionCard
-                step="٤ · إعدادات"
-                title="إعدادات المنصة الإضافية"
-                subtitle="اختياري — كائن بصيغة JSON يُخزَّن مع إعدادات المستأجر."
-                accent="gray"
+                step="4"
+                title="إعدادات إضافية"
+                subtitle="اختياري — كائن JSON يُخزَّن مع إعدادات المستأجر."
+                accent="orange"
               >
                 <FormControl>
-                  <FormLabel fontWeight="semibold" color={textColor}>
+                  <FormLabel fontWeight="600" color={textColor} fontSize="sm">
                     <HStack spacing={2}>
                       <Icon as={FaCog} />
-                      <Text>نص الإعدادات (JSON)</Text>
+                      <Text>إعدادات (JSON)</Text>
                     </HStack>
                   </FormLabel>
                   <Textarea
                     dir="ltr"
                     fontFamily="mono"
                     fontSize="sm"
-                    placeholder='{"حد_الطلبات": 100}'
+                    placeholder='{"key": "value"}'
                     value={settingsJson}
                     onChange={(e) => setSettingsJson(e.target.value)}
                     rows={5}
-                    borderRadius="xl"
+                    borderRadius="lg"
                     borderColor={borderColor}
                     bg={inputBg}
                   />
-                  <FormHelperText>
-                    اتركه فارغاً إن لم تكن بحاجة إلى إعدادات تقنية إضافية.
-                  </FormHelperText>
+                  <FormHelperText>اتركه فارغاً إن لم تكن بحاجة لإعدادات تقنية.</FormHelperText>
                 </FormControl>
               </SectionCard>
-
-              <Wrap spacing={4} justify="flex-end">
-                <WrapItem>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={resetForm}
-                    isDisabled={loading}
-                    borderRadius="xl"
-                  >
-                    مسح النموذج
-                  </Button>
-                </WrapItem>
-                <WrapItem flex={1} minW={{ base: "100%", md: "280px" }}>
-                  <Button
-                    type="submit"
-                    w="full"
-                    colorScheme="blue"
-                    size="lg"
-                    h="58px"
-                    borderRadius="xl"
-                    fontSize="md"
-                    fontWeight="bold"
-                    leftIcon={loading ? <Spinner size="sm" /> : <FaSave />}
-                    isLoading={loading || compressingMedia}
-                    isDisabled={compressingMedia}
-                    loadingText={
-                      compressingMedia
-                        ? "جاري ضغط الصور..."
-                        : formMode === "edit"
-                          ? "جاري التحديث..."
-                          : "جاري الإنشاء..."
-                    }
-                    boxShadow="lg"
-                    _hover={{ transform: "translateY(-1px)", boxShadow: "xl" }}
-                    transition="all 0.2s"
-                  >
-                    {formMode === "edit"
-                      ? multipart
-                        ? "تحديث المنصة مع رفع الصور"
-                        : "تحديث المنصة (إرسال نصي)"
-                      : multipart
-                        ? "إنشاء المنصة مع رفع الصور"
-                        : "إنشاء المنصة (إرسال نصي)"}
-                  </Button>
-                </WrapItem>
-              </Wrap>
             </VStack>
           </form>
         </VStack>
       </Container>
+
+      {/* Sticky action bar */}
+      <Box
+        position="fixed"
+        bottom={0}
+        left={0}
+        right={0}
+        zIndex={40}
+        bg={footerBg}
+        borderTopWidth="1px"
+        borderColor={borderColor}
+        boxShadow="0 -8px 24px rgba(15,23,42,0.06)"
+        py={3}
+        px={4}
+      >
+        <Container maxW="1080px" px={{ base: 0, md: 6 }}>
+          <Flex
+            gap={3}
+            align="center"
+            justify="space-between"
+            flexDir={{ base: "column-reverse", sm: "row" }}
+          >
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={resetForm}
+              isDisabled={loading}
+              borderRadius="lg"
+              w={{ base: "full", sm: "auto" }}
+              cursor="pointer"
+            >
+              مسح النموذج
+            </Button>
+            <HStack spacing={3} w={{ base: "full", sm: "auto" }}>
+              <Button
+                type="button"
+                variant="outline"
+                borderColor={borderColor}
+                onClick={() => navigate("/home")}
+                borderRadius="lg"
+                display={{ base: "none", md: "inline-flex" }}
+                cursor="pointer"
+              >
+                إلغاء
+              </Button>
+              <Button
+                type="submit"
+                form="add-teacher-form"
+                flex={1}
+                minW={{ sm: "240px" }}
+                bg={BRAND_BLUE}
+                color="white"
+                size="lg"
+                h="48px"
+                borderRadius="lg"
+                fontWeight="700"
+                leftIcon={loading ? undefined : <FaSave />}
+                isLoading={loading || compressingMedia}
+                isDisabled={compressingMedia || !!subdomainConflict}
+                loadingText={
+                  compressingMedia
+                    ? "ضغط الصور..."
+                    : isEditMode
+                      ? "جاري التحديث..."
+                      : "جاري الإنشاء..."
+                }
+                cursor="pointer"
+                _hover={{ bg: "#2B6CB0" }}
+                boxShadow="0 10px 24px -8px rgba(49,130,206,0.45)"
+              >
+                {isEditMode
+                  ? multipart
+                    ? "تحديث مع الصور"
+                    : "تحديث المنصة"
+                  : multipart
+                    ? "إنشاء مع الصور"
+                    : "إنشاء المنصة"}
+              </Button>
+            </HStack>
+          </Flex>
+        </Container>
+      </Box>
     </Box>
   );
 };

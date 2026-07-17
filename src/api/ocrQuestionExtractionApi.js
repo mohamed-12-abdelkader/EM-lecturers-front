@@ -117,6 +117,30 @@ export function formatOcrApiError(error) {
 
 export const newDraftId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
+/** عدد الاختيارات المدعوم من الاستخراج والبنك (أحياناً 3 / 4 / 5) */
+export const MCQ_CHOICE_MIN = 2;
+export const MCQ_CHOICE_MAX = 6;
+
+export const CHOICE_LETTERS_LATIN = ["A", "B", "C", "D", "E", "F"];
+export const CHOICE_LETTERS_AR = ["أ", "ب", "ج", "د", "هـ", "و"];
+
+export const getChoiceLetter = (index, script = "latin") => {
+  const list = script === "ar" ? CHOICE_LETTERS_AR : CHOICE_LETTERS_LATIN;
+  return list[index] || String(index + 1);
+};
+
+export const normalizeMcqChoices = (choices = []) =>
+  (Array.isArray(choices) ? choices : [])
+    .map((c) => String(c ?? "").trim())
+    .filter(Boolean)
+    .slice(0, MCQ_CHOICE_MAX);
+
+export const isValidMcqChoiceCount = (choices = []) => {
+  if (!Array.isArray(choices) || choices.length === 0) return false;
+  if (choices.length < MCQ_CHOICE_MIN || choices.length > MCQ_CHOICE_MAX) return false;
+  return choices.every((c) => String(c ?? "").trim());
+};
+
 export const emptyDraftQuestion = () => ({
   id: newDraftId(),
   question_text: "",
@@ -138,7 +162,9 @@ export const resolveOcrAnswer = (q) => {
   }
   if (q.correct_answer != null && q.correct_answer !== "") {
     const label = String(q.correct_answer).trim();
-    const byLabel = options.find((o) => String(o.label ?? "").trim() === label);
+    const byLabel = options.find(
+      (o) => String(o.label ?? "").trim().toLowerCase() === label.toLowerCase(),
+    );
     if (byLabel?.text) return byLabel.text;
     const byText = options.find((o) => String(o.text ?? "").trim() === label);
     if (byText?.text) return byText.text;
@@ -146,15 +172,33 @@ export const resolveOcrAnswer = (q) => {
   return "";
 };
 
+function resolveOcrCorrectIndex(q, optionTexts) {
+  if (
+    Number.isInteger(q.correct_answer_index) &&
+    q.correct_answer_index >= 0 &&
+    q.correct_answer_index < optionTexts.length
+  ) {
+    return q.correct_answer_index;
+  }
+  if (q.correct_answer == null || q.correct_answer === "") return null;
+  const label = String(q.correct_answer).trim().toLowerCase();
+  const options = Array.isArray(q.options) ? q.options : [];
+  const byLabel = options.findIndex(
+    (o) => String(o.label ?? "").trim().toLowerCase() === label,
+  );
+  if (byLabel >= 0) return byLabel;
+  const byText = optionTexts.findIndex((t) => t === String(q.correct_answer).trim());
+  return byText >= 0 ? byText : null;
+}
+
 /**
- * يطابق schema الـ API: options إما فارغة أو بالضبط 4
+ * يحوّل سؤال OCR إلى مسودة — يدعم 2–6 اختيارات (غالباً 3 / 4 / 5)
  * @param {object} q
  */
 export const mapOcrQuestionToDraft = (q) => {
   const rawOptions = Array.isArray(q.options) ? q.options : [];
-  const optionTexts = rawOptions.map((o) => (o.text ?? "").trim());
-  const hasFourOptions = optionTexts.length === 4;
-  const hasAnyOptionText = optionTexts.some(Boolean);
+  const optionTexts = normalizeMcqChoices(rawOptions.map((o) => o?.text ?? ""));
+  const hasMcqOptions = optionTexts.length >= MCQ_CHOICE_MIN;
 
   const questionImages = Array.isArray(q.question_images)
     ? q.question_images.filter((image) => image?.image_url)
@@ -163,7 +207,7 @@ export const mapOcrQuestionToDraft = (q) => {
   const hasImages = questionImages.length > 0 || !!questionImage?.image_url;
 
   let questionType = "choice";
-  if (hasFourOptions && hasAnyOptionText) {
+  if (hasMcqOptions) {
     questionType = "choice";
   } else if (hasImages) {
     questionType = "text_with_image";
@@ -171,10 +215,10 @@ export const mapOcrQuestionToDraft = (q) => {
     questionType = "text";
   }
 
-  const choices =
-    hasFourOptions && hasAnyOptionText
-      ? optionTexts
-      : ["", "", "", ""];
+  const choices = hasMcqOptions ? optionTexts : ["", "", "", ""];
+  const correctAnswerIndex = hasMcqOptions
+    ? resolveOcrCorrectIndex(q, optionTexts)
+    : null;
 
   return {
     id: newDraftId(),
@@ -182,15 +226,18 @@ export const mapOcrQuestionToDraft = (q) => {
     passage_id: q.passage_id ?? null,
     question_type: questionType,
     choices,
-    answer: hasFourOptions && hasAnyOptionText ? resolveOcrAnswer(q) : "",
-    correctAnswerIndex: Number.isInteger(q.correct_answer_index)
-      ? q.correct_answer_index
-      : null,
+    answer:
+      hasMcqOptions && correctAnswerIndex != null
+        ? optionTexts[correctAnswerIndex] || resolveOcrAnswer(q)
+        : hasMcqOptions
+          ? resolveOcrAnswer(q)
+          : "",
+    correctAnswerIndex,
     answerInferred: !!q.correct_answer_inferred,
     image_url: questionImage?.image_url ?? null,
     imageDescription: questionImage?.short_description ?? "",
     questionImages,
-    source_number: q.source_number ?? null,
+    source_number: q.source_number ?? q.number ?? null,
   };
 };
 
@@ -202,16 +249,17 @@ export const mapOcrPassageToDraft = (passage) => ({
 });
 
 export const getDraftCorrectAnswerIndex = (draft) => {
-  const choices = draft.choices.map((c) => c.trim()).filter(Boolean);
+  const choices = (draft.choices || []).map((c) => String(c ?? "").trim());
   if (
     Number.isInteger(draft.correctAnswerIndex) &&
     draft.correctAnswerIndex >= 0 &&
-    draft.correctAnswerIndex < choices.length
+    draft.correctAnswerIndex < choices.length &&
+    choices[draft.correctAnswerIndex]
   ) {
     return draft.correctAnswerIndex;
   }
   if (draft.answer?.trim()) {
-    const idx = choices.indexOf(draft.answer.trim());
+    const idx = choices.findIndex((c) => c === draft.answer.trim());
     return idx >= 0 ? idx : null;
   }
   return null;
@@ -220,7 +268,7 @@ export const getDraftCorrectAnswerIndex = (draft) => {
 export const getDraftCorrectAnswerLetter = (draft) => {
   const idx = getDraftCorrectAnswerIndex(draft);
   if (idx == null) return "A";
-  return ["A", "B", "C", "D"][idx] || "A";
+  return getChoiceLetter(idx, "latin");
 };
 
 export const isDraftMcq = (draft) => draft.question_type === "choice";
@@ -248,12 +296,12 @@ export const validateLectureExamDraftQuestion = (draft, index) => {
   }
 
   if (draft.question_type === "text") {
-    return `السؤال ${n}: امتحان المحاضرة يدعم أسئلة اختيار من متعدد (4 خيارات) أو أسئلة بالصورة`;
+    return `السؤال ${n}: امتحان المحاضرة يدعم أسئلة اختيار من متعدد (2–6 خيارات) أو أسئلة بالصورة`;
   }
 
   const choices = draft.choices.map((c) => c.trim());
-  if (choices.length !== 4 || choices.some((c) => !c)) {
-    return `السؤال ${n}: يجب إدخال 4 اختيارات كاملة`;
+  if (!isValidMcqChoiceCount(choices)) {
+    return `السؤال ${n}: أدخل من ${MCQ_CHOICE_MIN} إلى ${MCQ_CHOICE_MAX} اختيارات كاملة (حالياً ${choices.filter(Boolean).length})`;
   }
 
   const correctAnswerIndex = getDraftCorrectAnswerIndex(draft);
@@ -331,9 +379,13 @@ async function importImageDraftToLectureExam(examId, draft, token) {
 function buildBulkTextFromDrafts(drafts) {
   return drafts
     .map((draft) => {
-      const p = draftToLecturePayload(draft);
-      if (!p.questionText) return null;
-      return `${p.questionText}\na. ${p.optionA}\nb. ${p.optionB}\nc. ${p.optionC}\nd. ${p.optionD}`;
+      const questionText = draft.question_text?.trim();
+      if (!questionText) return null;
+      const choices = normalizeMcqChoices(draft.choices);
+      const optionsBlock = choices
+        .map((text, i) => `${String.fromCharCode(97 + i)}. ${text}`)
+        .join("\n");
+      return `${questionText}\n${optionsBlock}`;
     })
     .filter(Boolean)
     .join("\n\n");
@@ -641,14 +693,10 @@ export const validateCourseExamDraftQuestion = validateLectureExamDraftQuestion;
 const TEACHER_LIBRARY_API = "/api/teacher/questions";
 
 function draftToTeacherQuestionPayload(draft) {
-  const choices = (draft.choices || []).map((c) => c.trim());
-  const filledChoices = choices.filter(Boolean);
-  const isMcq =
-    draft.question_type === "choice" &&
-    choices.length === 4 &&
-    choices.every(Boolean);
+  const choices = normalizeMcqChoices(draft.choices);
+  const isMcq = draft.question_type === "choice" && isValidMcqChoiceCount(choices);
   const imageUrl = getDraftImageUrl(draft);
-  const correctAnswerIndex = getDraftCorrectAnswerIndex(draft);
+  const correctAnswerIndex = getDraftCorrectAnswerIndex({ ...draft, choices });
 
   if (isMcq) {
     return {
@@ -694,9 +742,9 @@ export const validateTeacherLibraryDraftQuestion = (draft, index) => {
     return null;
   }
 
-  const choices = (draft.choices || []).map((c) => c.trim());
-  if (choices.length !== 4 || choices.some((c) => !c)) {
-    return `السؤال ${n}: يجب إدخال 4 اختيارات كاملة`;
+  const choices = normalizeMcqChoices(draft.choices);
+  if (draft.question_type === "choice" && !isValidMcqChoiceCount(choices)) {
+    return `السؤال ${n}: أدخل من ${MCQ_CHOICE_MIN} إلى ${MCQ_CHOICE_MAX} اختيارات كاملة (حالياً ${choices.length})`;
   }
 
   return null;
@@ -773,7 +821,7 @@ export async function importDraftsToTeacherLibrary(
   return { totalAdded, errors };
 }
 
-const QUESTION_BANK_OPTION_LABELS = ["أ", "ب", "ج", "د"];
+const QUESTION_BANK_OPTION_LABELS = CHOICE_LETTERS_AR;
 
 function normalizeQuestionNumber(value, fallback) {
   const parsed = Number(value);
@@ -805,13 +853,10 @@ function draftQuestionImagesToExtraction(draft) {
 }
 
 function draftToExtractionQuestion(draft, index) {
-  const choices = (draft.choices || []).map((c) => c.trim());
-  const isMcq =
-    draft.question_type === "choice" &&
-    choices.length === 4 &&
-    choices.every(Boolean);
+  const choices = normalizeMcqChoices(draft.choices);
+  const isMcq = draft.question_type === "choice" && isValidMcqChoiceCount(choices);
 
-  const correctAnswerIndex = getDraftCorrectAnswerIndex(draft);
+  const correctAnswerIndex = getDraftCorrectAnswerIndex({ ...draft, choices });
   const questionImages = draftQuestionImagesToExtraction(draft);
 
   return {

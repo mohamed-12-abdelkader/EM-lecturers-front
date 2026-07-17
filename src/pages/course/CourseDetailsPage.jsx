@@ -1320,12 +1320,12 @@ const CourseDetailsPage = () => {
     setDeleteDialog({ isOpen: false, type: "", id: null, title: "" });
   };
 
-  // 2. دوال API للامتحان محسنة
+  // 2. دوال API للواجب / امتحان المحاضرة
   const createExam = async (lectureId, data) => {
     if (!lectureId) {
       toast({
         title: "خطأ",
-        description: "لم يتم تحديد المحاضرة. أعد فتح نافذة إضافة الامتحان.",
+        description: "لم يتم تحديد المحاضرة. أعد فتح نافذة إضافة الواجب.",
         status: "error",
         duration: 4000,
         isClosable: true,
@@ -1335,18 +1335,18 @@ const CourseDetailsPage = () => {
     try {
       setExamActionLoading(true);
 
-      // تحضير البيانات للإرسال
       const examData = {
         title: data.title,
+        type: data.type || "assignment",
         total_grade: data.total_grade,
         duration: data.duration,
-        is_visible: data.is_visible,
-        lock_next_lectures: data.lock_next_lectures,
+        is_visible: data.is_visible ?? true,
+        // الواجبات تقفل المحاضرة التالية افتراضياً
+        lock_next_lectures: data.lock_next_lectures ?? true,
         show_answers_immediately: data.show_answers_immediately,
         show_answers_after_hours: data.show_answers_after_hours,
       };
 
-      // إضافة التواريخ إذا تم تحديدها
       if (data.show_at) {
         examData.show_at = new Date(data.show_at).toISOString();
       }
@@ -1359,21 +1359,19 @@ const CourseDetailsPage = () => {
       });
 
       toast({
-        title: "تم إضافة الامتحان بنجاح",
-        description: `تم إنشاء امتحان "${data.title}" بنجاح`,
+        title: "تم إضافة الواجب بنجاح",
+        description: `تم إنشاء "${data.title}" لهذه المحاضرة`,
         status: "success",
         duration: 4000,
         isClosable: true,
       });
 
-      // تحديث البيانات بدون إعادة تحميل
       await refreshCourseData();
-      // إغلاق الموديل بعد النجاح
       setExamModal({ isOpen: false, type: "add", lectureId: null, data: null });
     } catch (error) {
       console.error("Error creating exam:", error);
       toast({
-        title: "خطأ في إضافة الامتحان",
+        title: "خطأ في إضافة الواجب",
         description: error.response?.data?.message || "حدث خطأ غير متوقع",
         status: "error",
         duration: 4000,
@@ -1387,7 +1385,6 @@ const CourseDetailsPage = () => {
     try {
       setExamActionLoading(true);
 
-      // تحضير البيانات للإرسال
       const examData = {
         title: data.title,
         total_grade: data.total_grade,
@@ -1397,6 +1394,7 @@ const CourseDetailsPage = () => {
         show_answers_immediately: data.show_answers_immediately,
         show_answers_after_hours: data.show_answers_after_hours,
       };
+      if (data.type) examData.type = data.type;
 
       // إضافة التواريخ إذا تم تحديدها
       if (data.show_at) {
@@ -1411,8 +1409,8 @@ const CourseDetailsPage = () => {
       });
 
       toast({
-        title: "تم تعديل الامتحان بنجاح",
-        description: `تم تحديث امتحان "${data.title}" بنجاح`,
+        title: "تم تعديل الواجب بنجاح",
+        description: `تم تحديث "${data.title}" بنجاح`,
         status: "success",
         duration: 4000,
         isClosable: true,
@@ -1425,7 +1423,7 @@ const CourseDetailsPage = () => {
     } catch (error) {
       console.error("Error updating exam:", error);
       toast({
-        title: "خطأ في تعديل الامتحان",
+        title: "خطأ في تعديل الواجب",
         description: error.response?.data?.message || "حدث خطأ غير متوقع",
         status: "error",
         duration: 4000,
@@ -1442,7 +1440,7 @@ const CourseDetailsPage = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       toast({
-        title: "تم حذف الامتحان بنجاح",
+        title: "تم حذف الواجب بنجاح",
         status: "success",
         duration: 3000,
         isClosable: true,
@@ -1451,7 +1449,7 @@ const CourseDetailsPage = () => {
       await refreshCourseData();
     } catch (error) {
       toast({
-        title: "خطأ في حذف الامتحان",
+        title: "خطأ في حذف الواجب",
         description: error.response?.data?.message || "حدث خطأ غير متوقع",
         status: "error",
         duration: 3000,
@@ -1539,7 +1537,8 @@ const CourseDetailsPage = () => {
 
     const [formData, setFormData] = useState({
       title: data?.title || "",
-      total_grade: data?.total_grade || 100,
+      type: data?.type || "assignment",
+      total_grade: data?.total_grade ?? 20,
       duration: data?.duration || 60,
       is_visible: data?.is_visible ?? true,
       show_at: data?.show_at || "",
@@ -1553,7 +1552,8 @@ const CourseDetailsPage = () => {
       if (data) {
         setFormData({
           title: data.title || "",
-          total_grade: data.total_grade || 100,
+          type: data.type || "assignment",
+          total_grade: data.total_grade ?? 20,
           duration: data.duration || 60,
           is_visible: data.is_visible ?? true,
           show_at: data.show_at || "",
@@ -1565,7 +1565,8 @@ const CourseDetailsPage = () => {
       } else {
         setFormData({
           title: "",
-          total_grade: 100,
+          type: "assignment",
+          total_grade: 20,
           duration: 60,
           is_visible: true,
           show_at: "",
@@ -1618,12 +1619,12 @@ const CourseDetailsPage = () => {
               </Box>
               <VStack align="start" spacing={0}>
                 <Text fontSize="xl" fontWeight="bold">
-                  {type === "add" ? "إضافة امتحان جديد" : "تعديل الامتحان"}
+                  {type === "add" ? "إضافة واجب جديد" : "تعديل الواجب"}
                 </Text>
                 <Text fontSize="sm" opacity={0.9}>
                   {type === "add"
-                    ? "إنشاء امتحان محاضرة جديد مع إعدادات متقدمة"
-                    : "تعديل إعدادات الامتحان"}
+                    ? "يمكنك إنشاء أكثر من واجب لنفس المحاضرة"
+                    : "تعديل إعدادات الواجب"}
                 </Text>
               </VStack>
             </HStack>
@@ -1664,14 +1665,14 @@ const CourseDetailsPage = () => {
                       >
                         <Icon as={FaRegFileAlt} color="blue.500" boxSize={4} />
                       </Box>
-                      عنوان الامتحان
+                      عنوان الواجب
                     </FormLabel>
                     <Input
                       value={formData.title}
                       onChange={(e) =>
                         setFormData({ ...formData, title: e.target.value })
                       }
-                      placeholder="أدخل عنوان الامتحان"
+                      placeholder="مثال: واجب 1"
                       isDisabled={loading}
                       borderRadius="lg"
                       borderWidth="1px"
@@ -2058,14 +2059,14 @@ const CourseDetailsPage = () => {
                             color={labelColor}
                             fontSize="md"
                           >
-                            إظهار الامتحان
+                            إظهار الواجب
                           </Text>
                           <Text
                             fontSize="sm"
                             color="gray.500"
                             _dark={{ color: "gray.400" }}
                           >
-                            جعل الامتحان مرئياً للطلاب
+                            جعل الواجب مرئياً للطلاب
                           </Text>
                         </VStack>
                         <Switch
@@ -2103,7 +2104,7 @@ const CourseDetailsPage = () => {
                             color="gray.500"
                             _dark={{ color: "gray.400" }}
                           >
-                            منع الوصول للمحاضرات التالية حتى اجتياز الامتحان
+                            منع الوصول للمحاضرات التالية حتى اجتياز الواجب
                           </Text>
                         </VStack>
                         <Switch
@@ -2153,7 +2154,7 @@ const CourseDetailsPage = () => {
                   borderRadius="xl"
                   fontWeight="bold"
                 >
-                  {type === "add" ? "إضافة الامتحان" : "تعديل الامتحان"}
+                  {type === "add" ? "إضافة الواجب" : "تعديل الواجب"}
                 </Button>
               </HStack>
             </ModalFooter>

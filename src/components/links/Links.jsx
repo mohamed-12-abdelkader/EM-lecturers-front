@@ -229,6 +229,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
       links: [
         { to: "/center-mgmt", Icon: MdBusiness, label: "إدارة السنتر" },
         { to: "/managed-students", Icon: MdManageAccounts, label: "إدارة الطلاب" },
+        { to: "/platform-students", Icon: MdPeople, label: "كل الطلاب" },
         { to: "/teacher-students", Icon: MdPeople, label: "طلاب الكورسات" },
         { to: "/teacher-invoices", Icon: MdDescription, label: "فواتير الاشتراك" },
       ],
