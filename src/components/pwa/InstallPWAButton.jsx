@@ -1,11 +1,6 @@
 /**
- * InstallPWAButton — production-ready PWA install CTA for the Hero section.
- *
- * - Shows only when installable and not already installed
- * - Chromium: native beforeinstallprompt
- * - iOS: guided modal (Add to Home Screen)
- * - Framer Motion entrance + hover animations
- * - Toast on successful install; silent on dismiss
+ * InstallPWAButton — PWA install CTA.
+ * Always visible when not running as an installed app.
  */
 
 import { useEffect, useState } from "react";
@@ -14,6 +9,7 @@ import { FaDownload, FaMobileAlt } from "react-icons/fa";
 import { toast } from "react-toastify";
 import usePWAInstall from "../../Hooks/pwa/usePWAInstall";
 import IOSInstallGuideModal from "./IOSInstallGuideModal";
+import DesktopInstallGuideModal from "./DesktopInstallGuideModal";
 
 export default function InstallPWAButton({
   label = "تثبيت التطبيق",
@@ -23,9 +19,9 @@ export default function InstallPWAButton({
   const { canShowInstallButton, canInstallNative, isIos, promptInstall } =
     usePWAInstall();
   const [iosOpen, setIosOpen] = useState(false);
+  const [desktopOpen, setDesktopOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  // Toast when install completes via browser UI or our prompt
   useEffect(() => {
     const onInstalled = () => {
       toast.success("تم تثبيت التطبيق بنجاح 🎉", {
@@ -40,21 +36,25 @@ export default function InstallPWAButton({
   const handleClick = async () => {
     if (busy) return;
 
-    // iOS: show step-by-step guide (no native prompt API)
+    // iOS: guided Add to Home Screen
     if (isIos && !canInstallNative) {
       setIosOpen(true);
       return;
     }
 
-    setBusy(true);
-    try {
-      const result = await promptInstall();
-      // accepted → appinstalled event shows toast
-      // dismissed / unavailable / error → silent
-      void result;
-    } finally {
-      setBusy(false);
+    // Chromium native prompt ready
+    if (canInstallNative) {
+      setBusy(true);
+      try {
+        await promptInstall();
+      } finally {
+        setBusy(false);
+      }
+      return;
     }
+
+    // Fallback: browser menu instructions (desktop / prompt not ready yet)
+    setDesktopOpen(true);
   };
 
   const baseHero =
@@ -73,7 +73,7 @@ export default function InstallPWAButton({
             initial={{ opacity: 0, y: 12, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.96 }}
-            transition={{ type: "spring", stiffness: 380, damping: 28, delay: 0.15 }}
+            transition={{ type: "spring", stiffness: 380, damping: 28, delay: 0.1 }}
             className="w-full sm:w-auto"
           >
             <motion.button
@@ -96,6 +96,10 @@ export default function InstallPWAButton({
       </AnimatePresence>
 
       <IOSInstallGuideModal isOpen={iosOpen} onClose={() => setIosOpen(false)} />
+      <DesktopInstallGuideModal
+        isOpen={desktopOpen}
+        onClose={() => setDesktopOpen(false)}
+      />
     </>
   );
 }

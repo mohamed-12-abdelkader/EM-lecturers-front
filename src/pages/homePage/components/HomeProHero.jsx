@@ -1,110 +1,222 @@
-import { FaArrowLeft, FaQrcode, FaUser, FaPlay } from "react-icons/fa";
+import { FaArrowLeft, FaQrcode, FaUser, FaIdCard, FaBookOpen } from "react-icons/fa";
 import { MdSchedule } from "react-icons/md";
+import { motion, useReducedMotion } from "framer-motion";
 import InstallPWAButton from "../../../components/pwa/InstallPWAButton";
+
+const EASE = [0.22, 1, 0.36, 1];
 
 export default function HomeProHero({
   studentName,
   studentId,
   teacherName,
   teacherAvatar,
+  enrolledCount = 0,
   onStartLearning,
   onContinue,
   onActivateWithQr,
 }) {
+  const reduceMotion = useReducedMotion();
   const displayId = studentId != null && studentId !== "" ? String(studentId) : null;
   const firstName = (studentName || "عزيزي الطالب").split(" ")[0];
+  const fullName = studentName || "عزيزي الطالب";
 
   return (
-    <section className="relative overflow-hidden" dir="rtl">
-      <div className="absolute inset-0 bg-gradient-to-bl from-[#1D4ED8] via-[#2563EB] to-[#0EA5E9]" />
-      <div className="pointer-events-none absolute -left-16 -top-20 h-64 w-64 rounded-full bg-white/15 blur-2xl" />
-      <div className="pointer-events-none absolute -bottom-24 -right-10 h-72 w-72 rounded-full bg-orange-400/25 blur-2xl" />
-      <div
-        className="pointer-events-none absolute inset-0 opacity-30"
-        style={{
-          backgroundImage: "radial-gradient(rgba(255,255,255,0.22) 1px, transparent 1px)",
-          backgroundSize: "22px 22px",
-        }}
-      />
+    <section className="relative z-0 px-4 pt-4 md:px-6 md:pt-6 lg:px-8" dir="rtl">
+      <div className="relative mx-auto w-full max-w-7xl overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-[0_20px_50px_-28px_rgba(15,23,42,0.35)] dark:border-slate-700 dark:bg-slate-900">
+        {/* Top brand bar */}
+        <div className="h-1.5 w-full bg-gradient-to-l from-blue-500 via-blue-500 to-orange-500" />
 
-      <div className="relative mx-auto w-full max-w-7xl px-4 py-8 md:px-6 md:py-10 lg:px-8">
-        <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between lg:gap-12">
-          <div className="min-w-0 flex-1">
+        {/* Soft atmosphere — not a flat fill */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-100"
+          aria-hidden
+          style={{
+            background:
+              "radial-gradient(ellipse 80% 70% at 100% 0%, rgba(49,130,206,0.12), transparent 55%), radial-gradient(ellipse 60% 50% at 0% 100%, rgba(221,107,32,0.09), transparent 50%)",
+          }}
+        />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.4] dark:opacity-[0.15]"
+          aria-hidden
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(148,163,184,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.12) 1px, transparent 1px)",
+            backgroundSize: "28px 28px",
+            maskImage: "linear-gradient(to bottom, black 0%, transparent 85%)",
+          }}
+        />
+
+        <div className="relative grid gap-6 p-5 sm:p-6 md:gap-8 md:p-8 lg:grid-cols-[1.35fr_0.85fr] lg:items-center">
+          {/* ── Left: welcome ── */}
+          <motion.div
+            initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: EASE }}
+            className="min-w-0"
+          >
             {teacherName ? (
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/15 px-3 py-1.5 backdrop-blur-sm">
+              <div className="mb-4 inline-flex max-w-full items-center gap-2.5 rounded-full border border-slate-200 bg-slate-50/90 py-1 pe-3.5 ps-1 dark:border-slate-600 dark:bg-slate-800/80">
                 {teacherAvatar ? (
                   <img
                     src={teacherAvatar}
                     alt=""
-                    className="h-7 w-7 rounded-full object-cover ring-2 ring-white/40"
+                    className="h-8 w-8 rounded-full object-cover ring-2 ring-white dark:ring-slate-700"
                   />
                 ) : (
-                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-white">
-                    <FaUser className="text-[10px]" />
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-500 text-white">
+                    <FaUser className="text-[11px]" />
                   </span>
                 )}
-                <span className="text-xs font-bold text-white/95">منصة مستر {teacherName}</span>
+                <span className="truncate text-xs font-bold text-slate-700 dark:text-slate-200 md:text-sm">
+                  منصة مستر {teacherName}
+                </span>
+              </div>
+            ) : (
+              <span className="mb-4 inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-600 dark:bg-blue-950/50 dark:text-blue-300">
+                مساحة الطالب
+              </span>
+            )}
+
+            <p className="text-xs font-semibold text-blue-500 dark:text-blue-400 md:text-sm">
+              مرحباً بعودتك
+            </p>
+
+            <h1 className="mt-1.5 font-heading text-3xl font-black leading-[1.2] tracking-tight text-slate-900 dark:text-white md:text-4xl lg:text-[2.6rem]">
+              أهلاً،{" "}
+              <span className="bg-gradient-to-l from-orange-500 to-orange-400 bg-clip-text text-transparent">
+                {firstName}
+              </span>
+            </h1>
+
+            <p className="mt-3 max-w-xl text-sm leading-7 text-slate-500 dark:text-slate-400 md:text-[15px] md:leading-8">
+              جاهز تكمل رحلتك التعليمية؟ كورساتك ومحاضراتك في مكان واحد بتجربة أوضح وأسرع.
+            </p>
+
+            {Number(enrolledCount) > 0 ? (
+              <div className="mt-4 inline-flex items-center gap-2 rounded-xl border border-emerald-200/80 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+                <FaBookOpen className="text-[11px]" />
+                مشترك في {enrolledCount} كورس
               </div>
             ) : null}
 
-            <p className="mb-2 text-sm font-semibold text-blue-100">مرحباً بعودتك</p>
-            <h1 className="font-heading text-3xl font-black leading-tight tracking-tight text-white md:text-4xl lg:text-[2.75rem]">
-              أهلاً، <span className="text-orange-200">{firstName}</span>
-            </h1>
-            <p className="mt-3 max-w-xl text-sm leading-7 text-blue-50/90 md:text-base">
-              تابع كورساتك، أكمل محاضراتك، وفعّل المحتوى الجديد من مكان واحد بتجربة أوضح وأسرع.
-            </p>
-
-            <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
-              <button
+            {/* Actions */}
+            <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center">
+              <motion.button
                 type="button"
                 onClick={onStartLearning}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-orange-500/30 transition hover:bg-orange-600 sm:w-auto"
+                whileHover={reduceMotion ? undefined : { y: -1 }}
+                whileTap={{ scale: 0.98 }}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-orange-500/25 transition hover:bg-orange-600 sm:w-auto"
               >
                 ابدأ التعلم
                 <FaArrowLeft className="text-[10px]" />
-              </button>
-              <button
+              </motion.button>
+
+              <motion.button
                 type="button"
                 onClick={onContinue}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/35 bg-white/10 px-5 py-3 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-white/20 sm:w-auto"
+                whileHover={reduceMotion ? undefined : { y: -1 }}
+                whileTap={{ scale: 0.98 }}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-5 py-3 text-sm font-bold text-blue-600 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/70 sm:w-auto"
               >
                 <MdSchedule className="text-base" />
                 أكمل من حيث توقفت
-              </button>
+              </motion.button>
+
               {onActivateWithQr ? (
-                <button
+                <motion.button
                   type="button"
                   onClick={onActivateWithQr}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-blue-700 shadow-sm transition hover:bg-blue-50 sm:w-auto"
+                  whileHover={reduceMotion ? undefined : { y: -1 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm transition hover:border-orange-300 hover:text-orange-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 sm:w-auto"
                 >
-                  <FaQrcode className="text-base" />
-                  تفعيل بالـ QR
-                </button>
+                  <FaQrcode className="text-sm text-orange-500" />
+                  تفعيل QR
+                </motion.button>
               ) : null}
-              {/* PWA: يظهر فقط إذا كان التثبيت متاحاً وغير مثبت */}
-              <InstallPWAButton label="تثبيت التطبيق" variant="hero" />
-            </div>
-          </div>
 
-          <div className="w-full shrink-0 lg:w-[260px]">
-            <div className="rounded-2xl border border-white/30 bg-white/15 p-5 text-center shadow-xl backdrop-blur-md">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 text-white">
-                <FaPlay className="text-sm" />
-              </div>
-              <p className="text-xs font-semibold text-blue-100">كود الطالب</p>
-              {displayId ? (
-                <p className="mt-1 font-heading text-4xl font-black tabular-nums tracking-wide text-white">
-                  {displayId}
-                </p>
-              ) : (
-                <p className="mt-2 text-xs text-blue-100/80">غير متوفر حالياً</p>
-              )}
-              <p className="mt-2 text-[11px] leading-5 text-blue-50/75">
-                استخدمه عند التفعيل أو الدعم الفني
-              </p>
+              <InstallPWAButton
+                label="تثبيت التطبيق"
+                variant="solid"
+                className="!shadow-md !shadow-blue-500/20"
+              />
             </div>
-          </div>
+          </motion.div>
+
+          {/* ── Right: student ID card ── */}
+          <motion.div
+            initial={reduceMotion ? false : { opacity: 0, y: 20, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.55, delay: 0.06, ease: EASE }}
+            className="w-full justify-self-stretch lg:max-w-sm lg:justify-self-end"
+          >
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-blue-500 to-blue-700 p-[1px] shadow-[0_18px_40px_-16px_rgba(49,130,206,0.55)]">
+              <div className="relative overflow-hidden rounded-[15px] bg-gradient-to-br from-blue-600 via-blue-500 to-[#1a5fad] p-5 text-white sm:p-6">
+                {/* Decorative shapes */}
+                <div
+                  className="pointer-events-none absolute -left-10 -top-10 h-36 w-36 rounded-full bg-orange-400/25 blur-2xl"
+                  aria-hidden
+                />
+                <div
+                  className="pointer-events-none absolute -bottom-12 -right-8 h-40 w-40 rounded-full bg-sky-300/20 blur-2xl"
+                  aria-hidden
+                />
+                <div
+                  className="pointer-events-none absolute inset-0 opacity-20"
+                  aria-hidden
+                  style={{
+                    backgroundImage:
+                      "radial-gradient(circle at 1px 1px, white 1px, transparent 0)",
+                    backgroundSize: "14px 14px",
+                  }}
+                />
+
+                <div className="relative flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/30 backdrop-blur-sm">
+                      <FaIdCard className="text-base" />
+                    </span>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-blue-100">
+                        Student ID
+                      </p>
+                      <p className="text-xs font-bold text-white/95">بطاقة الطالب</p>
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-orange-500 px-2.5 py-1 text-[10px] font-black text-white shadow-sm shadow-orange-600/30">
+                    ACTIVE
+                  </span>
+                </div>
+
+                <div className="relative mt-6">
+                  <p className="text-[11px] font-semibold text-blue-100">كود الحضور / التفعيل</p>
+                  {displayId ? (
+                    <p className="mt-1 font-heading text-5xl font-black tabular-nums tracking-wide text-white sm:text-[3.25rem]">
+                      {displayId}
+                    </p>
+                  ) : (
+                    <p className="mt-2 text-sm text-blue-100/80">غير متوفر حالياً</p>
+                  )}
+                </div>
+
+                <div className="relative mt-5 flex items-center justify-between gap-3 border-t border-white/20 pt-4">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-semibold text-blue-100">الاسم</p>
+                    <p className="truncate text-sm font-bold text-white">{fullName}</p>
+                  </div>
+                  {teacherName ? (
+                    <div className="min-w-0 text-left">
+                      <p className="text-[10px] font-semibold text-blue-100">المنصة</p>
+                      <p className="truncate text-sm font-bold text-orange-200">
+                        مستر {teacherName}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </motion.div>
         </div>
       </div>
     </section>

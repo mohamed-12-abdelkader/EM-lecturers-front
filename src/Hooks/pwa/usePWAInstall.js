@@ -1,10 +1,8 @@
 /**
  * usePWAInstall — reusable hook for Progressive Web App install flows.
  *
- * Handles:
- * - Chromium `beforeinstallprompt` (Android / Chrome / Edge)
- * - iOS Safari "Add to Home Screen" guidance (no native prompt API)
- * - Hiding the CTA when already installed (standalone / iOS standalone)
+ * Shows the install CTA whenever the app is NOT already running as installed PWA.
+ * Native prompt is used when available; otherwise a guide modal is shown.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -34,7 +32,7 @@ export function isIosDevice() {
   return iOS || iPadOs;
 }
 
-/** Safari on iOS (excludes Chrome/Firefox/CriOS on iOS where A2HS differs) */
+/** Safari on iOS */
 export function isIosSafari() {
   if (!isIosDevice()) return false;
   const ua = navigator.userAgent || "";
@@ -45,7 +43,6 @@ export function isIosSafari() {
 
 /**
  * Ensure the site service worker is registered (required for installability).
- * Safe to call multiple times — browsers dedupe by script URL.
  */
 export async function ensurePwaServiceWorker() {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
@@ -66,9 +63,8 @@ export default function usePWAInstall() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [isInstalled, setIsInstalled] = useState(() => {
     if (typeof window === "undefined") return false;
-    return (
-      isRunningStandalone() || localStorage.getItem(INSTALLED_KEY) === "1"
-    );
+    // Only trust live standalone mode — localStorage alone used to hide the button forever
+    return isRunningStandalone();
   });
   const [isIos, setIsIos] = useState(false);
   const [canInstallNative, setCanInstallNative] = useState(false);
@@ -85,11 +81,10 @@ export default function usePWAInstall() {
       try {
         localStorage.setItem(INSTALLED_KEY, "1");
       } catch {
-        // ignore quota / private mode
+        // ignore
       }
     };
 
-    // Hydration-safe: detect platform after mount
     const ios = isIosDevice();
     setIsIos(ios);
 
@@ -101,10 +96,18 @@ export default function usePWAInstall() {
       };
     }
 
+    // Clear stale flag from older sessions that hid the button incorrectly
+    try {
+      if (localStorage.getItem(INSTALLED_KEY) === "1" && !isRunningStandalone()) {
+        localStorage.removeItem(INSTALLED_KEY);
+      }
+    } catch {
+      // ignore
+    }
+
     ensurePwaServiceWorker();
 
     const onBeforeInstallPrompt = (event) => {
-      // Prevent the mini-infobar; we show our own CTA
       event.preventDefault();
       if (cancelled) return;
       setDeferredPrompt(event);
@@ -118,7 +121,6 @@ export default function usePWAInstall() {
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
     window.addEventListener("appinstalled", onAppInstalled);
 
-    // Listen for display-mode changes (user installed mid-session)
     const media = window.matchMedia?.("(display-mode: standalone)");
     const onDisplayModeChange = (e) => {
       if (e.matches) markInstalled();
@@ -136,7 +138,6 @@ export default function usePWAInstall() {
   }, []);
 
   /**
-   * Trigger the native install prompt when available.
    * @returns {"accepted"|"dismissed"|"unavailable"|"error"}
    */
   const promptInstall = useCallback(async () => {
@@ -165,18 +166,15 @@ export default function usePWAInstall() {
     }
   }, [deferredPrompt]);
 
-  /** Show install CTA: native prompt ready, or iOS guidance needed */
-  const canShowInstallButton =
-    isReady &&
-    !isInstalled &&
-    (canInstallNative || (isIos && !isRunningStandalone()));
+  /**
+   * Always show the button in the browser tab when not already running as PWA.
+   * Native prompt / guide modal is decided on click.
+   */
+  const canShowInstallButton = isReady && !isInstalled && !isRunningStandalone();
 
   return {
-    /** Whether the custom install button should render */
     canShowInstallButton,
-    /** Chromium deferred prompt is available */
     canInstallNative,
-    /** Running on iOS — use Add to Home Screen modal instead */
     isIos,
     isInstalled,
     isReady,

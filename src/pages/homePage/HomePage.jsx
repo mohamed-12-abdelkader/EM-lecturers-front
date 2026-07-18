@@ -971,18 +971,22 @@ const HomePage = () => {
           studentId={studentId}
           teacherName={teacherDisplayName}
           teacherAvatar={teacherAvatar}
+          enrolledCount={enrolledCount}
           onStartLearning={() => navigate("/my-courses")}
           onContinue={() => navigate("/lectures_taple")}
           onActivateWithQr={() => setIsQrScannerOpen(true)}
         />
 
-        <HomeProStats
-          enrolledCount={enrolledCount}
-          coursesCount={availableCourses.length}
-          availableToJoin={availableToJoin}
-        />
+        {/* الإحصائيات والاختصارات: تظهر من التابلت فأعلى فقط */}
+        <Box display={{ base: "none", md: "block" }}>
+          <HomeProStats
+            enrolledCount={enrolledCount}
+            coursesCount={availableCourses.length}
+            availableToJoin={availableToJoin}
+          />
 
-        <HomeProQuickActions onActivateWithQr={() => setIsQrScannerOpen(true)} />
+          <HomeProQuickActions onActivateWithQr={() => setIsQrScannerOpen(true)} />
+        </Box>
 
         {/* My Courses */}
         <Box px={{ base: 4, md: 6 }} maxW="7xl" w="full" mx="auto">
