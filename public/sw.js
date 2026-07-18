@@ -1,9 +1,28 @@
 /* eslint-disable no-restricted-globals */
 /**
- * Web Push Service Worker — handles background notifications and click navigation.
+ * Service Worker — PWA installability + Web Push.
+ * A fetch handler is required for Chrome's installability criteria.
  */
 
-const DEFAULT_ICON = "/next%20logo.png";
+const DEFAULT_ICON = "/pwa-icon-192.png";
+
+/** Activate immediately so the SW controls the page without a second refresh */
+self.addEventListener("install", (event) => {
+  self.skipWaiting();
+  event.waitUntil(Promise.resolve());
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+/**
+ * Network passthrough — required for Chrome installability.
+ * Does not intercept caching aggressively (push SW stays simple).
+ */
+self.addEventListener("fetch", (event) => {
+  event.respondWith(fetch(event.request));
+});
 
 function parsePushPayload(event) {
   if (!event.data) return {};

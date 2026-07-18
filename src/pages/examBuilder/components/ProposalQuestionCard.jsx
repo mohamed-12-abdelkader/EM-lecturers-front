@@ -4,6 +4,7 @@ import {
   Flex,
   Text,
   Badge,
+  Button,
   HStack,
   Image,
   SimpleGrid,
@@ -22,7 +23,14 @@ import {
 } from "../examBuilderUtils";
 import { ACCENT } from "../examBuilderTheme";
 
-export default function ProposalQuestionCard({ item, index }) {
+export default function ProposalQuestionCard({
+  item,
+  index,
+  canAdjust = false,
+  adjusting = false,
+  onRemove,
+  onReplace,
+}) {
   const border = useColorModeValue("gray.200", "gray.700");
   const bg = useColorModeValue("white", "gray.800");
   const metaColor = useColorModeValue("gray.500", "gray.400");
@@ -85,7 +93,7 @@ export default function ProposalQuestionCard({ item, index }) {
             )}
           </Box>
         </HStack>
-        <HStack spacing={1.5} flexShrink={0}>
+        <HStack spacing={1.5} flexShrink={0} flexWrap="wrap" justify="flex-end">
           <Badge variant="subtle" colorScheme="blue" fontSize="10px" borderRadius="md">
             {QUESTION_TYPE_LABELS[item.question_type] || item.question_type || "—"}
           </Badge>
@@ -93,6 +101,29 @@ export default function ProposalQuestionCard({ item, index }) {
             <Badge variant="outline" fontSize="10px" borderRadius="md">
               {DIFFICULTY_LABELS[item.difficulty_level] || item.difficulty_level}
             </Badge>
+          )}
+          {canAdjust && (
+            <>
+              <Button
+                size="xs"
+                variant="outline"
+                borderRadius="md"
+                onClick={() => onReplace?.(item, index)}
+                isLoading={adjusting}
+              >
+                استبدال
+              </Button>
+              <Button
+                size="xs"
+                variant="ghost"
+                colorScheme="red"
+                borderRadius="md"
+                onClick={() => onRemove?.(item, index)}
+                isLoading={adjusting}
+              >
+                حذف
+              </Button>
+            </>
           )}
         </HStack>
       </Flex>

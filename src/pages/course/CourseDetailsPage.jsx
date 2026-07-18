@@ -18,11 +18,6 @@ import {
   Avatar,
   Link as ChakraLink,
   IconButton,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
   Fade, // For smooth transitions
   Spinner,
   Center,
@@ -112,20 +107,17 @@ import {
   FaFilm, // For no data component
   FaCog, // For settings
   FaBroadcastTower,
-  FaRobot,
 } from "react-icons/fa";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import baseUrl from "../../api/baseUrl";
 import UserType from "../../Hooks/auth/userType";
 import { useParams, useNavigate } from "react-router-dom";
 import CourseHeroSection from "./components/CourseHeroSection";
-import CourseProTabBar, { CourseProTab } from "./components/CourseProTabBar";
+import CourseContentNav, { SectionPanelHeader } from "./components/CourseContentNav";
 import { crContainer } from "./courseTheme";
 import LectureCard from "./components/LectureCard";
 import LecturesTab from "./components/LecturesTab";
 import CourseExamsTab from "./components/CourseExamsTab";
-import ScientificChatTab from "./components/ScientificChatTab";
-import ScientificChatStudent from "./components/ScientificChatStudent";
 import VideoPlayer from "./components/VideoPlayer";
 import dayjs from "dayjs";
 import jsPDF from "jspdf";
@@ -626,7 +618,8 @@ const CourseDetailsPage = () => {
   const [courseExams, setCourseExams] = useState([]);
   const [courseExamsLoading, setCourseExamsLoading] = useState(false);
   const [courseExamsError, setCourseExamsError] = useState(null);
-  const [tabIndex, setTabIndex] = useState(0);
+  // القسم النشط في محتوى الكورس (محاضرات / بث مباشر / امتحانات / مساعد علمي)
+  const [activeSection, setActiveSection] = useState("lectures");
 
   // جلسات البث المباشر للكورس — لظهور أيقونة "بث شغال" على تاب المحاضرات المباشرة
   const { data: courseStreamsData } = useQuery({
@@ -644,6 +637,13 @@ const CourseDetailsPage = () => {
   const hasActiveLiveStream = (courseStreamsData?.meetings || []).some(
     (m) => m.status === "started",
   );
+
+  // لو بدأ بث مباشر، انتقل تلقائيًا لقسم البث
+  useEffect(() => {
+    if (hasActiveLiveStream) {
+      setActiveSection("live");
+    }
+  }, [hasActiveLiveStream]);
 
   // تفاصيل الكورس مع كاش — الرجوع لنفس الكورس لا يعيد التحميل من الصفر
   const {
@@ -3072,6 +3072,37 @@ display:block;
   const { course, lectures } = courseData;
   const mockCompletionPercent = 62;
 
+  // أقسام محتوى الكورس — قائمة التنقل الجانبية
+  const courseContentSections = [
+    {
+      id: "lectures",
+      label: "المحاضرات",
+      desc: "الفيديوهات والملفات والواجبات",
+      icon: FaPlayCircle,
+      colorKey: "blue",
+      count: lectures?.length || 0,
+    },
+    {
+      id: "live",
+      label: "المحاضرات المباشرة",
+      desc: hasActiveLiveStream ? "فيه بث شغال دلوقتي!" : "جلسات البث المباشر",
+      icon: hasActiveLiveStream ? FaBroadcastTower : FaVideo,
+      colorKey: hasActiveLiveStream ? "red" : "green",
+      live: hasActiveLiveStream,
+    },
+    {
+      id: "exams",
+      label: "الامتحانات",
+      desc: "الامتحانات الشاملة للكورس",
+      icon: FaListOl,
+      colorKey: "orange",
+      count: courseExams?.length || 0,
+    },
+  ];
+  const activeSectionMeta = courseContentSections.find(
+    (s) => s.id === activeSection,
+  );
+
   return (
     <Box minH="100vh" bg={pageBg} dir="rtl" overflowX="hidden">
       {/* Hero Section - Full Width Image with Overlay */}
@@ -3788,168 +3819,97 @@ display:block;
           minW={0}
           overflowX="hidden"
         >
-          <Tabs
-            index={tabIndex}
-            onChange={setTabIndex}
-            variant="unstyled"
-            size={{ base: "sm", md: "md" }}
-          >
-            <CourseProTabBar>
-              {hasActiveLiveStream && (
-                <CourseProTab colorKey="red">
-                  <Icon as={FaBroadcastTower} fontSize="lg" animation="pulse 1.5s ease-in-out infinite" />
-                  المحاضرات المباشرة
-                  <Badge colorScheme="red" variant="solid" borderRadius="full" px={2} animation="pulse 1.5s ease-in-out infinite">
-                    مباشر الآن
-                  </Badge>
-                </CourseProTab>
-              )}
-              <CourseProTab colorKey="blue">
-                <Icon as={FaPlayCircle} fontSize="lg" />
-                المحاضرات
-              </CourseProTab>
-              {!hasActiveLiveStream && (
-                <CourseProTab colorKey="green">
-                  <Icon as={FaVideo} fontSize="lg" />
-                  المحاضرات المباشرة
-                </CourseProTab>
-              )}
-              <CourseProTab colorKey="purple">
-                <Icon as={FaRobot} fontSize="lg" />
-                المساعد العلمي
-              </CourseProTab>
-              <CourseProTab colorKey="orange">
-                <Icon as={FaListOl} fontSize="lg" />
-                الامتحانات
-              </CourseProTab>
-            </CourseProTabBar>
+          <VStack spacing={{ base: 3, md: 5 }} align="stretch" w="full">
+            {/* شريط أقسام المحتوى — أعلى الصفحة */}
+            <CourseContentNav
+              sections={courseContentSections}
+              activeId={activeSection}
+              onChange={setActiveSection}
+            />
 
-              <TabPanels p={0}>
-                {hasActiveLiveStream && (
-                  <TabPanel px={{ base: 2, sm: 4, md: 6, lg: 8 }} py={4}>
-                    <Box
-                      bg={sectionBg}
-                      borderRadius="xl"
-                      borderWidth="1px"
-                      borderColor={
-                        hasActiveLiveStream ? "red.300" : borderColor
-                      }
-                      boxShadow={
-                        hasActiveLiveStream
-                          ? "0 0 15px rgba(229, 62, 62, 0.15)"
-                          : "none"
-                      }
-                      p={4}
-                      minH="280px"
-                    >
-                      {isAdmin || isTeacher ? (
-                        <CourseStreams courseId={id} />
-                      ) : (
-                        <StudentStreamsList courseId={id} />
-                      )}
-                    </Box>
-                  </TabPanel>
-                )}
-                <TabPanel px={0} py={4}>
-                  <Box
-                    className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900 md:p-6"
-                    minH="280px"
-                  >
-                    <LecturesTab
-                      lectures={lectures}
-                      isTeacher={isTeacher}
-                      isAdmin={isAdmin}
-                      expandedLecture={expandedLecture}
-                      setExpandedLecture={setExpandedLecture}
-                      handleAddLecture={handleAddLecture}
-                      handleEditLecture={handleEditLecture}
-                      handleDeleteLecture={handleDeleteLecture}
-                      handleAddVideo={handleAddVideo}
-                      handleEditVideo={handleEditVideo}
-                      handleDeleteVideo={handleDeleteVideo}
-                      handleAddFile={handleAddFile}
-                      handleEditFile={handleEditFile}
-                      handleDeleteFile={handleDeleteFile}
-                      setExamModal={setExamModal}
-                      setDeleteExamDialog={setDeleteExamDialog}
-                      examActionLoading={actionLoading}
-                      itemBg={itemBg}
-                      sectionBg={sectionBg}
-                      headingColor={headingColor}
-                      subTextColor={subTextColor}
-                      borderColor={borderColor}
-                      dividerColor={dividerColor}
-                      textColor={textColor}
-                      formatDate={formatDate}
-                      onAddBulkQuestions={handleOpenBulkQuestionsModal}
-                      handleOpenVideo={handleOpenVideo}
-                    />
-                  </Box>
-                </TabPanel>
-                {!hasActiveLiveStream && (
-                  <TabPanel px={{ base: 2, sm: 4, md: 6, lg: 8 }} py={4}>
-                    <Box
-                      bg={sectionBg}
-                      borderRadius="xl"
-                      borderWidth="1px"
-                      borderColor={borderColor}
-                      p={4}
-                      minH="280px"
-                    >
-                      {isAdmin || isTeacher ? (
-                        <CourseStreams courseId={id} />
-                      ) : (
-                        <StudentStreamsList courseId={id} />
-                      )}
-                    </Box>
-                  </TabPanel>
-                )}
-                {/* Tab Panel للدعم العلمي — يعرض الدعم العلمي فقط */}
-                <TabPanel px={{ base: 2, sm: 4, md: 6, lg: 8 }} py={4}>
-                  <Box
-                    bg={sectionBg}
-                    borderRadius="xl"
-                    borderWidth="1px"
-                    borderColor={borderColor}
-                    p={4}
-                    minH="280px"
-                  >
-                    {isAdmin || isTeacher ? (
-                      <ScientificChatTab courseId={id} token={token} />
-                    ) : (
-                      <ScientificChatStudent courseId={id} token={token} />
-                    )}
-                  </Box>
-                </TabPanel>
+            {/* منطقة المحتوى */}
+            <Box
+              w="full"
+              minW={0}
+              bg={sectionBg}
+              borderRadius="2xl"
+              borderWidth="1px"
+              borderColor={
+                activeSectionMeta?.live ? "red.300" : borderColor
+              }
+              boxShadow={
+                activeSectionMeta?.live
+                  ? "0 0 20px rgba(229, 62, 62, 0.15)"
+                  : "0 1px 3px rgba(15,23,42,0.05)"
+              }
+              p={{ base: 3.5, md: 6 }}
+              minH="420px"
+            >
+              {activeSectionMeta && activeSection === "live" ? (
+                <SectionPanelHeader section={activeSectionMeta} />
+              ) : null}
 
-                {/* Tab Panel للامتحانات — يعرض الامتحانات فقط */}
-                <TabPanel px={{ base: 2, sm: 4, md: 6, lg: 8 }} py={4}>
-                  <Box
-                    bg={sectionBg}
-                    borderRadius="xl"
-                    borderWidth="1px"
-                    borderColor={borderColor}
-                    p={4}
-                    minH="280px"
-                  >
-                    <CourseExamsTab
-                      courseExams={courseExams}
-                      courseExamsLoading={courseExamsLoading}
-                      courseExamsError={courseExamsError}
-                      headingColor={headingColor}
-                      sectionBg={sectionBg}
-                      dividerColor={dividerColor}
-                      formatDate={formatDate}
-                      isTeacher={isTeacher}
-                      token={token}
-                      courseId={id}
-                      refreshExams={refreshExams}
-                      onAddBulkQuestions={handleOpenBulkQuestionsModal}
-                    />
-                  </Box>
-                </TabPanel>
-              </TabPanels>
-            </Tabs>
+              {activeSection === "live" && (
+                <>
+                  {isAdmin || isTeacher ? (
+                    <CourseStreams courseId={id} />
+                  ) : (
+                    <StudentStreamsList courseId={id} />
+                  )}
+                </>
+              )}
+
+              {activeSection === "lectures" && (
+                <LecturesTab
+                  lectures={lectures}
+                  isTeacher={isTeacher}
+                  isAdmin={isAdmin}
+                  expandedLecture={expandedLecture}
+                  setExpandedLecture={setExpandedLecture}
+                  handleAddLecture={handleAddLecture}
+                  handleEditLecture={handleEditLecture}
+                  handleDeleteLecture={handleDeleteLecture}
+                  handleAddVideo={handleAddVideo}
+                  handleEditVideo={handleEditVideo}
+                  handleDeleteVideo={handleDeleteVideo}
+                  handleAddFile={handleAddFile}
+                  handleEditFile={handleEditFile}
+                  handleDeleteFile={handleDeleteFile}
+                  setExamModal={setExamModal}
+                  setDeleteExamDialog={setDeleteExamDialog}
+                  examActionLoading={actionLoading}
+                  itemBg={itemBg}
+                  sectionBg={sectionBg}
+                  headingColor={headingColor}
+                  subTextColor={subTextColor}
+                  borderColor={borderColor}
+                  dividerColor={dividerColor}
+                  textColor={textColor}
+                  formatDate={formatDate}
+                  onAddBulkQuestions={handleOpenBulkQuestionsModal}
+                  handleOpenVideo={handleOpenVideo}
+                />
+              )}
+
+              {activeSection === "exams" && (
+                <CourseExamsTab
+                  courseExams={courseExams}
+                  courseExamsLoading={courseExamsLoading}
+                  courseExamsError={courseExamsError}
+                  headingColor={headingColor}
+                  sectionBg={sectionBg}
+                  dividerColor={dividerColor}
+                  formatDate={formatDate}
+                  isTeacher={isTeacher}
+                  token={token}
+                  courseId={id}
+                  refreshExams={refreshExams}
+                  onAddBulkQuestions={handleOpenBulkQuestionsModal}
+                />
+              )}
+
+            </Box>
+          </VStack>
         </MotionBox>
       </Box>
 

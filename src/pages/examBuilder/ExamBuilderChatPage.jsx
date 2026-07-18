@@ -38,13 +38,14 @@ import { FaFilePdf } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import UserType from "../../Hooks/auth/userType";
-import {
+  import {
   fetchExamBuilderInfo,
   fetchExamBuilderCatalog,
   fetchExamBuilderHistory,
   fetchExamBuilderSession,
   sendExamBuilderChat,
   regenerateExamBuilderSession,
+  adjustExamBuilderSession,
   approveExamBuilderSession,
   normalizeChatResponse,
   mapHistoryItemToSession,
@@ -201,11 +202,16 @@ export default function ExamBuilderChatPage() {
   const [proposalQuestions, setProposalQuestions] = useState([]);
   const [sessionReply, setSessionReply] = useState("");
   const [chatError, setChatError] = useState("");
-  const [actions, setActions] = useState({ can_approve: false, can_regenerate: false });
+  const [actions, setActions] = useState({
+    can_approve: false,
+    can_regenerate: false,
+    can_adjust: false,
+  });
   const [proposalReadOnly, setProposalReadOnly] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [thinking, setThinking] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const [adjusting, setAdjusting] = useState(false);
   const [approving, setApproving] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
 
@@ -293,7 +299,7 @@ export default function ExamBuilderChatPage() {
     setSession(nextSession);
     setProposalQuestions(questions);
     setSessionReply(reply || "");
-    setActions(nextActions || { can_approve: false, can_regenerate: false });
+    setActions(nextActions || { can_approve: false, can_regenerate: false, can_adjust: false });
     setProposalReadOnly(!!readOnly);
     setActiveSessionId(nextSession?.id ?? null);
     if (requestText !== undefined) setCurrentRequest(requestText);
@@ -304,7 +310,7 @@ export default function ExamBuilderChatPage() {
     setProposalQuestions([]);
     setSessionReply("");
     setChatError("");
-    setActions({ can_approve: false, can_regenerate: false });
+    setActions({ can_approve: false, can_regenerate: false, can_adjust: false });
     setProposalReadOnly(false);
     setActiveSessionId(null);
   };
@@ -361,14 +367,24 @@ export default function ExamBuilderChatPage() {
     const trimmed = String(text).trim();
     if (!trimmed) return;
 
+    const isAdjustFollowUp =
+      session?.status === "proposed" &&
+      /(شيل|احذف|حذف|استبدل|بدّل|بدل|غير|غيّر|ازل|أزل)/i.test(trimmed) &&
+      /(سؤال|أسئلة|اسئلة|question)/i.test(trimmed);
+
     setCurrentRequest(trimmed);
     setSessionReply("");
     setChatError("");
-    clearProposal();
+    if (!isAdjustFollowUp) {
+      clearProposal();
+    }
     setThinking(true);
 
     try {
-      const data = await sendExamBuilderChat(trimmed);
+      const data = await sendExamBuilderChat(
+        trimmed,
+        isAdjustFollowUp ? session?.id : undefined,
+      );
       applyChatResponse(data, trimmed);
 
       if (data.status === "message_only" && !data.session) {
@@ -414,6 +430,36 @@ export default function ExamBuilderChatPage() {
       });
     } finally {
       setRegenerating(false);
+    }
+  };
+
+  const handleAdjustQuestion = async (mode, item) => {
+    if (!session?.id || !item?.id) return;
+    setAdjusting(true);
+    try {
+      const payload =
+        mode === "replace"
+          ? { replace_ids: [item.id] }
+          : { remove_ids: [item.id] };
+      const data = await adjustExamBuilderSession(session.id, payload);
+      applyChatResponse(data, currentRequest);
+      toast({
+        title: mode === "replace" ? "تم استبدال السؤال" : "تم حذف السؤال",
+        status: "success",
+        duration: 2200,
+      });
+    } catch (err) {
+      const message = apiErrorMessage(err, "فشل تعديل السؤال");
+      setChatError(message);
+      toast({
+        title: "فشل التعديل",
+        description: message,
+        status: "error",
+        duration: 8000,
+        isClosable: true,
+      });
+    } finally {
+      setAdjusting(false);
     }
   };
 
@@ -488,7 +534,7 @@ export default function ExamBuilderChatPage() {
         session: approvedSession,
         questions: resolveProposalQuestions(data),
         reply: sessionReply,
-        actions: { can_approve: false, can_regenerate: false },
+        actions: { can_approve: false, can_regenerate: false, can_adjust: false },
         readOnly: true,
         requestText: currentRequest,
       });
@@ -604,8 +650,11 @@ export default function ExamBuilderChatPage() {
                 onApprove={approveDisclosure.onOpen}
                 onOpenExam={handleOpenExam}
                 onExportPdf={handleExportPdfClick}
+                onRemoveQuestion={(item) => handleAdjustQuestion("remove", item)}
+                onReplaceQuestion={(item) => handleAdjustQuestion("replace", item)}
                 exportingPdf={exportingPdf}
                 regenerating={regenerating}
+                adjusting={adjusting}
                 approving={approving}
                 readOnly={proposalReadOnly}
                 hideReply

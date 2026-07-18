@@ -77,6 +77,7 @@ import baseUrl from "../../api/baseUrl";
 import ScrollToTop from "../../components/scollToTop/ScrollToTop";
 import TeacherSubscriptionExpiryAlert from "../../components/teacher/TeacherSubscriptionExpiryAlert";
 import { useTeacherSubscriptionExpiryAlert } from "../../Hooks/useTeacherSubscriptionExpiryAlert";
+import InstallPWAButton from "../../components/pwa/InstallPWAButton";
 
 function KpiCard({ icon, label, value, accent = "blue" }) {
   const bg = useColorModeValue("white", "gray.800");
@@ -950,6 +951,11 @@ const TeacherDashboardHome = () => {
                 >
                   تحديث
                 </Button>
+                <InstallPWAButton
+                  label="تثبيت التطبيق"
+                  variant="solid"
+                  className="!w-auto !py-2 !px-4 !text-xs !rounded-lg flex-[1] sm:flex-initial"
+                />
               </HStack>
             </Flex>
           </Box>

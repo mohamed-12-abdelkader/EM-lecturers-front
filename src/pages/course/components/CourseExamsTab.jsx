@@ -128,6 +128,286 @@ const getExamDurationStatus = (exam) => {
   return { label: `${durationMinutes} دقيقة`, colorScheme: "blue" };
 };
 
+/** قسم داخل مودالات الامتحان — عنوان بأيقونة ملوّنة وجسم نظيف */
+const ExamModalSection = ({ icon, title, accent = "blue", children }) => {
+  const border = useColorModeValue("gray.200", "gray.600");
+  const bg = useColorModeValue("white", "gray.750");
+  const titleColor = useColorModeValue("gray.800", "white");
+
+  return (
+    <Box borderWidth="1px" borderColor={border} borderRadius="xl" bg={bg} overflow="hidden">
+      <HStack
+        spacing={2.5}
+        px={4}
+        py={2.5}
+        borderBottomWidth="1px"
+        borderColor={border}
+        bg={useColorModeValue(`${accent}.50`, "whiteAlpha.50")}
+      >
+        <Center w={7} h={7} borderRadius="lg" bg={`${accent}.500`} color="white">
+          <Icon as={icon} boxSize={3.5} />
+        </Center>
+        <Text fontWeight="700" fontSize="sm" color={titleColor}>
+          {title}
+        </Text>
+      </HStack>
+      <Box px={4} py={4}>
+        {children}
+      </Box>
+    </Box>
+  );
+};
+
+/** صف Switch بعنوان ووصف — أوضح من FormControl الأفقي */
+const ExamSwitchRow = ({ label, hint, isChecked, onChange, colorScheme = "blue" }) => {
+  const border = useColorModeValue("gray.200", "gray.600");
+  const titleColor = useColorModeValue("gray.800", "white");
+  const hintColor = useColorModeValue("gray.500", "gray.400");
+
+  return (
+    <Flex
+      align="center"
+      justify="space-between"
+      gap={3}
+      borderWidth="1px"
+      borderColor={border}
+      borderRadius="lg"
+      px={3.5}
+      py={3}
+    >
+      <Box minW={0}>
+        <Text fontWeight="600" fontSize="sm" color={titleColor}>
+          {label}
+        </Text>
+        {hint ? (
+          <Text fontSize="xs" color={hintColor} mt={0.5}>
+            {hint}
+          </Text>
+        ) : null}
+      </Box>
+      <Switch colorScheme={colorScheme} isChecked={isChecked} onChange={onChange} />
+    </Flex>
+  );
+};
+
+/** كارت امتحان شامل — تصميم جديد نظيف بدون صورة */
+const ExamCard = ({
+  exam,
+  isTeacher,
+  formatDate,
+  actionLoading,
+  onToggleVisibility,
+  onAddQuestions,
+  onAddImageQuestions,
+  onEdit,
+  onDelete,
+}) => {
+  const cardBg = useColorModeValue("white", "gray.800");
+  const border = useColorModeValue("gray.200", "gray.700");
+  const titleColor = useColorModeValue("gray.900", "white");
+  const muted = useColorModeValue("gray.500", "gray.400");
+  const statBg = useColorModeValue("gray.50", "whiteAlpha.50");
+  const availability = getExamAvailabilityStatus(exam);
+  const visible = !!exam.is_visible_to_students;
+  const canAttempt = exam.can_attempt !== false;
+
+  const stats = [
+    { label: "سؤال", value: exam.questions_count ?? "—", icon: FaBookOpen, color: "blue.500" },
+    { label: "دقيقة", value: exam.duration_minutes ?? "—", icon: FaClock, color: "orange.500" },
+    {
+      label: "محاولات",
+      value: exam.attempt_limit
+        ? isTeacher
+          ? exam.attempt_limit
+          : `${exam.attempts_count || 0}/${exam.attempt_limit}`
+        : "∞",
+      icon: FaStar,
+      color: "purple.500",
+    },
+  ];
+
+  return (
+    <Box
+      bg={cardBg}
+      borderWidth="1px"
+      borderColor={border}
+      borderRadius="2xl"
+      overflow="hidden"
+      display="flex"
+      flexDirection="column"
+      transition="all 0.2s ease"
+      _hover={{
+        borderColor: "blue.300",
+        boxShadow: "0 12px 28px rgba(49,130,206,0.12)",
+        transform: "translateY(-2px)",
+      }}
+    >
+      <Box h="4px" bgGradient="linear(to-l, blue.500, orange.400)" />
+
+      {/* الهيدر: أيقونة + عنوان + حالة */}
+      <Flex align="flex-start" gap={3} px={4} pt={4}>
+        <Center
+          w="44px"
+          h="44px"
+          borderRadius="xl"
+          bgGradient="linear(135deg, blue.500, blue.400)"
+          color="white"
+          flexShrink={0}
+          boxShadow="0 6px 14px rgba(49,130,206,0.35)"
+        >
+          <Icon as={FaGraduationCap} boxSize={5} />
+        </Center>
+        <Box minW={0} flex={1}>
+          <Text fontWeight="800" color={titleColor} fontSize="md" noOfLines={2} lineHeight="1.4">
+            {exam.title}
+          </Text>
+          <HStack spacing={1.5} mt={1.5} flexWrap="wrap">
+            <Badge colorScheme={availability.colorScheme} variant="subtle" borderRadius="full" px={2} fontSize="11px">
+              {availability.label}
+            </Badge>
+            {isTeacher && (
+              <Badge colorScheme={visible ? "green" : "gray"} variant="subtle" borderRadius="full" px={2} fontSize="11px">
+                {visible ? "ظاهر للطلاب" : "مخفي"}
+              </Badge>
+            )}
+            {!exam.is_active && (
+              <Badge colorScheme="red" variant="subtle" borderRadius="full" px={2} fontSize="11px">
+                غير نشط
+              </Badge>
+            )}
+            {!isTeacher && !canAttempt && (
+              <Badge colorScheme="red" variant="subtle" borderRadius="full" px={2} fontSize="11px">
+                استنفدت المحاولات
+              </Badge>
+            )}
+          </HStack>
+        </Box>
+      </Flex>
+
+      {/* الإحصائيات */}
+      <SimpleGrid columns={3} spacing={2} px={4} mt={4}>
+        {stats.map((stat) => (
+          <VStack
+            key={stat.label}
+            spacing={0.5}
+            bg={statBg}
+            borderRadius="xl"
+            py={2.5}
+            borderWidth="1px"
+            borderColor={border}
+          >
+            <Icon as={stat.icon} boxSize={3.5} color={stat.color} />
+            <Text fontWeight="800" fontSize="sm" color={titleColor} dir="ltr">
+              {stat.value}
+            </Text>
+            <Text fontSize="10px" color={muted}>
+              {stat.label}
+            </Text>
+          </VStack>
+        ))}
+      </SimpleGrid>
+
+      {/* الأزرار */}
+      <Box px={4} pt={4} pb={3} mt="auto">
+        <Link to={`/exam/${exam.id}`} style={{ display: "block", textDecoration: "none" }}>
+          <Button
+            w="full"
+            colorScheme={!isTeacher && !canAttempt ? "gray" : "blue"}
+            borderRadius="xl"
+            fontWeight="700"
+            size="md"
+            leftIcon={<Icon as={FaGraduationCap} />}
+            cursor="pointer"
+          >
+            {isTeacher
+              ? "عرض الامتحان"
+              : !canAttempt
+                ? "عرض الامتحان"
+                : exam.attempts_count > 0
+                  ? `محاولة جديدة (${exam.attempts_count + 1})`
+                  : "ابدأ الامتحان"}
+          </Button>
+        </Link>
+
+        {isTeacher && (
+          <HStack spacing={1.5} mt={2}>
+            <Tooltip label="إضافة أسئلة" hasArrow>
+              <IconButton
+                aria-label="إضافة أسئلة"
+                icon={<Icon as={FaPlus} />}
+                size="sm"
+                variant="outline"
+                colorScheme="green"
+                borderRadius="lg"
+                flex={1}
+                cursor="pointer"
+                onClick={onAddQuestions}
+              />
+            </Tooltip>
+            <Tooltip label="أسئلة كصور" hasArrow>
+              <IconButton
+                aria-label="أسئلة كصور"
+                icon={<Icon as={FaCamera} />}
+                size="sm"
+                variant="outline"
+                colorScheme="purple"
+                borderRadius="lg"
+                flex={1}
+                cursor="pointer"
+                onClick={onAddImageQuestions}
+              />
+            </Tooltip>
+            <Tooltip label={visible ? "إخفاء عن الطلاب" : "إظهار للطلاب"} hasArrow>
+              <IconButton
+                aria-label="تبديل الظهور"
+                icon={<Icon as={visible ? FaEye : FaEyeSlash} />}
+                size="sm"
+                variant="outline"
+                colorScheme={visible ? "blue" : "gray"}
+                borderRadius="lg"
+                flex={1}
+                isLoading={actionLoading}
+                cursor="pointer"
+                onClick={onToggleVisibility}
+              />
+            </Tooltip>
+            <Tooltip label="تعديل" hasArrow>
+              <IconButton
+                aria-label="تعديل الامتحان"
+                icon={<Icon as={FaEdit} />}
+                size="sm"
+                variant="outline"
+                colorScheme="orange"
+                borderRadius="lg"
+                flex={1}
+                cursor="pointer"
+                onClick={onEdit}
+              />
+            </Tooltip>
+            <Tooltip label="حذف" hasArrow>
+              <IconButton
+                aria-label="حذف الامتحان"
+                icon={<Icon as={FaTrash} />}
+                size="sm"
+                variant="outline"
+                colorScheme="red"
+                borderRadius="lg"
+                flex={1}
+                cursor="pointer"
+                onClick={onDelete}
+              />
+            </Tooltip>
+          </HStack>
+        )}
+
+        <Text fontSize="11px" color={muted} mt={2.5} textAlign="center">
+          أُنشئ في {formatDate(exam.created_at)}
+        </Text>
+      </Box>
+    </Box>
+  );
+};
+
 
 const CourseExamsTab = ({
   courseExams,
@@ -975,111 +1255,92 @@ const CourseExamsTab = ({
           </Button>
         )}
       </Flex>
-      <Modal isOpen={createModalOpen} onClose={() => setCreateModalOpen(false)} isCentered size={{ base: 'sm', md: 'md', lg: 'lg' }}>
-        <ModalOverlay />
-        <ModalContent mx={{ base: 2, md: 0 }}>
-          <ModalHeader p={0} borderBottomWidth="1px" borderColor={modalSectionBorder}>
+      <Modal
+        isOpen={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        isCentered
+        size={{ base: "full", sm: "lg", md: "xl" }}
+        scrollBehavior="inside"
+      >
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
+        <ModalContent mx={{ base: 0, sm: 3 }} borderRadius={{ base: 0, sm: "2xl" }} overflow="hidden" dir="rtl">
+          <ModalHeader p={0}>
             <Box
-              bgGradient="linear(135deg, rgba(59,130,246,0.95), rgba(14,165,233,0.9))"
+              bgGradient="linear(135deg, #2B6CB0, #3182CE)"
               color="white"
               px={{ base: 4, md: 6 }}
               py={{ base: 4, md: 5 }}
+              position="relative"
+              overflow="hidden"
             >
-              <HStack spacing={4} align="flex-start">
-                <Box
-                  bg="whiteAlpha.200"
-                  borderRadius="full"
-                  w="48px"
-                  h="48px"
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="center"
-                  boxShadow="0 8px 20px rgba(15,118,255,0.35)"
+              <Box
+                position="absolute"
+                inset={0}
+                opacity={0.15}
+                bgImage="radial-gradient(circle at 85% 20%, white 1px, transparent 1px)"
+                bgSize="18px 18px"
+                pointerEvents="none"
+              />
+              <HStack spacing={3.5} position="relative">
+                <Center
+                  bg="whiteAlpha.250"
+                  borderRadius="xl"
+                  w="46px"
+                  h="46px"
+                  flexShrink={0}
                 >
-                  <Icon as={FaRegFileAlt} boxSize="24px" color="white" />
-                </Box>
-                <VStack align="flex-start" spacing={1}>
-                  <Heading size="md">إنشاء امتحان شامل جديد</Heading>
-                  <Text fontSize="sm" color="whiteAlpha.800">
-                    اضبط جميع إعدادات Exam Flow من مكان واحد
+                  <Icon as={FaRegFileAlt} boxSize={5} />
+                </Center>
+                <Box>
+                  <Heading size="md" fontWeight="800">
+                    إنشاء امتحان شامل جديد
+                  </Heading>
+                  <Text fontSize="sm" color="whiteAlpha.800" mt={0.5}>
+                    املأ البيانات الأساسية واضبط الظهور والمحاولات
                   </Text>
-                </VStack>
+                </Box>
               </HStack>
             </Box>
           </ModalHeader>
-          <ModalCloseButton color="white" />
+          <ModalCloseButton color="white" top={4} left={3} right="auto" />
           <form onSubmit={handleCreateExam}>
-            <ModalBody>
-              <VStack spacing={{ base: 4, md: 5 }} align="stretch">
-                <Box
-                  borderWidth="1px"
-                  borderColor={modalSectionBorder}
-                  borderRadius="lg"
-                  bg="blue.50"
-                  p={{ base: 3, md: 4 }}
-                >
-                  <HStack align="flex-start" spacing={3}>
-                    <Box
-                      bg="white"
-                      borderRadius="full"
-                      w="36px"
-                      h="36px"
-                      display="flex"
-                      alignItems="center"
-                      justifyContent="center"
-                      boxShadow="md"
-                    >
-                      <Icon as={FaClock} color="blue.500" />
-                    </Box>
-                    <VStack spacing={1} align="flex-start">
-                      <Text fontWeight="bold" color="blue.700">
-                        تلميح سريع
-                      </Text>
-                      <Text fontSize="sm" color="blue.600">
-                        يمكنك تحديد نافذة عرض الامتحان ووقت إصدار الإجابات من نفس المكان للحصول على تدفق موحد للطلاب.
-                      </Text>
-                    </VStack>
-                  </HStack>
-                </Box>
-                <Box
-                  borderWidth="1px"
-                  borderColor={modalSectionBorder}
-                  borderRadius="xl"
-                  p={{ base: 3, md: 4 }}
-                  bg={modalSectionBg}
-                >
-                  <Heading size="sm" mb={3} color="gray.600">
-                    المعلومات الأساسية
-                  </Heading>
+            <ModalBody px={{ base: 4, md: 5 }} py={5} bg={modalSectionBg}>
+              <VStack spacing={4} align="stretch">
+                <ExamModalSection icon={FaRegFileAlt} title="المعلومات الأساسية" accent="blue">
                   <VStack spacing={4} align="stretch">
                     <FormControl isRequired>
-                      <FormLabel>عنوان الامتحان</FormLabel>
+                      <FormLabel fontSize="sm" fontWeight="600">
+                        عنوان الامتحان
+                      </FormLabel>
                       <Input
                         value={form.title}
-                        onChange={(e) =>
-                          setForm((f) => ({ ...f, title: e.target.value }))
-                        }
+                        onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                         placeholder="مثال: امتحان نهاية الكورس"
+                        borderRadius="lg"
+                        _focus={{ borderColor: "blue.400", boxShadow: "0 0 0 1px #63B3ED" }}
                       />
                     </FormControl>
 
-                    <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                    <SimpleGrid columns={2} spacing={3}>
                       <FormControl isRequired>
-                        <FormLabel>عدد الأسئلة</FormLabel>
+                        <FormLabel fontSize="sm" fontWeight="600">
+                          عدد الأسئلة
+                        </FormLabel>
                         <Input
                           type="number"
                           min={1}
                           value={form.questions_count}
                           onChange={(e) =>
-                            setForm((f) => ({
-                              ...f,
-                              questions_count: e.target.value,
-                            }))
+                            setForm((f) => ({ ...f, questions_count: e.target.value }))
                           }
+                          placeholder="20"
+                          borderRadius="lg"
                         />
                       </FormControl>
                       <FormControl isRequired>
-                        <FormLabel>مدة الامتحان (دقائق)</FormLabel>
+                        <FormLabel fontSize="sm" fontWeight="600">
+                          المدة (دقائق)
+                        </FormLabel>
                         <Input
                           type="number"
                           min={1}
@@ -1087,142 +1348,122 @@ const CourseExamsTab = ({
                           onChange={(e) =>
                             setForm((f) => ({ ...f, duration_minutes: e.target.value }))
                           }
+                          placeholder="60"
+                          borderRadius="lg"
                         />
                       </FormControl>
-                      <FormControl display="flex" alignItems="center">
-                        <FormLabel mb="0">إظهار الامتحان للطلاب</FormLabel>
-                        <Switch
-                          colorScheme="green"
-                          isChecked={form.is_visible_to_students}
+                    </SimpleGrid>
+                  </VStack>
+                </ExamModalSection>
+
+                <ExamModalSection icon={FaEye} title="الظهور للطلاب" accent="green">
+                  <VStack spacing={3} align="stretch">
+                    <ExamSwitchRow
+                      label="إظهار الامتحان للطلاب"
+                      hint="الطلاب يشوفوا الامتحان فور إنشائه"
+                      colorScheme="green"
+                      isChecked={form.is_visible_to_students}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          is_visible_to_students: e.target.checked,
+                          visibility_end_date: e.target.checked ? "" : f.visibility_end_date,
+                        }))
+                      }
+                    />
+                    {!form.is_visible_to_students && (
+                      <FormControl isRequired>
+                        <FormLabel fontSize="sm" fontWeight="600">
+                          موعد انتهاء الظهور
+                        </FormLabel>
+                        <Input
+                          type="datetime-local"
+                          value={toDateTimeLocalValue(form.visibility_end_date)}
                           onChange={(e) =>
                             setForm((f) => ({
                               ...f,
-                              is_visible_to_students: e.target.checked,
-                              visibility_end_date: e.target.checked ? "" : f.visibility_end_date,
+                              visibility_end_date: fromDateTimeLocalValue(e.target.value),
                             }))
                           }
+                          borderRadius="lg"
                         />
                       </FormControl>
-                      {!form.is_visible_to_students && (
-                        <FormControl isRequired>
-                          <FormLabel>موعد انتهاء الظهور</FormLabel>
-                          <Input
-                            type="datetime-local"
-                            value={toDateTimeLocalValue(form.visibility_end_date)}
-                            onChange={(e) =>
-                              setForm((f) => ({
-                                ...f,
-                                visibility_end_date: fromDateTimeLocalValue(e.target.value),
-                              }))
-                            }
-                          />
-                        </FormControl>
-                      )}
-                    </SimpleGrid>
-                  </VStack>
-                </Box>
-
-
-                <Box
-                  borderWidth="1px"
-                  borderColor={modalSectionBorder}
-                  borderRadius="xl"
-                  p={{ base: 3, md: 4 }}
-                  bg={modalSectionBg}
-                >
-                  <Heading size="sm" mb={3} color="gray.600">
-                    إعدادات عرض الإجابات
-                  </Heading>
-                  <VStack spacing={4} align="stretch">
-                    <FormControl display="flex" alignItems="center">
-                      <FormLabel mb="0">إظهار الإجابات فور التسليم</FormLabel>
-                      <Switch
-                        colorScheme="blue"
-                        isChecked={form.show_answers_immediately}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            show_answers_immediately: e.target.checked,
-                          }))
-                        }
-                      />
-                    </FormControl>
+                    )}
+                    <ExamSwitchRow
+                      label="إظهار الإجابات فور التسليم"
+                      hint="لو اتقفل، حدد موعد إظهار الإجابات"
+                      colorScheme="blue"
+                      isChecked={form.show_answers_immediately}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          show_answers_immediately: e.target.checked,
+                        }))
+                      }
+                    />
                     {!form.show_answers_immediately && (
                       <FormControl isRequired>
-                        <FormLabel>موعد إظهار الإجابات</FormLabel>
+                        <FormLabel fontSize="sm" fontWeight="600">
+                          موعد إظهار الإجابات
+                        </FormLabel>
                         <Input
                           type="datetime-local"
                           value={toDateTimeLocalValue(form.answers_visible_at)}
                           onChange={(e) =>
                             setForm((f) => ({
                               ...f,
-                              answers_visible_at: fromDateTimeLocalValue(
-                                e.target.value
-                              ),
+                              answers_visible_at: fromDateTimeLocalValue(e.target.value),
                             }))
                           }
+                          borderRadius="lg"
                         />
                       </FormControl>
                     )}
                   </VStack>
-                </Box>
+                </ExamModalSection>
 
-                <Box
-                  borderWidth="1px"
-                  borderColor={modalSectionBorder}
-                  borderRadius="xl"
-                  p={{ base: 3, md: 4 }}
-                  bg={modalSectionBg}
-                >
-                  <Heading size="sm" mb={3} color="gray.600">
-                    حالة الامتحان والمحاولات
-                  </Heading>
-                  <VStack spacing={4} align="stretch">
-                    <FormControl display="flex" alignItems="center">
-                      <FormLabel mb="0">الامتحان نشط</FormLabel>
-                      <Switch
-                        colorScheme="green"
-                        isChecked={form.is_active}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            is_active: e.target.checked,
-                          }))
-                        }
-                      />
-                    </FormControl>
+                <ExamModalSection icon={FaStar} title="الحالة والمحاولات" accent="orange">
+                  <VStack spacing={3} align="stretch">
+                    <ExamSwitchRow
+                      label="الامتحان نشط"
+                      hint="الامتحان غير النشط لا يمكن للطلاب دخوله"
+                      colorScheme="green"
+                      isChecked={form.is_active}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, is_active: e.target.checked }))
+                      }
+                    />
                     <FormControl>
-                      <FormLabel>حد المحاولات</FormLabel>
+                      <FormLabel fontSize="sm" fontWeight="600">
+                        حد المحاولات
+                      </FormLabel>
                       <NumberInput
                         min={1}
                         value={form.attempt_limit}
                         onChange={(valueString) =>
-                          setForm((f) => ({
-                            ...f,
-                            attempt_limit: valueString,
-                          }))
+                          setForm((f) => ({ ...f, attempt_limit: valueString }))
                         }
                       >
-                        <NumberInputField placeholder="اتركه فارغاً لعدد غير محدود" />
+                        <NumberInputField
+                          placeholder="اتركه فارغاً لعدد غير محدود"
+                          borderRadius="lg"
+                        />
                       </NumberInput>
-                      <Text fontSize="xs" color="gray.500" mt={1}>
-                        اتركه فارغاً للسماح بعدد غير محدود من المحاولات
-                      </Text>
                     </FormControl>
                   </VStack>
-                </Box>
+                </ExamModalSection>
               </VStack>
             </ModalBody>
-            <ModalFooter>
+            <ModalFooter
+              borderTopWidth="1px"
+              borderColor={modalSectionBorder}
+              gap={2}
+              px={{ base: 4, md: 5 }}
+            >
               <Button
                 variant="ghost"
-                mr={3}
+                borderRadius="lg"
                 onClick={() => setCreateModalOpen(false)}
-                size={{ base: 'sm', sm: 'md' }}
-                fontSize={{ base: 'sm', sm: 'md' }}
-                px={{ base: 3, sm: 4 }}
-                py={{ base: 2, sm: 3 }}
-                minW={{ base: '80px', sm: '100px' }}
               >
                 إلغاء
               </Button>
@@ -1230,13 +1471,13 @@ const CourseExamsTab = ({
                 colorScheme="blue"
                 type="submit"
                 isLoading={createLoading}
-                size={{ base: 'sm', sm: 'md' }}
-                fontSize={{ base: 'sm', sm: 'md' }}
-                px={{ base: 3, sm: 4 }}
-                py={{ base: 2, sm: 3 }}
-                minW={{ base: '100px', sm: '120px' }}
+                loadingText="جاري الإنشاء..."
+                borderRadius="lg"
+                px={8}
+                fontWeight="700"
+                leftIcon={<Icon as={FaPlus} boxSize={3} />}
               >
-                إنشاء
+                إنشاء الامتحان
               </Button>
             </ModalFooter>
           </form>
@@ -1264,261 +1505,23 @@ const CourseExamsTab = ({
           </VStack>
         </Center>
       ) : (
-        <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={{ base: 4, md: 6 }} gap={{ base: 3, md: 6 }}>
-          {courseExams.map((exam) => {
-            const availabilityStatus = getExamAvailabilityStatus(exam);
-            const durationStatus = getExamDurationStatus(exam);
-            return (
-              <Box
-                key={exam.id}
-                bg={useColorModeValue("white", "gray.800")}
-                borderRadius={{ base: 'xl', md: '2xl' }}
-                boxShadow="lg"
-                p={{ base: 4, md: 5 }}
-                borderWidth="2px"
-                borderColor={useColorModeValue("gray.200", "gray.700")}
-                transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
-                _hover={{
-                  boxShadow: '0 20px 40px rgba(0, 0, 0, 0.1)',
-                  borderColor: 'blue.400',
-                  transform: 'translateY(-4px)'
-                }}
-                position="relative"
-                _before={{
-                  content: '""',
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  borderRadius: { base: 'xl', md: '2xl' },
-                  background: "linear-gradient(135deg, rgba(59, 130, 246, 0.03) 0%, rgba(147, 197, 253, 0.03) 100%)",
-                  zIndex: -1
-                }}
-              >
-                <VStack align="start" spacing={{ base: 2, md: 3 }}>
-                  <Box
-                    w="full"
-                    h={{ base: '120px', sm: '140px', md: '160px' }}
-                    borderRadius={{ base: 'xl', md: '2xl' }}
-                    overflow="hidden"
-                    bg="gray.100"
-                    mb={3}
-                    boxShadow="0 8px 16px rgba(0, 0, 0, 0.1)"
-                    border="2px solid"
-                    borderColor={useColorModeValue("gray.200", "gray.600")}
-                    position="relative"
-                    _before={{
-                      content: '""',
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      borderRadius: { base: 'xl', md: '2xl' },
-                      background: "linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 197, 253, 0.1) 100%)",
-                      zIndex: 1
-                    }}
-                  >
-                    {exam.image ? (
-                      <img
-                        src={exam.image}
-                        alt={exam.title}
-                        w="full"
-                        h="full"
-                        style={{
-                          objectFit: 'cover',
-                          width: '100%',
-                          height: '100%',
-                          position: 'relative',
-                          zIndex: 2
-                        }}
-                      />
-                    ) : (
-                      <Center w="full" h="full" position="relative" zIndex={2}>
-                        <Icon as={FaGraduationCap} boxSize={12} color="gray.400" />
-                      </Center>
-                    )}
-                  </Box>
-                  <HStack spacing={2}>
-                    <Icon as={FaGraduationCap} color="green.500" />
-                    <Text fontWeight="bold" fontSize={{ base: 'sm', md: 'lg' }} color={headingColor} noOfLines={2}>{exam.title}</Text>
-                  </HStack>
-                  <VStack spacing={{ base: 1, md: 2 }} fontSize={{ base: 'xs', md: 'sm' }} color="gray.500" align="start" w="full">
-                    <HStack spacing={1}><Icon as={FaBookOpen} /> <Text>{exam.questions_count} سؤال</Text></HStack>
-                    <HStack spacing={1}><Icon as={FaClock} /> <Text>{exam.duration_minutes} دقيقة</Text></HStack>
-                    {!isTeacher && exam.attempt_limit && (
-                      <HStack spacing={1}>
-                        <Icon as={FaStar} />
-                        <Text>
-                          المحاولات: {exam.attempts_count || 0} / {exam.attempt_limit}
-                          {exam.attempts_remaining !== null && ` (متبقي: ${exam.attempts_remaining})`}
-                        </Text>
-                      </HStack>
-                    )}
-                    {!isTeacher && exam.attempt_limit && exam.last_attempt_number && (
-                      <HStack spacing={1}>
-                        <Icon as={FaCalendarAlt} />
-                        <Text>آخر محاولة: #{exam.last_attempt_number}</Text>
-                      </HStack>
-                    )}
-                    <HStack spacing={1}>
-                      <Icon as={exam.is_visible_to_students ? FaEye : FaEyeSlash} />
-                      <Text>الحالة: {exam.is_visible_to_students ? "ظاهر" : "مخفي"}</Text>
-                      <Badge
-                        colorScheme={exam.is_visible_to_students ? "green" : "yellow"}
-                        fontSize="xs"
-                        borderRadius="full"
-                        px={2}
-                        py={1}
-                      >
-                        {exam.is_visible_to_students ? "ظاهر" : "مخفي"}
-                      </Badge>
-                    </HStack>
-                    <HStack spacing={2} flexWrap="wrap">
-                      <Badge colorScheme={availabilityStatus.colorScheme} borderRadius="full" px={3} py={1}>
-                        {availabilityStatus.label}
-                      </Badge>
-                      {durationStatus && (
-                        <Badge colorScheme={durationStatus.colorScheme} borderRadius="full" px={3} py={1}>
-                          {durationStatus.label}
-                        </Badge>
-                      )}
-                      {!exam.is_active && (
-                        <Badge colorScheme="gray" borderRadius="full" px={3} py={1}>
-                          غير نشط
-                        </Badge>
-                      )}
-                      {!isTeacher && exam.can_attempt === false && (
-                        <Badge colorScheme="red" borderRadius="full" px={3} py={1}>
-                          لا يمكن المحاولة
-                        </Badge>
-                      )}
-                      {!isTeacher && exam.can_attempt === true && exam.attempt_limit && exam.attempts_remaining !== null && exam.attempts_remaining > 0 && (
-                        <Badge colorScheme="green" borderRadius="full" px={3} py={1}>
-                          يمكن المحاولة ({exam.attempts_remaining} متبقي)
-                        </Badge>
-                      )}
-                    </HStack>
-                  </VStack>
-                  <Text fontSize={{ base: 'xs', md: 'xs' }} color="gray.400">تاريخ الإنشاء: {formatDate(exam.created_at)}</Text>
-                  <VStack spacing={{ base: 1, md: 2 }} w="full">
-                    <Link
-                      to={`/exam/${exam.id}`}
-                      style={{ width: '100%', textDecoration: 'none' }}
-                    >
-                      <Button
-                        colorScheme={!isTeacher && exam.can_attempt === false ? "gray" : "blue"}
-                        size={{ base: 'xs', sm: 'sm', md: 'md' }}
-                        leftIcon={<Icon as={FaGraduationCap} boxSize={{ base: 3, sm: 4, md: 4 }} />}
-                        w="full"
-                        variant="solid"
-                        borderRadius="full"
-                        _hover={{
-                          transform: !isTeacher && exam.can_attempt === false ? 'none' : 'translateY(-2px)',
-                          boxShadow: !isTeacher && exam.can_attempt === false ? 'none' : 'lg',
-                          bg: !isTeacher && exam.can_attempt === false ? 'gray.400' : 'blue.600'
-                        }}
-                        transition="all 0.2s"
-                        fontWeight="bold"
-                        fontSize={{ base: 'xs', sm: 'sm', md: 'md' }}
-                        py={{ base: 2, sm: 2, md: 3 }}
-                        px={{ base: 2, sm: 3, md: 4 }}
-                        h={{ base: '36px', sm: '40px', md: '48px' }}
-                        minW={{ base: '140px', sm: '160px', md: '180px' }}
-                      >
-                        {isTeacher
-                          ? "عرض الامتحان"
-                          : exam.can_attempt === false
-                            ? "عرض الامتحان"
-                            : exam.attempts_count > 0
-                              ? `محاولة جديدة (${exam.attempts_count + 1})`
-                              : "ابدأ الامتحان"}
-                      </Button>
-                    </Link>
-                    {isTeacher && (
-                      <HStack spacing={{ base: 1, md: 2 }} w="full" flexWrap="wrap" gap={1}>
-                        <Tooltip label={exam.is_visible_to_students ? "إخفاء الامتحان" : "إظهار الامتحان"} placement="top">
-                          <IconButton
-                            colorScheme={exam.is_visible_to_students ? "blue" : "gray"}
-                            size={{ base: 'xs', md: 'sm' }}
-                            icon={<Icon as={exam.is_visible_to_students ? FaEye : FaEyeSlash} />}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleToggleVisibility(exam.id, exam.is_visible_to_students);
-                            }}
-                            aria-label={exam.is_visible_to_students ? "إخفاء الامتحان" : "إظهار الامتحان"}
-                            isLoading={actionLoading}
-                            type="button"
-                            as="button"
-                          />
-                        </Tooltip>
-                        <Tooltip label="إضافة أسئلة للامتحان" placement="top">
-                          <IconButton
-                            colorScheme="green"
-                            size={{ base: 'xs', md: 'sm' }}
-                            icon={<Icon as={FaPlus} />}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleOpenQuestionManagerModal(exam, 0);
-                            }}
-                            aria-label="إضافة أسئلة للامتحان"
-                            type="button"
-                            as="button"
-                          />
-                        </Tooltip>
-                        <Tooltip label="إضافة أسئلة كصور" placement="top">
-                          <IconButton
-                            colorScheme="purple"
-                            size={{ base: 'xs', md: 'sm' }}
-                            icon={<Icon as={FaCamera} />}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              handleOpenQuestionManagerModal(exam, 1);
-                            }}
-                            aria-label="إضافة أسئلة كصور"
-                            type="button"
-                            as="button"
-                          />
-                        </Tooltip>
-                        <Button
-                          colorScheme="yellow"
-                          size={{ base: 'xs', sm: 'sm', md: 'md' }}
-                          leftIcon={<Icon as={FaEdit} boxSize={{ base: 3, sm: 4, md: 4 }} />}
-                          onClick={() => setEditModal({ isOpen: true, exam })}
-                          flex={1}
-                          fontSize={{ base: 'xs', sm: 'sm', md: 'md' }}
-                          px={{ base: 2, sm: 3, md: 4 }}
-                          py={{ base: 1, sm: 2, md: 2 }}
-                          minW={{ base: '80px', sm: '100px', md: '120px' }}
-                          h={{ base: '32px', sm: '36px', md: '40px' }}
-                        >
-                          تعديل
-                        </Button>
-                        <Button
-                          colorScheme="red"
-                          size={{ base: 'xs', sm: 'sm', md: 'md' }}
-                          leftIcon={<Icon as={FaTrash} boxSize={{ base: 3, sm: 4, md: 4 }} />}
-                          onClick={() => setDeleteDialog({ isOpen: true, exam })}
-                          flex={1}
-                          fontSize={{ base: 'xs', sm: 'sm', md: 'md' }}
-                          px={{ base: 2, sm: 3, md: 4 }}
-                          py={{ base: 1, sm: 2, md: 2 }}
-                          minW={{ base: '80px', sm: '100px', md: '120px' }}
-                          h={{ base: '32px', sm: '36px', md: '40px' }}
-                        >
-                          حذف
-                        </Button>
-                      </HStack>
-                    )}
-                  </VStack>
-                </VStack>
-              </Box>
-            );
-          })}
+        <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={{ base: 3, md: 5 }}>
+          {courseExams.map((exam) => (
+            <ExamCard
+              key={exam.id}
+              exam={exam}
+              isTeacher={isTeacher}
+              formatDate={formatDate}
+              actionLoading={actionLoading}
+              onToggleVisibility={() =>
+                handleToggleVisibility(exam.id, exam.is_visible_to_students)
+              }
+              onAddQuestions={() => handleOpenQuestionManagerModal(exam, 0)}
+              onAddImageQuestions={() => handleOpenQuestionManagerModal(exam, 1)}
+              onEdit={() => setEditModal({ isOpen: true, exam })}
+              onDelete={() => setDeleteDialog({ isOpen: true, exam })}
+            />
+          ))}
         </SimpleGrid>
       )}
       {/* Modals */}

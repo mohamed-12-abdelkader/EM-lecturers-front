@@ -7,11 +7,10 @@ import { field, studentCode, studentName } from "../centerMgmtUtils";
 
 /**
  * 12 كارت في صفحة A4 أفقي (3×4)
- * النسبة مضبوطة على 297×210 عشان تملأ الورقة بدون فراغ على الأجناب أو فوق/تحت
  */
 const A4_RATIO = 297 / 210;
-const PAGE_RENDER_W = 1188; // ~4px/mm × 297
-const PAGE_RENDER_H = Math.round(PAGE_RENDER_W / A4_RATIO); // ~840
+const PAGE_RENDER_W = 1188;
+const PAGE_RENDER_H = Math.round(PAGE_RENDER_W / A4_RATIO);
 const GRID_COLS = 3;
 const GRID_ROWS = 4;
 const CARDS_PER_PAGE = 12;
@@ -25,23 +24,41 @@ const CARD_H = Math.floor(
   (PAGE_RENDER_H - PAGE_PAD * 2 - GRID_GAP * GRID_ROWS) / GRID_ROWS
 );
 
-const QR_SIZE = 86;
-const QR_BOX = 92;
+/** QR أكبر لوضوح المسح */
+const QR_BOX = 108;
+const QR_IMG = 100;
 
-/** Professional navy / slate palette */
-const NAVY = "#0F2744";
-const NAVY_SOFT = "#1A3A5C";
-const INK = "#14233A";
-const MUTED = "#64748B";
-const ACCENT = "#C4782A";
-const SURFACE = "#F7F9FC";
-const LINE = "#E2E8F0";
-const BORDER = "#CBD5E1";
+/** Chakra: blue.500 / orange.500 */
+const BLUE = "#3182CE";
+const BLUE_SOFT = "#EBF8FF";
+const ORANGE = "#DD6B20";
+const ORANGE_SOFT = "#FFFAF0";
+const INK = "#1A202C";
+const MUTED = "#718096";
+const WHITE = "#FFFFFF";
+const BORDER = "#E2E8F0";
 
-/**
- * Tahoma + Cairo: Tahoma أولوية لـ html2canvas لأنه يثبت تشكيل العربي.
- */
-const FONT = "Tahoma,'Cairo','Segoe UI',Arial,sans-serif";
+/** Tahoma يثبت تشكيل العربي في html2canvas — Cairo بيخلي الحروف تلزق */
+const FONT = "Tahoma,'Segoe UI',Arial,sans-serif";
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/** مسافات غير قابلة للانهيار بين الكلمات عشان html2canvas ما يلزقش الحروف */
+function spacedAr(text) {
+  return escapeHtml(String(text || "")).replace(/ /g, "&nbsp;");
+}
+
+function truncate(text, max = 24) {
+  const s = String(text || "").trim();
+  if (s.length <= max) return s;
+  return `${s.slice(0, max - 1)}…`;
+}
 
 function normalizeQrSrc(qrData, student) {
   const raw =
@@ -71,20 +88,58 @@ export async function fetchCenterCardBranding() {
   return { teacherName };
 }
 
-function escapeHtml(value) {
-  return String(value || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+/**
+ * عرض أنظف للبيانات:
+ * - الاسم كبير وبارز بدون صندوق فورم
+ * - المجموعة سطر بسيط بخط فاصل
+ * - الكود شارة برتقالية واضحة
+ */
+function infoBlock({ name, group, code }) {
+  return `
+<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;font-family:${FONT};">
+  <tr>
+    <td style="padding:0 2px 8px 2px;direction:rtl;text-align:right;border-bottom:1px solid ${BORDER};">
+      <div style="color:${BLUE};font-size:7px;font-weight:700;font-family:${FONT};line-height:1.2;white-space:nowrap;">
+        ${spacedAr("اسم الطالب")}
+      </div>
+      <div style="color:${INK};font-size:13px;font-weight:700;font-family:${FONT};line-height:1.35;white-space:nowrap;padding-top:2px;">
+        ${spacedAr(name)}
+      </div>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:7px 2px;direction:rtl;text-align:right;border-bottom:1px solid ${BORDER};">
+      <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;">
+        <tr>
+          <td style="direction:rtl;text-align:right;vertical-align:middle;white-space:nowrap;">
+            <span style="color:${MUTED};font-size:7.5px;font-weight:700;font-family:${FONT};">${spacedAr("المجموعة")}</span>
+            <span style="color:${ORANGE};padding:0 4px;font-size:8px;">•</span>
+            <span style="color:${INK};font-size:11px;font-weight:700;font-family:${FONT};">${spacedAr(group)}</span>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:8px 0 0 0;">
+      <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;background:${ORANGE};border-radius:6px;">
+        <tr>
+          <td style="padding:6px 8px;direction:rtl;text-align:center;vertical-align:middle;">
+            <span style="color:${WHITE};font-size:7.5px;font-weight:700;font-family:${FONT};opacity:0.95;">${spacedAr("كود حضور السنتر")}</span>
+            <span style="color:${WHITE};font-size:9px;padding:0 5px;">—</span>
+            <span style="color:${WHITE};font-size:14px;font-weight:700;font-family:${FONT};letter-spacing:0.5px;">${spacedAr(code)}</span>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>`;
 }
 
-function truncate(text, max = 24) {
-  const s = String(text || "").trim();
-  if (s.length <= max) return s;
-  return `${s.slice(0, max - 1)}…`;
-}
-
+/**
+ * هيدر سطر واحد: الصف + كارت سنتر مستر + المدرس
+ * جسم: بيانات محسّنة | QR
+ */
 function buildCardHtml({
   studentName: name,
   studentId,
@@ -93,182 +148,103 @@ function buildCardHtml({
   qrSrc,
   branding,
 }) {
-  const grade = escapeHtml(truncate(gradeName || "—", 24));
-  const safeName = escapeHtml(truncate(name, 24));
-  const headerGroup = escapeHtml(truncate(groupName || "—", 18));
-  const safeId = escapeHtml(String(studentId ?? "—"));
-  const teacher = escapeHtml(truncate(branding.teacherName || "المدرس", 20));
+  const grade = truncate(gradeName || "—", 18);
+  const safeName = truncate(name, 20);
+  const safeGroup = truncate(groupName || "—", 16);
+  const safeId = String(studentId ?? "—");
+  const teacherRaw = truncate(branding.teacherName || "المدرس", 14);
+  const teacherDisplay = /^أ[.\s]|الاستاذ|الأستاذ/i.test(teacherRaw)
+    ? teacherRaw
+    : `أ. ${teacherRaw}`;
 
   const qrBlock = qrSrc
     ? `<img
         src="${qrSrc}"
         alt="QR"
-        width="${QR_SIZE}"
-        height="${QR_SIZE}"
-        style="
-          width:${QR_SIZE}px;
-          height:${QR_SIZE}px;
-          object-fit:contain;
-          display:block;
-          image-rendering:-webkit-optimize-contrast;
-          image-rendering:crisp-edges;
-          image-rendering:pixelated;
-        "
+        width="${QR_IMG}"
+        height="${QR_IMG}"
+        style="width:${QR_IMG}px;height:${QR_IMG}px;object-fit:contain;display:block;image-rendering:pixelated;"
       />`
-    : `<div style="width:${QR_SIZE}px;height:${QR_SIZE}px;display:flex;align-items:center;justify-content:center;font-size:10px;color:${MUTED};font-family:${FONT};">لا QR</div>`;
+    : `<div style="width:${QR_IMG}px;height:${QR_IMG}px;text-align:center;line-height:${QR_IMG}px;font-size:9px;color:#A0AEC0;font-family:${FONT};">لا&nbsp;QR</div>`;
 
-  // ملاحظة: ممنوع overflow:hidden + text-overflow:ellipsis على العربي مع html2canvas
+  const headerH = 30;
+  const bodyH = CARD_H - headerH;
+  const headerGrade = spacedAr(grade);
+  const headerTitle = spacedAr("كارت سنتر مستر");
+  const headerTeacher = spacedAr(teacherDisplay);
+
   return `
-<table dir="rtl" cellpadding="0" cellspacing="0" style="
+<table dir="ltr" cellpadding="0" cellspacing="0" style="
   width:${CARD_W}px;
   height:${CARD_H}px;
   border-collapse:separate;
   border-spacing:0;
   border-radius:10px;
   overflow:hidden;
-  border:1px solid ${BORDER};
-  background:#ffffff;
+  border:1.5px solid ${BORDER};
+  background:${WHITE};
   font-family:${FONT};
   table-layout:fixed;
 ">
+  <!-- هيدر سطر واحد: الصف | كارت سنتر مستر | المدرس -->
   <tr>
-    <td colspan="2" style="
-      background:${NAVY};
-      padding:7px 12px;
-      vertical-align:middle;
-      height:30px;
-    ">
-      <table dir="rtl" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-family:${FONT};">
+    <td colspan="2" style="height:${headerH}px;padding:0;background:${BLUE};vertical-align:middle;">
+      <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;height:${headerH}px;">
         <tr>
-          <td style="
-            color:#FFFFFF;
-            font-size:11px;
-            font-weight:700;
-            font-family:${FONT};
-            line-height:1.25;
-            text-align:right;
-            white-space:nowrap;
-            vertical-align:middle;
-          ">${grade}</td>
-          <td style="
-            text-align:left;
-            white-space:nowrap;
-            vertical-align:middle;
-            width:48%;
-          ">
-            <span style="
-              display:inline-block;
-              background:${NAVY_SOFT};
-              color:#FFFFFF;
-              font-size:10px;
-              font-weight:700;
-              font-family:${FONT};
-              line-height:1.25;
-              padding:3px 10px;
-              border-radius:999px;
-              border:1px solid rgba(255,255,255,0.18);
-            ">${headerGroup}</span>
+          <td style="width:5px;background:${ORANGE};font-size:0;line-height:0;">&nbsp;</td>
+          <td style="padding:0 10px;vertical-align:middle;direction:rtl;text-align:right;">
+            <div style="
+              font-size:10px;font-weight:700;font-family:${FONT};
+              line-height:1.3;white-space:nowrap;
+            ">
+              <span style="color:${ORANGE};">${headerGrade}</span>
+              <span style="color:rgba(255,255,255,0.45);padding:0 5px;">|</span>
+              <span style="color:${WHITE};">${headerTitle}</span>
+              <span style="color:rgba(255,255,255,0.45);padding:0 5px;">|</span>
+              <span style="color:${WHITE};">${headerTeacher}</span>
+            </div>
           </td>
         </tr>
       </table>
     </td>
   </tr>
-  <tr>
-    <td colspan="2" style="height:3px;background:${ACCENT};padding:0;font-size:0;line-height:0;">&nbsp;</td>
-  </tr>
 
+  <!-- جسم: بيانات محسّنة | QR -->
   <tr>
     <td style="
-      padding:10px 12px 10px 10px;
+      width:50%;
+      height:${bodyH}px;
       vertical-align:middle;
-      background:${SURFACE};
-      border-left:1px solid ${LINE};
+      padding:10px 8px 10px 10px;
+      background:${WHITE};
     ">
-      <div style="
-        color:${MUTED};
-        font-size:9px;
-        font-weight:700;
-        font-family:${FONT};
-        line-height:1.15;
-        margin-bottom:2px;
-        text-align:right;
-        white-space:nowrap;
-      ">المدرس</div>
-      <div style="
-        color:${INK};
-        font-size:13px;
-        font-weight:700;
-        font-family:${FONT};
-        line-height:1.25;
-        margin-bottom:8px;
-        text-align:right;
-        white-space:nowrap;
-      ">${teacher}</div>
-
-      <div style="height:1px;background:${LINE};margin:0 0 8px;line-height:0;font-size:0;">&nbsp;</div>
-
-      <div style="
-        color:${MUTED};
-        font-size:9px;
-        font-weight:700;
-        font-family:${FONT};
-        line-height:1.15;
-        margin-bottom:2px;
-        text-align:right;
-        white-space:nowrap;
-      ">اسم الطالب</div>
-      <div style="
-        color:${NAVY};
-        font-size:16px;
-        font-weight:700;
-        font-family:${FONT};
-        line-height:1.25;
-        margin-bottom:8px;
-        text-align:right;
-        white-space:nowrap;
-      ">${safeName}</div>
-
-      <div style="
-        display:inline-block;
-        background:#FFFFFF;
-        border:1px solid ${LINE};
-        border-radius:7px;
-        padding:4px 10px;
-        color:${INK};
-        font-size:12px;
-        font-weight:700;
-        font-family:${FONT};
-        line-height:1.25;
-        white-space:nowrap;
-      ">الكود&nbsp;&nbsp;<span style="color:${ACCENT};">${safeId}</span></div>
+      ${infoBlock({ name: safeName, group: safeGroup, code: safeId })}
     </td>
-
     <td style="
-      width:112px;
-      padding:10px 12px;
+      width:50%;
+      height:${bodyH}px;
       vertical-align:middle;
       text-align:center;
-      background:#FFFFFF;
+      padding:6px 8px;
+      background:${BLUE_SOFT};
     ">
+      <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 auto;background:${WHITE};border:2.5px solid ${ORANGE};border-radius:8px;">
+        <tr>
+          <td style="padding:3px;">
+            <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:2px solid ${BLUE};border-radius:5px;background:${WHITE};">
+              <tr>
+                <td style="padding:2px;width:${QR_BOX}px;height:${QR_BOX}px;text-align:center;vertical-align:middle;">
+                  ${qrBlock}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
       <div style="
-        width:${QR_BOX}px;
-        height:${QR_BOX}px;
-        margin:0 auto;
-        border:1px solid ${BORDER};
-        border-radius:8px;
-        padding:2px;
-        background:#FFFFFF;
-        box-sizing:border-box;
-        line-height:0;
-      ">${qrBlock}</div>
-      <div style="
-        margin-top:5px;
-        color:${MUTED};
-        font-size:8px;
-        font-weight:700;
-        font-family:${FONT};
-        white-space:nowrap;
-      ">SCAN QR</div>
+        color:${BLUE};font-size:7.5px;font-weight:700;font-family:${FONT};
+        line-height:1.35;padding-top:4px;white-space:nowrap;
+      ">${spacedAr("امسح للحضور")}</div>
     </td>
   </tr>
 </table>`;
@@ -329,7 +305,6 @@ function buildPageHtml(cardHtmlList) {
     return `<tr>${cells}</tr>`;
   }).join("");
 
-  // استخدم مقاس ثابت بنفس نسبة A4 حتى لو عدد الصفوف أقل من 4
   const pageW = PAGE_RENDER_W;
   const pageH =
     rows === GRID_ROWS
@@ -362,16 +337,13 @@ function buildIsolatedDocument(pageInnerHtml) {
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@700;800&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
       background: #fff;
       font-family: ${FONT};
-      -webkit-font-smoothing: antialiased;
-      text-rendering: geometricPrecision;
+      -webkit-font-smoothing: auto;
+      text-rendering: optimizeLegibility;
     }
     table { border-collapse: separate; }
     img { max-width: none; }
@@ -402,14 +374,13 @@ async function renderPageInIsolatedFrame(pageInnerHtml) {
   doc.write(buildIsolatedDocument(pageInnerHtml));
   doc.close();
 
-  // انتظر تحميل الخطوط عشان العربي ميتقطّعش
   await new Promise((resolve) => setTimeout(resolve, 1000));
   if (doc.fonts?.ready) {
     await doc.fonts.ready;
   }
   try {
-    await doc.fonts.load(`700 20px Tahoma`);
-    await doc.fonts.load(`700 15px Cairo`);
+    await doc.fonts.load(`700 12px Tahoma`);
+    await doc.fonts.load(`700 16px Tahoma`);
   } catch {
     // ignore
   }

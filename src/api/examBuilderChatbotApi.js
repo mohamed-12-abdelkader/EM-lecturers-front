@@ -112,12 +112,13 @@ export async function fetchExamBuilderSessionsList(params = {}) {
   };
 }
 
-export async function sendExamBuilderChat(message) {
-  const { data } = await baseUrl.post(
-    `${API}/chat`,
-    { message: String(message).trim() },
-    { headers: authHeaders("application/json") }
-  );
+export async function sendExamBuilderChat(message, sessionId) {
+  const body = { message: String(message).trim() };
+  if (sessionId) body.session_id = sessionId;
+
+  const { data } = await baseUrl.post(`${API}/chat`, body, {
+    headers: authHeaders("application/json"),
+  });
   if (data?.success === false) throw rejectApiResponse(data, "فشل إرسال الرسالة");
   return data;
 }
@@ -140,6 +141,14 @@ export async function regenerateExamBuilderSession(sessionId) {
     { headers: authHeaders("application/json") }
   );
   if (data?.success === false) throw rejectApiResponse(data, "فشل إعادة الاختيار");
+  return data;
+}
+
+export async function adjustExamBuilderSession(sessionId, payload = {}) {
+  const { data } = await baseUrl.post(`${API}/sessions/${sessionId}/adjust`, payload, {
+    headers: authHeaders("application/json"),
+  });
+  if (data?.success === false) throw rejectApiResponse(data, "فشل تعديل الأسئلة");
   return data;
 }
 
@@ -204,9 +213,9 @@ export function mapHistoryItemToSession(item) {
 
 export function deriveActionsFromSession(session) {
   if (!session || session.status !== "proposed") {
-    return { can_approve: false, can_regenerate: false };
+    return { can_approve: false, can_regenerate: false, can_adjust: false };
   }
-  return { can_approve: true, can_regenerate: true };
+  return { can_approve: true, can_regenerate: true, can_adjust: true };
 }
 
 export const QUESTION_TYPE_LABELS = {

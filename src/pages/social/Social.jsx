@@ -117,16 +117,16 @@ const PLATFORM_ICONS = {
 
 const EXAMPLE_PROMPTS = [
   {
-    label: "إعلان كورس جديد",
-    text: "اكتب منشور إعلان عن بداية كورس فيزياء للصف الثالث الثانوي مع دعوة واضحة للحجز.",
+    label: "أفكار تسويقية",
+    text: "اقترح عليّ أفكار تسويقية لكورس فيزياء ثالثة ثانوي على فيسبوك، ونناقش أفضل فكرة قبل التنفيذ.",
   },
   {
-    label: "تصميم مراجعة نهائية",
-    text: "صمم بوست جذاب عن حصة مراجعة نهائية في الرياضيات، النص داخل الصورة يكون قصير وواضح.",
+    label: "مسودة بوست",
+    text: "عايز أفكار بوستات عن مراجعة نهائية في الرياضيات، ورّيني مسودات ونعدّلها سوا قبل ما ننفّذ.",
   },
   {
-    label: "رسالة واتساب",
-    text: "اكتب رسالة واتساب مختصرة لتذكير الطلاب بموعد امتحان شامل يوم الجمعة.",
+    label: "فكرة تصميم",
+    text: "ناقش معايا فكرة تصميم إعلان لحصة مباشرة، وبعد ما نتفق على الشكل ننفّذ الصورة.",
   },
 ];
 
@@ -191,8 +191,14 @@ const Social = () => {
   const [editLastDesign, setEditLastDesign] = useState(false);
   const [references, setReferences] = useState([]);
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState(null);
-  const [lastRequest, setLastRequest] = useState(null);
+  const [executing, setExecuting] = useState(false);
+  const [sessionId, setSessionId] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [actions, setActions] = useState({
+    can_execute: false,
+    can_generate_post: false,
+    can_generate_image: false,
+  });
   const [activeHistoryId, setActiveHistoryId] = useState(null);
   const [isMobileHistoryOpen, setIsMobileHistoryOpen] = useState(false);
 
@@ -208,11 +214,14 @@ const Social = () => {
   const chipBg = useColorModeValue("gray.100", "gray.700");
   const composerShellBg = useColorModeValue("white", "gray.800");
   const composerBorder = useColorModeValue("gray.300", "gray.600");
-  const showWelcome = !lastRequest && !result && !submitting;
+  const showWelcome = messages.length === 0 && !submitting && !executing;
 
   const uploadLimit = options.uploads || FALLBACK_OPTIONS.uploads;
   const promptLength = prompt.trim().length;
-  const canSubmit = promptLength > 0 && promptLength <= 3000 && !submitting;
+  const canSubmit = promptLength > 0 && promptLength <= 4000 && !submitting && !executing;
+  const welcomeText =
+    options?.chat_mode?.welcome_message ||
+    "نتناقش في أفكار تسويقية ومسودات بوستات قبل التنفيذ. لما توافق قول نفّذ أو اضغط زر التنفيذ.";
 
   const loadOptions = async () => {
     try {
@@ -265,7 +274,33 @@ const Social = () => {
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [result, submitting, lastRequest]);
+  }, [messages, submitting, executing]);
+
+  const appendAssistantFromResponse = (data) => {
+    if (data?.session_id) setSessionId(data.session_id);
+    if (data?.actions) setActions(data.actions);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        message: data?.reply || "",
+        ideas: data?.ideas || [],
+        draft_post: data?.draft_post || null,
+        image_concept: data?.image_concept || null,
+        ready_to_execute: Boolean(data?.ready_to_execute),
+        executed: Boolean(data?.executed),
+        generation: data?.generation || null,
+        post_text: data?.post_text || data?.generation?.generated_text || null,
+        image_url: data?.image_url || data?.generation?.generated_image_url || null,
+        suggested_action: data?.suggested_action || "none",
+      },
+    ]);
+    if (data?.generation?.id) {
+      setActiveHistoryId(data.generation.id);
+      loadHistory();
+    }
+  };
 
   const handlePickReferences = () => {
     fileInputRef.current?.click();
@@ -359,7 +394,7 @@ const Social = () => {
     }
   };
 
-  const handleGenerate = async () => {
+  const handleSend = async () => {
     const cleanPrompt = prompt.trim();
 
     if (!cleanPrompt) {
@@ -372,10 +407,10 @@ const Social = () => {
       return;
     }
 
-    if (promptLength > 3000) {
+    if (promptLength > 4000) {
       toast({
         title: "الطلب أطول من المسموح",
-        description: "الحد الأقصى 3000 حرف.",
+        description: "الحد الأقصى 4000 حرف.",
         status: "warning",
         duration: 2500,
         isClosable: true,
@@ -383,59 +418,42 @@ const Social = () => {
       return;
     }
 
-    const requestSnapshot = {
-      prompt: cleanPrompt,
+    const userMessage = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      message: cleanPrompt,
       mode,
       platform,
       tone,
       aspectRatio,
       languageMode,
-      editLastDesign,
       referencePreviews: references.map((item) => item.previewUrl),
     };
 
     try {
       setSubmitting(true);
-      setResult(null);
-      setLastRequest(requestSnapshot);
-
-      if (mode === "post") {
-        const { data } = await baseUrl.post(
-          "/api/teacher/creative-chatbot/posts",
-          { prompt: cleanPrompt, platform, tone },
-          { headers: authHeaders },
-        );
-        setResult({ type: "post", ...data });
-        if (data?.generation?.id) setActiveHistoryId(data.generation.id);
-      } else {
-        const form = new FormData();
-        form.append("prompt", cleanPrompt);
-        form.append("platform", platform);
-        form.append("aspect_ratio", aspectRatio);
-        form.append("language_mode", languageMode);
-        if (editLastDesign) {
-          form.append("edit_last_design", "true");
-        }
-        references.forEach((item) => form.append("references", item.file));
-
-        const { data } = await baseUrl.post("/api/teacher/creative-chatbot/images", form, {
-          headers: authHeaders,
-        });
-        setResult({ type: "image", ...data });
-        if (data?.generation?.id) setActiveHistoryId(data.generation.id);
-      }
-
-      toast({
-        title: mode === "post" ? "تم توليد المنشور بنجاح" : "تم توليد التصميم بنجاح",
-        status: "success",
-        duration: 2200,
-        isClosable: true,
-      });
+      setMessages((prev) => [...prev, userMessage]);
       setPrompt("");
-      loadHistory();
+
+      const form = new FormData();
+      form.append("message", cleanPrompt);
+      if (sessionId) form.append("session_id", String(sessionId));
+      form.append("preferred_output", mode);
+      form.append("platform", platform);
+      form.append("tone", tone);
+      form.append("aspect_ratio", aspectRatio);
+      form.append("language_mode", languageMode);
+      if (editLastDesign) form.append("edit_last_design", "true");
+      references.forEach((item) => form.append("references", item.file));
+
+      const { data } = await baseUrl.post("/api/teacher/creative-chatbot/chat", form, {
+        headers: authHeaders,
+      });
+      appendAssistantFromResponse(data);
+      clearReferences();
     } catch (error) {
       toast({
-        title: "تعذر توليد المحتوى",
+        title: "تعذر إرسال الرسالة",
         description: getErrorMessage(error),
         status: "error",
         duration: 4500,
@@ -446,39 +464,109 @@ const Social = () => {
     }
   };
 
+  const handleExecute = async (requestType) => {
+    if (!sessionId) {
+      toast({
+        title: "ابدأ المحادثة أولاً",
+        status: "warning",
+        duration: 2200,
+        isClosable: true,
+      });
+      return;
+    }
+
+    try {
+      setExecuting(true);
+      const form = new FormData();
+      form.append("session_id", String(sessionId));
+      form.append("request_type", requestType || mode);
+      if (editLastDesign) form.append("edit_last_design", "true");
+      references.forEach((item) => form.append("references", item.file));
+
+      const { data } = await baseUrl.post("/api/teacher/creative-chatbot/chat/execute", form, {
+        headers: authHeaders,
+      });
+      appendAssistantFromResponse(data);
+      clearReferences();
+      toast({
+        title: "تم التنفيذ بنجاح",
+        status: "success",
+        duration: 2200,
+        isClosable: true,
+      });
+    } catch (error) {
+      toast({
+        title: "تعذر التنفيذ",
+        description: getErrorMessage(error),
+        status: "error",
+        duration: 4500,
+        isClosable: true,
+      });
+    } finally {
+      setExecuting(false);
+    }
+  };
+
   const applyHistoryItem = (item) => {
     setIsMobileHistoryOpen(false);
     setActiveHistoryId(item.id);
-    setLastRequest({
-      prompt: item.prompt,
-      mode: item.request_type,
-      platform: item.platform || "general",
-      tone: item.tone || "professional",
-      aspectRatio: item.aspect_ratio || "1:1",
-      languageMode: item.language_mode || options.default_language || "arabic",
-      editLastDesign: Boolean(item.edited_generation_id),
-      referencePreviews: [],
-    });
-    setResult({
-      type: item.request_type,
-      post_text: item.generated_text,
-      image_url: item.generated_image_url,
-      generation: item,
-    });
+    setMessages([
+      {
+        id: `user-history-${item.id}`,
+        role: "user",
+        message: item.prompt,
+        mode: item.request_type,
+        platform: item.platform || "general",
+        tone: item.tone || "professional",
+        aspectRatio: item.aspect_ratio || "1:1",
+        languageMode: item.language_mode || options.default_language || "arabic",
+      },
+      {
+        id: `assistant-history-${item.id}`,
+        role: "assistant",
+        message:
+          item.request_type === "image"
+            ? "هذا تصميم سابق من المحفوظات."
+            : "هذا منشور سابق من المحفوظات.",
+        executed: true,
+        generation: item,
+        post_text: item.generated_text,
+        image_url: item.generated_image_url,
+        ideas: [],
+      },
+    ]);
   };
 
-  const resultText = result?.post_text || result?.generation?.generated_text || "";
-  const resultImage = result?.image_url || result?.generation?.generated_image_url;
-
-  const startNewSession = () => {
+  const startNewSession = async () => {
     setPrompt("");
-    setResult(null);
-    setLastRequest(null);
+    setMessages([]);
+    setActions({
+      can_execute: false,
+      can_generate_post: false,
+      can_generate_image: false,
+    });
     setActiveHistoryId(null);
     setSubmitting(false);
+    setExecuting(false);
     clearReferences();
     setEditLastDesign(false);
     setIsMobileHistoryOpen(false);
+    try {
+      const { data } = await baseUrl.post(
+        "/api/teacher/creative-chatbot/chat/new",
+        {
+          preferred_output: mode,
+          platform,
+          tone,
+          aspect_ratio: aspectRatio,
+          language_mode: languageMode,
+        },
+        { headers: authHeaders },
+      );
+      setSessionId(data?.session_id || null);
+    } catch {
+      setSessionId(null);
+    }
   };
 
   const sidebarProps = {
@@ -548,7 +636,8 @@ const Social = () => {
                   مساعد السوشيال ميديا
                 </Text>
                 <Text fontSize="xs" color={muted} noOfLines={1}>
-                  {getItemLabel(options.platforms, platform)} · {mode === "post" ? "منشور نصي" : "تصميم صورة"}
+                  نقاش أولاً · {getItemLabel(options.platforms, platform)} ·{" "}
+                  {mode === "post" ? "منشور نصي" : "تصميم صورة"}
                 </Text>
               </Box>
             </HStack>
@@ -585,36 +674,67 @@ const Social = () => {
             sx={{ overscrollBehavior: "contain", WebkitOverflowScrolling: "touch" }}
           >
             <Box flex={1} w="full" maxW="48rem" mx="auto">
-              {showWelcome && <AssistantWelcome muted={muted} ink={ink} />}
-
-              {lastRequest && (
-                <UserMessage
-                  request={lastRequest}
-                  platformLabel={getItemLabel(options.platforms, lastRequest.platform)}
-                  toneLabel={getItemLabel(options.tones, lastRequest.tone)}
-                  aspectLabel={getItemLabel(options.aspect_ratios, lastRequest.aspectRatio)}
-                  languageLabel={getItemLabel(options.languages, lastRequest.languageMode)}
-                />
+              {showWelcome && (
+                <AssistantWelcome muted={muted} ink={ink} welcomeText={welcomeText} />
               )}
 
-              {submitting && (
-                <AssistantLoading mode={mode} muted={muted} borderColor={borderColor} panelBg={panelBg} />
+              {messages.map((item) =>
+                item.role === "user" ? (
+                  <UserMessage
+                    key={item.id}
+                    request={{
+                      prompt: item.message,
+                      mode: item.mode || mode,
+                      platform: item.platform || platform,
+                      tone: item.tone || tone,
+                      aspectRatio: item.aspectRatio || aspectRatio,
+                      languageMode: item.languageMode || languageMode,
+                      referencePreviews: item.referencePreviews || [],
+                    }}
+                    platformLabel={getItemLabel(options.platforms, item.platform || platform)}
+                    toneLabel={getItemLabel(options.tones, item.tone || tone)}
+                    aspectLabel={getItemLabel(options.aspect_ratios, item.aspectRatio || aspectRatio)}
+                    languageLabel={getItemLabel(
+                      options.languages,
+                      item.languageMode || languageMode,
+                    )}
+                  />
+                ) : (
+                  <AssistantChatMessage
+                    key={item.id}
+                    item={item}
+                    muted={muted}
+                    ink={ink}
+                    borderColor={borderColor}
+                    panelBg={panelBg}
+                    onCopy={handleCopy}
+                    onDownload={downloadImage}
+                    onExecute={handleExecute}
+                    actions={actions}
+                    executing={executing}
+                    platformLabel={getItemLabel(
+                      options.platforms,
+                      item.generation?.platform || platform,
+                    )}
+                    toneLabel={getItemLabel(options.tones, item.generation?.tone || tone)}
+                    aspectLabel={getItemLabel(
+                      options.aspect_ratios,
+                      item.generation?.aspect_ratio || aspectRatio,
+                    )}
+                    languageLabel={getItemLabel(
+                      options.languages,
+                      item.generation?.language_mode || languageMode,
+                    )}
+                  />
+                ),
               )}
 
-              {result && (
-                <AssistantResult
-                  result={result}
-                  text={resultText}
-                  imageUrl={resultImage}
+              {(submitting || executing) && (
+                <AssistantLoading
+                  mode={executing ? mode : "chat"}
                   muted={muted}
                   borderColor={borderColor}
                   panelBg={panelBg}
-                  onCopy={handleCopy}
-                  onDownload={downloadImage}
-                  platformLabel={getItemLabel(options.platforms, result?.generation?.platform || platform)}
-                  toneLabel={getItemLabel(options.tones, result?.generation?.tone || tone)}
-                  aspectLabel={getItemLabel(options.aspect_ratios, result?.generation?.aspect_ratio || aspectRatio)}
-                  languageLabel={getItemLabel(options.languages, result?.generation?.language_mode || languageMode)}
                 />
               )}
 
@@ -646,8 +766,18 @@ const Social = () => {
             fileInputRef={fileInputRef}
             handleReferenceChange={handleReferenceChange}
             canSubmit={canSubmit}
-            submitting={submitting}
-            handleGenerate={handleGenerate}
+            submitting={submitting || executing}
+            handleGenerate={handleSend}
+            canExecute={actions.can_execute}
+            onExecute={() =>
+              handleExecute(
+                actions.can_generate_image && !actions.can_generate_post
+                  ? "image"
+                  : actions.can_generate_post && !actions.can_generate_image
+                    ? "post"
+                    : mode,
+              )
+            }
             muted={muted}
             subtle={subtle}
             borderColor={borderColor}
@@ -832,21 +962,22 @@ const HistoryList = ({
   );
 };
 
-const AssistantWelcome = ({ muted, ink }) => {
+const AssistantWelcome = ({ muted, ink, welcomeText }) => {
   const iconBg = useColorModeValue("green.50", "green.900");
 
   return (
     <Flex flex={1} align="center" justify="center" minH="full" px={3} py={8} textAlign="center" w="full">
-      <VStack spacing={4} maxW="420px">
+      <VStack spacing={4} maxW="480px">
         <Flex w={14} h={14} borderRadius="2xl" bg={iconBg} color="green.500" align="center" justify="center">
           <Icon as={FiMessageSquare} boxSize={6} />
         </Flex>
         <Box>
           <Text fontSize="lg" fontWeight="semibold" color={ink} lineHeight="1.4" mb={1.5}>
-            ماذا تريد أن تنشر اليوم؟
+            نتناقش قبل التنفيذ
           </Text>
-          <Text color={muted} fontSize="sm" lineHeight="1.75">
-            اكتب طلبك في الأسفل واختر المنصة — نص جاهز أو تصميم صورة.
+          <Text color={muted} fontSize="sm" lineHeight="1.75" whiteSpace="pre-wrap">
+            {welcomeText ||
+              "اقترح أفكار تسويقية ومسودات بوستات، وبعد ما توافق ننفّذ المنشور أو التصميم."}
           </Text>
         </Box>
       </VStack>
@@ -911,7 +1042,11 @@ const AssistantLoading = ({ mode, muted, borderColor, panelBg }) => {
           <Spinner size="sm" color="white" thickness="2px" />
         </Flex>
         <Text fontSize="sm" color={muted} pt={1.5}>
-          {mode === "image" ? "يتم إنشاء التصميم..." : "يتم صياغة المنشور..."}
+          {mode === "image"
+            ? "يتم إنشاء التصميم..."
+            : mode === "chat"
+              ? "بيفكر ويقترح أفكار..."
+              : "يتم صياغة المنشور..."}
         </Text>
       </HStack>
       {mode === "image" && <ImageGenerationPreview borderColor={borderColor} panelBg={panelBg} />}
@@ -938,6 +1073,171 @@ const ImageGenerationPreview = ({ borderColor, panelBg }) => (
     />
   </Box>
 );
+
+const AssistantChatMessage = ({
+  item,
+  muted,
+  ink,
+  borderColor,
+  panelBg,
+  onCopy,
+  onDownload,
+  onExecute,
+  actions,
+  executing,
+  platformLabel,
+  toneLabel,
+  aspectLabel,
+  languageLabel,
+}) => {
+  const assistantIconBg = useColorModeValue("green.500", "green.400");
+  const softBg = useColorModeValue("green.50", "whiteAlpha.100");
+  const textColor = useColorModeValue("gray.800", "gray.100");
+  const draftText = item.post_text || item.draft_post || "";
+  const imageUrl = item.image_url || null;
+  const showExecute =
+    Boolean(item.ready_to_execute) && Boolean(actions?.can_execute) && !item.executed;
+
+  return (
+    <Box px={{ base: 3, md: 4 }} py={4} w="full">
+      <HStack spacing={3} align="start" mb={3}>
+        <Flex
+          boxSize={8}
+          borderRadius="full"
+          bg={assistantIconBg}
+          align="center"
+          justify="center"
+          flexShrink={0}
+        >
+          <Icon as={FiMessageSquare} boxSize={3.5} color="white" />
+        </Flex>
+        <Box flex={1} minW={0}>
+          <Text fontSize="sm" fontWeight="semibold" color={ink} mb={1}>
+            المساعد
+          </Text>
+          <Text whiteSpace="pre-wrap" lineHeight="1.85" fontSize="sm" color={textColor}>
+            {item.message}
+          </Text>
+        </Box>
+      </HStack>
+
+      {item.ideas?.length > 0 && (
+        <Box
+          mr={{ base: 0, md: 11 }}
+          mb={3}
+          borderWidth="1px"
+          borderColor={borderColor}
+          borderRadius="xl"
+          bg={softBg}
+          p={3}
+        >
+          <Text fontSize="xs" fontWeight="bold" color={muted} mb={2}>
+            أفكار مقترحة
+          </Text>
+          <VStack align="stretch" spacing={2}>
+            {item.ideas.map((idea, index) => (
+              <Text key={`${item.id}-idea-${index}`} fontSize="sm" color={textColor}>
+                {index + 1}. {idea}
+              </Text>
+            ))}
+          </VStack>
+        </Box>
+      )}
+
+      {item.image_concept && !imageUrl && (
+        <Box
+          mr={{ base: 0, md: 11 }}
+          mb={3}
+          borderWidth="1px"
+          borderColor={borderColor}
+          borderRadius="xl"
+          bg={panelBg}
+          p={3}
+        >
+          <Text fontSize="xs" fontWeight="bold" color={muted} mb={1}>
+            فكرة التصميم
+          </Text>
+          <Text whiteSpace="pre-wrap" fontSize="sm" color={textColor}>
+            {item.image_concept}
+          </Text>
+        </Box>
+      )}
+
+      {draftText && !item.executed && (
+        <Box
+          mr={{ base: 0, md: 11 }}
+          mb={3}
+          borderWidth="1px"
+          borderColor={borderColor}
+          borderRadius="xl"
+          bg={panelBg}
+          p={3}
+        >
+          <Flex justify="space-between" align="center" mb={2} gap={2}>
+            <Text fontSize="xs" fontWeight="bold" color={muted}>
+              مسودة للنقاش
+            </Text>
+            <Button size="xs" variant="ghost" leftIcon={<FaCopy />} onClick={() => onCopy(draftText)}>
+              نسخ
+            </Button>
+          </Flex>
+          <Text whiteSpace="pre-wrap" fontSize="sm" color={textColor} lineHeight="1.8">
+            {draftText}
+          </Text>
+        </Box>
+      )}
+
+      {item.executed && (
+        <Box mr={{ base: 0, md: 11 }}>
+          <AssistantResult
+            result={{
+              type: imageUrl ? "image" : "post",
+              generation: item.generation,
+            }}
+            text={draftText}
+            imageUrl={imageUrl}
+            muted={muted}
+            borderColor={borderColor}
+            panelBg={panelBg}
+            onCopy={onCopy}
+            onDownload={onDownload}
+            platformLabel={platformLabel}
+            toneLabel={toneLabel}
+            aspectLabel={aspectLabel}
+            languageLabel={languageLabel}
+          />
+        </Box>
+      )}
+
+      {showExecute && (
+        <HStack mr={{ base: 0, md: 11 }} mt={2} spacing={2} flexWrap="wrap">
+          {actions.can_generate_post && (
+            <Button
+              size="sm"
+              colorScheme="green"
+              borderRadius="lg"
+              isLoading={executing}
+              onClick={() => onExecute("post")}
+            >
+              نفّذ المنشور
+            </Button>
+          )}
+          {actions.can_generate_image && (
+            <Button
+              size="sm"
+              colorScheme="teal"
+              borderRadius="lg"
+              isLoading={executing}
+              onClick={() => onExecute("image")}
+            >
+              نفّذ التصميم
+            </Button>
+          )}
+        </HStack>
+      )}
+    </Box>
+  );
+};
 
 const AssistantResult = ({
   result,
@@ -1050,6 +1350,8 @@ const ChatComposer = ({
   canSubmit,
   submitting,
   handleGenerate,
+  canExecute,
+  onExecute,
   muted,
   subtle,
   borderColor,
@@ -1215,6 +1517,20 @@ const ChatComposer = ({
             />
           </Flex>
         </Box>
+
+        {canExecute ? (
+          <Button
+            mt={2}
+            size="sm"
+            w="full"
+            colorScheme="teal"
+            borderRadius="lg"
+            onClick={onExecute}
+            isLoading={submitting}
+          >
+            نفّذ المسودة المتفق عليها
+          </Button>
+        ) : null}
 
         <Flex mt={1.5} align="center" gap={1.5} flexWrap="wrap">
           <HStack spacing={0} bg={chipBg} borderRadius="full" p={0.5} flexShrink={0}>

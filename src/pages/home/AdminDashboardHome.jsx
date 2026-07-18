@@ -23,6 +23,7 @@ import {
 import { FaChalkboardTeacher } from "react-icons/fa";
 import ScrollToTop from "../../components/scollToTop/ScrollToTop";
 import AdminTenantsPanel from "./components/AdminTenantsPanel";
+import InstallPWAButton from "../../components/pwa/InstallPWAButton";
 import { AD_BLUE, AD_ORANGE } from "./adminDashboardTheme";
 
 function formatNumber(value) {
@@ -167,6 +168,11 @@ const AdminDashboardHome = () => {
               >
                 إدارة الباقات
               </Button>
+              <InstallPWAButton
+                label="تثبيت التطبيق"
+                variant="solid"
+                className="!w-auto !py-2 !px-4 !text-xs !rounded-lg"
+              />
             </HStack>
           </Flex>
 

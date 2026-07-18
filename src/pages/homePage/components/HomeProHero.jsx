@@ -1,5 +1,6 @@
 import { FaArrowLeft, FaQrcode, FaUser, FaPlay } from "react-icons/fa";
 import { MdSchedule } from "react-icons/md";
+import InstallPWAButton from "../../../components/pwa/InstallPWAButton";
 
 export default function HomeProHero({
   studentName,
@@ -81,6 +82,8 @@ export default function HomeProHero({
                   تفعيل بالـ QR
                 </button>
               ) : null}
+              {/* PWA: يظهر فقط إذا كان التثبيت متاحاً وغير مثبت */}
+              <InstallPWAButton label="تثبيت التطبيق" variant="hero" />
             </div>
           </div>
 

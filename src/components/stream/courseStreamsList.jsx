@@ -19,11 +19,10 @@ import {
   ModalBody,
   ModalCloseButton,
   useDisclosure,
-  Container,
   VStack,
   Icon,
-  Avatar,
-  Tooltip
+  Tooltip,
+  Center,
 } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -34,8 +33,10 @@ import {
   FaTrash,
   FaVideo,
   FaCalendarAlt,
-  FaClock,
-  FaDownload
+  FaDownload,
+  FaBroadcastTower,
+  FaHourglassHalf,
+  FaCheckCircle,
 } from "react-icons/fa";
 import { useState } from "react";
 import baseUrl from "../../api/baseUrl";
@@ -51,17 +52,282 @@ const fetchStreams = async (courseId) => {
   return res.data;
 };
 
-const statusLabel = {
-  started: "مباشر الآن",
-  idle: "قيد الانتظار",
-  ended: "منتهي",
+const STATUS_META = {
+  started: {
+    label: "مباشر الآن",
+    scheme: "red",
+    accent: "#E53E3E",
+    icon: FaBroadcastTower,
+  },
+  idle: {
+    label: "قيد الانتظار",
+    scheme: "orange",
+    accent: "#DD6B20",
+    icon: FaHourglassHalf,
+  },
+  ended: {
+    label: "منتهي",
+    scheme: "gray",
+    accent: "#718096",
+    icon: FaCheckCircle,
+  },
 };
 
-const statusColor = {
-  started: "red",
-  idle: "orange",
-  ended: "gray",
-};
+function LivePulseDot() {
+  return (
+    <Box position="relative" w={2.5} h={2.5} flexShrink={0}>
+      <Box
+        position="absolute"
+        inset={0}
+        borderRadius="full"
+        bg="red.500"
+        animation="streamPing 1.2s cubic-bezier(0,0,0.2,1) infinite"
+        sx={{
+          "@keyframes streamPing": {
+            "75%, 100%": { transform: "scale(2.4)", opacity: 0 },
+          },
+        }}
+      />
+      <Box position="absolute" inset={0} borderRadius="full" bg="red.500" />
+    </Box>
+  );
+}
+
+function StreamCard({
+  stream,
+  downloadingId,
+  onJoin,
+  onClose,
+  onEdit,
+  onDelete,
+  onDownload,
+}) {
+  const meta = STATUS_META[stream.status] || STATUS_META.ended;
+  const isLive = stream.status === "started";
+  const isIdle = stream.status === "idle";
+  const isEnded = stream.status === "ended";
+
+  const cardBg = useColorModeValue("white", "gray.800");
+  const border = useColorModeValue("gray.200", "gray.700");
+  const titleColor = useColorModeValue("gray.900", "white");
+  const muted = useColorModeValue("gray.500", "gray.400");
+  const idChipBg = useColorModeValue("gray.100", "whiteAlpha.100");
+  const iconSoftBg = useColorModeValue(
+    isLive ? "red.50" : isIdle ? "orange.50" : "gray.100",
+    "whiteAlpha.100",
+  );
+
+  return (
+    <Box
+      bg={cardBg}
+      borderWidth="1px"
+      borderColor={isLive ? "red.300" : border}
+      borderRadius="2xl"
+      overflow="hidden"
+      transition="all 0.2s ease"
+      boxShadow={isLive ? "0 8px 28px rgba(229,62,62,0.18)" : "0 1px 3px rgba(15,23,42,0.05)"}
+      _hover={{
+        transform: "translateY(-2px)",
+        boxShadow: isLive
+          ? "0 12px 32px rgba(229,62,62,0.22)"
+          : "0 8px 20px rgba(15,23,42,0.08)",
+        borderColor: isLive ? "red.400" : `${meta.accent}66`,
+      }}
+      dir="rtl"
+    >
+      <Box h="4px" bg={meta.accent} />
+
+      <Flex
+        direction={{ base: "column", md: "row" }}
+        align={{ base: "stretch", md: "center" }}
+        gap={{ base: 3.5, md: 4 }}
+        p={{ base: 4, md: 5 }}
+      >
+        {/* الأيقونة + البيانات */}
+        <HStack spacing={3.5} flex={1} minW={0} align="flex-start">
+          <Center
+            w={{ base: 12, md: 14 }}
+            h={{ base: 12, md: 14 }}
+            borderRadius="xl"
+            bg={isLive ? "red.500" : iconSoftBg}
+            color={isLive ? "white" : meta.accent}
+            flexShrink={0}
+            boxShadow={isLive ? "0 6px 16px rgba(229,62,62,0.4)" : "none"}
+          >
+            <Icon
+              as={meta.icon}
+              boxSize={{ base: 5, md: 6 }}
+              animation={isLive ? "pulse 1.5s ease-in-out infinite" : undefined}
+            />
+          </Center>
+
+          <Box minW={0} flex={1}>
+            <HStack spacing={2} flexWrap="wrap">
+              <Text
+                fontWeight="800"
+                fontSize={{ base: "md", md: "lg" }}
+                color={titleColor}
+                noOfLines={1}
+              >
+                {stream.title}
+              </Text>
+              <HStack
+                spacing={1.5}
+                bg={isLive ? "red.50" : "transparent"}
+                _dark={{ bg: isLive ? "rgba(229,62,62,0.15)" : "transparent" }}
+                px={isLive ? 2.5 : 0}
+                py={isLive ? 1 : 0}
+                borderRadius="full"
+              >
+                {isLive && <LivePulseDot />}
+                <Badge
+                  colorScheme={meta.scheme}
+                  variant={isLive ? "solid" : "subtle"}
+                  borderRadius="full"
+                  px={2.5}
+                  fontSize="xs"
+                  fontWeight="700"
+                >
+                  {meta.label}
+                </Badge>
+              </HStack>
+            </HStack>
+
+            <HStack color={muted} fontSize="sm" spacing={3} mt={1.5} flexWrap="wrap">
+              <HStack spacing={1.5}>
+                <Icon as={FaCalendarAlt} boxSize={3} />
+                <Text fontSize="xs">
+                  {new Date(stream.created_at || Date.now()).toLocaleDateString("ar-EG", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </Text>
+              </HStack>
+              <Text
+                fontFamily="mono"
+                fontSize="11px"
+                bg={idChipBg}
+                px={2}
+                py={0.5}
+                borderRadius="md"
+                dir="ltr"
+              >
+                #{stream.id}
+              </Text>
+            </HStack>
+          </Box>
+        </HStack>
+
+        {/* الإجراءات */}
+        <Flex
+          align="center"
+          gap={2}
+          flexWrap="wrap"
+          justify={{ base: "stretch", md: "flex-end" }}
+          flexShrink={0}
+        >
+          {(isLive || isIdle) && (
+            <Button
+              as="a"
+              href={onJoin(stream)}
+              target="_blank"
+              rel="noopener noreferrer"
+              leftIcon={<Icon as={FaPlay} boxSize={3} />}
+              colorScheme={isLive ? "red" : "blue"}
+              size="sm"
+              borderRadius="xl"
+              fontWeight="700"
+              px={5}
+              flex={{ base: 1, md: "initial" }}
+              boxShadow={isLive ? "0 4px 14px rgba(229,62,62,0.35)" : "none"}
+              cursor="pointer"
+            >
+              {isLive ? "انضم الآن" : "دخول البث"}
+            </Button>
+          )}
+
+          {isEnded && stream.egress_url && (
+            <Button
+              as={Link}
+              href={stream.egress_url}
+              isExternal
+              leftIcon={<Icon as={FaExternalLinkAlt} boxSize={3} />}
+              colorScheme="purple"
+              variant="outline"
+              size="sm"
+              borderRadius="xl"
+              fontWeight="700"
+              flex={{ base: 1, md: "initial" }}
+              cursor="pointer"
+            >
+              مشاهدة التسجيل
+            </Button>
+          )}
+
+          {isEnded && (
+            <Button
+              leftIcon={<Icon as={FaDownload} boxSize={3} />}
+              colorScheme="green"
+              variant="outline"
+              size="sm"
+              isLoading={downloadingId === stream.id}
+              loadingText="جاري التحميل..."
+              borderRadius="xl"
+              fontWeight="700"
+              flex={{ base: 1, md: "initial" }}
+              cursor="pointer"
+              onClick={() => onDownload(stream.id, stream.title)}
+            >
+              تحميل التسجيل
+            </Button>
+          )}
+
+          <HStack spacing={1}>
+            {(isLive || isIdle) && (
+              <Tooltip label="إغلاق البث" hasArrow>
+                <IconButton
+                  icon={<FaTimesCircle />}
+                  aria-label="إغلاق البث"
+                  colorScheme="orange"
+                  variant="ghost"
+                  size="sm"
+                  borderRadius="lg"
+                  cursor="pointer"
+                  onClick={() => onClose(stream.id)}
+                />
+              </Tooltip>
+            )}
+            <Tooltip label="تعديل العنوان" hasArrow>
+              <IconButton
+                icon={<FaEdit />}
+                aria-label="تعديل"
+                colorScheme="blue"
+                variant="ghost"
+                size="sm"
+                borderRadius="lg"
+                cursor="pointer"
+                onClick={() => onEdit(stream)}
+              />
+            </Tooltip>
+            <Tooltip label="حذف الجلسة" hasArrow>
+              <IconButton
+                icon={<FaTrash />}
+                aria-label="حذف"
+                colorScheme="red"
+                variant="ghost"
+                size="sm"
+                borderRadius="lg"
+                cursor="pointer"
+                onClick={() => onDelete(stream)}
+              />
+            </Tooltip>
+          </HStack>
+        </Flex>
+      </Flex>
+    </Box>
+  );
+}
 
 const CourseStreamsList = ({ courseId }) => {
   const { data, isLoading, isError, refetch } = useQuery({
@@ -71,16 +337,23 @@ const CourseStreamsList = ({ courseId }) => {
 
   const subTextColor = useColorModeValue("gray.500", "gray.400");
   const cardBg = useColorModeValue("white", "gray.800");
-  const borderColor = useColorModeValue("gray.100", "gray.700");
+  const borderColor = useColorModeValue("gray.200", "gray.700");
+  const headingColor = useColorModeValue("gray.900", "white");
+  const errorBg = useColorModeValue("red.50", "red.900");
+  const errorBorder = useColorModeValue("red.200", "red.700");
+  const errorIcon = useColorModeValue("red.500", "red.300");
+  const errorText = useColorModeValue("red.600", "red.200");
+  const emptyIconBg = useColorModeValue("gray.50", "gray.700");
 
   const streams = data?.meetings || [];
+  const liveCount = streams.filter((s) => s.status === "started").length;
 
   // state for edit & delete
   const [editingStream, setEditingStream] = useState(null);
   const [newTitle, setNewTitle] = useState("");
   const [deletingStream, setDeletingStream] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { onOpen, onClose } = useDisclosure();
 
   const handleUpdateTitle = async () => {
     try {
@@ -166,204 +439,73 @@ const CourseStreamsList = ({ courseId }) => {
 
   if (isError) {
     return (
-      <Box textAlign="center" py={10} bg={useColorModeValue("red.50", "red.900")} borderRadius="xl" border="1px dashed" borderColor={useColorModeValue("red.200", "red.700")}>
-        <Icon as={FaTimesCircle} color={useColorModeValue("red.500", "red.300")} boxSize={10} mb={3} />
-        <Text color={useColorModeValue("red.600", "red.200")} fontWeight="bold">حدث خطأ أثناء تحميل البيانات</Text>
+      <Box
+        textAlign="center"
+        py={10}
+        bg={errorBg}
+        borderRadius="xl"
+        border="1px dashed"
+        borderColor={errorBorder}
+      >
+        <Icon as={FaTimesCircle} color={errorIcon} boxSize={10} mb={3} />
+        <Text color={errorText} fontWeight="bold">حدث خطأ أثناء تحميل البيانات</Text>
       </Box>
     );
   }
 
   return (
-    <Box mt={8}>
-      <Flex justify="space-between" align="center" mb={6}>
-        <Heading as="h2" size="lg" color={useColorModeValue("gray.700", "white")}>
-          جلسات البث المباشر
-        </Heading>
-        <Badge colorScheme="blue" borderRadius="full" px={3} py={1}>
-          {streams.length} جلسة
-        </Badge>
+    <Box dir="rtl">
+      {/* الهيدر */}
+      <Flex justify="space-between" align="center" mb={5} flexWrap="wrap" gap={2}>
+        <Box>
+          <Heading as="h2" size="md" fontWeight="800" color={headingColor}>
+            جلسات البث المباشر
+          </Heading>
+          <Text fontSize="sm" color={subTextColor} mt={0.5}>
+            إدارة جلساتك المباشرة وتسجيلاتها
+          </Text>
+        </Box>
+        <HStack spacing={2}>
+          {liveCount > 0 && (
+            <HStack
+              spacing={1.5}
+              bg="red.50"
+              _dark={{ bg: "rgba(229,62,62,0.15)" }}
+              px={3}
+              py={1.5}
+              borderRadius="full"
+            >
+              <LivePulseDot />
+              <Text fontSize="xs" fontWeight="800" color="red.500">
+                {liveCount} بث شغال
+              </Text>
+            </HStack>
+          )}
+          <Badge colorScheme="blue" borderRadius="full" px={3} py={1.5} fontSize="xs">
+            {streams.length} جلسة
+          </Badge>
+        </HStack>
       </Flex>
 
       {streams.length > 0 ? (
-        <VStack spacing={4} align="stretch">
+        <VStack spacing={3.5} align="stretch">
           {streams.map((stream) => (
-            <Flex
+            <StreamCard
               key={stream.id}
-              className="modern-card"
-              p={{ base: 4, md: 5 }}
-              borderWidth="1px"
-              borderColor={stream.status === 'started' ? "red.200" : borderColor}
-              borderRadius="2xl"
-              boxShadow={stream.status === 'started' ? "0 4px 20px rgba(229, 62, 62, 0.15)" : "sm"}
-              bg={cardBg}
-              direction={{ base: "column", md: "row" }}
-              align={{ base: "stretch", md: "center" }}
-              justify="space-between"
-              gap={{ base: 4, md: 6 }}
-              transition="all 0.3s ease"
-              _hover={{ transform: "translateY(-2px)", boxShadow: "md" }}
-              position="relative"
-              overflow="hidden"
-            >
-              {stream.status === 'started' && (
-                <Box
-                  position="absolute"
-                  top={0}
-                  right={0}
-                  width="4px"
-                  height="100%"
-                  bg="red.500"
-                />
-              )}
-
-              {/* Left side: Icon + Info */}
-              <HStack spacing={4} flex={1}>
-                <Flex
-                  align="center"
-                  justify="center"
-                  w={{ base: 12, md: 14 }}
-                  h={{ base: 12, md: 14 }}
-                  borderRadius="2xl"
-                  bg={stream.status === 'started' ? useColorModeValue("red.50", "red.900") : useColorModeValue("blue.50", "blue.900")}
-                  color={stream.status === 'started' ? useColorModeValue("red.500", "red.300") : useColorModeValue("blue.500", "blue.300")}
-                  flexShrink={0}
-                >
-                  <Icon as={FaVideo} boxSize={{ base: 5, md: 6 }} />
-                </Flex>
-
-                <VStack align="start" spacing={1} overflow="hidden">
-                  <HStack>
-                    <Heading size="md" noOfLines={1} color={useColorModeValue("gray.800", "white")}>
-                      {stream.title}
-                    </Heading>
-                    <Badge
-                      colorScheme={statusColor[stream.status]}
-                      px={2}
-                      py={0.5}
-                      borderRadius="md"
-                      fontSize="xs"
-                      variant="subtle"
-                    >
-                      {statusLabel[stream.status]}
-                    </Badge>
-                  </HStack>
-
-                  <HStack color="gray.500" fontSize="sm" spacing={3}>
-                    <HStack spacing={1}>
-                      <Icon as={FaCalendarAlt} boxSize={3} />
-                      <Text>{new Date(stream.created_at || Date.now()).toLocaleDateString('ar-EG')}</Text>
-                    </HStack>
-                    <Text color="gray.300">•</Text>
-                    <Text fontFamily="monospace" fontSize="xs" bg={useColorModeValue("gray.100", "gray.700")} px={2} py={0.5} borderRadius="md">{stream.id}</Text>
-                  </HStack>
-                </VStack>
-              </HStack>
-
-              {/* Right side: Actions */}
-              <Flex
-                align="center"
-                gap={3}
-                direction={{ base: "column", sm: "row" }}
-                width={{ base: "full", md: "auto" }}
-                mt={{ base: 2, md: 0 }}
-              >
-                {(stream.status === "started" || stream.status === "idle") && (
-                  <Button
-                    as="a"
-                    href={`${STREAM_REDIRECT_URL}/${stream.id
-                      }?t=${localStorage.getItem("token")}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    leftIcon={<Icon as={FaPlay} />}
-                    colorScheme={stream.status === 'started' ? "red" : "blue"}
-                    size="md"
-                    borderRadius="xl"
-                    width={{ base: "full", sm: "auto" }}
-                    _hover={{ transform: 'scale(1.02)' }}
-                    boxShadow={stream.status === 'started' ? "0 4px 12px rgba(229, 62, 62, 0.4)" : "none"}
-                  >
-                    {stream.status === 'started' ? "انضم الآن" : "دخول البث"}
-                  </Button>
-                )}
-
-                {stream.status === "ended" && stream.egress_url && (
-                  <Button
-                    as={Link}
-                    href={stream.egress_url}
-                    isExternal
-                    leftIcon={<Icon as={FaExternalLinkAlt} />}
-                    colorScheme="purple"
-                    variant="outline"
-                    size="md"
-                    borderRadius="xl"
-                    width={{ base: "full", sm: "auto" }}
-                  >
-                    مشاهدة التسجيل
-                  </Button>
-                )}
-
-                {stream.status === "ended" && (
-                  <Button
-                    leftIcon={<Icon as={FaDownload} />}
-                    colorScheme="green"
-                    variant="solid"
-                    size="md"
-                    isLoading={downloadingId === stream.id}
-                    borderRadius="xl"
-                    width={{ base: "full", sm: "auto" }}
-                    onClick={() => handleDownload(stream.id, stream.title)}
-                  >
-                    تحميل التسجيل
-                  </Button>
-                )}
-
-                <HStack width={{ base: "full", sm: "auto" }} justify={{ base: "center", sm: "flex-end" }}>
-                  {(stream.status === "started" || stream.status === "idle") && (
-                    <Tooltip label="إغلاق البث">
-                      <IconButton
-                        icon={<FaTimesCircle />}
-                        aria-label="إغلاق البث"
-                        colorScheme="orange"
-                        variant="ghost"
-                        size="md"
-                        onClick={() => handleCloseStream(stream.id)}
-                        borderRadius="lg"
-                      />
-                    </Tooltip>
-                  )}
-
-                  <Tooltip label="تعديل العنوان">
-                    <IconButton
-                      icon={<FaEdit />}
-                      aria-label="تعديل"
-                      colorScheme="blue"
-                      variant="ghost"
-                      size="md"
-                      onClick={() => {
-                        setEditingStream(stream);
-                        setNewTitle(stream.title);
-                      }}
-                      borderRadius="lg"
-                    />
-                  </Tooltip>
-
-                  <Tooltip label="حذف الجلسة">
-                    <IconButton
-                      icon={<FaTrash />}
-                      aria-label="حذف"
-                      colorScheme="red"
-                      variant="ghost"
-                      size="md"
-                      onClick={() => {
-                        setDeletingStream(stream);
-                        onOpen();
-                      }}
-                      borderRadius="lg"
-                    />
-                  </Tooltip>
-                </HStack>
-              </Flex>
-            </Flex>
+              stream={stream}
+              downloadingId={downloadingId}
+              onJoin={(s) => `${STREAM_REDIRECT_URL}/${s.id}?t=${localStorage.getItem("token")}`}
+              onClose={handleCloseStream}
+              onEdit={(s) => {
+                setEditingStream(s);
+                setNewTitle(s.title);
+              }}
+              onDelete={(s) => {
+                setDeletingStream(s);
+                onOpen();
+              }}
+              onDownload={handleDownload}
+            />
           ))}
         </VStack>
       ) : (
@@ -377,11 +519,11 @@ const CourseStreamsList = ({ courseId }) => {
           border="2px dashed"
           borderColor={borderColor}
         >
-          <Box p={4} bg={useColorModeValue("gray.50", "gray.700")} borderRadius="full" mb={4}>
+          <Center p={4} bg={emptyIconBg} borderRadius="full" mb={4}>
             <Icon as={FaVideo} color={subTextColor} boxSize={10} />
-          </Box>
-          <Text color={useColorModeValue("gray.500", "gray.400")} fontSize="lg" fontWeight="bold">لا توجد جلسات مباشرة حالياً</Text>
-          <Text color={useColorModeValue("gray.400", "gray.500")} fontSize="sm">عند بدء بث مباشر جديد سيظهر هنا</Text>
+          </Center>
+          <Text color={subTextColor} fontSize="lg" fontWeight="bold">لا توجد جلسات مباشرة حالياً</Text>
+          <Text color={subTextColor} fontSize="sm" mt={1}>عند بدء بث مباشر جديد سيظهر هنا</Text>
         </Flex>
       )}
 
@@ -393,9 +535,9 @@ const CourseStreamsList = ({ courseId }) => {
         motionPreset="slideInBottom"
       >
         <ModalOverlay backdropFilter="blur(5px)" bg="blackAlpha.300" />
-        <ModalContent borderRadius="2xl">
+        <ModalContent borderRadius="2xl" dir="rtl">
           <ModalHeader borderBottomWidth="1px">تعديل عنوان الجلسة</ModalHeader>
-          <ModalCloseButton />
+          <ModalCloseButton left={3} right="auto" />
           <ModalBody py={6}>
             <VStack spacing={4} align="stretch">
               <Text fontSize="sm" color="gray.500">قم بتحديث عنوان الجلسة ليظهر للطلاب بشكل صحيح.</Text>
@@ -409,10 +551,9 @@ const CourseStreamsList = ({ courseId }) => {
               />
             </VStack>
           </ModalBody>
-          <ModalFooter borderTopWidth="1px">
+          <ModalFooter borderTopWidth="1px" gap={2}>
             <Button
               variant="ghost"
-              mr={3}
               onClick={() => setEditingStream(null)}
               borderRadius="xl"
             >
@@ -433,9 +574,19 @@ const CourseStreamsList = ({ courseId }) => {
         size="sm"
       >
         <ModalOverlay backdropFilter="blur(5px)" bg="blackAlpha.300" />
-        <ModalContent borderRadius="2xl" textAlign="center" pt={6}>
+        <ModalContent borderRadius="2xl" textAlign="center" pt={6} dir="rtl">
           <ModalBody>
-            <Icon as={FaTrash} color="red.500" boxSize={12} mb={4} />
+            <Center
+              mx="auto"
+              mb={4}
+              w={14}
+              h={14}
+              borderRadius="2xl"
+              bg="red.50"
+              _dark={{ bg: "rgba(229,62,62,0.15)" }}
+            >
+              <Icon as={FaTrash} color="red.500" boxSize={6} />
+            </Center>
             <Heading size="md" mb={2}>حذف الجلسة؟</Heading>
             <Text color="gray.500">
               هل أنت متأكد من حذف <strong>"{deletingStream?.title}"</strong>؟ <br />

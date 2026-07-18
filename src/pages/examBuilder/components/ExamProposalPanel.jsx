@@ -47,9 +47,12 @@ export default function ExamProposalPanel({
   onApprove,
   onOpenExam,
   onExportPdf,
+  onRemoveQuestion,
+  onReplaceQuestion,
   exportingPdf = false,
   regenerating,
   approving,
+  adjusting = false,
   readOnly = false,
   hideReply = false,
   embedded = false,
@@ -68,6 +71,7 @@ export default function ExamProposalPanel({
   const available = session?.available_count;
   const statusLabel = SESSION_STATUS_LABELS[session?.status] || session?.status;
   const showActions = !readOnly && (actions?.can_approve || actions?.can_regenerate);
+  const canAdjust = !readOnly && (actions?.can_adjust || actions?.can_regenerate);
   const hasExam = session?.exam_id && session?.exam_type;
 
   return (
@@ -181,7 +185,15 @@ export default function ExamProposalPanel({
       <Box px={{ base: 3, md: 4, lg: 6 }} py={{ base: 3, md: 4 }}>
         <VStack spacing={3} align="stretch">
           {questions.map((q, idx) => (
-            <ProposalQuestionCard key={`${q.source}-${q.id}`} item={q} index={idx} />
+            <ProposalQuestionCard
+              key={`${q.source}-${q.id}-${idx}`}
+              item={q}
+              index={idx}
+              canAdjust={canAdjust}
+              adjusting={adjusting}
+              onRemove={onRemoveQuestion}
+              onReplace={onReplaceQuestion}
+            />
           ))}
         </VStack>
       </Box>
