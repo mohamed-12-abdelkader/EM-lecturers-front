@@ -27,7 +27,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AppRouter />
-      <ToastContainer />
+      <ToastContainer rtl newestOnTop position="top-center" />
     </QueryClientProvider>
   );
 }

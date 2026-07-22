@@ -14,7 +14,7 @@ import DesktopInstallGuideModal from "./DesktopInstallGuideModal";
 export default function InstallPWAButton({
   label = "تثبيت التطبيق",
   className = "",
-  variant = "hero", // "hero" | "solid"
+  variant = "hero", // "hero" | "solid" | "link"
 }) {
   const { canShowInstallButton, canInstallNative, isIos, promptInstall } =
     usePWAInstall();
@@ -61,8 +61,12 @@ export default function InstallPWAButton({
     "inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-bold text-blue-600 shadow-lg shadow-blue-900/20 ring-1 ring-white/60 transition hover:bg-orange-50 hover:text-orange-600 hover:shadow-orange-500/25 sm:w-auto";
   const baseSolid =
     "inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition hover:bg-orange-500 hover:shadow-orange-500/30 sm:w-auto";
+  const baseLink =
+    "inline-flex items-center justify-center gap-1.5 bg-transparent p-0 text-xs font-bold text-slate-500 shadow-none ring-0 transition hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400";
 
-  const buttonClass = `${variant === "solid" ? baseSolid : baseHero} ${className}`.trim();
+  const buttonClass = `${
+    variant === "solid" ? baseSolid : variant === "link" ? baseLink : baseHero
+  } ${className}`.trim();
 
   return (
     <>
@@ -74,7 +78,7 @@ export default function InstallPWAButton({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.96 }}
             transition={{ type: "spring", stiffness: 380, damping: 28, delay: 0.1 }}
-            className="w-full sm:w-auto"
+            className={variant === "link" ? "w-auto" : "w-full sm:w-auto"}
           >
             <motion.button
               type="button"

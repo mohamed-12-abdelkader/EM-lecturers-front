@@ -64,6 +64,7 @@ import ScientificChatPanel from "../../components/scientificChat/ScientificChatP
 import HomeProHero from "./components/HomeProHero";
 import HomeProStats from "./components/HomeProStats";
 import HomeProQuickActions from "./components/HomeProQuickActions";
+import HomePlatformCourseCard from "./components/HomePlatformCourseCard";
 
 const MotionBox = motion(Box);
 const MotionCard = motion(Card);
@@ -972,8 +973,6 @@ const HomePage = () => {
           teacherName={teacherDisplayName}
           teacherAvatar={teacherAvatar}
           enrolledCount={enrolledCount}
-          onStartLearning={() => navigate("/my-courses")}
-          onContinue={() => navigate("/lectures_taple")}
           onActivateWithQr={() => setIsQrScannerOpen(true)}
         />
 
@@ -1033,21 +1032,27 @@ const HomePage = () => {
           </Box>
         </Box>
 
-        {/* Available courses */}
-        <Box px={{ base: 4, md: 6 }} maxW="7xl" w="full" mx="auto" pb={2}>
+        {/* Available courses — أعرض على الموبايل، والشاشات الكبيرة كما كانت (3 أعمدة) */}
+        <Box
+          px={{ base: 1.5, md: 6 }}
+          maxW="7xl"
+          w="full"
+          mx="auto"
+          pb={2}
+        >
           <Box
             bg={sectionCardBg}
-            borderWidth="1px"
+            borderWidth={{ base: 0, md: "1px" }}
             borderColor={sectionBorder}
-            borderRadius="2xl"
+            borderRadius={{ base: "xl", md: "2xl" }}
             overflow="hidden"
-            boxShadow="sm"
+            boxShadow={{ base: "none", md: "sm" }}
           >
             <Flex
               align="center"
               justify="space-between"
               gap={3}
-              px={{ base: 4, md: 5 }}
+              px={{ base: 2, md: 5 }}
               py={4}
               borderBottomWidth="1px"
               borderColor={sectionBorder}
@@ -1074,11 +1079,11 @@ const HomePage = () => {
               )}
             </Flex>
 
-            <Box p={{ base: 3, md: 4 }}>
+            <Box p={{ base: 1.5, md: 4 }}>
               {coursesLoading ? (
                 <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={{ base: 3, md: 4 }}>
                   {[0, 1, 2].map((i) => (
-                    <Card
+                    <Box
                       key={`course-skeleton-${i}`}
                       bg={cardBg}
                       borderWidth="1px"
@@ -1087,13 +1092,17 @@ const HomePage = () => {
                       overflow="hidden"
                       boxShadow={courseCardShadow}
                     >
-                      <Skeleton h="168px" startColor="gray.100" endColor="gray.200" />
+                      <Skeleton
+                        h={{ base: "200px", md: "168px" }}
+                        startColor="gray.100"
+                        endColor="gray.200"
+                      />
                       <Box p={4}>
                         <Skeleton height="16px" mb={3} borderRadius="md" />
                         <Skeleton height="12px" width="60%" mb={4} borderRadius="md" />
                         <Skeleton height="40px" borderRadius="xl" />
                       </Box>
-                    </Card>
+                    </Box>
                   ))}
                 </SimpleGrid>
               ) : (
@@ -1102,153 +1111,15 @@ const HomePage = () => {
                     const free = isCourseFree(course);
                     const enrolled = !!course.is_enrolled;
                     return (
-                      <Card
+                      <HomePlatformCourseCard
                         key={course.id}
-                        bg={cardBg}
-                        borderWidth="1px"
-                        borderColor={courseCardBorder}
-                        borderRadius="2xl"
-                        overflow="hidden"
-                        boxShadow={courseCardShadow}
-                        w="100%"
-                        h="full"
-                        display="flex"
-                        flexDirection="column"
-                        transition="all 0.22s ease"
-                        _hover={{
-                          transform: "translateY(-4px)",
-                          boxShadow: courseCardHoverShadow,
-                          borderColor: "blue.200",
-                        }}
-                      >
-                        <Box
-                          position="relative"
-                          flexShrink={0}
-                          w="full"
-                          h={{ base: "150px", md: "168px" }}
-                          overflow="hidden"
-                          bg={courseImageBg}
-                        >
-                          <Box
-                            as="img"
-                            src={
-                              course.avatar ||
-                              "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200&q=80"
-                            }
-                            alt={course.title}
-                            w="full"
-                            h="full"
-                            objectFit="cover"
-                          />
-                          <Box
-                            position="absolute"
-                            inset={0}
-                            bgGradient="linear(to-t, blackAlpha.700 0%, transparent 55%)"
-                          />
-                          <Badge
-                            position="absolute"
-                            top={3}
-                            left={3}
-                            bg={courseBadgeBg}
-                            color={courseBadgeColor}
-                            borderRadius="full"
-                            px={2.5}
-                            py={1}
-                            fontSize="10px"
-                            fontWeight="black"
-                          >
-                            {course?.grade?.name || "عام"}
-                          </Badge>
-                          <Badge
-                            position="absolute"
-                            top={3}
-                            right={3}
-                            colorScheme={enrolled ? "green" : free ? "green" : "orange"}
-                            variant={enrolled || free ? "solid" : "subtle"}
-                            borderRadius="full"
-                            px={2.5}
-                            py={1}
-                            fontSize="10px"
-                            fontWeight="bold"
-                          >
-                            {enrolled ? "مشترك" : free ? "مجاني" : "متاح"}
-                          </Badge>
-                          <Box position="absolute" bottom={3} right={3} left={3}>
-                            <Text
-                              color="white"
-                              fontSize="md"
-                              fontWeight="black"
-                              noOfLines={2}
-                              lineHeight="1.35"
-                              textShadow="0 2px 8px rgba(0,0,0,0.45)"
-                            >
-                              {course.title}
-                            </Text>
-                          </Box>
-                        </Box>
-
-                        <Box
-                          p={4}
-                          flex="1"
-                          display="flex"
-                          flexDirection="column"
-                          gap={3}
-                        >
-                          <HStack justify="space-between" fontSize="xs" color={subtextColor}>
-                            <HStack spacing={2} minW={0}>
-                              <Text noOfLines={1} fontWeight="medium">
-                                {teacherDisplayName || "مستر"}
-                              </Text>
-                            </HStack>
-                            <Text fontWeight="black" color={free ? "green.500" : "orange.500"}>
-                              {free ? "مجاني" : `${course.price} جنيه`}
-                            </Text>
-                          </HStack>
-
-                          {course.description ? (
-                            <Text fontSize="sm" color={subtextColor} noOfLines={2} lineHeight="1.7">
-                              {course.description}
-                            </Text>
-                          ) : (
-                            <Box flex="1" />
-                          )}
-
-                          <Box mt="auto">
-                            {enrolled || free ? (
-                              <Button
-                                size="sm"
-                                w="full"
-                                h="40px"
-                                bg="blue.500"
-                                color="white"
-                                _hover={{ bg: "blue.600" }}
-                                borderRadius="xl"
-                                fontSize="sm"
-                                fontWeight="bold"
-                                rightIcon={<Icon as={FaChevronLeft} boxSize={3} />}
-                                onClick={() => navigate(`/CourseDetailsPage/${course.id}`)}
-                              >
-                                دخول للكورس
-                              </Button>
-                            ) : (
-                              <Button
-                                size="sm"
-                                w="full"
-                                h="40px"
-                                bg="orange.500"
-                                color="white"
-                                _hover={{ bg: "orange.600" }}
-                                borderRadius="xl"
-                                fontSize="sm"
-                                fontWeight="bold"
-                                onClick={() => openCourseActivationModal(course)}
-                              >
-                                اشترك الآن
-                              </Button>
-                            )}
-                          </Box>
-                        </Box>
-                      </Card>
+                        course={course}
+                        teacherName={teacherDisplayName}
+                        isFree={free}
+                        isEnrolled={enrolled}
+                        onEnter={() => navigate(`/CourseDetailsPage/${course.id}`)}
+                        onSubscribe={() => openCourseActivationModal(course)}
+                      />
                     );
                   })}
                 </SimpleGrid>

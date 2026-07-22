@@ -16,8 +16,11 @@ import {
   HStack,
   Icon,
   Portal,
+  Image,
+  Avatar,
 } from "@chakra-ui/react";
 import { motion, useScroll, useTransform } from "framer-motion";
+import { useEffect, useState } from "react";
 
 import { FaMoon, FaSun } from "react-icons/fa";
 import { Link } from "react-router-dom";
@@ -25,12 +28,59 @@ import NotificationDropdown from "../notifications/NotificationDropdown";
 
 import Links from "../links/Links";
 import logoImg from "../../img/2 (5).png";
+import { getTenantSubdomain } from "../../utils/tenantHost";
+import { fetchTenantPublic } from "../../api/tenantPublicApi";
+import {
+  readCachedTenantBrandLogo,
+  resolveTenantBrandLogo,
+} from "../../utils/tenantBrandLogo";
 
 export default function Nav() {
   const user = JSON.parse(localStorage.getItem("user"));
   const { colorMode, toggleColorMode } = useColorMode();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const isMobile = useBreakpointValue({ base: true, lg: false });
+  const tenantSubdomain = getTenantSubdomain();
+
+  const [teacherLogo, setTeacherLogo] = useState(() =>
+    tenantSubdomain ? readCachedTenantBrandLogo(tenantSubdomain) : null,
+  );
+  const [brandName, setBrandName] = useState(
+    tenantSubdomain || "Edu Platform",
+  );
+
+  // Navbar is outside QueryClientProvider (main.jsx) — fetch without useQuery
+  useEffect(() => {
+    if (!tenantSubdomain) {
+      setTeacherLogo(null);
+      setBrandName("Edu Platform");
+      return undefined;
+    }
+
+    const cached = readCachedTenantBrandLogo(tenantSubdomain);
+    if (cached) setTeacherLogo(cached);
+
+    let cancelled = false;
+    fetchTenantPublic(tenantSubdomain)
+      .then((res) => {
+        if (cancelled) return;
+        const tenant = res?.data?.tenant;
+        const teacher = res?.data?.teacher;
+        setTeacherLogo(resolveTenantBrandLogo(tenant, teacher));
+        setBrandName(
+          teacher?.name || tenant?.display_name || tenantSubdomain || "Edu Platform",
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBrandName(tenantSubdomain || "Edu Platform");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tenantSubdomain]);
 
   const { scrollYProgress } = useScroll();
   const scaleX = useTransform(scrollYProgress, [0, 1], [0, 1]);
@@ -47,6 +97,7 @@ export default function Nav() {
     "0 2px 12px rgba(66, 153, 225, 0.08)",
     "0 2px 12px rgba(0,0,0,0.25)",
   );
+  const logoRing = useColorModeValue("blue.100", "blue.800");
 
   return (
     <Portal>
@@ -85,12 +136,36 @@ export default function Nav() {
           zIndex={1}
         >
           <Link to={user ? `/home` : "/"}>
-            <Box display="flex" alignItems="center" _hover={{ opacity: 0.9 }}>
-              <img
-                src={logoImg}
-                alt="Edu Platform"
-                style={{ height: "48px", width: "auto", objectFit: "contain" }}
-              />
+            <Box
+              display="flex"
+              alignItems="center"
+              gap={2}
+              _hover={{ opacity: 0.92 }}
+            >
+              {tenantSubdomain && teacherLogo ? (
+                <Image
+                  src={teacherLogo}
+                  alt={brandName}
+                  h="48px"
+                  w="48px"
+                  objectFit="contain"
+                  borderRadius="lg"
+                  border="2px solid"
+                  borderColor={logoRing}
+                  p={0.5}
+                  fallback={
+                    <Avatar name={brandName} size="md" bg="blue.500" color="white" />
+                  }
+                />
+              ) : tenantSubdomain ? (
+                <Avatar name={brandName} size="md" bg="blue.500" color="white" />
+              ) : (
+                <img
+                  src={logoImg}
+                  alt="Edu Platform"
+                  style={{ height: "48px", width: "auto", objectFit: "contain" }}
+                />
+              )}
             </Box>
           </Link>
 

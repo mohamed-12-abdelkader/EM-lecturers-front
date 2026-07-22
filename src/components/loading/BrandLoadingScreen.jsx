@@ -1,12 +1,19 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Box, Flex, Image, useColorModeValue } from "@chakra-ui/react";
 import { motion } from "framer-motion";
+import { getTenantSubdomain } from "../../utils/tenantHost";
+import { fetchTenantPublic } from "../../api/tenantPublicApi";
+import {
+  readCachedTenantBrandLogo,
+  readDocumentTenantIcon,
+  resolveTenantBrandLogo,
+} from "../../utils/tenantBrandLogo";
 
 const BRAND_LOGO = "/Picsart_25-08-26_23-28-39-014.png";
 
 /**
  * شاشة تحميل بالبراند: لوجو في المنتصف + انيميشن انتظار + شريط تقدم تحت اللوجو.
- * استخدمها كشاشة كاملة أو داخل Container بـ flex: 1.
+ * على subdomain المدرس يعرض لوجو المدرس (favicon / avatar)، وإلا لوجو الشركة.
  *
  * @param {Object} props
  * @param {number} [props.progress] - اختياري: رقم 0–1 لشريط تحميل محدد؛ بدونه الشريط indeterminate (متحرك).
@@ -14,6 +21,59 @@ const BRAND_LOGO = "/Picsart_25-08-26_23-28-39-014.png";
 export default function BrandLoadingScreen({ progress }) {
   const hasDeterminate = typeof progress === "number";
   const trackBg = useColorModeValue("blue.50", "whiteAlpha.100");
+  const screenBg = useColorModeValue("white", "gray.900");
+  const tenantSubdomain = getTenantSubdomain();
+
+  const [logoSrc, setLogoSrc] = useState(() => {
+    if (!tenantSubdomain) return BRAND_LOGO;
+    return (
+      readCachedTenantBrandLogo(tenantSubdomain) ||
+      readDocumentTenantIcon() ||
+      null
+    );
+  });
+  const [logoAlt, setLogoAlt] = useState(
+    tenantSubdomain ? tenantSubdomain : "EM Lectures",
+  );
+
+  useEffect(() => {
+    if (!tenantSubdomain) {
+      setLogoSrc(BRAND_LOGO);
+      setLogoAlt("EM Lectures");
+      return undefined;
+    }
+
+    // Instant from cache / current favicon while fetch runs
+    const instant =
+      readCachedTenantBrandLogo(tenantSubdomain) || readDocumentTenantIcon();
+    if (instant) setLogoSrc(instant);
+
+    let cancelled = false;
+    fetchTenantPublic(tenantSubdomain)
+      .then((res) => {
+        if (cancelled) return;
+        const tenant = res?.data?.tenant;
+        const teacher = res?.data?.teacher;
+        const icon = resolveTenantBrandLogo(tenant, teacher);
+        // Never fall back to company logo on a teacher platform
+        if (icon) setLogoSrc(icon);
+        setLogoAlt(
+          teacher?.name ||
+            tenant?.display_name ||
+            tenantSubdomain ||
+            "EM Lectures",
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLogoAlt(tenantSubdomain || "EM Lectures");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tenantSubdomain]);
 
   const NAVBAR_HEIGHT = 72;
 
@@ -28,7 +88,7 @@ export default function BrandLoadingScreen({ progress }) {
       justify="center"
       align="center"
       direction="column"
-      bg={useColorModeValue("white", "gray.900")}
+      bg={screenBg}
       px={8}
     >
       <Box
@@ -53,14 +113,25 @@ export default function BrandLoadingScreen({ progress }) {
           ease: "easeInOut",
         }}
       >
-        <Image
-          src={BRAND_LOGO}
-          alt="EM Lectures"
-          maxH={{ base: "140px", md: "180px" }}
-          w="auto"
-          objectFit="contain"
-          mb={8}
-        />
+        {logoSrc ? (
+          <Image
+            src={logoSrc}
+            alt={logoAlt}
+            maxH={{ base: "140px", md: "180px" }}
+            w="auto"
+            objectFit="contain"
+            mb={8}
+          />
+        ) : (
+          <Box
+            mb={8}
+            h={{ base: "100px", md: "120px" }}
+            w={{ base: "100px", md: "120px" }}
+            borderRadius="2xl"
+            bgGradient="linear(to-br, blue.400, orange.400)"
+            opacity={0.85}
+          />
+        )}
       </motion.div>
 
       <Box

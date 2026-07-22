@@ -98,8 +98,8 @@ function ProgressRing({ percent }) {
 /** عنوان قسم داخل جسم المحاضرة (الفيديوهات / الواجبات) */
 function SectionHeading({ icon: IconComp, label, count, accent, action }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <div className="flex items-center gap-2.5">
+    <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-2.5">
         <div
           className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white sm:h-9 sm:w-9 ${
             accent === "orange" ? "bg-orange-500" : "bg-blue-500"
@@ -107,9 +107,9 @@ function SectionHeading({ icon: IconComp, label, count, accent, action }) {
         >
           <IconComp className="text-xs sm:text-sm" />
         </div>
-        <h4 className={`${lcTitleSm} !text-base`}>{label}</h4>
+        <h4 className={`${lcTitleSm} !text-sm sm:!text-base`}>{label}</h4>
         <span
-          className={`rounded-full px-2.5 py-0.5 ${lcBadge} ${
+          className={`rounded-full px-2 py-0.5 sm:px-2.5 ${lcBadge} ${
             accent === "orange"
               ? "bg-orange-50 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400"
               : "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400"
@@ -118,49 +118,51 @@ function SectionHeading({ icon: IconComp, label, count, accent, action }) {
           {count}
         </span>
       </div>
-      {action}
+      {action ? <div className="w-full sm:w-auto">{action}</div> : null}
     </div>
   );
 }
 
-/** صف فيديو — سطر واحد بسيط */
+/** صف فيديو — عمودي على الموبايل، أفقي من sm */
 function VideoRow({ video, index, canManage, handleDeleteVideo }) {
   const isDone = video.is_completed;
   const isStarted = video.is_watched && !video.is_completed;
 
   return (
     <div
-      className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 transition-colors hover:border-blue-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-700"
+      className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 transition-colors hover:border-blue-300 sm:flex-row sm:items-center sm:gap-3 sm:px-3.5 sm:py-2.5 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-700"
       dir="rtl"
     >
-      <span
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold ${
-          isDone
-            ? "bg-emerald-500 text-white"
-            : isStarted
-              ? "bg-blue-500 text-white"
-              : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-        }`}
-      >
-        {isDone ? <FaCheckCircle className="text-sm" /> : index + 1}
-      </span>
+      <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
+        <span
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold sm:h-8 sm:w-8 ${
+            isDone
+              ? "bg-emerald-500 text-white"
+              : isStarted
+                ? "bg-blue-500 text-white"
+                : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+          }`}
+        >
+          {isDone ? <FaCheckCircle className="text-sm" /> : index + 1}
+        </span>
 
-      <div className="min-w-0 flex-1 text-right">
-        <h5 className={`truncate ${lcTitleSm} !text-sm`}>
-          {video.title || `الفيديو ${index + 1}`}
-        </h5>
-        {video.duration && (
-          <span className={`inline-flex items-center gap-1 ${lcCaption}`}>
-            <FaClock className="text-[9px]" />
-            {video.duration}
-          </span>
-        )}
+        <div className="min-w-0 flex-1 text-right">
+          <h5 className={`break-words ${lcTitleSm} !text-sm sm:truncate`}>
+            {video.title || `الفيديو ${index + 1}`}
+          </h5>
+          {video.duration ? (
+            <span className={`mt-0.5 inline-flex items-center gap-1 ${lcCaption}`}>
+              <FaClock className="text-[9px]" />
+              {video.duration}
+            </span>
+          ) : null}
+        </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1.5">
+      <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto sm:justify-end">
         <Link
           to={`/video/${video.id}`}
-          className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 ${lcBtn} transition-colors ${
+          className={`inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 sm:flex-initial sm:py-1.5 ${lcBtn} transition-colors ${
             isDone || isStarted
               ? "border border-blue-500 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40"
               : "bg-blue-500 text-white hover:bg-blue-600"
@@ -169,22 +171,22 @@ function VideoRow({ video, index, canManage, handleDeleteVideo }) {
           {isDone ? <FaRedo className="text-[10px]" /> : <FaPlay className="text-[10px]" />}
           مشاهدة
         </Link>
-        {canManage && (
+        {canManage ? (
           <button
             type="button"
             aria-label="حذف الفيديو"
-            className="inline-flex cursor-pointer items-center justify-center rounded-lg p-2 text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/40"
+            className="inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg text-red-500 transition-colors hover:bg-red-50 sm:h-auto sm:w-auto sm:p-2 dark:hover:bg-red-950/40"
             onClick={() => handleDeleteVideo(video.id, video.title || "فيديو")}
           >
             <FaTrash className="text-xs" />
           </button>
-        )}
+        ) : null}
       </div>
     </div>
   );
 }
 
-/** صف واجب — سطر واحد بسيط */
+/** صف واجب — عمودي على الموبايل، أفقي من sm */
 function AssignmentRow({
   exam,
   canManage,
@@ -199,12 +201,12 @@ function AssignmentRow({
 
   return (
     <div
-      className="flex flex-col gap-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 transition-colors hover:border-orange-300 sm:flex-row sm:items-center sm:gap-3 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-orange-700"
+      className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 transition-colors hover:border-orange-300 sm:flex-row sm:items-center sm:gap-3 sm:px-3.5 sm:py-2.5 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-orange-700"
       dir="rtl"
     >
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
         <span
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white ${
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white sm:h-8 sm:w-8 ${
             solved ? "bg-emerald-500" : "bg-orange-500"
           }`}
         >
@@ -212,13 +214,13 @@ function AssignmentRow({
         </span>
 
         <div className="min-w-0 flex-1 text-right">
-          <div className="flex flex-wrap items-center gap-2">
-            <h5 className={`truncate ${lcTitleSm} !text-sm`}>
+          <div className="flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
+            <h5 className={`break-words ${lcTitleSm} !text-sm sm:truncate`}>
               {exam.title || "واجب المحاضرة"}
             </h5>
-            {!canManage && examStatus && (
+            {!canManage && examStatus ? (
               <span
-                className={`shrink-0 rounded-full px-2 py-0.5 ${lcBadge} ${
+                className={`w-fit shrink-0 rounded-full px-2 py-0.5 ${lcBadge} ${
                   solved
                     ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400"
                     : inProgress
@@ -228,9 +230,9 @@ function AssignmentRow({
               >
                 {examStatus.label}
               </span>
-            )}
+            ) : null}
           </div>
-          <p className={`mt-0.5 ${lcCaption}`}>
+          <p className={`mt-0.5 break-words ${lcCaption}`}>
             {canManage
               ? `الدرجة: ${exam.total_grade ?? "—"} • المدة: ${exam.duration ?? "—"} دقيقة`
               : exam.student_submission?.score != null
@@ -240,11 +242,11 @@ function AssignmentRow({
         </div>
       </div>
 
-      <div className="flex shrink-0 flex-wrap gap-1.5 sm:justify-end">
-        {!canManage && (
+      <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end sm:gap-1.5">
+        {!canManage ? (
           <Link
             to={`/ComprehensiveExam/${exam.id}`}
-            className={`inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 sm:w-auto ${lcBtn} text-white transition-colors ${
+            className={`inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 sm:w-auto sm:py-1.5 ${lcBtn} text-white transition-colors ${
               inProgress && !solved
                 ? "bg-orange-500 hover:bg-orange-600"
                 : "bg-blue-500 hover:bg-blue-600"
@@ -253,19 +255,18 @@ function AssignmentRow({
             <examStatus.icon className="text-[10px]" />
             {examStatus.cta}
           </Link>
-        )}
-        {canManage && (
+        ) : (
           <>
             <Link
               to={`/ComprehensiveExam/${exam.id}`}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-blue-500 px-3 py-1.5 text-xs font-bold text-blue-500 transition-colors hover:bg-blue-50 dark:hover:bg-blue-950/40"
+              className="inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-blue-500 px-3 py-2.5 text-xs font-bold text-blue-500 transition-colors hover:bg-blue-50 sm:w-auto sm:py-1.5 dark:hover:bg-blue-950/40"
             >
               <FaCog className="text-[10px]" />
               إدارة
             </Link>
             <button
               type="button"
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-blue-500 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-blue-600"
+              className="inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-blue-500 px-3 py-2.5 text-xs font-bold text-white transition-colors hover:bg-blue-600 sm:w-auto sm:py-1.5"
               onClick={() => openExamModal("edit", exam)}
             >
               <FaEdit className="text-[10px]" />
@@ -274,11 +275,12 @@ function AssignmentRow({
             <button
               type="button"
               aria-label="حذف الواجب"
-              className="inline-flex cursor-pointer items-center justify-center rounded-lg p-2 text-red-500 hover:bg-red-50 disabled:opacity-50 dark:hover:bg-red-950/40"
+              className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-lg p-2 text-red-500 hover:bg-red-50 disabled:opacity-50 sm:h-auto sm:w-auto dark:hover:bg-red-950/40"
               disabled={examActionLoading}
               onClick={() => openDeleteExamDialog(exam)}
             >
               {examActionLoading ? <Spinner size="sm" /> : <FaTrash className="text-xs" />}
+              <span className="ms-1.5 text-xs font-bold sm:hidden">حذف</span>
             </button>
           </>
         )}
@@ -558,7 +560,7 @@ const LectureCard = ({
                         canManage ? (
                           <button
                             type="button"
-                            className={`${crBtnSecondary} !px-3.5 !py-2 !text-xs`}
+                            className={`${crBtnSecondary} w-full !px-3.5 !py-2.5 !text-xs sm:w-auto sm:!py-2`}
                             onClick={() => handleAddVideo(lecture.id)}
                           >
                             <FaPlus />
@@ -572,7 +574,7 @@ const LectureCard = ({
                         {canManage ? "لم تُضف فيديوهات بعد — ابدأ بإضافة أول فيديو" : "لا توجد فيديوهات في هذه المحاضرة بعد"}
                       </p>
                     ) : (
-                      <div className="grid gap-2.5">
+                      <div className="grid grid-cols-1 gap-2.5">
                         {lecture.videos.map((video, index) => (
                           <VideoRow
                             key={video.id}
@@ -598,7 +600,7 @@ const LectureCard = ({
                           canManage ? (
                             <button
                               type="button"
-                              className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-orange-500 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-all duration-200 hover:bg-orange-600"
+                              className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-orange-500 px-3.5 py-2.5 text-xs font-bold text-white shadow-sm transition-all duration-200 hover:bg-orange-600 sm:w-auto sm:py-2"
                               onClick={() =>
                                 openExamModal("add", {
                                   title: suggestedAssignmentTitle,
@@ -620,7 +622,7 @@ const LectureCard = ({
                           جاري تحميل الواجبات...
                         </p>
                       ) : hasAssignments ? (
-                        <div className="grid gap-2.5">
+                        <div className="grid grid-cols-1 gap-2.5">
                           {assignments.map((assignment) => (
                             <AssignmentRow
                               key={assignment.id}

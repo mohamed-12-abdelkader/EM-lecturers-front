@@ -22,6 +22,7 @@ import {
 import { motion, ScrollProgress } from "./tenantLandingMotion";
 import { useTenantPageMetadata } from "../../Hooks/tenantPublic/useTenantPageMetadata";
 import { getPortraitImageUrl } from "../../utils/highQualityImageUrl";
+import TenantSeoHead from "./components/TenantSeoHead";
 
 const TENANT_FONT_LINK_ID = "tenant-public-arabic-fonts";
 const TENANT_FONT_BODY = "'Noto Sans Arabic', 'Segoe UI', Tahoma, sans-serif";
@@ -155,7 +156,11 @@ export default function TenantPublicLanding({ subdomain }) {
   }, [landing, tenant]);
 
   const teacher = payload?.teacher;
-  useTenantPageMetadata(subdomain, "home", undefined, { tenant, teacher, subdomain });
+  const seoFallback = useMemo(
+    () => ({ tenant, teacher, subdomain, theme }),
+    [tenant, teacher, subdomain, theme],
+  );
+  useTenantPageMetadata(subdomain, "home", undefined, seoFallback);
 
   useEffect(() => {
     const onScroll = () => setNavScrolled(window.scrollY > 32);
@@ -323,6 +328,7 @@ export default function TenantPublicLanding({ subdomain }) {
         WebkitFontSmoothing: "antialiased",
       }}
     >
+      <TenantSeoHead subdomain={subdomain} />
       <style>{`
         .tenant-public-page h1,
         .tenant-public-page h2,

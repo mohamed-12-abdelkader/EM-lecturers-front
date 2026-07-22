@@ -7,6 +7,7 @@ import {
 } from "./components/TenantPublicNavbar";
 import TenantSearchBar from "./components/TenantSearchBar";
 import { useTenantPageMetadata } from "../../Hooks/tenantPublic/useTenantPageMetadata";
+import TenantSeoHead from "./components/TenantSeoHead";
 
 const TENANT_FONT_LINK_ID = "tenant-public-arabic-fonts";
 
@@ -49,12 +50,14 @@ export default function TenantPublicShell({
   const payload = tenantData?.data;
   const tenant = payload?.tenant;
   const teacher = payload?.teacher;
+  const theme = payload?.landing?.theme;
 
-  useTenantPageMetadata(subdomain, seoPage, seoSlug, {
-    tenant,
-    teacher,
-    subdomain,
-  });
+  const seoFallback = useMemo(
+    () => ({ tenant, teacher, subdomain, theme }),
+    [tenant, teacher, subdomain, theme],
+  );
+
+  useTenantPageMetadata(subdomain, seoPage, seoSlug, seoFallback);
 
   const brandName = tenant?.display_name || subdomain;
   const cssVars = useMemo(() => {
@@ -80,6 +83,7 @@ export default function TenantPublicShell({
       style={cssVars}
       dir="rtl"
     >
+      <TenantSeoHead subdomain={subdomain} />
       <TenantPublicNavbar
         brandName={brandName}
         specialty={tenant?.specialty || teacher?.subject}

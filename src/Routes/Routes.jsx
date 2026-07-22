@@ -149,6 +149,7 @@ import {
   renderTenantPublicRoutes,
   TenantPublicNotFoundRoute,
 } from "../pages/tenantPublic/TenantPublicRoutes";
+import TenantSeoHead from "../pages/tenantPublic/components/TenantSeoHead";
 import GlobalSearchPage from "../pages/search/GlobalSearchPage";
 import Match from "../pages/league/Match";
 import EssayExam from "../pages/exam/EssayExam";
@@ -165,6 +166,7 @@ const AppRouter = () => {
 
   return (
     <div>
+      {tenantSubdomain ? <TenantSeoHead subdomain={tenantSubdomain} /> : null}
       <Routes>
         {/* Public Routes — على النطاق الفرعي للمستأجر: الرئيسية = لاندنج العميل؛ باقي المسارات (login, home, …) مشتركة لنفس الـ origin وللـ localStorage */}
         <Route

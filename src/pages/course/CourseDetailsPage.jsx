@@ -118,6 +118,11 @@ import { crContainer } from "./courseTheme";
 import LectureCard from "./components/LectureCard";
 import LecturesTab from "./components/LecturesTab";
 import CourseExamsTab from "./components/CourseExamsTab";
+import CourseFormModal, {
+  CourseModalFieldCard,
+  CourseModalFieldLabel,
+  useCourseModalInputProps,
+} from "../../components/CourseFormModal";
 import VideoPlayer from "./components/VideoPlayer";
 import dayjs from "dayjs";
 import jsPDF from "jspdf";
@@ -130,6 +135,7 @@ import eduPlatformLogo from "../../img/2 (5).png";
 
 // Modal Components
 const LectureModal = ({ isOpen, onClose, type, data, onSubmit, loading }) => {
+  const inputProps = useCourseModalInputProps("blue");
   const [formData, setFormData] = useState({
     title: data?.title || "",
     description: data?.description || "",
@@ -143,130 +149,94 @@ const LectureModal = ({ isOpen, onClose, type, data, onSubmit, loading }) => {
         description: data.description || "",
         position: data.position || 1,
       });
+    } else if (isOpen) {
+      setFormData({ title: "", description: "", position: 1 });
     }
-  }, [data]);
+  }, [data, isOpen]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (type === "edit") {
-      onSubmit(data.id, formData);
-    } else {
-      onSubmit(formData);
-    }
-    // لا نغلق الموديل هنا، سيتم إغلاقه بعد نجاح العملية
+    if (type === "edit") onSubmit(data.id, formData);
+    else onSubmit(formData);
   };
 
   return (
-    <Modal
+    <CourseFormModal
       isOpen={isOpen}
-      onClose={loading ? undefined : onClose}
-      closeOnOverlayClick={!loading}
-      size={{ base: "full", md: "lg" }}
-      scrollBehavior="inside"
+      onClose={onClose}
+      loading={loading}
+      icon={FaChalkboardTeacher}
+      accent="blue"
+      title={type === "add" ? "إضافة محاضرة جديدة" : "تعديل المحاضرة"}
+      subtitle={
+        type === "add"
+          ? "أضف محاضرة للمحتوى وحدد ترتيبها داخل الكورس"
+          : "حدّث عنوان المحاضرة ووصفها وترتيبها"
+      }
+      onSubmit={handleSubmit}
+      submitLabel={type === "add" ? "إضافة المحاضرة" : "حفظ التعديلات"}
+      loadingText={type === "add" ? "جاري الإضافة..." : "جاري الحفظ..."}
     >
-      <ModalOverlay />
-      <ModalContent
-        borderRadius={{ base: "none", md: "2xl" }}
-        boxShadow="2xl"
-        mx={{ base: 0, md: 4 }}
-        maxH={{ base: "100vh", md: "90vh" }}
-      >
-        <ModalHeader
-          display="flex"
-          alignItems="center"
-          fontWeight="bold"
-          fontSize={{ base: "lg", md: "xl" }}
-          color="blue.600"
-          p={{ base: 3, md: 6 }}
-        >
-          <Icon as={FaChalkboardTeacher} className="ml-2" />
-          {type === "add" ? "إضافة محاضرة جديدة" : "تعديل المحاضرة"}
-        </ModalHeader>
-        <ModalCloseButton isDisabled={loading} />
-        <form onSubmit={handleSubmit}>
-          <ModalBody p={{ base: 3, md: 6 }}>
-            <VStack spacing={{ base: 4, md: 5 }} align="stretch">
-              {/* عنوان المحاضرة */}
-              <FormControl isRequired>
-                <FormLabel display="flex" alignItems="center" gap={2}>
-                  <FaChalkboardTeacher /> عنوان المحاضرة
-                </FormLabel>
-                <Input
-                  value={formData.title}
-                  onChange={(e) =>
-                    setFormData({ ...formData, title: e.target.value })
-                  }
-                  placeholder="أدخل عنوان المحاضرة"
-                  borderRadius="lg"
-                  size={{ base: "sm", md: "md" }}
-                />
-              </FormControl>
+      <VStack spacing={3} align="stretch">
+        <CourseModalFieldCard>
+          <FormControl isRequired>
+            <CourseModalFieldLabel icon={FaChalkboardTeacher}>
+              عنوان المحاضرة
+            </CourseModalFieldLabel>
+            <Input
+              value={formData.title}
+              onChange={(e) =>
+                setFormData({ ...formData, title: e.target.value })
+              }
+              placeholder="مثال: المحاضرة الأولى — مقدمة"
+              isDisabled={loading}
+              {...inputProps}
+            />
+          </FormControl>
+        </CourseModalFieldCard>
 
-              {/* وصف المحاضرة */}
-              <FormControl>
-                <FormLabel display="flex" alignItems="center" gap={2}>
-                  <FaRegFileAlt /> وصف المحاضرة (اختياري)
-                </FormLabel>
-                <Textarea
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
-                  placeholder="أدخل وصف المحاضرة"
-                  rows={{ base: 2, md: 3 }}
-                  borderRadius="lg"
-                  size={{ base: "sm", md: "md" }}
-                />
-              </FormControl>
+        <CourseModalFieldCard>
+          <FormControl>
+            <CourseModalFieldLabel icon={FaRegFileAlt} color="orange">
+              وصف المحاضرة (اختياري)
+            </CourseModalFieldLabel>
+            <Textarea
+              value={formData.description}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
+              placeholder="نبذة قصيرة تظهر للطالب تحت عنوان المحاضرة"
+              rows={3}
+              isDisabled={loading}
+              {...inputProps}
+            />
+          </FormControl>
+        </CourseModalFieldCard>
 
-              {/* ترتيب المحاضرة */}
-              <FormControl isRequired>
-                <FormLabel display="flex" alignItems="center" gap={2}>
-                  <FaListOl /> ترتيب المحاضرة
-                </FormLabel>
-                <Input
-                  type="number"
-                  value={formData.position}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      position: parseInt(e.target.value),
-                    })
-                  }
-                  placeholder="أدخل ترتيب المحاضرة"
-                  borderRadius="lg"
-                />
-              </FormControl>
-            </VStack>
-          </ModalBody>
-
-          <ModalFooter p={{ base: 3, md: 6 }} flexWrap="wrap" gap={2}>
-            <Button
-              variant="outline"
-              colorScheme="red"
-              mr={{ base: 0, md: 3 }}
-              onClick={onClose}
-              leftIcon={<FaTimes />}
-              borderRadius="xl"
-              size={{ base: "sm", md: "md" }}
-            >
-              إلغاء
-            </Button>
-            <Button
-              className="mx-2"
-              colorScheme="blue"
-              type="submit"
-              isLoading={loading}
-              leftIcon={<FaCheck />}
-              borderRadius="xl"
-              size={{ base: "sm", md: "md" }}
-            >
-              {type === "add" ? "إضافة" : "تعديل"}
-            </Button>
-          </ModalFooter>
-        </form>
-      </ModalContent>
-    </Modal>
+        <CourseModalFieldCard>
+          <FormControl isRequired>
+            <CourseModalFieldLabel icon={FaListOl}>
+              ترتيب المحاضرة
+            </CourseModalFieldLabel>
+            <Input
+              type="number"
+              min={1}
+              value={formData.position}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  position: parseInt(e.target.value, 10) || 1,
+                })
+              }
+              placeholder="1"
+              isDisabled={loading}
+              {...inputProps}
+              maxW="160px"
+            />
+          </FormControl>
+        </CourseModalFieldCard>
+      </VStack>
+    </CourseFormModal>
   );
 };
 
@@ -279,6 +249,7 @@ const VideoModal = ({
   onSubmit,
   loading,
 }) => {
+  const inputProps = useCourseModalInputProps("orange");
   const [formData, setFormData] = useState({
     video_url: data?.video_url || "",
     title: data?.title || "",
@@ -292,134 +263,99 @@ const VideoModal = ({
         title: data.title || "",
         position: data.position || 1,
       });
+    } else if (isOpen) {
+      setFormData({ video_url: "", title: "", position: 1 });
     }
-  }, [data]);
+  }, [data, isOpen]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (type === "edit") {
-      onSubmit(data.id, formData);
-    } else {
-      onSubmit(lectureId, formData);
-    }
-    // لا نغلق الموديل هنا، سيتم إغلاقه بعد نجاح العملية
+    if (type === "edit") onSubmit(data.id, formData);
+    else onSubmit(lectureId, formData);
   };
 
   return (
-    <Modal
+    <CourseFormModal
       isOpen={isOpen}
-      onClose={loading ? undefined : onClose}
-      closeOnOverlayClick={!loading}
-      size={{ base: "full", md: "lg" }}
-      scrollBehavior="inside"
+      onClose={onClose}
+      loading={loading}
+      icon={FaFilm}
+      accent="orange"
+      title={type === "add" ? "إضافة فيديو جديد" : "تعديل الفيديو"}
+      subtitle={
+        type === "add"
+          ? "أرفق رابط الفيديو داخل المحاضرة وحدد ترتيبه"
+          : "حدّث رابط الفيديو أو عنوانه أو ترتيبه"
+      }
+      onSubmit={handleSubmit}
+      submitLabel={type === "add" ? "إضافة الفيديو" : "حفظ التعديلات"}
+      loadingText={type === "add" ? "جاري الإضافة..." : "جاري الحفظ..."}
+      submitColorScheme="orange"
     >
-      <ModalOverlay />
-      <ModalContent
-        borderRadius={{ base: "none", md: "2xl" }}
-        boxShadow="2xl"
-        mx={{ base: 0, md: 4 }}
-        maxH={{ base: "100vh", md: "90vh" }}
-      >
-        <ModalHeader
-          display="flex"
-          alignItems="center"
-          gap={2}
-          fontWeight="bold"
-          fontSize={{ base: "lg", md: "xl" }}
-          color="blue.600"
-          p={{ base: 3, md: 6 }}
-        >
-          <Icon as={FaFilm} />
-          {type === "add" ? "إضافة فيديو جديد" : "تعديل الفيديو"}
-        </ModalHeader>
-        <ModalCloseButton isDisabled={loading} />
-        <form onSubmit={handleSubmit}>
-          <ModalBody p={{ base: 3, md: 6 }}>
-            <VStack spacing={{ base: 4, md: 5 }} align="stretch">
-              {/* رابط الفيديو */}
-
-              {/* عنوان الفيديو */}
-              <FormControl>
-                <FormLabel display="flex" alignItems="center" gap={2}>
-                  <FaRegFileAlt /> عنوان الفيديو (اختياري)
-                </FormLabel>
-                <Input
-                  value={formData.title}
-                  onChange={(e) =>
-                    setFormData({ ...formData, title: e.target.value })
-                  }
-                  placeholder="أدخل عنوان الفيديو"
-                  isDisabled={loading}
-                  borderRadius="lg"
-                />
-              </FormControl>
-              <FormControl isRequired>
-                <FormLabel display="flex" alignItems="center" gap={2}>
-                  <FaVideo /> رابط الفيديو
-                </FormLabel>
-                <Input
-                  value={formData.video_url}
-                  onChange={(e) =>
-                    setFormData({ ...formData, video_url: e.target.value })
-                  }
-                  placeholder="أدخل رابط الفيديو"
-                  isDisabled={loading}
-                  borderRadius="lg"
-                />
-              </FormControl>
-              {/* ترتيب الفيديو */}
-              <FormControl isRequired>
-                <FormLabel display="flex" alignItems="center" gap={2}>
-                  <FaListOl /> ترتيب الفيديو
-                </FormLabel>
-                <Input
-                  type="number"
-                  value={formData.position}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      position: parseInt(e.target.value),
-                    })
-                  }
-                  placeholder="أدخل ترتيب الفيديو"
-                  isDisabled={loading}
-                  borderRadius="lg"
-                />
-              </FormControl>
-            </VStack>
-          </ModalBody>
-
-          <ModalFooter p={{ base: 3, md: 6 }} flexWrap="wrap" gap={2}>
-            <Button
-              variant="outline"
-              colorScheme="red"
-              mr={{ base: 0, md: 3 }}
-              onClick={onClose}
-              isDisabled={loading}
-              leftIcon={<FaTimes />}
-              borderRadius="xl"
-              size={{ base: "sm", md: "md" }}
-            >
-              إلغاء
-            </Button>
-            <Button
-              colorScheme="blue"
-              type="submit"
-              isLoading={loading}
-              loadingText={
-                type === "add" ? "جاري الإضافة..." : "جاري التعديل..."
+      <VStack spacing={3} align="stretch">
+        <CourseModalFieldCard>
+          <FormControl>
+            <CourseModalFieldLabel icon={FaRegFileAlt}>
+              عنوان الفيديو (اختياري)
+            </CourseModalFieldLabel>
+            <Input
+              value={formData.title}
+              onChange={(e) =>
+                setFormData({ ...formData, title: e.target.value })
               }
-              leftIcon={!loading && <FaCheck />}
-              borderRadius="xl"
-              className="mx-2"
-              size={{ base: "sm", md: "md" }}
-            >
-              {type === "add" ? "إضافة" : "تعديل"}
-            </Button>
-          </ModalFooter>
-        </form>
-      </ModalContent>
-    </Modal>
+              placeholder="مثال: شرح الجزء الأول"
+              isDisabled={loading}
+              {...inputProps}
+            />
+          </FormControl>
+        </CourseModalFieldCard>
+
+        <CourseModalFieldCard>
+          <FormControl isRequired>
+            <CourseModalFieldLabel icon={FaVideo} color="orange">
+              رابط الفيديو
+            </CourseModalFieldLabel>
+            <Input
+              value={formData.video_url}
+              onChange={(e) =>
+                setFormData({ ...formData, video_url: e.target.value })
+              }
+              placeholder="https://..."
+              dir="ltr"
+              textAlign="left"
+              isDisabled={loading}
+              {...inputProps}
+            />
+            <Text mt={2} fontSize="xs" color="gray.500">
+              الصق رابط الفيديو من منصة الاستضافة الخاصة بك
+            </Text>
+          </FormControl>
+        </CourseModalFieldCard>
+
+        <CourseModalFieldCard>
+          <FormControl isRequired>
+            <CourseModalFieldLabel icon={FaListOl}>
+              ترتيب الفيديو
+            </CourseModalFieldLabel>
+            <Input
+              type="number"
+              min={1}
+              value={formData.position}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  position: parseInt(e.target.value, 10) || 1,
+                })
+              }
+              placeholder="1"
+              isDisabled={loading}
+              {...inputProps}
+              maxW="160px"
+            />
+          </FormControl>
+        </CourseModalFieldCard>
+      </VStack>
+    </CourseFormModal>
   );
 };
 
@@ -1534,6 +1470,7 @@ const CourseDetailsPage = () => {
     const labelColor = useColorModeValue("gray.700", "gray.200");
     const footerBg = useColorModeValue("gray.50", "gray.800");
     const footerBorder = useColorModeValue("gray.200", "gray.600");
+    const headerIconBg = useColorModeValue("orange.50", "orange.900");
 
     const [formData, setFormData] = useState({
       title: data?.title || "",
@@ -1589,16 +1526,22 @@ const CourseDetailsPage = () => {
         isOpen={isOpen}
         onClose={loading ? undefined : onClose}
         closeOnOverlayClick={!loading}
-        size="4xl"
+        size={{ base: "full", md: "4xl" }}
+        scrollBehavior="inside"
+        isCentered
       >
-        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(8px)" />
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(6px)" />
         <ModalContent
-          borderRadius="2xl"
+          borderRadius={{ base: "none", md: "2xl" }}
           overflow="hidden"
           bg={cardBg}
           borderWidth="1px"
           borderColor={cardBorder}
           boxShadow="xl"
+          mx={{ base: 0, md: 4 }}
+          maxH={{ base: "100vh", md: "92vh" }}
+          display="flex"
+          flexDirection="column"
         >
           <Box
             h="1"
@@ -1607,38 +1550,59 @@ const CourseDetailsPage = () => {
             flexShrink={0}
           />
           <ModalHeader
-            py={6}
-            px={8}
-            bg="blue.500"
-            color="white"
-            borderRadius="0"
+            py={4}
+            px={{ base: 4, md: 6 }}
+            borderBottomWidth="1px"
+            borderColor={cardBorder}
+            bg={cardBg}
+            flexShrink={0}
           >
-            <HStack spacing={4}>
-              <Box p={2} bg="whiteAlpha.200" borderRadius="xl">
-                <Icon as={FaGraduationCap} boxSize={6} />
+            <HStack spacing={3} align="flex-start" pe={8}>
+              <Box
+                p={2.5}
+                bg={headerIconBg}
+                borderRadius="xl"
+                lineHeight={0}
+              >
+                <Icon as={FaGraduationCap} boxSize={5} color="orange.500" />
               </Box>
-              <VStack align="start" spacing={0}>
-                <Text fontSize="xl" fontWeight="bold">
+              <VStack align="start" spacing={0.5}>
+                <Text fontSize={{ base: "md", md: "lg" }} fontWeight="bold" color={labelColor}>
                   {type === "add" ? "إضافة واجب جديد" : "تعديل الواجب"}
                 </Text>
-                <Text fontSize="sm" opacity={0.9}>
+                <Text fontSize="sm" color="gray.500" fontWeight="normal">
                   {type === "add"
                     ? "يمكنك إنشاء أكثر من واجب لنفس المحاضرة"
-                    : "تعديل إعدادات الواجب"}
+                    : "حدّث إعدادات الواجب والدرجات والظهور"}
                 </Text>
               </VStack>
             </HStack>
           </ModalHeader>
           <ModalCloseButton
-            color="white"
-            _hover={{ bg: "whiteAlpha.200" }}
             top={4}
-            right={4}
+            insetEnd={3}
+            borderRadius="lg"
             isDisabled={loading}
           />
-          <form onSubmit={handleSubmit}>
-            <ModalBody py={8} px={8} bg={modalBg}>
-              <VStack spacing={6} align="stretch">
+          <form
+            onSubmit={handleSubmit}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              flex: 1,
+              minHeight: 0,
+              overflow: "hidden",
+            }}
+          >
+            <ModalBody
+              py={{ base: 4, md: 6 }}
+              px={{ base: 4, md: 6 }}
+              bg={modalBg}
+              flex="1"
+              minH={0}
+              overflowY="auto"
+            >
+              <VStack spacing={4} align="stretch">
                 {/* عنوان الامتحان */}
                 <Box
                   p={5}
@@ -1695,8 +1659,8 @@ const CourseDetailsPage = () => {
                   borderWidth="1px"
                   borderColor={cardBorder}
                 >
-                  <HStack spacing={6} align="flex-start">
-                    <FormControl isRequired flex={1}>
+                  <HStack spacing={6} align="flex-start" flexDir={{ base: "column", md: "row" }}>
+                    <FormControl isRequired flex={1} w="full">
                       <FormLabel
                         display="flex"
                         alignItems="center"
@@ -1740,7 +1704,7 @@ const CourseDetailsPage = () => {
                         size="lg"
                       />
                     </FormControl>
-                    <FormControl isRequired flex={1}>
+                    <FormControl isRequired flex={1} w="full">
                       <FormLabel
                         display="flex"
                         alignItems="center"
@@ -1795,8 +1759,8 @@ const CourseDetailsPage = () => {
                   borderWidth="1px"
                   borderColor={cardBorder}
                 >
-                  <HStack spacing={6} align="flex-start">
-                    <FormControl flex={1}>
+                  <HStack spacing={6} align="flex-start" flexDir={{ base: "column", md: "row" }}>
+                    <FormControl flex={1} w="full">
                       <FormLabel
                         display="flex"
                         alignItems="center"
@@ -1838,7 +1802,7 @@ const CourseDetailsPage = () => {
                         size="lg"
                       />
                     </FormControl>
-                    <FormControl flex={1}>
+                    <FormControl flex={1} w="full">
                       <FormLabel
                         display="flex"
                         alignItems="center"
@@ -2127,19 +2091,20 @@ const CourseDetailsPage = () => {
             </ModalBody>
 
             <ModalFooter
-              py={6}
-              px={8}
+              py={4}
+              px={{ base: 4, md: 6 }}
               borderTopWidth="1px"
               borderColor={footerBorder}
               bg={footerBg}
-              borderRadius="0 0 2xl 2xl"
+              flexShrink={0}
             >
-              <HStack spacing={4} w="full" justify="flex-end">
+              <HStack spacing={3} w="full" justify="flex-end" flexWrap="wrap">
                 <Button
                   variant="ghost"
                   onClick={onClose}
                   isDisabled={loading}
                   fontWeight="600"
+                  borderRadius="xl"
                 >
                   إلغاء
                 </Button>
@@ -2153,8 +2118,10 @@ const CourseDetailsPage = () => {
                   leftIcon={!loading ? <Icon as={FaCheck} /> : undefined}
                   borderRadius="xl"
                   fontWeight="bold"
+                  px={6}
+                  shadow="sm"
                 >
-                  {type === "add" ? "إضافة الواجب" : "تعديل الواجب"}
+                  {type === "add" ? "إضافة الواجب" : "حفظ التعديلات"}
                 </Button>
               </HStack>
             </ModalFooter>

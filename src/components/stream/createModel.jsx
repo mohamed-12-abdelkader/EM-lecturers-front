@@ -1,26 +1,30 @@
+import { useEffect, useState } from "react";
 import {
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
-  ModalBody,
-  ModalCloseButton,
   FormControl,
-  FormLabel,
   Input,
-  Button,
-  Stack,
+  Text,
+  VStack,
 } from "@chakra-ui/react";
-import { useState } from "react";
-import baseUrl from "../../api/baseUrl";
+import { FaBroadcastTower } from "react-icons/fa";
 import { toast } from "react-toastify";
+import baseUrl from "../../api/baseUrl";
+import CourseFormModal, {
+  CourseModalFieldCard,
+  CourseModalFieldLabel,
+  useCourseModalInputProps,
+} from "../CourseFormModal";
 
 const CreateStreamModal = ({ isOpen, onClose, onSuccess, courseId }) => {
   const [title, setTitle] = useState("");
   const [loading, setLoading] = useState(false);
+  const inputProps = useCourseModalInputProps("blue");
 
-  const handleSubmit = async () => {
+  useEffect(() => {
+    if (isOpen) setTitle("");
+  }, [isOpen]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     if (!title.trim()) {
       toast.error("الرجاء إدخال عنوان البث");
       return;
@@ -30,13 +34,13 @@ const CreateStreamModal = ({ isOpen, onClose, onSuccess, courseId }) => {
     try {
       const { data } = await baseUrl.post(
         "/api/meeting",
-        { title, course_id: courseId },
+        { title: title.trim(), course_id: courseId },
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
       toast.success("تم إنشاء البث بنجاح");
       onSuccess?.(data);
@@ -50,33 +54,42 @@ const CreateStreamModal = ({ isOpen, onClose, onSuccess, courseId }) => {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="lg" isCentered>
-      <ModalOverlay />
-      <ModalContent>
-        <ModalHeader>إنشاء بث مباشر جديد</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
-          <Stack spacing={4}>
-            <FormControl isRequired>
-              <FormLabel>عنوان البث (الحصة)</FormLabel>
-              <Input
-                name="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-            </FormControl>
-          </Stack>
-        </ModalBody>
-        <ModalFooter>
-          <Button variant="ghost" ml={3} onClick={onClose}>
-            إلغاء
-          </Button>
-          <Button colorScheme="blue" isLoading={loading} onClick={handleSubmit}>
-            إنشاء
-          </Button>
-        </ModalFooter>
-      </ModalContent>
-    </Modal>
+    <CourseFormModal
+      isOpen={isOpen}
+      onClose={onClose}
+      loading={loading}
+      size={{ base: "full", md: "md" }}
+      icon={FaBroadcastTower}
+      accent="blue"
+      title="إنشاء بث مباشر"
+      subtitle="ابدأ جلسة بث مباشرة للطلاب داخل هذا الكورس"
+      onSubmit={handleSubmit}
+      submitLabel="بدء البث"
+      loadingText="جاري الإنشاء..."
+      submitColorScheme="blue"
+    >
+      <VStack spacing={3} align="stretch">
+        <CourseModalFieldCard>
+          <FormControl isRequired>
+            <CourseModalFieldLabel icon={FaBroadcastTower}>
+              عنوان البث (الحصة)
+            </CourseModalFieldLabel>
+            <Input
+              name="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="مثال: مراجعة ليلة الامتحان"
+              isDisabled={loading}
+              autoFocus
+              {...inputProps}
+            />
+            <Text mt={2} fontSize="xs" color="gray.500">
+              سيظهر العنوان للطلاب في قائمة البث المباشر
+            </Text>
+          </FormControl>
+        </CourseModalFieldCard>
+      </VStack>
+    </CourseFormModal>
   );
 };
 

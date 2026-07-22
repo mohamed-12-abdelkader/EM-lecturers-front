@@ -17,6 +17,11 @@ body {
   font-variation-settings: "slnt" 0;
   background-color: #f8fafc;
   overflow-x: clip;
+  direction: rtl;
+}
+
+html {
+  direction: rtl;
 }
 
 @supports not (overflow-x: clip) {
@@ -27,6 +32,7 @@ body {
 
 #root {
   isolation: isolate;
+  direction: rtl;
 }
 
 [data-theme='dark'] body {

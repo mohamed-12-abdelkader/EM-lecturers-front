@@ -4,7 +4,6 @@ import App from "./App.jsx";
 import "./index.css";
 import { ChakraProvider, useBreakpointValue, useColorMode, Box } from "@chakra-ui/react";
 import { BrowserRouter as Router, useLocation } from "react-router-dom";
-import Footer from "./components/Footer/Footer.jsx";
 import "react-toastify/dist/ReactToastify.css";
 import WhatsButton from "./components/whatsButton/WhatsButton.jsx";
 import SidebarWithHeader from "./components/navbar/Navbar.jsx";
@@ -12,6 +11,11 @@ import BottomNavItems from "./components/Footer/BottomNavItems.jsx";
 import UserType from "./Hooks/auth/userType.js";
 import { getTenantSubdomain } from "./utils/tenantHost.js";
 import { NotificationProvider } from "./context/NotificationProvider.jsx";
+import { forceArabicDocumentLocale } from "./utils/forceArabicLocale.js";
+import theme from "./theme/chakraTheme.js";
+
+// فرض العربية قبل أي رندر — مستقل عن لغة الجهاز
+forceArabicDocumentLocale();
 
 // Sync Chakra color mode to data-theme + class "dark" for Tailwind dark: classes
 const SyncTheme = () => {
@@ -27,34 +31,21 @@ const SyncTheme = () => {
   return null;
 };
 
+const ForceArabicLocale = () => {
+  useEffect(() => {
+    forceArabicDocumentLocale();
+  }, []);
+  return null;
+};
+
 const RootContent = () => {
-  // Get the current location to determine the current path
   const location = useLocation();
   const [userData, isAdmin, isTeacher, student] = UserType();
   const isMobile = useBreakpointValue({ base: true, md: false });
   const tenantSubdomain = getTenantSubdomain();
 
-  useEffect(() => {
-    const overlay = document.getElementById("overlay");
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "hidden") {
-        overlay.style.display = "block";
-      } else {
-        overlay.style.display = "none";
-      }
-    };
-
-    document.addEventListener("visibilitychange", onVisibilityChange);
-
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, []);
-
-  // Only display the SidebarWithHeader if the current path is not '/landing' or '/video'
-  const hideSidebarOnMobileSupportChat = Boolean(isMobile) && location.pathname === "/support-chat";
-  // على سابدومين المستأجر: إظهار النافبار للطالب والمدرس في كل الصفحات
+  const hideSidebarOnMobileSupportChat =
+    Boolean(isMobile) && location.pathname === "/support-chat";
   const showSidebarForTenantUser =
     Boolean(tenantSubdomain) && (Boolean(student) || Boolean(isTeacher));
   const showSidebar =
@@ -76,10 +67,10 @@ const RootContent = () => {
 
   return (
     <NotificationProvider>
+      <ForceArabicLocale />
       <SyncTheme />
-      <div id="overlay" className="overlay"></div>
       {showSidebar && <SidebarWithHeader />}
-      <Box pb={showStudentBottomNav ? { base: "76px", lg: 0 } : 0}>
+      <Box pb={showStudentBottomNav ? { base: "76px", lg: 0 } : 0} dir="rtl" lang="ar">
         <App />
       </Box>
       {showStudentBottomNav ? <BottomNavItems /> : null}
@@ -90,7 +81,7 @@ const RootContent = () => {
 
 const Root = () => (
   <React.StrictMode>
-    <ChakraProvider>
+    <ChakraProvider theme={theme}>
       <Router>
         <RootContent />
       </Router>

@@ -1,7 +1,16 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl" translate="no">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="content-language" content="ar" />
+    <meta name="language" content="Arabic" />
+    <meta name="google" content="notranslate" />
+    <!--
+      Default company SEO (root domain: emlectures.com).
+      On teacher tenant subdomains these tags are replaced dynamically by:
+      - Client: src/utils/tenantSeo.js + useTenantPageMetadata
+      - Server/preview: vite-plugin-tenant-seo.mjs (for crawlers)
+    -->
     <link rel="icon" type="image/png" href="/em-lectures-icon.png" />
     <link rel="apple-touch-icon" href="/pwa-icon-192.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
@@ -10,6 +19,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="EM Lectures" />
+    <meta name="application-name" content="EM Lectures" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -42,7 +52,6 @@
     <meta property="og:image" content="https://emlectures.com/em-lectures-icon.png" />
     <meta property="og:url" content="https://emlectures.com/" />
     <meta property="og:locale" content="ar_AR" />
-    <meta property="og:locale:alternate" content="en_US" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="EM Lectures | منصة إي إم للمحاضرين" />
@@ -51,8 +60,17 @@
       content="منصة تعليمية للمدرسين — كورسات ومحاضرات وامتحانات أونلاين."
     />
     <meta name="twitter:image" content="https://emlectures.com/em-lectures-icon.png" />
+    <script>
+      /* فرض العربية فوراً قبل تحميل React — حتى لو لغة الجهاز إنجليزية */
+      (function () {
+        var html = document.documentElement;
+        html.lang = "ar";
+        html.dir = "rtl";
+        html.setAttribute("translate", "no");
+      })();
+    </script>
   </head>
-  <body>
+  <body dir="rtl" lang="ar" translate="no">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
