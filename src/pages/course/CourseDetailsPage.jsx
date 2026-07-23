@@ -951,8 +951,22 @@ const CourseDetailsPage = () => {
   const createLecture = async (data) => {
     try {
       setActionLoading(true);
-      const response = await baseUrl.post(`api/course/${id}/lectures`, data, {
-        headers: { Authorization: `bearer ${token}` },
+      const authToken = localStorage.getItem("token");
+      if (!authToken) {
+        toast({
+          title: "يجب تسجيل الدخول مرة أخرى",
+          description: "انتهت الجلسة أو التوكن غير موجود",
+          status: "warning",
+          duration: 4000,
+          isClosable: true,
+        });
+        return;
+      }
+      // التوكن يُرفَق تلقائياً من interceptor في baseUrl (Bearer + X-Tenant-Subdomain)
+      await baseUrl.post(`api/course/${id}/lectures`, {
+        title: data.title,
+        description: data.description || "",
+        position: Number(data.position) || 1,
       });
       toast({
         title: "تم إضافة المحاضرة بنجاح",
@@ -965,11 +979,18 @@ const CourseDetailsPage = () => {
       // إغلاق الموديل بعد النجاح
       setLectureModal({ isOpen: false, type: "add", data: null });
     } catch (error) {
+      const apiMsg =
+        error.response?.data?.message ||
+        error.response?.data?.msg ||
+        error.message;
       toast({
         title: "خطأ في إضافة المحاضرة",
-        description: error.response?.data?.message || "حدث خطأ غير متوقع",
+        description:
+          error.response?.status === 401
+            ? `غير مصرح (401): ${apiMsg || "تحقق من تسجيل الدخول أو أعد الدخول"}`
+            : apiMsg || "حدث خطأ غير متوقع",
         status: "error",
-        duration: 3000,
+        duration: 5000,
         isClosable: true,
       });
     } finally {

@@ -21,6 +21,15 @@ self.addEventListener("activate", (event) => {
  * Does not intercept caching aggressively (push SW stays simple).
  */
 self.addEventListener("fetch", (event) => {
+  const url = new URL(event.request.url);
+  // لا تعترض طلبات الـ API حتى لا تُفقد هيدرز Authorization (خصوصًا POST)
+  if (
+    url.pathname.startsWith("/api/") ||
+    url.hostname.startsWith("api.") ||
+    url.hostname.includes("em-online")
+  ) {
+    return;
+  }
   event.respondWith(fetch(event.request));
 });
 

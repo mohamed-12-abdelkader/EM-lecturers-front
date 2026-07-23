@@ -1,15 +1,86 @@
 import axios from "axios";
-import { clearAuthSession } from "../utils/authStorage";
+import {
+  clearAuthSession,
+  normalizeAuthToken,
+} from "../utils/authStorage";
+import { getTenantSubdomain } from "../utils/tenantHost";
 import { getApiBaseURL } from "./apiConfig";
 
 const baseUrl = axios.create({
   baseURL: getApiBaseURL(),
 });
 
-// Response interceptor to handle token expiration globally
+function persistToken(token) {
+  const normalized = normalizeAuthToken(token);
+  if (!normalized) return;
+  try {
+    localStorage.setItem("token", normalized);
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function setHeader(headers, key, value) {
+  if (!headers || value == null || value === "") return;
+  if (typeof headers.set === "function") {
+    headers.set(key, value);
+  } else {
+    headers[key] = value;
+  }
+}
+
+function getHeader(headers, key) {
+  if (!headers) return "";
+  if (typeof headers.get === "function") {
+    const viaGet = headers.get(key);
+    if (viaGet != null && viaGet !== false) return String(viaGet);
+  }
+  const direct = headers[key] ?? headers[key.toLowerCase()];
+  return direct != null ? String(direct) : "";
+}
+
+// Always attach a fresh, normalized Bearer token + tenant context
+baseUrl.interceptors.request.use((config) => {
+  const headers = config.headers || {};
+  let rawStored = "";
+  try {
+    rawStored = localStorage.getItem("token") || "";
+  } catch {
+    rawStored = "";
+  }
+  const token = normalizeAuthToken(rawStored);
+  // أصلح التوكن المخزّن لو كان فيه Bearer مكرر أو اقتباسات
+  if (token && token !== rawStored) persistToken(token);
+
+  if (token) {
+    // Always overwrite — callers often send lowercase/double Bearer or stale values
+    setHeader(headers, "Authorization", `Bearer ${token}`);
+  }
+
+  const tenant = getTenantSubdomain();
+  if (tenant && !getHeader(headers, "X-Tenant-Subdomain")) {
+    setHeader(headers, "X-Tenant-Subdomain", tenant);
+  }
+
+  config.headers = headers;
+  return config;
+});
+
+// Persist refreshed tokens + handle global session expiry
 baseUrl.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const refreshed =
+      response?.headers?.["x-access-token"] ||
+      response?.headers?.["X-Access-Token"];
+    if (refreshed) persistToken(refreshed);
+    return response;
+  },
   (error) => {
+    const refreshed =
+      error?.response?.headers?.["x-access-token"] ||
+      error?.response?.headers?.["X-Access-Token"];
+    if (refreshed) persistToken(refreshed);
+
     if (error.response && error.response.status === 401) {
       const apiMessage = error?.response?.data?.message;
 
