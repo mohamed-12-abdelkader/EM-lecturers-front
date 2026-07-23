@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Box,
   VStack,
@@ -26,8 +26,11 @@ import {
   Heading,
   Spinner,
   useColorModeValue,
+  Image,
+  IconButton,
+  SimpleGrid,
 } from "@chakra-ui/react";
-import { FaPlus, FaUpload, FaFilePdf, FaImage } from "react-icons/fa";
+import { FaPlus, FaUpload, FaFilePdf, FaImage, FaPaste, FaTimes, FaMagic } from "react-icons/fa";
 import {
   emptyDraftQuestion,
   mapOcrQuestionToDraft,
@@ -40,6 +43,9 @@ import {
   validatePdfPageRange,
   mapExtractionResponseMeta,
   formatOcrApiError,
+  filesFromClipboardEvent,
+  isPdfFile,
+  MAX_OCR_IMAGE_FILES,
 } from "../../../api/ocrQuestionExtractionApi";
 import ExtractionDraftQuestionCard from "../../../components/question/ExtractionDraftQuestionCard";
 import ExtractionMathPreview from "../../../components/question/ExtractionMathPreview";
@@ -67,12 +73,31 @@ export default function TeacherLibraryExtractionModal({
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef(null);
+  const addFilesToQueueRef = useRef(null);
 
   const cardBg = useColorModeValue("white", "gray.800");
   const borderColor = useColorModeValue("gray.200", "gray.700");
   const headingColor = useColorModeValue("blue.700", "blue.200");
   const subTextColor = useColorModeValue("gray.500", "gray.400");
   const ocrUploadBg = useColorModeValue("blue.50", "gray.700");
+
+  const imagePreviewUrls = React.useMemo(
+    () =>
+      selectedFiles.map((file) =>
+        file.type?.startsWith("image/") || /\.(png|jpe?g|webp|gif|avif|bmp|tiff?)$/i.test(file.name)
+          ? URL.createObjectURL(file)
+          : null,
+      ),
+    [selectedFiles],
+  );
+
+  React.useEffect(() => {
+    return () => {
+      imagePreviewUrls.forEach((url) => {
+        if (url) URL.revokeObjectURL(url);
+      });
+    };
+  }, [imagePreviewUrls]);
 
   const resetState = () => {
     setDraftPassages([]);
@@ -119,12 +144,65 @@ export default function TeacherLibraryExtractionModal({
     fileInputRef.current?.click();
   };
 
-  const handleOcrFileUpload = async (event) => {
-    const fileList = event.target.files;
-    if (!fileList?.length) return;
+  const addFilesToQueue = (incoming) => {
+    if (!incoming?.length || isExtractingOcr || isImporting) return;
 
-    const files = Array.from(fileList);
-    setSelectedFiles(files);
+    const incomingHasPdf = incoming.some(isPdfFile);
+    let next;
+    if (incomingHasPdf) {
+      next = incoming;
+    } else if (selectedFiles.some(isPdfFile)) {
+      next = incoming;
+    } else {
+      next = [...selectedFiles, ...incoming];
+    }
+
+    if (next.length > MAX_OCR_IMAGE_FILES) {
+      toast({
+        title: "خطأ",
+        description: `الحد الأقصى ${MAX_OCR_IMAGE_FILES} صورة`,
+        status: "error",
+        duration: 3500,
+        isClosable: true,
+      });
+      return;
+    }
+
+    const fileError = validateOcrFiles(next);
+    if (fileError) {
+      toast({
+        title: "خطأ",
+        description: fileError,
+        status: "error",
+        duration: 4000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    setSelectedFiles(next);
+    toast({
+      title: "تمت الإضافة",
+      description: `الآن لديك ${next.length} ملف — الصق المزيد أو اضغط «بدء الاستخراج»`,
+      status: "success",
+      duration: 2500,
+      isClosable: true,
+    });
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeQueuedFile = (index) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const clearQueuedFiles = () => {
+    setSelectedFiles([]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const runExtraction = async () => {
+    const files = selectedFiles;
+    if (!files?.length || isExtractingOcr || isImporting) return;
 
     const fileError = validateOcrFiles(files);
     if (fileError) {
@@ -135,8 +213,6 @@ export default function TeacherLibraryExtractionModal({
         duration: 4000,
         isClosable: true,
       });
-      setSelectedFiles([]);
-      if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
 
@@ -149,8 +225,6 @@ export default function TeacherLibraryExtractionModal({
         duration: 4000,
         isClosable: true,
       });
-      setSelectedFiles([]);
-      if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
 
@@ -213,6 +287,37 @@ export default function TeacherLibraryExtractionModal({
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
+
+  const handleOcrFileUpload = (event) => {
+    const fileList = event.target.files;
+    if (!fileList?.length) return;
+    addFilesToQueue(Array.from(fileList));
+  };
+
+  const handlePasteImages = (event) => {
+    if (!isOpen || isExtractingOcr || isImporting) return;
+    const pasted = filesFromClipboardEvent(event);
+    if (!pasted.length) return;
+    event.preventDefault();
+    event.stopPropagation();
+    addFilesToQueue(pasted);
+  };
+
+  addFilesToQueueRef.current = addFilesToQueue;
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onPaste = (event) => {
+      if (isExtractingOcr || isImporting) return;
+      const pasted = filesFromClipboardEvent(event);
+      if (!pasted.length) return;
+      event.preventDefault();
+      event.stopPropagation();
+      addFilesToQueueRef.current?.(pasted);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [isOpen, isExtractingOcr, isImporting]);
 
   const handleImport = async () => {
     if (!lessonId) {
@@ -448,47 +553,167 @@ export default function TeacherLibraryExtractionModal({
                 display="none"
                 onChange={handleOcrFileUpload}
               />
-              <Button
+              <Box
+                tabIndex={0}
+                role="button"
+                aria-label="منطقة لصق صور"
+                onPaste={handlePasteImages}
                 onClick={openFilePicker}
-                leftIcon={isExtractingOcr ? <Spinner size="sm" /> : <FaUpload />}
-                colorScheme="blue"
-                variant="outline"
-                w="full"
+                borderWidth="2px"
+                borderStyle="dashed"
+                borderColor="blue.300"
+                borderRadius="xl"
+                bg={cardBg}
+                px={4}
+                py={5}
+                textAlign="center"
                 cursor={isExtractingOcr || isImporting ? "not-allowed" : "pointer"}
-                isDisabled={isExtractingOcr || isImporting}
-                borderRadius="lg"
+                opacity={isExtractingOcr || isImporting ? 0.7 : 1}
+                _hover={
+                  isExtractingOcr || isImporting
+                    ? undefined
+                    : { borderColor: "blue.400", bg: ocrUploadBg }
+                }
+                _focusVisible={{ outline: "2px solid", outlineColor: "blue.400" }}
+                mb={3}
               >
-                {isExtractingOcr
-                  ? "جاري الاستخراج…"
-                  : selectedFiles.length > 0
-                    ? `تم اختيار ${selectedFiles.length === 1 ? "ملف" : `${selectedFiles.length} ملفات`}`
-                    : "اختر PDF أو صورة (أو صور متعددة)"}
-              </Button>
+                <VStack spacing={2}>
+                  {isExtractingOcr ? (
+                    <HStack>
+                      <Spinner size="sm" color="blue.500" />
+                      <Text fontWeight="700" fontSize="sm" color="blue.600">
+                        جاري الاستخراج…
+                      </Text>
+                    </HStack>
+                  ) : (
+                    <>
+                      <Icon as={FaPaste} boxSize={6} color="blue.400" />
+                      <Text fontWeight="700" fontSize="sm">
+                        الصق صوراً متعددة (Ctrl+V) ثم ابدأ الاستخراج
+                      </Text>
+                      <Text fontSize="xs" color={subTextColor}>
+                        الصق صورة… صورة… صورة — كلها تتجمع هنا قبل التنفيذ
+                      </Text>
+                    </>
+                  )}
+                </VStack>
+              </Box>
+              <HStack spacing={2} mb={3}>
+                <Button
+                  onClick={openFilePicker}
+                  leftIcon={<FaUpload />}
+                  colorScheme="blue"
+                  variant="outline"
+                  flex={1}
+                  isDisabled={isExtractingOcr || isImporting}
+                  borderRadius="lg"
+                >
+                  إضافة من الجهاز
+                </Button>
+                <Button
+                  onClick={runExtraction}
+                  leftIcon={isExtractingOcr ? <Spinner size="sm" /> : <FaMagic />}
+                  colorScheme="blue"
+                  flex={1}
+                  isDisabled={
+                    isExtractingOcr || isImporting || selectedFiles.length === 0
+                  }
+                  borderRadius="lg"
+                >
+                  {isExtractingOcr
+                    ? "جاري الاستخراج…"
+                    : `بدء الاستخراج${selectedFiles.length ? ` (${selectedFiles.length})` : ""}`}
+                </Button>
+              </HStack>
               {selectedFiles.length > 0 && (
                 <Box
-                  mt={3}
                   p={3}
                   borderRadius="lg"
                   borderWidth="1px"
                   borderColor="blue.200"
                   bg={cardBg}
                 >
-                  <Text fontSize="sm" fontWeight="semibold" mb={2}>
-                    الملفات المختارة:
-                  </Text>
-                  <VStack align="stretch" spacing={1}>
-                    {selectedFiles.map((file) => (
-                      <HStack key={`${file.name}-${file.size}-${file.lastModified}`} spacing={2}>
-                        <Icon
-                          as={file.type === "application/pdf" || /\.pdf$/i.test(file.name) ? FaFilePdf : FaImage}
-                          color="blue.500"
-                        />
-                        <Text fontSize="sm" noOfLines={1} flex={1}>
-                          {file.name}
-                        </Text>
-                      </HStack>
-                    ))}
-                  </VStack>
+                  <Flex justify="space-between" align="center" mb={2} gap={2}>
+                    <Text fontSize="sm" fontWeight="semibold">
+                      الملفات الجاهزة ({selectedFiles.length})
+                    </Text>
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      colorScheme="red"
+                      onClick={clearQueuedFiles}
+                      isDisabled={isExtractingOcr || isImporting}
+                    >
+                      مسح الكل
+                    </Button>
+                  </Flex>
+                  <SimpleGrid columns={{ base: 2, md: 3, lg: 4 }} spacing={3}>
+                    {selectedFiles.map((file, index) => {
+                      const preview = imagePreviewUrls[index];
+                      const pdf = isPdfFile(file);
+                      return (
+                        <Box
+                          key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                          position="relative"
+                          borderWidth="1px"
+                          borderColor="blue.100"
+                          borderRadius="lg"
+                          overflow="hidden"
+                          bg="gray.50"
+                          _dark={{ bg: "gray.700", borderColor: "blue.800" }}
+                        >
+                          {preview ? (
+                            <Image
+                              src={preview}
+                              alt={file.name}
+                              w="full"
+                              h="90px"
+                              objectFit="cover"
+                            />
+                          ) : (
+                            <Flex
+                              h="90px"
+                              align="center"
+                              justify="center"
+                              direction="column"
+                              gap={1}
+                              px={2}
+                            >
+                              <Icon as={pdf ? FaFilePdf : FaImage} color="blue.500" />
+                              <Text fontSize="xs" noOfLines={2} textAlign="center">
+                                {file.name}
+                              </Text>
+                            </Flex>
+                          )}
+                          <IconButton
+                            icon={<FaTimes />}
+                            aria-label="حذف الملف"
+                            size="xs"
+                            colorScheme="red"
+                            variant="solid"
+                            borderRadius="full"
+                            position="absolute"
+                            top={1}
+                            insetStart={1}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeQueuedFile(index);
+                            }}
+                            isDisabled={isExtractingOcr || isImporting}
+                          />
+                          <Text
+                            fontSize="10px"
+                            px={1.5}
+                            py={1}
+                            noOfLines={1}
+                            color={subTextColor}
+                          >
+                            {file.name}
+                          </Text>
+                        </Box>
+                      );
+                    })}
+                  </SimpleGrid>
                 </Box>
               )}
               <HStack mt={2} spacing={4} justify="center" color={subTextColor} fontSize="sm">
@@ -498,7 +723,7 @@ export default function TeacherLibraryExtractionModal({
                 </HStack>
                 <HStack>
                   <Icon as={FaImage} />
-                  <Text>PNG, JPG, WebP, AVIF, TIFF…</Text>
+                  <Text>PNG, JPG, WebP…</Text>
                 </HStack>
               </HStack>
             </Box>

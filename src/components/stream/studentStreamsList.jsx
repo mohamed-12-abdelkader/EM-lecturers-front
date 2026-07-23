@@ -2,7 +2,6 @@ import {
   Box,
   Button,
   Flex,
-  Heading,
   Text,
   Badge,
   useColorModeValue,
@@ -29,35 +28,23 @@ import baseUrl from "../../api/baseUrl";
 const STREAM_REDIRECT_URL = import.meta.env.VITE_STREAM_REDIRECT_URL;
 
 const STATUS_META = {
-  started: {
-    label: "مباشر الآن",
-    scheme: "red",
-    icon: FaBroadcastTower,
-  },
-  idle: {
-    label: "قيد الانتظار",
-    scheme: "orange",
-    icon: FaHourglassHalf,
-  },
-  ended: {
-    label: "منتهي",
-    scheme: "gray",
-    icon: FaCheckCircle,
-  },
+  started: { label: "مباشر", scheme: "red", icon: FaBroadcastTower },
+  idle: { label: "انتظار", scheme: "orange", icon: FaHourglassHalf },
+  ended: { label: "منتهي", scheme: "gray", icon: FaCheckCircle },
 };
 
 function LivePulseDot() {
   return (
-    <Box position="relative" w={2.5} h={2.5} flexShrink={0}>
+    <Box position="relative" w={2} h={2} flexShrink={0}>
       <Box
         position="absolute"
         inset={0}
         borderRadius="full"
         bg="red.500"
         sx={{
-          animation: "streamPing 1.2s cubic-bezier(0,0,0.2,1) infinite",
+          animation: "streamPing 1.4s cubic-bezier(0,0,0.2,1) infinite",
           "@keyframes streamPing": {
-            "75%, 100%": { transform: "scale(2.4)", opacity: 0 },
+            "75%, 100%": { transform: "scale(2.2)", opacity: 0 },
           },
         }}
       />
@@ -73,118 +60,84 @@ const fetchCourseStreams = async (courseId) => {
   return res.data;
 };
 
-function StudentStreamCard({ stream }) {
+function StudentStreamRow({ stream }) {
   const meta = STATUS_META[stream.status] || STATUS_META.ended;
   const isLive = stream.status === "started";
   const isIdle = stream.status === "idle";
   const isEnded = stream.status === "ended";
 
-  const cardBg = useColorModeValue("white", "gray.800");
+  const rowBg = useColorModeValue("white", "gray.800");
   const border = useColorModeValue("gray.200", "gray.700");
-  const titleColor = useColorModeValue("gray.900", "white");
+  const titleColor = useColorModeValue("gray.800", "white");
   const muted = useColorModeValue("gray.500", "gray.400");
-  const iconSoftBg = useColorModeValue(
-    isLive ? "red.50" : isIdle ? "orange.50" : "gray.100",
-    "whiteAlpha.100",
-  );
-  const barColor = useColorModeValue(
-    isLive ? "red.500" : isIdle ? "orange.400" : "gray.200",
-    isLive ? "red.500" : isIdle ? "orange.400" : "gray.600",
-  );
-  const actionsBg = useColorModeValue("gray.50", "whiteAlpha.50");
+  const hoverBg = useColorModeValue("gray.50", "whiteAlpha.50");
 
   return (
     <Box
-      bg={cardBg}
+      bg={rowBg}
       borderWidth="1px"
       borderColor={isLive ? "red.200" : border}
-      borderRadius="2xl"
-      overflow="hidden"
-      boxShadow={
-        isLive
-          ? "0 8px 24px rgba(229,62,62,0.14)"
-          : "0 1px 2px rgba(15,23,42,0.04)"
-      }
-      transition="all 0.2s ease"
-      _hover={{
-        transform: "translateY(-2px)",
-        boxShadow: isLive
-          ? "0 12px 28px rgba(229,62,62,0.18)"
-          : "0 8px 18px rgba(15,23,42,0.07)",
-      }}
+      borderRadius="xl"
+      px={{ base: 3, md: 4 }}
+      py={{ base: 3, md: 3.5 }}
+      _hover={{ bg: hoverBg }}
+      dir="rtl"
     >
-      <Box h="3px" bg={barColor} />
       <Flex
         direction={{ base: "column", md: "row" }}
         align={{ base: "stretch", md: "center" }}
-        gap={4}
-        p={{ base: 4, md: 5 }}
+        gap={3}
       >
-        <HStack spacing={3.5} flex={1} minW={0} align="flex-start">
+        <HStack spacing={3} flex={1} minW={0}>
           <Center
-            w={{ base: 12, md: 14 }}
-            h={{ base: 12, md: 14 }}
-            borderRadius="xl"
-            bg={isLive ? "red.500" : iconSoftBg}
-            color={isLive ? "white" : isIdle ? "orange.500" : "gray.500"}
+            w={9}
+            h={9}
+            borderRadius="lg"
+            bg={isLive ? "red.500" : isIdle ? "orange.100" : "gray.100"}
+            color={isLive ? "white" : isIdle ? "orange.600" : "gray.500"}
+            _dark={{
+              bg: isLive ? "red.500" : isIdle ? "orange.900" : "whiteAlpha.200",
+              color: isLive ? "white" : isIdle ? "orange.300" : "gray.400",
+            }}
             flexShrink={0}
-            boxShadow={isLive ? "0 6px 16px rgba(229,62,62,0.35)" : "none"}
           >
-            <Icon as={meta.icon} boxSize={{ base: 5, md: 6 }} />
+            <Icon as={meta.icon} boxSize={3.5} />
           </Center>
 
-          <VStack align="start" spacing={1.5} minW={0} flex={1}>
-            <Text
-              fontSize={{ base: "md", md: "lg" }}
-              fontWeight="800"
-              color={titleColor}
-              noOfLines={2}
-            >
-              {stream.title}
-            </Text>
-            <HStack spacing={2} flexWrap="wrap">
-              <HStack
-                spacing={1.5}
-                bg={isLive ? "red.50" : "transparent"}
-                _dark={{ bg: isLive ? "rgba(229,62,62,0.15)" : "transparent" }}
-                px={isLive ? 2.5 : 0}
-                py={isLive ? 1 : 0}
-                borderRadius="full"
-              >
-                {isLive && <LivePulseDot />}
+          <Box minW={0} flex={1}>
+            <HStack spacing={2} flexWrap="wrap" mb={0.5}>
+              <Text fontWeight="700" fontSize="sm" color={titleColor} noOfLines={1}>
+                {stream.title}
+              </Text>
+              <HStack spacing={1}>
+                {isLive ? <LivePulseDot /> : null}
                 <Badge
                   colorScheme={meta.scheme}
                   variant={isLive ? "solid" : "subtle"}
                   borderRadius="full"
-                  px={2.5}
-                  fontSize="xs"
+                  px={2}
+                  fontSize="10px"
                   fontWeight="700"
                   textTransform="none"
                 >
                   {meta.label}
                 </Badge>
               </HStack>
-              <HStack spacing={1.5} color={muted}>
-                <Icon as={FaClock} boxSize={3} />
-                <Text fontSize="xs">
-                  {new Date(stream.created_at || Date.now()).toLocaleDateString(
-                    "ar-EG",
-                    { year: "numeric", month: "short", day: "numeric" },
-                  )}
-                </Text>
-              </HStack>
             </HStack>
-          </VStack>
+            <HStack color={muted} spacing={1.5} fontSize="xs">
+              <Icon as={FaClock} boxSize={2.5} />
+              <Text>
+                {new Date(stream.created_at || Date.now()).toLocaleDateString(
+                  "ar-EG",
+                  { year: "numeric", month: "short", day: "numeric" },
+                )}
+              </Text>
+            </HStack>
+          </Box>
         </HStack>
 
-        <Flex
-          align="center"
-          gap={2}
-          bg={{ base: actionsBg, md: "transparent" }}
-          borderRadius={{ base: "xl", md: "none" }}
-          p={{ base: 2.5, md: 0 }}
-        >
-          {isLive && (
+        <Flex gap={2}>
+          {isLive ? (
             <Button
               as="a"
               href={`${STREAM_REDIRECT_URL}/${stream.id}?t=${localStorage.getItem("token")}`}
@@ -193,16 +146,15 @@ function StudentStreamCard({ stream }) {
               leftIcon={<Icon as={FaPlay} boxSize={3} />}
               colorScheme="red"
               size="sm"
-              borderRadius="xl"
+              borderRadius="lg"
               fontWeight="700"
               w={{ base: "full", md: "auto" }}
-              boxShadow="0 4px 14px rgba(229,62,62,0.3)"
             >
               دخول المحاضرة
             </Button>
-          )}
+          ) : null}
 
-          {isEnded && stream.egress_url && (
+          {isEnded && stream.egress_url ? (
             <Button
               as="a"
               href={stream.egress_url}
@@ -212,13 +164,13 @@ function StudentStreamCard({ stream }) {
               colorScheme="blue"
               variant="outline"
               size="sm"
-              borderRadius="xl"
+              borderRadius="lg"
               fontWeight="700"
               w={{ base: "full", md: "auto" }}
             >
               مشاهدة التسجيل
             </Button>
-          )}
+          ) : null}
         </Flex>
       </Flex>
     </Box>
@@ -234,69 +186,29 @@ const StudentStreamsList = ({ courseId }) => {
   const subTextColor = useColorModeValue("gray.500", "gray.400");
   const cardBg = useColorModeValue("white", "gray.800");
   const borderColor = useColorModeValue("gray.200", "gray.700");
-  const titleColor = useColorModeValue("gray.900", "white");
-  const iconBg = useColorModeValue("blue.50", "blue.900");
-  const softPanel = useColorModeValue("gray.50", "whiteAlpha.50");
-  const waitingBg = useColorModeValue("orange.50", "orange.900");
-  const waitingColor = useColorModeValue("orange.600", "orange.300");
-  const errorBg = useColorModeValue("red.50", "red.900");
-  const errorBorder = useColorModeValue("red.200", "red.700");
-  const errorIcon = useColorModeValue("red.500", "red.300");
-  const errorText = useColorModeValue("red.600", "red.200");
+  const titleColor = useColorModeValue("gray.800", "white");
+  const muted = useColorModeValue("gray.500", "gray.400");
   const emptyIconBg = useColorModeValue("blue.50", "blue.900");
+  const liveBg = useColorModeValue("red.50", "rgba(229,62,62,0.12)");
 
   const streams = data?.meetings || [];
   const startedStream = streams.find((s) => s.status === "started");
 
   if (isLoading) {
     return (
-      <Box
-        mt={2}
-        bg={cardBg}
-        borderRadius="2xl"
-        borderWidth="1px"
-        borderColor={borderColor}
-        overflow="hidden"
-      >
-        <Box h="1" w="full" bgGradient="linear(to-r, blue.500, orange.500)" />
-        <Box p={{ base: 4, md: 5 }}>
-          <Flex
-            direction={{ base: "column", md: "row" }}
-            justify="space-between"
-            gap={3}
-          >
-            <HStack spacing={3}>
-              <Skeleton borderRadius="xl" height="48px" width="48px" />
-              <Box>
-                <Skeleton height="18px" width="160px" />
-                <Skeleton height="12px" width="220px" mt={2} />
-              </Box>
-            </HStack>
-            <Skeleton height="36px" width="140px" borderRadius="xl" />
-          </Flex>
-          <VStack mt={5} spacing={3} align="stretch">
-            <Skeleton height="110px" borderRadius="2xl" />
-            <Skeleton height="110px" borderRadius="2xl" />
-          </VStack>
-        </Box>
-      </Box>
+      <VStack spacing={2} align="stretch" dir="rtl">
+        <Skeleton height="40px" borderRadius="lg" />
+        <Skeleton height="72px" borderRadius="xl" />
+        <Skeleton height="72px" borderRadius="xl" />
+      </VStack>
     );
   }
 
   if (isError) {
     return (
-      <Box
-        mt={2}
-        textAlign="center"
-        py={12}
-        bg={errorBg}
-        borderRadius="2xl"
-        borderWidth="1px"
-        borderStyle="dashed"
-        borderColor={errorBorder}
-      >
-        <Icon as={FaTimesCircle} color={errorIcon} boxSize={10} mb={3} />
-        <Text color={errorText} fontWeight="700">
+      <Box textAlign="center" py={10} dir="rtl">
+        <Icon as={FaTimesCircle} color="red.400" boxSize={8} mb={2} />
+        <Text color="red.500" fontWeight="700" fontSize="sm">
           حدث خطأ أثناء تحميل الجلسات
         </Text>
       </Box>
@@ -304,109 +216,87 @@ const StudentStreamsList = ({ courseId }) => {
   }
 
   return (
-    <Box mt={2} dir="rtl">
-      <Box
-        bg={cardBg}
-        borderRadius="2xl"
-        borderWidth="1px"
-        borderColor={startedStream ? "red.200" : borderColor}
-        boxShadow={
-          startedStream
-            ? "0 10px 28px rgba(229,62,62,0.12)"
-            : "0 1px 3px rgba(15,23,42,0.04)"
-        }
-        overflow="hidden"
+    <Box dir="rtl">
+      <Flex
+        direction={{ base: "column", sm: "row" }}
+        justify="space-between"
+        align={{ base: "stretch", sm: "center" }}
+        gap={3}
         mb={5}
+        pb={4}
+        borderBottomWidth="1px"
+        borderColor={borderColor}
       >
-        <Box h="1" w="full" bgGradient="linear(to-r, blue.500, orange.500)" />
-        <Flex
-          direction={{ base: "column", md: "row" }}
-          justify="space-between"
-          align={{ base: "stretch", md: "center" }}
-          gap={4}
-          p={{ base: 4, md: 5 }}
-        >
-          <HStack spacing={3.5} align="flex-start" minW={0}>
-            <Center
-              w={{ base: 12, md: 14 }}
-              h={{ base: 12, md: 14 }}
-              borderRadius="xl"
-              bg={startedStream ? "red.500" : iconBg}
-              color={startedStream ? "white" : "blue.500"}
-              flexShrink={0}
-              boxShadow={
-                startedStream ? "0 8px 18px rgba(229,62,62,0.35)" : "none"
-              }
-            >
-              <Icon as={FaVideo} boxSize={{ base: 5, md: 6 }} />
-            </Center>
-            <VStack align="start" spacing={1} minW={0}>
-              <Heading as="h2" size="md" fontWeight="800" color={titleColor}>
-                الجلسات المباشرة
-              </Heading>
-              <Text fontSize="sm" color={subTextColor} lineHeight="1.7">
-                انضم للبث الجاري أو شاهد تسجيل الجلسات السابقة
-              </Text>
-            </VStack>
-          </HStack>
-
-          <Box
-            bg={softPanel}
+        <HStack spacing={3} align="flex-start">
+          <Center
+            w={11}
+            h={11}
             borderRadius="xl"
-            px={{ base: 3, md: 4 }}
-            py={3}
-            borderWidth="1px"
-            borderColor={borderColor}
+            bg={startedStream ? "red.500" : "blue.500"}
+            color="white"
+            flexShrink={0}
           >
-            <HStack spacing={3} flexWrap="wrap">
-              <Badge
-                colorScheme="blue"
-                borderRadius="full"
-                px={3}
-                py={1.5}
-                fontWeight="800"
-                textTransform="none"
-              >
-                {streams.length} جلسة
-              </Badge>
-
-              {startedStream ? (
-                <Button
-                  as="a"
-                  href={`${STREAM_REDIRECT_URL}/${startedStream.id}?t=${localStorage.getItem("token")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  leftIcon={<Icon as={FaPlayCircle} boxSize={3.5} />}
-                  colorScheme="red"
-                  borderRadius="xl"
-                  fontWeight="700"
-                  size="md"
-                  boxShadow="0 4px 14px rgba(229,62,62,0.3)"
-                >
-                  متابعة الآن
-                </Button>
-              ) : (
-                <Badge
-                  bg={waitingBg}
-                  color={waitingColor}
-                  px={3}
-                  py={1.5}
-                  borderRadius="full"
-                  fontWeight="800"
-                  textTransform="none"
-                >
-                  لا يوجد بث مباشر
-                </Badge>
-              )}
-            </HStack>
+            <Icon as={FaVideo} boxSize={5} />
+          </Center>
+          <Box>
+            <Text fontWeight="800" fontSize="lg" color={titleColor}>
+              المحاضرات المباشرة
+            </Text>
+            <Text fontSize="sm" color={muted}>
+              انضم للبث أو شاهد التسجيلات السابقة
+            </Text>
           </Box>
-        </Flex>
-      </Box>
+        </HStack>
+
+        {startedStream ? (
+          <HStack
+            spacing={2}
+            bg={liveBg}
+            borderRadius="xl"
+            px={3}
+            py={2}
+            flexWrap="wrap"
+          >
+            <HStack spacing={1.5}>
+              <LivePulseDot />
+              <Text fontSize="xs" fontWeight="700" color="red.600">
+                مباشر الآن
+              </Text>
+            </HStack>
+            <Button
+              as="a"
+              href={`${STREAM_REDIRECT_URL}/${startedStream.id}?t=${localStorage.getItem("token")}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              leftIcon={<Icon as={FaPlayCircle} boxSize={3} />}
+              colorScheme="red"
+              size="sm"
+              borderRadius="lg"
+              fontWeight="700"
+            >
+              متابعة
+            </Button>
+          </HStack>
+        ) : (
+          <Badge
+            colorScheme="gray"
+            variant="subtle"
+            borderRadius="full"
+            px={3}
+            py={1.5}
+            textTransform="none"
+            fontWeight="700"
+            alignSelf={{ base: "flex-start", sm: "center" }}
+          >
+            لا يوجد بث مباشر حالياً
+          </Badge>
+        )}
+      </Flex>
 
       {streams.length > 0 ? (
-        <VStack spacing={3} align="stretch">
+        <VStack spacing={2} align="stretch">
           {streams.map((stream) => (
-            <StudentStreamCard key={stream.id} stream={stream} />
+            <StudentStreamRow key={stream.id} stream={stream} />
           ))}
         </VStack>
       ) : (
@@ -414,20 +304,20 @@ const StudentStreamsList = ({ courseId }) => {
           direction="column"
           align="center"
           justify="center"
-          py={14}
+          py={12}
           px={4}
           bg={cardBg}
-          borderRadius="2xl"
+          borderRadius="xl"
           borderWidth="1px"
           borderStyle="dashed"
           borderColor={borderColor}
           textAlign="center"
         >
-          <Center p={4} bg={emptyIconBg} borderRadius="2xl" mb={4}>
-            <Icon as={FaVideo} color="blue.500" boxSize={8} />
+          <Center p={3} bg={emptyIconBg} borderRadius="xl" mb={3}>
+            <Icon as={FaVideo} color="blue.500" boxSize={6} />
           </Center>
-          <Text color={titleColor} fontSize="lg" fontWeight="800">
-            لا توجد جلسات مباشرة حالياً
+          <Text color={titleColor} fontWeight="700">
+            لا توجد جلسات مباشرة
           </Text>
           <Text color={subTextColor} fontSize="sm" mt={1}>
             عند بدء المدرس بثاً جديداً سيظهر هنا

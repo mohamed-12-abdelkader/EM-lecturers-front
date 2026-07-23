@@ -3801,18 +3801,12 @@ display:block;
               bg={sectionBg}
               borderRadius="2xl"
               borderWidth="1px"
-              borderColor={
-                activeSectionMeta?.live ? "red.300" : borderColor
-              }
-              boxShadow={
-                activeSectionMeta?.live
-                  ? "0 0 20px rgba(229, 62, 62, 0.15)"
-                  : "0 1px 3px rgba(15,23,42,0.05)"
-              }
+              borderColor={borderColor}
+              boxShadow="0 1px 3px rgba(15,23,42,0.05)"
               p={{ base: 3.5, md: 6 }}
               minH="420px"
             >
-              {activeSectionMeta && activeSection === "live" ? (
+              {activeSectionMeta && activeSection !== "live" ? (
                 <SectionPanelHeader section={activeSectionMeta} />
               ) : null}
 

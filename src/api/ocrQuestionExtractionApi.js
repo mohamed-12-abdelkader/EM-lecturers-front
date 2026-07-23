@@ -38,6 +38,35 @@ export function isImageOcrFile(file) {
   );
 }
 
+/**
+ * يستخرج ملفات الصور من حدث اللصق (Ctrl+V / Cmd+V).
+ * @param {ClipboardEvent} event
+ * @returns {File[]}
+ */
+export function filesFromClipboardEvent(event) {
+  const items = event?.clipboardData?.items;
+  if (!items?.length) return [];
+
+  const files = [];
+  const stamp = Date.now();
+  for (let i = 0; i < items.length; i += 1) {
+    const item = items[i];
+    if (!item || item.kind !== "file") continue;
+    if (!String(item.type || "").startsWith("image/")) continue;
+    const blob = item.getAsFile();
+    if (!blob) continue;
+    const ext =
+      (item.type.split("/")[1] || "png").replace("jpeg", "jpg") || "png";
+    files.push(
+      new File([blob], `pasted-image-${stamp}-${i}.${ext}`, {
+        type: blob.type || item.type || "image/png",
+        lastModified: stamp,
+      }),
+    );
+  }
+  return files;
+}
+
 /** @param {File} file */
 export function validateOcrFile(file) {
   if (!file) return "لم يتم اختيار ملف";
