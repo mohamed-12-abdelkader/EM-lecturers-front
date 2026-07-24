@@ -631,10 +631,26 @@ const CourseExamsTab = ({
     };
 
     return (
-      <Modal isOpen={isOpen} onClose={onClose} size={{ base: 'sm', md: 'md', lg: 'lg' }}>
-        <ModalOverlay />
-        <ModalContent mx={{ base: 2, md: 0 }}>
-          <ModalHeader p={0} borderBottomWidth="1px" borderColor={sectionBorder}>
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        size={{ base: "full", sm: "md", lg: "lg" }}
+        isCentered
+        scrollBehavior="inside"
+      >
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
+        <ModalContent
+          mx={{ base: 0, sm: 3 }}
+          my={{ base: 0, sm: 4 }}
+          borderRadius={{ base: 0, sm: "2xl" }}
+          overflow="hidden"
+          dir="rtl"
+          maxH={{ base: "100dvh", sm: "90vh" }}
+          h={{ base: "100dvh", sm: "auto" }}
+          display="flex"
+          flexDirection="column"
+        >
+          <ModalHeader p={0} borderBottomWidth="1px" borderColor={sectionBorder} flexShrink={0}>
             <Box
               bgGradient="linear(135deg, rgba(147,51,234,0.95), rgba(59,130,246,0.9))"
               color="white"
@@ -651,21 +667,31 @@ const CourseExamsTab = ({
                   alignItems="center"
                   justifyContent="center"
                   boxShadow="0 8px 20px rgba(99,102,241,0.35)"
+                  flexShrink={0}
                 >
                   <Icon as={FaCog} boxSize="24px" color="white" />
                 </Box>
-                <VStack align="flex-start" spacing={1}>
+                <VStack align="flex-start" spacing={1} minW={0}>
                   <Heading size="md">تعديل الامتحان الشامل</Heading>
                   <Text fontSize="sm" color="whiteAlpha.800">
-                    قم بمزامنة إعدادات Exam Flow مع طلابك
+                    حدّث إعدادات الظهور والإجابات والمحاولات
                   </Text>
                 </VStack>
               </HStack>
             </Box>
           </ModalHeader>
-          <ModalCloseButton color="white" />
-          <form onSubmit={handleSubmit}>
-            <ModalBody>
+          <ModalCloseButton color="white" top={4} left={3} right="auto" zIndex={2} />
+          <form
+            onSubmit={handleSubmit}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              flex: 1,
+              minHeight: 0,
+              overflow: "hidden",
+            }}
+          >
+            <ModalBody flex="1" minH={0} overflowY="auto" overscrollBehavior="contain" py={5}>
               <VStack spacing={{ base: 4, md: 5 }} align="stretch">
                 <Box
                   borderWidth="1px"
@@ -684,6 +710,7 @@ const CourseExamsTab = ({
                       alignItems="center"
                       justifyContent="center"
                       boxShadow="md"
+                      flexShrink={0}
                     >
                       <Icon as={FaCheck} color="purple.500" />
                     </Box>
@@ -865,10 +892,9 @@ const CourseExamsTab = ({
                 </Box>
               </VStack>
             </ModalBody>
-            <ModalFooter>
+            <ModalFooter flexShrink={0} flexWrap="wrap" gap={2}>
               <Button
                 variant="ghost"
-                mr={3}
                 onClick={onClose}
                 size={{ base: 'sm', sm: 'md' }}
                 fontSize={{ base: 'sm', sm: 'md' }}
@@ -1263,8 +1289,18 @@ const CourseExamsTab = ({
         scrollBehavior="inside"
       >
         <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
-        <ModalContent mx={{ base: 0, sm: 3 }} borderRadius={{ base: 0, sm: "2xl" }} overflow="hidden" dir="rtl">
-          <ModalHeader p={0}>
+        <ModalContent
+          mx={{ base: 0, sm: 3 }}
+          my={{ base: 0, sm: 4 }}
+          borderRadius={{ base: 0, sm: "2xl" }}
+          overflow="hidden"
+          dir="rtl"
+          maxH={{ base: "100dvh", sm: "90vh" }}
+          h={{ base: "100dvh", sm: "auto" }}
+          display="flex"
+          flexDirection="column"
+        >
+          <ModalHeader p={0} flexShrink={0}>
             <Box
               bgGradient="linear(135deg, #2B6CB0, #3182CE)"
               color="white"
@@ -1302,9 +1338,26 @@ const CourseExamsTab = ({
               </HStack>
             </Box>
           </ModalHeader>
-          <ModalCloseButton color="white" top={4} left={3} right="auto" />
-          <form onSubmit={handleCreateExam}>
-            <ModalBody px={{ base: 4, md: 5 }} py={5} bg={modalSectionBg}>
+          <ModalCloseButton color="white" top={4} left={3} right="auto" zIndex={2} />
+          <form
+            onSubmit={handleCreateExam}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              flex: 1,
+              minHeight: 0,
+              overflow: "hidden",
+            }}
+          >
+            <ModalBody
+              px={{ base: 4, md: 5 }}
+              py={5}
+              bg={modalSectionBg}
+              flex="1"
+              minH={0}
+              overflowY="auto"
+              overscrollBehavior="contain"
+            >
               <VStack spacing={4} align="stretch">
                 <ExamModalSection icon={FaRegFileAlt} title="المعلومات الأساسية" accent="blue">
                   <VStack spacing={4} align="stretch">
@@ -1321,7 +1374,7 @@ const CourseExamsTab = ({
                       />
                     </FormControl>
 
-                    <SimpleGrid columns={2} spacing={3}>
+                    <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={3}>
                       <FormControl isRequired>
                         <FormLabel fontSize="sm" fontWeight="600">
                           عدد الأسئلة
@@ -1459,6 +1512,9 @@ const CourseExamsTab = ({
               borderColor={modalSectionBorder}
               gap={2}
               px={{ base: 4, md: 5 }}
+              flexShrink={0}
+              flexWrap="wrap"
+              bg={modalSectionBg}
             >
               <Button
                 variant="ghost"
@@ -1542,12 +1598,23 @@ const CourseExamsTab = ({
       <Modal
         isOpen={questionManagerModal.isOpen}
         onClose={resetQuestionManagerState}
-        size={{ base: "xl", md: "2xl" }}
+        size={{ base: "full", sm: "xl", md: "2xl" }}
         isCentered
+        scrollBehavior="inside"
       >
-        <ModalOverlay />
-        <ModalContent mx={{ base: 2, md: 0 }}>
-          <ModalHeader p={0} borderBottomWidth="1px" borderColor={modalSectionBorder}>
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
+        <ModalContent
+          mx={{ base: 0, sm: 3 }}
+          my={{ base: 0, sm: 4 }}
+          borderRadius={{ base: 0, sm: "2xl" }}
+          overflow="hidden"
+          dir="rtl"
+          maxH={{ base: "100dvh", sm: "90vh" }}
+          h={{ base: "100dvh", sm: "auto" }}
+          display="flex"
+          flexDirection="column"
+        >
+          <ModalHeader p={0} borderBottomWidth="1px" borderColor={modalSectionBorder} flexShrink={0}>
             <Box
               bgGradient="linear(135deg, rgba(59,130,246,0.95), rgba(14,165,233,0.9))"
               color="white"
@@ -1564,10 +1631,11 @@ const CourseExamsTab = ({
                   alignItems="center"
                   justifyContent="center"
                   boxShadow="0 8px 20px rgba(15,118,255,0.35)"
+                  flexShrink={0}
                 >
                   <Icon as={FaPlus} boxSize="24px" color="white" />
                 </Box>
-                <VStack align="flex-start" spacing={1}>
+                <VStack align="flex-start" spacing={1} minW={0} pe={8}>
                   <Heading size="md">
                     إدارة أسئلة الامتحان {questionManagerModal.exam ? `- ${questionManagerModal.exam.title}` : ""}
                   </Heading>
@@ -1578,8 +1646,8 @@ const CourseExamsTab = ({
               </HStack>
             </Box>
           </ModalHeader>
-          <ModalCloseButton color="white" />
-          <ModalBody>
+          <ModalCloseButton color="white" top={4} left={3} right="auto" zIndex={2} />
+          <ModalBody flex="1" minH={0} overflowY="auto" overscrollBehavior="contain" py={5}>
             <Tabs
               index={questionManagerModal.tabIndex}
               onChange={(idx) =>
@@ -1872,8 +1940,8 @@ const CourseExamsTab = ({
               </TabPanels>
             </Tabs>
           </ModalBody>
-          <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={resetQuestionManagerState}>
+          <ModalFooter flexShrink={0}>
+            <Button variant="ghost" onClick={resetQuestionManagerState}>
               إغلاق
             </Button>
           </ModalFooter>
