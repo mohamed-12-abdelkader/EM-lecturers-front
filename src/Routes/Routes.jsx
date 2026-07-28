@@ -111,11 +111,6 @@ import ChatPage from "../pages/chat/ChatPage";
 import TeacherChat from "../pages/chat/TeacherChatPage";
 import ChatbotPage from "../pages/chatbot/ChatbotPage";
 import TeamChat from "../pages/teamChatPage/TeamChat";
-import SupportChatAdmin from "../pages/support/SupportChatAdmin";
-import SupportChatStudent from "../pages/support/SupportChatStudent";
-import SupportChatTeacher from "../pages/support/SupportChatTeacher";
-import SupportGuestPage from "../pages/support/SupportGuestPage";
-
 // Other Components
 import Code from "../pages/code/Code";
 import TeacherCode from "../pages/code/TeacherCode";
@@ -131,6 +126,9 @@ import League from "../pages/league/League";
 import LecturesSchedule from "../pages/lecturesSchedule/LecturesSchedule";
 import FinanceManagementPage from "../pages/finance/FinanceManagementPage";
 import AdminAllStudentsPage from "../pages/Admin/AdminAllStudentsPage";
+import WhatsAppSessionsPage from "../pages/admin/whatsapp/WhatsAppSessionsPage";
+import WhatsAppServicesPage from "../pages/admin/whatsapp/WhatsAppServicesPage";
+import WhatsAppMonitorPage from "../pages/admin/whatsapp/WhatsAppMonitorPage";
 import TeacherInvoicesPage from "../pages/teacher/TeacherInvoicesPage";
 import AdminDashboardHome from "../pages/home/AdminDashboardHome";
 import TeacherDashboardHome from "../pages/home/TeacherDashboardHome";
@@ -178,7 +176,6 @@ const AppRouter = () => {
           ) : null}
         </Route>
         <Route path="/landing" element={<LandingPage />} />
-        <Route path="/support-guest" element={<SupportGuestPage />} />
         {!tenantSubdomain ? <Route path="/search" element={<GlobalSearchPage />} /> : null}
         {renderTenantPublicRoutes(tenantSubdomain)}
 
@@ -237,14 +234,6 @@ const AppRouter = () => {
           element={
             <ProtectedRoute auth={isAdmin}>
               <AllStudents />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/support-chat"
-          element={
-            <ProtectedRoute auth={isAdmin}>
-              <SupportChatAdmin />
             </ProtectedRoute>
           }
         />
@@ -323,6 +312,38 @@ const AppRouter = () => {
           }
         >
           <Route index element={<AdminAllStudentsPage />} />
+        </Route>
+
+        {/* WhatsApp platform admin */}
+        <Route
+          path="/admin/whatsapp/sessions"
+          element={
+            <ProtectedRoute auth={isAdmin}>
+              <HomeLogin />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<WhatsAppSessionsPage />} />
+        </Route>
+        <Route
+          path="/admin/whatsapp/services"
+          element={
+            <ProtectedRoute auth={isAdmin}>
+              <HomeLogin />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<WhatsAppServicesPage />} />
+        </Route>
+        <Route
+          path="/admin/whatsapp/monitor"
+          element={
+            <ProtectedRoute auth={isAdmin}>
+              <HomeLogin />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<WhatsAppMonitorPage />} />
         </Route>
 
         {/* إنشاء/تعديل منصة مدرس — صفحة مستقلة خارج لياوت الأدمن */}
@@ -537,7 +558,6 @@ const AppRouter = () => {
           </Route>
           <Route path="teacher-students/:studentId" element={<StudentReport />} />
           <Route path="platform-students" element={<PlatformStudents />} />
-          <Route path="support-teacher" element={<SupportChatTeacher />} />
           <Route path="teacher-my-files" element={<TeacherMyFilesPage />} />
           <Route path="teacher-assignments" element={<TeacherAssignmentsPage />} />
           <Route path="teacher-exams" element={<TeacherCourseExamsPage />} />
@@ -552,7 +572,6 @@ const AppRouter = () => {
 
         {/* Shared Routes (طالب + مدرس) */}
         <Route element={<ProtectedRoute auth={isTeacher || student} />}>
-          <Route path="support" element={<SupportChatStudent />} />
           <Route path="video/:videoId/:token?" element={<Vedio />} />
         </Route>
 

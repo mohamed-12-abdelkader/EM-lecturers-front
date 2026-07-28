@@ -20,7 +20,7 @@ import {
   MdInventory,
   MdPersonAdd,
 } from "react-icons/md";
-import { FaChalkboardTeacher } from "react-icons/fa";
+import { FaChalkboardTeacher, FaWhatsapp } from "react-icons/fa";
 import ScrollToTop from "../../components/scollToTop/ScrollToTop";
 import AdminTenantsPanel from "./components/AdminTenantsPanel";
 import InstallPWAButton from "../../components/pwa/InstallPWAButton";
@@ -167,6 +167,21 @@ const AdminDashboardHome = () => {
                 _hover={{ bg: "blue.50" }}
               >
                 إدارة الباقات
+              </Button>
+              <Button
+                as={RouterLink}
+                to="/admin/whatsapp/sessions"
+                size="sm"
+                variant="outline"
+                borderColor="green.500"
+                color="green.600"
+                borderRadius="lg"
+                leftIcon={<FaWhatsapp />}
+                fontWeight="700"
+                cursor="pointer"
+                _hover={{ bg: "green.50" }}
+              >
+                واتساب
               </Button>
               <InstallPWAButton
                 label="تثبيت التطبيق"

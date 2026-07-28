@@ -16,12 +16,11 @@ import {
   MdHome,
   MdPublic,
   MdSchedule,
-  MdSupportAgent,
   MdCollectionsBookmark,
   MdDescription,
   MdBusiness,
 } from "react-icons/md";
-import { FaAndroid, FaRobot, FaFolderOpen } from "react-icons/fa";
+import { FaAndroid, FaRobot, FaFolderOpen, FaWhatsapp } from "react-icons/fa";
 import { Link, useLocation } from "react-router-dom";
 import {
   VStack,
@@ -183,6 +182,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
       links: [
         { to: "/admin/management", Icon: MdDashboard, label: "لوحة التحكم" },
         { to: "/admin/finance", Icon: MdAccountBalanceWallet, label: "الحسابات والمالية" },
+        { to: "/admin/whatsapp/sessions", Icon: FaWhatsapp, label: "واتساب" },
         { to: "/all_students", Icon: MdPeople, label: "كل الطلاب" },
         {
           to: "/question-bank-dashboard",
@@ -252,10 +252,6 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
         { to: "/exam_grades", Icon: MdGrading, label: "درجات الامتحانات" },
         { to: "/scientific-chat", Icon: FaRobot, label: "المساعد العلمي" },
       ],
-    },
-    {
-      title: "الدعم",
-      links: [{ to: "/support", Icon: MdSupportAgent, label: "الدعم الفني" }],
     },
   ];
 

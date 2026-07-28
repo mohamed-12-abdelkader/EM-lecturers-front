@@ -18,8 +18,8 @@ import {
   Image,
   Wrap,
   WrapItem,
-  keyframes,
 } from "@chakra-ui/react";
+import { keyframes } from "@emotion/react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FaRobot,

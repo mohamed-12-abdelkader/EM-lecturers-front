@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import "./index.css";
-import { ChakraProvider, useBreakpointValue, useColorMode, Box } from "@chakra-ui/react";
+import { ChakraProvider, useColorMode, Box } from "@chakra-ui/react";
 import { BrowserRouter as Router, useLocation } from "react-router-dom";
 import "react-toastify/dist/ReactToastify.css";
 import WhatsButton from "./components/whatsButton/WhatsButton.jsx";
@@ -41,16 +41,12 @@ const ForceArabicLocale = () => {
 const RootContent = () => {
   const location = useLocation();
   const [userData, isAdmin, isTeacher, student] = UserType();
-  const isMobile = useBreakpointValue({ base: true, md: false });
   const tenantSubdomain = getTenantSubdomain();
 
-  const hideSidebarOnMobileSupportChat =
-    Boolean(isMobile) && location.pathname === "/support-chat";
   const showSidebarForTenantUser =
     Boolean(tenantSubdomain) && (Boolean(student) || Boolean(isTeacher));
   const showSidebar =
     (!tenantSubdomain || showSidebarForTenantUser) &&
-    !hideSidebarOnMobileSupportChat &&
     location.pathname !== "/landing" &&
     !location.pathname.startsWith("/video/");
   const hasUser = Boolean(userData);

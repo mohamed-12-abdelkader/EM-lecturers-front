@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import UserType from "../../Hooks/auth/userType";
 // أيقونات من react-icons
 import { MdDashboard, MdPersonAdd, MdCode, MdAccountBalanceWallet, MdPhoneIphone, MdDateRange, MdOndemandVideo, MdPictureAsPdf, MdGroupAdd, MdPersonAddAlt, MdQuiz, MdListAlt, MdAssignment, MdQuestionAnswer, MdCheckCircle, MdViewList, MdBook, MdPeople } from "react-icons/md";
+import { FaWhatsapp } from "react-icons/fa";
 
 const AdminLinks = ({ currentLink, setCurrentLink }) => {
   const location = useLocation();
@@ -39,6 +40,12 @@ const AdminLinks = ({ currentLink, setCurrentLink }) => {
       link: "كل الطلاب",
       path: "/admin/students",
       icon: <MdPeople size={22} />,
+    },
+    {
+      id: Math.random(),
+      link: "واتساب",
+      path: "/admin/whatsapp/sessions",
+      icon: <FaWhatsapp size={22} />,
     },
     {
       id: Math.random(),
