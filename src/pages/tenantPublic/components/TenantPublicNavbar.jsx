@@ -8,7 +8,9 @@ import {
   motion,
   slideDown,
 } from "../tenantLandingMotion";
-import { TL_BLUE, TL_ORANGE } from "../tenantLandingTheme";
+import { TL_CYAN, TL_LIME } from "../tenantLandingTheme";
+import { safeLocalGet, safeLocalSet } from "../../../utils/safeStorage";
+import TenantAppLink from "./TenantAppLink";
 
 const TENANT_FONT_LINK_ID = "tenant-public-arabic-fonts";
 
@@ -40,25 +42,26 @@ export function useTenantPublicTheme() {
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
-    const savedMode =
-      typeof window !== "undefined" ? window.localStorage.getItem("tenant-public-theme") : null;
-    if (savedMode === "dark") {
-      setIsDarkMode(true);
-      return;
-    }
-    if (savedMode === "light") {
+    try {
+      const savedMode = safeLocalGet("tenant-public-theme");
+      if (savedMode === "dark") {
+        setIsDarkMode(true);
+        return;
+      }
+      if (savedMode === "light") {
+        setIsDarkMode(false);
+        return;
+      }
+      if (typeof window !== "undefined" && window.matchMedia) {
+        setIsDarkMode(window.matchMedia("(prefers-color-scheme: dark)").matches);
+      }
+    } catch {
       setIsDarkMode(false);
-      return;
-    }
-    if (typeof window !== "undefined") {
-      setIsDarkMode(window.matchMedia("(prefers-color-scheme: dark)").matches);
     }
   }, []);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("tenant-public-theme", isDarkMode ? "dark" : "light");
-    }
+    safeLocalSet("tenant-public-theme", isDarkMode ? "dark" : "light");
   }, [isDarkMode]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
@@ -66,41 +69,33 @@ export function useTenantPublicTheme() {
   return { isDarkMode, toggleTheme };
 }
 
-function ThemeToggle({ isDark, onToggle, solidNav }) {
+function ThemeToggle({ isDark, onToggle }) {
   return (
     <button
       type="button"
       onClick={onToggle}
       aria-label={isDark ? "تفعيل الوضع الفاتح" : "تفعيل الوضع الداكن"}
-      className={`relative flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl transition-all duration-200 ${
-        solidNav
-          ? "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-          : "bg-white/10 text-white hover:bg-white/18"
-      }`}
+      className="relative flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-white/10 text-white transition-all duration-200 hover:bg-white/18"
     >
-      {isDark ? <FaSun className="text-sm text-orange-400" /> : <FaMoon className="text-sm" />}
+      {isDark ? <FaSun className="text-sm" style={{ color: TL_LIME }} /> : <FaMoon className="text-sm" />}
     </button>
   );
 }
 
-function NavLinkItem({ href, label, solidNav, onClick }) {
+function NavLinkItem({ href, label, onClick }) {
   return (
-    <a
+    <TenantAppLink
       href={href}
       onClick={onClick}
-      className={`group relative cursor-pointer px-3.5 py-2 text-sm font-semibold tracking-wide transition-colors duration-200 ${
-        solidNav
-          ? "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
-          : "text-white/80 hover:text-white"
-      }`}
+      className="group relative cursor-pointer px-3.5 py-2 text-sm font-semibold tracking-wide text-white/80 transition-colors duration-200 hover:text-white"
     >
       {label}
       <span
         className="absolute inset-x-3 -bottom-0.5 h-[2px] origin-right scale-x-0 rounded-full transition-transform duration-300 group-hover:origin-left group-hover:scale-x-100"
-        style={{ background: `linear-gradient(90deg, ${TL_ORANGE}, ${TL_BLUE})` }}
+        style={{ background: `linear-gradient(90deg, ${TL_LIME}, ${TL_CYAN})` }}
         aria-hidden
       />
-    </a>
+    </TenantAppLink>
   );
 }
 
@@ -133,26 +128,24 @@ export function TenantPublicNavbar({
       dir="rtl"
     >
       <div
-        className={`pointer-events-auto mx-auto max-w-[1200px] overflow-hidden rounded-2xl transition-all duration-400 ${
+        className={`pointer-events-auto mx-auto max-w-[1200px] overflow-hidden rounded-2xl border border-white/15 backdrop-blur-xl transition-all duration-400 ${
           solidNav
-            ? "border border-slate-200/90 bg-white/90 shadow-[0_12px_40px_-12px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:border-slate-700/80 dark:bg-slate-950/90 dark:shadow-black/40"
-            : "border border-white/15 bg-slate-950/40 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.35)] backdrop-blur-xl"
+            ? "bg-[#0A1628]/92 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.45)]"
+            : "bg-[#0A1628]/40 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.35)]"
         }`}
       >
         {/* Accent hairline */}
         <div
           className="h-[2px] w-full"
           style={{
-            background: solidNav
-              ? `linear-gradient(90deg, ${TL_BLUE}, ${TL_ORANGE}, transparent)`
-              : `linear-gradient(90deg, ${TL_ORANGE}, ${TL_BLUE}, transparent)`,
+            background: `linear-gradient(90deg, ${TL_CYAN}, ${TL_LIME}, transparent)`,
           }}
           aria-hidden
         />
 
         <div className="flex h-[3.85rem] items-center gap-3 px-3.5 sm:px-4 md:h-16 md:gap-4 md:px-5">
           {/* Brand */}
-          <a
+          <TenantAppLink
             href={brandHref}
             className="group flex min-w-0 flex-1 items-center gap-2.5 min-[920px]:flex-none min-[920px]:max-w-[280px]"
           >
@@ -161,47 +154,35 @@ export function TenantPublicNavbar({
                 <img
                   src={tenantAvatar}
                   alt=""
-                  className={`h-10 w-10 rounded-xl object-cover transition-transform duration-300 group-hover:scale-[1.03] ${
-                    solidNav
-                      ? "ring-2 ring-blue-100 dark:ring-blue-900/40"
-                      : "ring-2 ring-white/25"
-                  }`}
+                  className="h-10 w-10 rounded-xl object-cover ring-2 ring-white/25 transition-transform duration-300 group-hover:scale-[1.03]"
                 />
               ) : (
                 <span
                   className="flex h-10 w-10 items-center justify-center rounded-xl text-sm font-black text-white shadow-sm"
                   style={{
-                    background: `linear-gradient(145deg, ${TL_BLUE}, #1A4F8C)`,
+                    background: `linear-gradient(145deg, ${TL_CYAN}, #0A4A6E)`,
                   }}
                 >
                   {(brandName || "م").slice(0, 1)}
                 </span>
               )}
               <span
-                className="absolute -bottom-0.5 -left-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-slate-950"
-                style={{ background: TL_ORANGE }}
+                className="absolute -bottom-0.5 -left-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-[#0A1628]"
+                style={{ background: TL_LIME }}
                 aria-hidden
               />
             </span>
             <div className="min-w-0 text-right leading-tight">
-              <p
-                className={`truncate font-heading text-[0.95rem] font-extrabold tracking-tight md:text-base ${
-                  solidNav ? "text-slate-900 dark:text-white" : "text-white"
-                }`}
-              >
+              <p className="truncate font-heading text-[0.95rem] font-extrabold tracking-tight text-white md:text-base">
                 {brandName}
               </p>
               {specialty ? (
-                <p
-                  className={`truncate text-[11px] font-medium tracking-wide ${
-                    solidNav ? "text-slate-500 dark:text-slate-400" : "text-white/65"
-                  }`}
-                >
+                <p className="truncate text-[11px] font-medium tracking-wide text-white/65">
                   {specialty}
                 </p>
               ) : null}
             </div>
-          </a>
+          </TenantAppLink>
 
           {/* Desktop links — centered cluster */}
           <nav
@@ -209,7 +190,7 @@ export function TenantPublicNavbar({
             aria-label="التنقل الرئيسي"
           >
             {navLinks.map(([href, label]) => (
-              <NavLinkItem key={href} href={href} label={label} solidNav={solidNav} />
+              <NavLinkItem key={href} href={href} label={label} />
             ))}
           </nav>
 
@@ -220,38 +201,29 @@ export function TenantPublicNavbar({
             <ThemeToggle
               isDark={isDarkMode}
               onToggle={handleToggleTheme}
-              solidNav={solidNav}
             />
 
             <div className="hidden items-center gap-2 min-[920px]:flex">
-              <a
+              <TenantAppLink
                 href={loginHref}
-                className={`cursor-pointer rounded-xl px-3.5 py-2 text-sm font-semibold transition-colors duration-200 ${
-                  solidNav
-                    ? "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
-                    : "text-white/85 hover:bg-white/10 hover:text-white"
-                }`}
+                className="cursor-pointer rounded-xl px-3.5 py-2 text-sm font-semibold text-white/85 transition-colors duration-200 hover:bg-white/10 hover:text-white"
               >
-                دخول
-              </a>
-              <a
+                تسجيل الدخول
+              </TenantAppLink>
+              <TenantAppLink
                 href={signupHref}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-bold text-white shadow-[0_8px_20px_-8px_rgba(221,107,32,0.65)] transition-[filter,transform] duration-200 hover:brightness-105 active:scale-[0.98]"
-                style={{ background: TL_ORANGE }}
+                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-bold text-white shadow-[0_8px_20px_-8px_#00A0E399] transition-[filter,transform] duration-200 hover:brightness-110 active:scale-[0.98]"
+                style={{ background: TL_CYAN }}
               >
-                ابدأ الآن
+                إنشاء حساب
                 <FaArrowLeft className="text-[9px] opacity-90" />
-              </a>
+              </TenantAppLink>
             </div>
 
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-              className={`inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl transition-colors duration-200 min-[920px]:hidden ${
-                solidNav
-                  ? "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200"
-                  : "bg-white/10 text-white hover:bg-white/18"
-              }`}
+              className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl bg-white/10 text-white transition-colors duration-200 hover:bg-white/18 min-[920px]:hidden"
               aria-expanded={isMobileMenuOpen}
               aria-label={isMobileMenuOpen ? "إغلاق القائمة" : "فتح القائمة"}
             >
@@ -260,7 +232,7 @@ export function TenantPublicNavbar({
           </div>
         </div>
 
-        {/* Mobile panel */}
+        {/* Mobile panel — app-style sheet */}
         <AnimatePresence>
           {isMobileMenuOpen ? (
             <motion.div
@@ -269,53 +241,44 @@ export function TenantPublicNavbar({
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-              className={`overflow-hidden border-t min-[920px]:hidden ${
-                solidNav
-                  ? "border-slate-200/80 bg-white/95 dark:border-slate-700 dark:bg-slate-950/95"
-                  : "border-white/10 bg-slate-950/50"
-              }`}
+              className="overflow-hidden border-t border-white/10 bg-[#0A1628]/95 min-[920px]:hidden"
             >
               <nav className="grid gap-0.5 px-3 py-3" aria-label="قائمة الجوال">
                 {navLinks.map(([href, label], i) => (
-                  <motion.a
+                  <motion.div
                     key={href}
-                    href={href}
-                    onClick={() => setIsMobileMenuOpen(false)}
                     initial={{ opacity: 0, x: 12 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.04, duration: 0.25 }}
-                    className={`cursor-pointer rounded-xl px-3.5 py-3 text-sm font-semibold transition-colors ${
-                      solidNav
-                        ? "text-slate-700 hover:bg-blue-50 hover:text-blue-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                        : "text-white/90 hover:bg-white/10"
-                    }`}
                   >
-                    {label}
-                  </motion.a>
+                    <TenantAppLink
+                      href={href}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="block cursor-pointer rounded-xl px-3.5 py-3.5 text-sm font-semibold text-white/90 transition-colors hover:bg-white/10"
+                    >
+                      {label}
+                    </TenantAppLink>
+                  </motion.div>
                 ))}
               </nav>
 
-              <div className="grid grid-cols-2 gap-2 border-t border-slate-200/70 px-3 py-3 dark:border-slate-700/70">
-                <a
+              <div className="grid grid-cols-2 gap-2 border-t border-white/10 px-3 py-3">
+                <TenantAppLink
                   href={loginHref}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className={`inline-flex h-11 cursor-pointer items-center justify-center rounded-xl border text-sm font-semibold transition-colors ${
-                    solidNav
-                      ? "border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200"
-                      : "border-white/25 text-white hover:bg-white/10"
-                  }`}
+                  className="inline-flex h-11 cursor-pointer items-center justify-center rounded-xl border border-white/25 text-sm font-semibold text-white transition-colors hover:bg-white/10"
                 >
-                  دخول
-                </a>
-                <a
+                  تسجيل الدخول
+                </TenantAppLink>
+                <TenantAppLink
                   href={signupHref}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="inline-flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl text-sm font-bold text-white"
-                  style={{ background: TL_ORANGE }}
+                  style={{ background: TL_CYAN }}
                 >
-                  ابدأ الآن
+                  إنشاء حساب
                   <FaArrowLeft className="text-[9px]" />
-                </a>
+                </TenantAppLink>
               </div>
             </motion.div>
           ) : null}

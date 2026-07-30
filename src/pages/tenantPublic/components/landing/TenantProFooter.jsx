@@ -1,7 +1,8 @@
 import { FaFacebook, FaInstagram, FaTelegram, FaTiktok, FaWhatsapp, FaYoutube } from "react-icons/fa";
 import { motion } from "framer-motion";
 import { Reveal, StaggerGrid, StaggerItem } from "../../tenantLandingMotion";
-import { tlContainer } from "../../tenantLandingTheme";
+import { TL_CYAN, TL_NAVY, tlContainer } from "../../tenantLandingTheme";
+import TenantAppLink from "../TenantAppLink";
 
 function SocialLink({ href, label, children }) {
   if (!href) return null;
@@ -11,7 +12,7 @@ function SocialLink({ href, label, children }) {
       target="_blank"
       rel="noopener noreferrer"
       aria-label={label}
-      className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-blue-500 transition-colors duration-200 hover:border-orange-300 hover:bg-orange-50 hover:text-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-orange-700 dark:hover:bg-orange-950/30"
+      className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-xl border border-white/12 bg-white/[0.05] text-[#00A0E3] transition-colors duration-200 hover:border-[#D4E157]/40 hover:bg-[#D4E157]/10 hover:text-[#D4E157]"
       whileHover={{ y: -3 }}
       whileTap={{ scale: 0.95 }}
     >
@@ -44,29 +45,44 @@ export default function TenantProFooter({
     contact.whatsapp;
 
   return (
-    <footer id="contact" className="border-t border-slate-200 bg-white py-12 dark:border-slate-800 dark:bg-slate-950" dir="rtl">
+    <footer
+      id="contact"
+      className="border-t border-white/10 py-10 md:py-12"
+      style={{ background: TL_NAVY }}
+      dir="rtl"
+    >
       <div className={tlContainer}>
         <StaggerGrid className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
           <StaggerItem className="sm:col-span-2 lg:col-span-1">
             <div className="flex items-center gap-3">
               {tenantAvatar ? (
-                <img src={tenantAvatar} alt="" className="h-11 w-11 rounded-full object-cover ring-2 ring-white/10" />
+                <img
+                  src={tenantAvatar}
+                  alt=""
+                  className="h-11 w-11 rounded-full object-cover ring-2 ring-white/15"
+                />
               ) : (
-                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-blue-500 text-sm font-bold text-white">
+                <span
+                  className="flex h-11 w-11 items-center justify-center rounded-full text-sm font-bold text-white"
+                  style={{ background: TL_CYAN }}
+                >
                   {brandName.slice(0, 1)}
                 </span>
               )}
-              <p className="font-heading text-lg font-bold text-slate-900 dark:text-white">{brandName}</p>
+              <p className="font-heading text-lg font-bold text-white">{brandName}</p>
             </div>
-            <p className="mt-4 max-w-xs text-sm leading-relaxed text-slate-500 dark:text-slate-400">{bioSnippet}</p>
+            <p className="mt-4 max-w-xs text-sm leading-relaxed text-[#7EB8D9]">{bioSnippet}</p>
           </StaggerItem>
 
           <StaggerItem>
-            <p className="text-sm font-bold text-slate-900 dark:text-white">روابط سريعة</p>
-            <ul className="mt-4 space-y-2.5 text-sm text-slate-600 dark:text-slate-400">
+            <p className="text-sm font-bold text-white">روابط سريعة</p>
+            <ul className="mt-4 space-y-2.5 text-sm text-[#7EB8D9]">
               {quickLinks.map(([href, label]) => (
                 <li key={href}>
-                  <a href={href} className="cursor-pointer transition-colors duration-200 hover:text-blue-500">
+                  <a
+                    href={href}
+                    className="cursor-pointer transition-colors duration-200 hover:text-[#00A0E3]"
+                  >
                     {label}
                   </a>
                 </li>
@@ -75,20 +91,20 @@ export default function TenantProFooter({
           </StaggerItem>
 
           <StaggerItem>
-            <p className="text-sm font-bold text-slate-900 dark:text-white">الدعم</p>
-            <ul className="mt-4 space-y-2.5 text-sm text-slate-600 dark:text-slate-400">
+            <p className="text-sm font-bold text-white">الدعم</p>
+            <ul className="mt-4 space-y-2.5 text-sm text-[#7EB8D9]">
               <li>
-                <a href={loginHref} className="cursor-pointer transition-colors duration-200 hover:text-blue-500">
+                <TenantAppLink href={loginHref} className="cursor-pointer transition-colors duration-200 hover:text-[#00A0E3]">
                   تسجيل الدخول
-                </a>
+                </TenantAppLink>
               </li>
               <li>
-                <a href={signupHref} className="cursor-pointer transition-colors duration-200 hover:text-orange-500">
+                <TenantAppLink href={signupHref} className="cursor-pointer transition-colors duration-200 hover:text-[#D4E157]">
                   إنشاء حساب
-                </a>
+                </TenantAppLink>
               </li>
               <li>
-                <a href={joinHref} className="cursor-pointer transition-colors duration-200 hover:text-blue-500">
+                <a href={joinHref} className="cursor-pointer transition-colors duration-200 hover:text-[#00A0E3]">
                   تواصل معنا
                 </a>
               </li>
@@ -96,7 +112,7 @@ export default function TenantProFooter({
           </StaggerItem>
 
           <StaggerItem>
-            <p className="text-sm font-bold text-slate-900 dark:text-white">تواصل معنا</p>
+            <p className="text-sm font-bold text-white">تواصل معنا</p>
             {hasSocial ? (
               <div className="mt-4 flex flex-wrap gap-2">
                 <SocialLink href={contact.facebook} label="Facebook">
@@ -119,22 +135,22 @@ export default function TenantProFooter({
                 </SocialLink>
               </div>
             ) : (
-              <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">لا توجد روابط تواصل حالياً.</p>
+              <p className="mt-4 text-sm text-[#7EB8D9]/80">لا توجد روابط تواصل حالياً.</p>
             )}
           </StaggerItem>
         </StaggerGrid>
 
         <Reveal variant="fadeIn" delay={0.1}>
-          <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-slate-200 pt-6 text-xs text-slate-500 dark:border-slate-800 sm:flex-row">
+          <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-6 text-xs text-[#7EB8D9]/80 sm:flex-row">
             <div className="text-center sm:text-start">
               <p>© {new Date().getFullYear()} EM Lectures. جميع الحقوق محفوظة.</p>
               <p className="mt-1">هذه المنصة تابعة لشركة EM Lectures.</p>
             </div>
             <div className="flex gap-5">
-              <a href="#" className="cursor-pointer transition-colors duration-200 hover:text-blue-500">
+              <a href="#" className="cursor-pointer transition-colors duration-200 hover:text-[#00A0E3]">
                 سياسة الخصوصية
               </a>
-              <a href="#" className="cursor-pointer transition-colors duration-200 hover:text-blue-500">
+              <a href="#" className="cursor-pointer transition-colors duration-200 hover:text-[#00A0E3]">
                 الشروط والأحكام
               </a>
             </div>

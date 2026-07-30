@@ -54,6 +54,12 @@ import UserType from "../../Hooks/auth/userType";
 import baseUrl from "../../api/baseUrl";
 import { getTenantSubdomain } from "../../utils/tenantHost";
 import { getSocketEndpoint } from "../../utils/socketEndpoint";
+import {
+  hasValidAuthSession,
+  markSessionExpired,
+  readAuthToken,
+} from "../../utils/authStorage";
+import { safeLocalGet } from "../../utils/safeStorage";
 import { Html5Qrcode } from "html5-qrcode";
 import { io } from "socket.io-client";
 import { Howl } from "howler";
@@ -79,16 +85,32 @@ const isCourseFree = (course) => {
   return course?.is_free === true || (!Number.isNaN(price) && price <= 0);
 };
 
+function readStoredUserSafe() {
+  try {
+    const raw = safeLocalGet("user");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function buildAuthHeader() {
+  const token = readAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 const HomePage = () => {
   // --- Logic & State (Preserved) ---
-  const userStr = localStorage.getItem("user");
-  const user = userStr ? JSON.parse(userStr) : null;
+  const user = useMemo(() => readStoredUserSafe(), []);
   const { isOpen, onOpen, onClose } = useDisclosure(); // For course activation modal
   const invitationModal = useDisclosure(); // For game invite
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
   const [userData] = UserType();
   const navigate = useNavigate();
   const location = useLocation();
+  const [sessionReady, setSessionReady] = useState(() => hasValidAuthSession());
 
   // Notifications & Feed
   const [competitionNotifications, setCompetitionNotifications] = useState([]);
@@ -111,7 +133,7 @@ const HomePage = () => {
   const [activatingFreeCourseId, setActivatingFreeCourseId] = useState(null);
   const supportChatModal = useDisclosure();
   const [supportChatCourseId, setSupportChatCourseId] = useState("");
-  const token = localStorage.getItem("token");
+  const token = readAuthToken();
   const supportSentSoundRef = useRef(null);
   const supportReceivedSoundRef = useRef(null);
 
@@ -122,18 +144,24 @@ const HomePage = () => {
   const [teacherAvatar, setTeacherAvatar] = useState("");
   const [availableCourses, setAvailableCourses] = useState([]);
 
-  const authHeader = useMemo(
-    () => ({
-      Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-    }),
-    [],
-  );
+  const authHeader = useMemo(() => buildAuthHeader(), [token, sessionReady]);
   const toast = useToast();
   const tenantSubdomain = getTenantSubdomain();
 
   // Socket & Invites
   const [latestInvitation, setLatestInvitation] = useState(null);
   const socketRef = useRef(null);
+
+  // جلسة منتهية / توكن تالف → مودال الخروج بدل شاشة بيضاء
+  useEffect(() => {
+    if (hasValidAuthSession()) {
+      setSessionReady(true);
+      return;
+    }
+    setSessionReady(false);
+    markSessionExpired();
+  }, []);
+
 
   const formatDateTime = (dateStr) => {
     if (!dateStr) return "";
@@ -278,22 +306,32 @@ const HomePage = () => {
   };
 
   useEffect(() => {
-    supportSentSoundRef.current = new Howl({
-      src: [SUPPORT_CHAT_SOUND_DATA_URI],
-      volume: 0.55,
-      rate: 1.25,
-      html5: false,
-    });
-    supportReceivedSoundRef.current = new Howl({
-      src: [SUPPORT_CHAT_SOUND_DATA_URI],
-      volume: 0.95,
-      rate: 0.85,
-      html5: false,
-    });
+    try {
+      supportSentSoundRef.current = new Howl({
+        src: [SUPPORT_CHAT_SOUND_DATA_URI],
+        volume: 0.55,
+        rate: 1.25,
+        html5: false,
+      });
+      supportReceivedSoundRef.current = new Howl({
+        src: [SUPPORT_CHAT_SOUND_DATA_URI],
+        volume: 0.95,
+        rate: 0.85,
+        html5: false,
+      });
+    } catch (e) {
+      console.warn("Howl init skipped:", e);
+      supportSentSoundRef.current = null;
+      supportReceivedSoundRef.current = null;
+    }
 
     return () => {
-      supportSentSoundRef.current?.unload();
-      supportReceivedSoundRef.current?.unload();
+      try {
+        supportSentSoundRef.current?.unload();
+        supportReceivedSoundRef.current?.unload();
+      } catch {
+        // ignore
+      }
     };
   }, []);
 
@@ -594,10 +632,12 @@ const HomePage = () => {
 
   useEffect(() => {
     if (!ENABLE_GRADE_FEED) return;
+    if (!sessionReady) return;
     fetchGradeFeed();
-  }, [authHeader]);
+  }, [authHeader, sessionReady]);
 
   useEffect(() => {
+    if (!sessionReady) return undefined;
     let stopped = false;
     fetchLiveStreamNotifications({ withSound: false });
     const timer = setInterval(() => {
@@ -608,7 +648,7 @@ const HomePage = () => {
       stopped = true;
       clearInterval(timer);
     };
-  }, [authHeader]);
+  }, [authHeader, sessionReady]);
 
   // Socket Logic
   const fetchLatestInvitation = async () => {
@@ -676,30 +716,35 @@ const HomePage = () => {
 
   useEffect(() => {
     if (!ENABLE_GAME_INVITATIONS) return;
+    if (!sessionReady) return;
     fetchLatestInvitation();
-  }, [authHeader]);
+  }, [authHeader, sessionReady]);
 
   useEffect(() => {
     if (!ENABLE_GAME_INVITATIONS) return;
+    if (!sessionReady) return undefined;
+
     const processNewInvitation = (invitation) => {
       if (!invitation) return;
       setLatestInvitation(invitation);
       if (invitation.status === "pending") invitationModal.onOpen();
     };
 
-    const tokenOnly =
-      (localStorage.getItem("Authorization") || "").replace(
-        /^Bearer\s+/i,
-        "",
-      ) || localStorage.getItem("token");
-    const socket = io(getSocketEndpoint(), {
-      path: "/socket.io",
-      withCredentials: true,
-      auth: tokenOnly ? { token: tokenOnly } : {},
-      transports: ["websocket"],
-      reconnection: true,
-    });
-    socketRef.current = socket;
+    let socket;
+    try {
+      const tokenOnly = readAuthToken();
+      socket = io(getSocketEndpoint(), {
+        path: "/socket.io",
+        withCredentials: true,
+        auth: tokenOnly ? { token: tokenOnly } : {},
+        transports: ["websocket", "polling"],
+        reconnection: true,
+      });
+      socketRef.current = socket;
+    } catch (e) {
+      console.warn("Socket init skipped:", e);
+      return undefined;
+    }
 
     socket.on("connect", () => {
       if (user?.id) {
@@ -732,11 +777,20 @@ const HomePage = () => {
     eventNames.forEach((evt) => socket.on(evt, handleInvitationEvent));
 
     return () => {
-      socket.disconnect();
+      try {
+        socket.disconnect();
+      } catch {
+        // ignore
+      }
     };
-  }, [invitationModal, user?.id]);
+  }, [invitationModal, user?.id, sessionReady]);
 
   useEffect(() => {
+    if (!sessionReady) {
+      setCoursesLoading(false);
+      return undefined;
+    }
+
     const fallbackName = tenantSubdomain
       ? decodeURIComponent(tenantSubdomain).replace(/-/g, " ")
       : "مدرسك";
@@ -747,7 +801,7 @@ const HomePage = () => {
       setTeacherAvatar("");
       setAvailableCourses([]);
       setCoursesLoading(false);
-      return;
+      return undefined;
     }
 
     (async () => {
@@ -755,7 +809,7 @@ const HomePage = () => {
         setCoursesLoading(true);
         const res = await baseUrl.get(
           `/api/student/teacher-platform/${encodeURIComponent(tenantSubdomain)}/courses`,
-          { headers: authHeader },
+          { headers: buildAuthHeader() },
         );
         const payload = res?.data?.data || {};
         const displayName = payload?.platform?.display_name;
@@ -764,7 +818,8 @@ const HomePage = () => {
         setTeacherDisplayName(displayName || fallbackName);
         setTeacherAvatar(avatar || "");
         setAvailableCourses(Array.isArray(payload?.courses) ? payload.courses : []);
-      } catch {
+      } catch (err) {
+        if (err?.sessionExpired) return;
         if (!mounted) return;
         setTeacherDisplayName(fallbackName);
         setTeacherAvatar("");
@@ -777,7 +832,7 @@ const HomePage = () => {
     return () => {
       mounted = false;
     };
-  }, [tenantSubdomain, authHeader]);
+  }, [tenantSubdomain, sessionReady]);
 
   // --- UI Styling (براند: blue.500 & orange.500) ---
   const mainLinks = [
@@ -850,15 +905,15 @@ const HomePage = () => {
   const availableToJoin = availableCourses.filter((c) => !c?.is_enrolled).length;
   const studentId =
     user?.id ?? userData?.id ?? user?.student_id ?? userData?.student_id ?? null;
-  const pageBgColor = useColorModeValue("#F4F7FB", "gray.950");
+  const pageBgColor = useColorModeValue("#F7FAFC", "gray.950");
   const courseCardShadow = useColorModeValue(
-    "0 10px 30px rgba(15,23,42,0.06)",
+    "0 8px 28px -14px rgba(26,32,44,0.18)",
     "0 12px 32px rgba(0,0,0,0.35)",
   );
-  const courseCardBorder = useColorModeValue("blackAlpha.100", "whiteAlpha.100");
+  const courseCardBorder = useColorModeValue("gray.200", "whiteAlpha.100");
   const courseCardHoverShadow = useColorModeValue(
-    "0 16px 36px rgba(37,99,235,0.14)",
-    "0 16px 38px rgba(30,64,175,0.45)",
+    "0 16px 36px rgba(49,130,206,0.18)",
+    "0 16px 38px rgba(49,130,206,0.25)",
   );
   const courseImageBg = useColorModeValue("gray.100", "gray.700");
   const courseBadgeBg = useColorModeValue("whiteAlpha.900", "blackAlpha.700");
@@ -885,12 +940,18 @@ const HomePage = () => {
   const liveMsgColor = useColorModeValue("orange.800", "orange.200");
   const liveMetaColor = useColorModeValue("orange.700", "orange.300");
   const liveDismissHover = useColorModeValue("orange.100", "orange.800");
-  const sectionCardBg = useColorModeValue("white", "gray.900");
+  const sectionSurfaceBg = useColorModeValue("white", "gray.900");
   const sectionBorder = useColorModeValue("blackAlpha.100", "whiteAlpha.100");
+  const emptyCoursesBg = useColorModeValue("white", "gray.900");
+  const ghostHoverBg = useColorModeValue("blackAlpha.50", "whiteAlpha.100");
+
+  if (!sessionReady) {
+    return <BrandLoadingScreen />;
+  }
 
   return (
-    <Box bg={pageBgColor} minH="calc(100vh - 80px)" pb={{ base: 28, lg: 10 }}>
-      <VStack spacing={5} align="stretch">
+    <Box bg={pageBgColor} minH="calc(100vh - 80px)" pb={{ base: 28, "2xl": 10 }}>
+      <VStack spacing={{ base: 4, md: 6 }} align="stretch">
         {liveBannerNotification ? (
           <Box px={{ base: 3, md: 4 }} pt={3}>
             <Card
@@ -976,180 +1037,174 @@ const HomePage = () => {
           onActivateWithQr={() => setIsQrScannerOpen(true)}
         />
 
-        {/* الإحصائيات والاختصارات: تظهر من التابلت فأعلى فقط */}
-        <Box display={{ base: "none", md: "block" }}>
-          <HomeProStats
-            enrolledCount={enrolledCount}
-            coursesCount={availableCourses.length}
-            availableToJoin={availableToJoin}
-          />
+        <HomeProStats
+          enrolledCount={enrolledCount}
+          coursesCount={availableCourses.length}
+          availableToJoin={availableToJoin}
+        />
 
-          <HomeProQuickActions onActivateWithQr={() => setIsQrScannerOpen(true)} />
-        </Box>
+        <HomeProQuickActions onActivateWithQr={() => setIsQrScannerOpen(true)} />
 
         {/* My Courses */}
         <Box px={{ base: 4, md: 6 }} maxW="7xl" w="full" mx="auto">
+          <Flex
+            align="center"
+            justify="space-between"
+            gap={3}
+            mb={3}
+            px={{ base: 0.5, md: 0 }}
+          >
+            <VStack align="flex-start" spacing={0}>
+              <Text fontWeight="bold" fontSize={{ base: "lg", md: "xl" }} color={headingColor} letterSpacing="-0.01em">
+                كورساتي
+              </Text>
+              <Text fontSize="sm" color={subtextColor}>
+                المحتوى الذي اشتركت به
+              </Text>
+            </VStack>
+            <Button
+              as={Link}
+              to="/my-courses"
+              size="sm"
+              variant="ghost"
+              color="blue.500"
+              borderRadius="xl"
+              rightIcon={<Icon as={FaChevronLeft} />}
+              _hover={{ bg: ghostHoverBg }}
+            >
+              عرض الكل
+            </Button>
+          </Flex>
           <Box
-            bg={sectionCardBg}
+            bg={sectionSurfaceBg}
             borderWidth="1px"
             borderColor={sectionBorder}
             borderRadius="2xl"
             overflow="hidden"
-            boxShadow="sm"
+            boxShadow="0 8px 28px -14px rgba(26,32,44,0.14)"
+            px={{ base: 2, md: 3 }}
+            py={3}
           >
-            <Flex
-              align="center"
-              justify="space-between"
-              gap={3}
-              px={{ base: 4, md: 5 }}
-              py={4}
-              borderBottomWidth="1px"
-              borderColor={sectionBorder}
-            >
-              <VStack align="flex-start" spacing={0}>
-                <Text fontWeight="black" fontSize="lg" color={headingColor}>
-                  كورساتي
-                </Text>
-                <Text fontSize="sm" color={subtextColor}>
-                  المحتوى الذي اشتركت به
-                </Text>
-              </VStack>
-              <Button
-                as={Link}
-                to="/my-courses"
-                size="sm"
-                variant="ghost"
-                colorScheme="blue"
-                borderRadius="lg"
-                rightIcon={<Icon as={FaChevronLeft} />}
-              >
-                عرض الكل
-              </Button>
-            </Flex>
-            <Box px={{ base: 2, md: 3 }} py={3}>
-              <MyCourses embedded />
-            </Box>
+            <MyCourses embedded />
           </Box>
         </Box>
 
-        {/* Available courses — أعرض على الموبايل، والشاشات الكبيرة كما كانت (3 أعمدة) */}
+        {/* Available courses */}
         <Box
-          px={{ base: 1.5, md: 6 }}
+          id="platform-courses"
+          px={{ base: 3, md: 6 }}
           maxW="7xl"
           w="full"
           mx="auto"
           pb={2}
+          scrollMarginTop="90px"
         >
-          <Box
-            bg={sectionCardBg}
-            borderWidth={{ base: 0, md: "1px" }}
-            borderColor={sectionBorder}
-            borderRadius={{ base: "xl", md: "2xl" }}
-            overflow="hidden"
-            boxShadow={{ base: "none", md: "sm" }}
+          <Flex
+            align="center"
+            justify="space-between"
+            gap={3}
+            mb={3}
+            px={{ base: 0.5, md: 0 }}
           >
-            <Flex
-              align="center"
-              justify="space-between"
-              gap={3}
-              px={{ base: 2, md: 5 }}
-              py={4}
-              borderBottomWidth="1px"
-              borderColor={sectionBorder}
-            >
-              <VStack align="flex-start" spacing={0}>
-                <Text fontWeight="black" fontSize="lg" color={headingColor}>
-                  كورسات المنصة
+            <VStack align="flex-start" spacing={0}>
+              <Text fontWeight="bold" fontSize={{ base: "lg", md: "xl" }} color={headingColor} letterSpacing="-0.01em">
+                كورسات المنصة
+              </Text>
+              <Text fontSize="sm" color={subtextColor}>
+                اكتشف المحتوى المتاح للاشتراك
+              </Text>
+            </VStack>
+            {coursesLoading ? (
+              <HStack spacing={2} color={subtextColor}>
+                <Spinner size="sm" color="blue.500" thickness="3px" />
+                <Text fontSize="xs" fontWeight="medium">
+                  جاري التحميل...
                 </Text>
-                <Text fontSize="sm" color={subtextColor}>
-                  اكتشف المحتوى المتاح للاشتراك
-                </Text>
-              </VStack>
-              {coursesLoading ? (
-                <HStack spacing={2} color={subtextColor}>
-                  <Spinner size="sm" color="blue.500" thickness="3px" />
-                  <Text fontSize="xs" fontWeight="medium">
-                    جاري التحميل...
-                  </Text>
-                </HStack>
-              ) : (
-                <Badge colorScheme="blue" borderRadius="full" px={3} py={1}>
-                  {availableCourses.length} كورس
-                </Badge>
-              )}
-            </Flex>
+              </HStack>
+            ) : (
+              <Badge
+                colorScheme="blue"
+                borderRadius="full"
+                px={3}
+                py={1}
+                fontWeight="800"
+              >
+                {availableCourses.length} كورس
+              </Badge>
+            )}
+          </Flex>
 
-            <Box p={{ base: 1.5, md: 4 }}>
-              {coursesLoading ? (
-                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={{ base: 3, md: 4 }}>
-                  {[0, 1, 2].map((i) => (
-                    <Box
-                      key={`course-skeleton-${i}`}
-                      bg={cardBg}
-                      borderWidth="1px"
-                      borderColor={courseCardBorder}
-                      borderRadius="2xl"
-                      overflow="hidden"
-                      boxShadow={courseCardShadow}
-                    >
-                      <Skeleton
-                        h={{ base: "200px", md: "168px" }}
-                        startColor="gray.100"
-                        endColor="gray.200"
-                      />
-                      <Box p={4}>
-                        <Skeleton height="16px" mb={3} borderRadius="md" />
-                        <Skeleton height="12px" width="60%" mb={4} borderRadius="md" />
-                        <Skeleton height="40px" borderRadius="xl" />
-                      </Box>
+          <Box>
+            {coursesLoading ? (
+              <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={{ base: 3, md: 4 }}>
+                {[0, 1, 2].map((i) => (
+                  <Box
+                    key={`course-skeleton-${i}`}
+                    bg={cardBg}
+                    borderWidth="1px"
+                    borderColor={courseCardBorder}
+                    borderRadius="2xl"
+                    overflow="hidden"
+                    boxShadow={courseCardShadow}
+                  >
+                    <Skeleton
+                      h={{ base: "200px", md: "168px" }}
+                      startColor="gray.100"
+                      endColor="gray.200"
+                    />
+                    <Box p={4}>
+                      <Skeleton height="16px" mb={3} borderRadius="md" />
+                      <Skeleton height="12px" width="60%" mb={4} borderRadius="md" />
+                      <Skeleton height="40px" borderRadius="xl" />
                     </Box>
-                  ))}
-                </SimpleGrid>
-              ) : (
-                <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={{ base: 3, md: 4 }}>
-                  {availableCourses.map((course) => {
-                    const free = isCourseFree(course);
-                    const enrolled = !!course.is_enrolled;
-                    return (
-                      <HomePlatformCourseCard
-                        key={course.id}
-                        course={course}
-                        teacherName={teacherDisplayName}
-                        isFree={free}
-                        isEnrolled={enrolled}
-                        onEnter={() => navigate(`/CourseDetailsPage/${course.id}`)}
-                        onSubscribe={() => openCourseActivationModal(course)}
-                      />
-                    );
-                  })}
-                </SimpleGrid>
-              )}
-              {!coursesLoading && availableCourses.length === 0 ? (
-                <Center
-                  py={12}
-                  borderRadius="2xl"
-                  borderWidth="1px"
-                  borderStyle="dashed"
-                  borderColor={courseCardBorder}
-                >
-                  <VStack spacing={2}>
-                    <Text fontWeight="black" color={headingColor}>
-                      لا توجد كورسات متاحة حالياً
-                    </Text>
-                    <Text fontSize="sm" color={subtextColor}>
-                      تابع المنصة لاحقاً لظهور محتوى جديد.
-                    </Text>
-                  </VStack>
-                </Center>
-              ) : null}
-            </Box>
+                  </Box>
+                ))}
+              </SimpleGrid>
+            ) : (
+              <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={{ base: 3, md: 4 }}>
+                {availableCourses.map((course) => {
+                  const free = isCourseFree(course);
+                  const enrolled = !!course.is_enrolled;
+                  return (
+                    <HomePlatformCourseCard
+                      key={course.id}
+                      course={course}
+                      teacherName={teacherDisplayName}
+                      isFree={free}
+                      isEnrolled={enrolled}
+                      onEnter={() => navigate(`/CourseDetailsPage/${course.id}`)}
+                      onSubscribe={() => openCourseActivationModal(course)}
+                    />
+                  );
+                })}
+              </SimpleGrid>
+            )}
+            {!coursesLoading && availableCourses.length === 0 ? (
+              <Center
+                py={12}
+                borderRadius="2xl"
+                borderWidth="1px"
+                borderStyle="dashed"
+                borderColor={courseCardBorder}
+                bg={emptyCoursesBg}
+              >
+                <VStack spacing={2}>
+                  <Text fontWeight="black" color={headingColor}>
+                    لا توجد كورسات متاحة حالياً
+                  </Text>
+                  <Text fontSize="sm" color={subtextColor}>
+                    تابع المنصة لاحقاً لظهور محتوى جديد.
+                  </Text>
+                </VStack>
+              </Center>
+            ) : null}
           </Box>
         </Box>
       </VStack>
 
       {/* Floating scientific support chat — desktop only; mobile/tablet use bottom nav */}
       <Box
-        display={{ base: "none", lg: "block" }}
+        display={{ base: "none", "2xl": "block" }}
         position="fixed"
         bottom="20px"
         left="16px"

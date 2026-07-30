@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import {
   Box,
@@ -13,12 +13,12 @@ import {
   Icon,
   Divider,
   Tooltip,
-  IconButton,
 } from "@chakra-ui/react";
 import { FaAndroid } from "react-icons/fa";
 import { MdVerified } from "react-icons/md";
 import Links from "../../components/links/Links";
 import UserType from "../../Hooks/auth/userType";
+import { SHELL_DESKTOP_BP } from "../../theme/chakraTheme";
 
 function getUserDisplayName(user) {
   if (!user) return "مستخدم";
@@ -139,8 +139,6 @@ const HomeLogin = () => {
     location.pathname === "/" ||
     location.pathname.endsWith("/home");
 
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
-
   const shouldHideSidebar =
     location.pathname.includes("CourseDetailsPage") ||
     location.pathname.includes("CourseStatisticsPage") ||
@@ -151,9 +149,7 @@ const HomeLogin = () => {
     location.pathname.toLowerCase().includes("question_bank") ||
     location.pathname.toLowerCase().includes("teacher_subjects");
 
-  const sidebarCollapsedWidth = "72px";
-  const sidebarExpandedWidth = "288px";
-  const sidebarWidth = isSidebarExpanded ? sidebarExpandedWidth : sidebarCollapsedWidth;
+  const sidebarWidth = "288px";
 
   return (
     <Flex
@@ -163,7 +159,7 @@ const HomeLogin = () => {
     >
       {!shouldHideSidebar && (
         <Box
-          display={{ base: "none", lg: "flex" }}
+          display={{ base: "none", [SHELL_DESKTOP_BP]: "flex" }}
           flexDirection="column"
           width={sidebarWidth}
           height="100vh"
@@ -177,14 +173,6 @@ const HomeLogin = () => {
           boxShadow={sidebarGlow}
           overflow="hidden"
           className="sidebar-container mt-[72px]"
-          transition="width 0.28s ease, box-shadow 0.28s ease"
-          onMouseEnter={() => setIsSidebarExpanded(true)}
-          onMouseLeave={() => setIsSidebarExpanded(false)}
-          sx={
-            isSidebarExpanded
-              ? { boxShadow: "0 0 0 1px rgba(15,23,42,0.06), 0 24px 48px rgba(15,23,42,0.14)" }
-              : undefined
-          }
         >
           <Box h="3px" bgGradient={accentGradient} flexShrink={0} />
 
@@ -192,7 +180,7 @@ const HomeLogin = () => {
             user={user}
             isAdmin={isAdmin}
             isTeacher={isTeacher}
-            isExpanded={isSidebarExpanded}
+            isExpanded
           />
 
           <Divider borderColor={sidebarBorder} opacity={0.7} />
@@ -201,7 +189,7 @@ const HomeLogin = () => {
             flex={1}
             overflowY="auto"
             overflowX="hidden"
-            px={isSidebarExpanded ? 2 : 1}
+            px={2}
             py={3}
             sx={{
               "&::-webkit-scrollbar": { width: "5px" },
@@ -212,81 +200,58 @@ const HomeLogin = () => {
               },
             }}
           >
-            <Links isSidebarOpen={isSidebarExpanded} />
+            <Links isSidebarOpen />
           </Box>
 
           <Box
-            p={isSidebarExpanded ? 3 : 2}
+            p={3}
             borderTopWidth="1px"
             borderColor={sidebarBorder}
             bg={footerBg}
             flexShrink={0}
           >
-            {isSidebarExpanded ? (
-              <>
-                <Button
-                  as="a"
-                  href="https://www.mediafire.com/file/f3afz741f5hohts/E-M+Online.apk/file"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  w="full"
-                  size="md"
-                  variant="outline"
-                  colorScheme="orange"
-                  borderRadius="xl"
-                  borderWidth="2px"
-                  fontWeight="bold"
-                  fontSize="sm"
-                  h="48px"
-                  rightIcon={<FaAndroid />}
-                  _hover={{
-                    bg: "orange.500",
-                    color: "white",
-                    borderColor: "orange.500",
-                    transform: "translateY(-1px)",
-                    boxShadow: "0 8px 20px rgba(237, 137, 54, 0.28)",
-                  }}
-                  transition="all 0.2s ease"
-                >
-                  تحميل تطبيق أندرويد
-                </Button>
-                <Text fontSize="10px" color={footerMutedColor} textAlign="center" mt={2}>
-                  EM Online · تعلم في أي وقت
-                </Text>
-              </>
-            ) : (
-              <Flex justify="center">
-                <Tooltip label="تحميل تطبيق أندرويد" placement="left" hasArrow openDelay={300}>
-                  <IconButton
-                    as="a"
-                    href="https://www.mediafire.com/file/f3afz741f5hohts/E-M+Online.apk/file"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="تحميل تطبيق أندرويد"
-                    icon={<FaAndroid />}
-                    size="md"
-                    variant="outline"
-                    colorScheme="orange"
-                    borderRadius="xl"
-                    borderWidth="2px"
-                  />
-                </Tooltip>
-              </Flex>
-            )}
+            <Button
+              as="a"
+              href="https://www.mediafire.com/file/f3afz741f5hohts/E-M+Online.apk/file"
+              target="_blank"
+              rel="noopener noreferrer"
+              w="full"
+              size="md"
+              variant="outline"
+              colorScheme="orange"
+              borderRadius="xl"
+              borderWidth="2px"
+              fontWeight="bold"
+              fontSize="sm"
+              h="48px"
+              rightIcon={<FaAndroid />}
+              _hover={{
+                bg: "orange.500",
+                color: "white",
+                borderColor: "orange.500",
+                transform: "translateY(-1px)",
+                boxShadow: "0 8px 20px rgba(237, 137, 54, 0.28)",
+              }}
+              transition="all 0.2s ease"
+            >
+              تحميل تطبيق أندرويد
+            </Button>
+            <Text fontSize="10px" color={footerMutedColor} textAlign="center" mt={2}>
+              EM Online · تعلم في أي وقت
+            </Text>
           </Box>
         </Box>
       )}
 
       <Box
         flex={1}
-        mr={{ base: 0, lg: shouldHideSidebar ? 0 : sidebarCollapsedWidth }}
+        mr={{ base: 0, [SHELL_DESKTOP_BP]: shouldHideSidebar ? 0 : sidebarWidth }}
         mt="72px"
         w="full"
         maxW="100%"
         overflowX="hidden"
         bg={mainBg}
         color={useColorModeValue("gray.800", "white")}
-        transition="margin-right 0.3s ease"
         minH="calc(100vh - 72px)"
       >
         <Box

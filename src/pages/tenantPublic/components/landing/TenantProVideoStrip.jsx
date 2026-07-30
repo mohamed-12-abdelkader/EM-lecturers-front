@@ -2,36 +2,57 @@ import { useRef } from "react";
 import { motion } from "framer-motion";
 import { FaChevronLeft, FaChevronRight, FaPlay } from "react-icons/fa";
 import { Reveal, StaggerItem } from "../../tenantLandingMotion";
-import { tlCard, tlContainer, tlEyebrow, tlHeading, tlSectionWhite } from "../../tenantLandingTheme";
+import { getCardImageUrl } from "../../../../utils/highQualityImageUrl";
+import {
+  TL_CYAN,
+  TL_LIME,
+  TL_NAVY,
+  tlContainer,
+  tlEyebrow,
+  tlHeading,
+} from "../../tenantLandingTheme";
 
 function LectureFrame({ lecture, fallbackImage, onPlay }) {
+  const thumb = getCardImageUrl(lecture.image_url || fallbackImage);
   return (
     <motion.button
       type="button"
       onClick={() => onPlay(lecture)}
-      className="group w-[min(340px,85vw)] shrink-0 cursor-pointer snap-center text-right"
-      whileHover={{ y: -4 }}
-      transition={{ duration: 0.2 }}
+      className="group w-[min(300px,82vw)] shrink-0 cursor-pointer snap-center text-right sm:w-[min(340px,85vw)]"
+      style={{ perspective: 1000, transformStyle: "preserve-3d" }}
+      whileHover={{ y: -10, rotateX: 8, rotateY: -4, scale: 1.03, z: 40 }}
+      whileTap={{ scale: 0.97 }}
+      transition={{ type: "spring", stiffness: 320, damping: 22 }}
     >
-      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-900 p-2 shadow-xl dark:border-slate-700">
-        <div className={`relative overflow-hidden rounded-xl ${tlCard} !border-0 !shadow-none`}>
+      <div className="overflow-hidden rounded-2xl border border-white/12 bg-white/[0.06] p-1.5 shadow-[0_20px_50px_-16px_rgba(0,0,0,0.6)] sm:p-2">
+        <div className="relative overflow-hidden rounded-xl bg-[#12263F]">
           <img
-            src={lecture.image_url || fallbackImage}
+            src={thumb}
             alt={lecture.title}
             className="aspect-video w-full object-cover"
             loading="lazy"
+            decoding="async"
           />
-          <div className="absolute inset-0 flex items-center justify-center bg-blue-900/40 transition-colors duration-200 group-hover:bg-blue-900/55">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-blue-500 shadow-md transition-transform duration-200 group-hover:scale-110">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0A1628]/45 transition-colors duration-200 group-hover:bg-[#0A1628]/55">
+            <motion.span
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-md"
+              style={{ color: TL_CYAN }}
+              whileHover={{ scale: 1.15 }}
+              animate={{ scale: [1, 1.08, 1] }}
+              transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+            >
               <FaPlay className="mr-[-2px]" />
-            </span>
+            </motion.span>
           </div>
-          <span className="absolute left-3 top-3 rounded-md bg-orange-500 px-2 py-0.5 text-[10px] font-bold text-white">
+          <span
+            className="absolute left-3 top-3 rounded-lg px-2 py-0.5 text-[10px] font-bold"
+            style={{ background: TL_LIME, color: TL_NAVY }}
+          >
             مجاني
           </span>
         </div>
       </div>
-      <p className="mt-3 font-heading text-sm font-bold text-slate-900 dark:text-white">{lecture.title}</p>
+      <p className="mt-3 line-clamp-2 font-heading text-sm font-bold text-white">{lecture.title}</p>
     </motion.button>
   );
 }
@@ -50,22 +71,27 @@ export default function TenantProVideoStrip({
   };
 
   return (
-    <section id="videos" className={`scroll-mt-20 py-16 md:py-24 ${tlSectionWhite}`} dir="rtl">
+    <section
+      id="videos"
+      className="scroll-mt-20 py-12 md:py-20"
+      style={{ background: TL_NAVY }}
+      dir="rtl"
+    >
       <div className={tlContainer}>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <Reveal variant="blurUp">
             <span className={tlEyebrow}>محاضرات مجانية</span>
             <h2 className={`${tlHeading} mt-3`}>جرّب قبل الاشتراك</h2>
-            <p className="mt-2 max-w-lg text-sm leading-7 text-slate-600 dark:text-slate-400">
+            <p className="mt-2 max-w-lg text-sm leading-7 text-[#7EB8D9]">
               شاهد محاضرات مجانية وتعرّف على أسلوب الشرح
             </p>
           </Reveal>
           {lectures.length > 1 && (
-            <div className="flex gap-2">
+            <div className="hidden gap-2 sm:flex">
               <button
                 type="button"
                 onClick={() => scroll(-1)}
-                className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors duration-200 hover:border-blue-500 hover:text-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white/80 transition-colors duration-200 hover:border-[#00A0E3]/50 hover:text-[#00A0E3]"
                 aria-label="السابق"
               >
                 <FaChevronRight />
@@ -73,7 +99,7 @@ export default function TenantProVideoStrip({
               <button
                 type="button"
                 onClick={() => scroll(1)}
-                className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition-colors duration-200 hover:border-blue-500 hover:text-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white/80 transition-colors duration-200 hover:border-[#00A0E3]/50 hover:text-[#00A0E3]"
                 aria-label="التالي"
               >
                 <FaChevronLeft />
@@ -83,16 +109,19 @@ export default function TenantProVideoStrip({
         </div>
 
         {loading ? (
-          <div className="mt-10 flex gap-5 overflow-hidden">
+          <div className="-mx-4 mt-8 flex gap-4 overflow-hidden px-4 sm:mx-0 sm:mt-10 sm:px-0">
             {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="h-52 w-[min(340px,85vw)] shrink-0 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800" />
+              <div
+                key={i}
+                className="h-48 w-[min(300px,82vw)] shrink-0 animate-pulse rounded-2xl bg-white/10 sm:h-52 sm:w-[min(340px,85vw)]"
+              />
             ))}
           </div>
         ) : lectures.length > 0 ? (
           <div
             ref={scrollRef}
-            className="mt-10 flex gap-5 overflow-x-auto pb-4 snap-x snap-mandatory"
-            style={{ scrollbarWidth: "thin" }}
+            className="-mx-4 mt-8 flex gap-4 overflow-x-auto px-4 pb-3 snap-x snap-mandatory sm:mx-0 sm:mt-10 sm:gap-5 sm:px-0 sm:pb-4"
+            style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
           >
             {lectures.map((lecture) => (
               <StaggerItem key={lecture.id} variant="blur">
@@ -102,9 +131,9 @@ export default function TenantProVideoStrip({
           </div>
         ) : (
           <Reveal variant="springPop" className="mt-10">
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-14 text-center dark:border-slate-600 dark:bg-slate-900/50">
-              <p className="font-heading text-lg font-bold text-slate-800 dark:text-white">لا توجد محاضرات مجانية حالياً</p>
-              <p className="mt-2 text-sm text-slate-500">سيتم إضافة محاضرات قريباً</p>
+            <div className="rounded-2xl border border-dashed border-white/20 bg-white/[0.04] px-6 py-14 text-center">
+              <p className="font-heading text-lg font-bold text-white">لا توجد محاضرات مجانية حالياً</p>
+              <p className="mt-2 text-sm text-[#7EB8D9]">سيتم إضافة محاضرات قريباً</p>
             </div>
           </Reveal>
         )}

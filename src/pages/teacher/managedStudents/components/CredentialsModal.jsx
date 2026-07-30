@@ -51,7 +51,7 @@ const CredentialsModal = ({
 
   const whatsappMessage = showCodeOnly
     ? buildCodeOnlyLoginMessage(studentName, studentCode, subdomain)
-    : buildPasswordLoginMessage(studentName, credentials);
+    : buildPasswordLoginMessage(studentName, credentials, subdomain);
 
   const copyValue = async (value, label) => {
     try {

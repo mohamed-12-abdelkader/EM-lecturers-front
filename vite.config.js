@@ -36,6 +36,11 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    build: {
+      // دعم أوسع لأجهزة/متصفحات أقدم — يقلل أعطال الشاشة البيضاء من syntax حديث
+      target: ["es2019", "safari13"],
+      cssTarget: ["chrome80", "safari13"],
+    },
     plugins: [
       react(),
       tenantSeoPlugin({

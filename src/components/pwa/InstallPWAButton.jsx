@@ -12,7 +12,7 @@ import IOSInstallGuideModal from "./IOSInstallGuideModal";
 import DesktopInstallGuideModal from "./DesktopInstallGuideModal";
 
 export default function InstallPWAButton({
-  label = "تثبيت التطبيق",
+  label = "تنزيل المنصة",
   className = "",
   variant = "hero", // "hero" | "solid" | "link"
 }) {
@@ -24,7 +24,7 @@ export default function InstallPWAButton({
 
   useEffect(() => {
     const onInstalled = () => {
-      toast.success("تم تثبيت التطبيق بنجاح 🎉", {
+      toast.success("تم تنزيل المنصة بنجاح 🎉", {
         position: "top-center",
         autoClose: 3500,
       });
@@ -93,7 +93,7 @@ export default function InstallPWAButton({
                 <FaDownload className="absolute text-[13px] opacity-90" />
                 <FaMobileAlt className="absolute translate-x-[7px] translate-y-[6px] text-[9px] text-orange-500" />
               </span>
-              {busy ? "جاري التثبيت..." : label}
+              {busy ? "جاري التنزيل..." : label}
             </motion.button>
           </motion.div>
         ) : null}

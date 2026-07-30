@@ -1,40 +1,68 @@
 import { FaBookOpen, FaCheckCircle, FaLayerGroup } from "react-icons/fa";
+import { HP_BLUE, HP_ORANGE, hpContainer } from "../homeTheme";
 
-function StatItem({ icon: Icon, label, value, tone = "blue" }) {
-  const tones = {
-    blue: "bg-blue-50 text-blue-500 dark:bg-blue-950/50",
-    orange: "bg-orange-50 text-orange-500 dark:bg-orange-950/40",
-    emerald: "bg-emerald-50 text-emerald-500 dark:bg-emerald-950/40",
-  };
-
-  return (
-    <div className="group flex items-center gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900">
-      <div
-        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${tones[tone]} transition group-hover:scale-105`}
-      >
-        <Icon className="text-lg" />
-      </div>
-      <div className="min-w-0 flex-1 text-right">
-        <p className="font-heading text-2xl font-black tabular-nums text-slate-900 dark:text-white">
-          {value}
-        </p>
-        <p className="text-xs font-medium text-slate-500">{label}</p>
-      </div>
-    </div>
-  );
-}
+const ITEMS = [
+  {
+    key: "enrolled",
+    icon: FaCheckCircle,
+    label: "مشترك بها",
+    color: HP_BLUE,
+    soft: "rgba(49,130,206,0.12)",
+  },
+  {
+    key: "platform",
+    icon: FaLayerGroup,
+    label: "على المنصة",
+    color: HP_BLUE,
+    soft: "rgba(49,130,206,0.08)",
+  },
+  {
+    key: "available",
+    icon: FaBookOpen,
+    label: "متاحة للاشتراك",
+    color: HP_ORANGE,
+    soft: "rgba(221,107,32,0.12)",
+  },
+];
 
 export default function HomeProStats({
   enrolledCount = 0,
   coursesCount = 0,
   availableToJoin = 0,
 }) {
+  const values = {
+    enrolled: enrolledCount,
+    platform: coursesCount,
+    available: availableToJoin,
+  };
+
   return (
-    <section className="py-1" dir="rtl">
-      <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-3 px-4 sm:grid-cols-3 md:px-6 lg:px-8">
-        <StatItem icon={FaCheckCircle} label="كورسات مشترك بها" value={enrolledCount} tone="emerald" />
-        <StatItem icon={FaLayerGroup} label="كورسات المنصة" value={coursesCount} tone="blue" />
-        <StatItem icon={FaBookOpen} label="متاحة للاشتراك" value={availableToJoin} tone="orange" />
+    <section className="pt-4 sm:pt-5" dir="rtl">
+      <div className={`${hpContainer}`}>
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+          {ITEMS.map((item) => {
+            const Icon = item.icon;
+            return (
+              <div
+                key={item.key}
+                className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-[0_6px_20px_-10px_rgba(26,32,44,0.15)] dark:border-slate-700 dark:bg-slate-900 sm:p-4"
+              >
+                <div
+                  className="mb-2.5 flex h-9 w-9 items-center justify-center rounded-xl sm:h-10 sm:w-10"
+                  style={{ background: item.soft, color: item.color }}
+                >
+                  <Icon className="text-sm sm:text-[15px]" />
+                </div>
+                <p className="font-heading text-xl font-bold tabular-nums text-slate-800 dark:text-white sm:text-2xl">
+                  {Number(values[item.key] || 0).toLocaleString("ar-EG")}
+                </p>
+                <p className="mt-0.5 text-[10px] font-medium text-slate-500 sm:text-xs">
+                  {item.label}
+                </p>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </section>
   );

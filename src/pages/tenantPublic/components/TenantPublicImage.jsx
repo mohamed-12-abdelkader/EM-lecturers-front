@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import { getBlurPlaceholderUrl } from "../../../utils/highQualityImageUrl";
 
 /**
- * Lazy-loaded image with aspect-ratio placeholder to reduce CLS.
- * Uses native loading="lazy" + decoding="async" for LCP optimization on hero via priority prop.
+ * Fast-appearing image: optional tiny blur LQIP, skeleton, shows as soon as decoded.
+ * priority → eager + high fetchpriority (LCP / hero).
  */
 export default function TenantPublicImage({
   src,
@@ -11,19 +12,29 @@ export default function TenantPublicImage({
   aspectClass = "aspect-[16/10]",
   priority = false,
   objectFit = "cover",
+  objectPosition = "center",
+  sizes,
+  srcSet,
 }) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
   const imgRef = useRef(null);
+  const blurSrc = src ? getBlurPlaceholderUrl(src) : null;
 
   useEffect(() => {
-    if (priority && imgRef.current?.complete) setLoaded(true);
-  }, [priority, src]);
+    setLoaded(false);
+    setError(false);
+  }, [src]);
+
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img?.complete && img.naturalWidth > 0) setLoaded(true);
+  }, [src]);
 
   if (!src || error) {
     return (
       <div
-        className={`flex items-center justify-center bg-slate-100 text-slate-400 dark:bg-slate-800 ${aspectClass} ${className}`}
+        className={`flex items-center justify-center bg-[#12263F] text-white/30 ${aspectClass} ${className}`}
         role="img"
         aria-label={alt}
       >
@@ -35,26 +46,35 @@ export default function TenantPublicImage({
   }
 
   return (
-    <div className={`relative overflow-hidden ${aspectClass} ${className}`}>
-      {!loaded ? (
-        <div
-          className="absolute inset-0 animate-pulse bg-slate-200 dark:bg-slate-700"
+    <div className={`relative overflow-hidden bg-[#12263F] ${aspectClass} ${className}`}>
+      {blurSrc ? (
+        <img
+          src={blurSrc}
+          alt=""
           aria-hidden
+          className="absolute inset-0 h-full w-full scale-110"
+          style={{ objectFit, objectPosition, filter: "blur(12px)" }}
+          loading="eager"
+          decoding="async"
         />
+      ) : !loaded ? (
+        <div className="absolute inset-0 animate-pulse bg-white/10" aria-hidden />
       ) : null}
       <img
         ref={imgRef}
         src={src}
+        srcSet={srcSet}
+        sizes={sizes}
         alt={alt}
         loading={priority ? "eager" : "lazy"}
-        decoding="async"
+        decoding={priority ? "sync" : "async"}
         fetchpriority={priority ? "high" : "auto"}
         onLoad={() => setLoaded(true)}
         onError={() => setError(true)}
-        className={`h-full w-full transition-opacity duration-300 ${
+        className={`relative z-[1] h-full w-full transition-opacity duration-200 ${
           loaded ? "opacity-100" : "opacity-0"
         }`}
-        style={{ objectFit }}
+        style={{ objectFit, objectPosition }}
       />
     </div>
   );

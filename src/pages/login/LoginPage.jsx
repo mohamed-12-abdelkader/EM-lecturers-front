@@ -23,19 +23,23 @@ import {
 } from "@chakra-ui/react";
 import { Link, useNavigate } from "react-router-dom";
 import ScrollToTop from "../../components/scollToTop/ScrollToTop";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast, ToastContainer } from "react-toastify";
 import { FiLock, FiPhone, FiMail, FiCheckCircle } from "react-icons/fi";
 import { FaMoon, FaSun, FaBars, FaTimes } from "react-icons/fa";
 import baseUrl from "../../api/baseUrl";
-import { getTenantSubdomain } from "../../utils/tenantHost";
+import {
+  ensureTenantAuthContext,
+  resolveTenantSubdomain,
+  withTenantQuery,
+} from "../../utils/tenantHost";
 import { persistLoginSession } from "../../utils/authStorage";
 import { TenantPublicNavbarShell } from "../tenantPublic/components/TenantPublicNavbar";
 import "react-toastify/dist/ReactToastify.css";
 
 const LoginPage = () => {
   const navigate = useNavigate();
-  const tenantSubdomain = getTenantSubdomain();
+  const [tenantSubdomain, setTenantSubdomain] = useState(() => resolveTenantSubdomain());
   const hasTenantNavbar = Boolean(tenantSubdomain);
   const { colorMode, toggleColorMode } = useColorMode();
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -49,6 +53,11 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const resolved = ensureTenantAuthContext();
+    if (resolved) setTenantSubdomain(resolved);
+  }, []);
 
   const pageBg = useColorModeValue("linear(to-br, blue.50, white)", "linear(to-br, gray.900, gray.800)");
   const cardBg = useColorModeValue("white", "gray.800");
@@ -150,7 +159,7 @@ const LoginPage = () => {
 
       // تحديد ما إذا كان المدخل بريدًا إلكترونيًا أو رقم هاتف
       const isEmail = identifier.includes("@");
-      const subdomain = getTenantSubdomain();
+      const subdomain = resolveTenantSubdomain();
       const basePayload = isEmail
         ? {
             email: identifier.trim(),
@@ -242,13 +251,13 @@ const LoginPage = () => {
               {colorMode === "dark" ? <FaSun className="text-sm" /> : <FaMoon className="text-sm" />}
             </button>
             <Link
-              to="/signup"
+              to={withTenantQuery("/signup", tenantSubdomain)}
               className="rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:hover:text-white"
             >
               إنشاء حساب
             </Link>
             <Link
-              to="/login"
+              to={withTenantQuery("/login", tenantSubdomain)}
               className="rounded-xl bg-gradient-to-l from-blue-600 to-blue-500 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/30 transition hover:brightness-110"
             >
               تسجيل الدخول
@@ -279,14 +288,14 @@ const LoginPage = () => {
           <div className="border-t border-slate-200 bg-white/95 px-4 pb-4 pt-3 shadow-sm backdrop-blur-lg dark:border-slate-800 dark:bg-slate-900/95 sm:hidden">
             <div className="grid grid-cols-2 gap-2">
               <Link
-                to="/signup"
+                to={withTenantQuery("/signup", tenantSubdomain)}
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               >
                 إنشاء حساب
               </Link>
               <Link
-                to="/login"
+                to={withTenantQuery("/login", tenantSubdomain)}
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="inline-flex h-11 items-center justify-center rounded-xl bg-gradient-to-l from-blue-600 to-blue-500 px-4 text-sm font-bold text-white shadow-md shadow-blue-600/25 transition hover:brightness-110"
               >

@@ -60,22 +60,34 @@ import { FaMoon, FaSun, FaBars, FaTimes } from "react-icons/fa";
 
 import "react-toastify/dist/ReactToastify.css";
 import baseUrl from "../../api/baseUrl";
-import { getTenantSubdomain } from "../../utils/tenantHost";
+import {
+  ensureTenantAuthContext,
+  resolveTenantSubdomain,
+  withTenantQuery,
+} from "../../utils/tenantHost";
 import { TenantPublicNavbarShell } from "../tenantPublic/components/TenantPublicNavbar";
 
 const SignUp = () => {
   const navigate = useNavigate();
-  const tenantSubdomain = getTenantSubdomain();
+  const [tenantSubdomain, setTenantSubdomain] = useState(() => resolveTenantSubdomain());
   const hasTenantNavbar = Boolean(tenantSubdomain);
   const { colorMode, toggleColorMode } = useColorMode();
   const location = useLocation();
   const redirectTo = new URLSearchParams(location.search).get("redirect");
-  const loginPath = redirectTo
-    ? `/login?redirect=${encodeURIComponent(redirectTo)}`
-    : "/login";
+  const loginPath = withTenantQuery(
+    redirectTo
+      ? `/login?redirect=${encodeURIComponent(redirectTo)}`
+      : "/login",
+    tenantSubdomain,
+  );
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [currentStep, setCurrentStep] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const resolved = ensureTenantAuthContext();
+    if (resolved) setTenantSubdomain(resolved);
+  }, []);
 
   const pageBg = useColorModeValue("gray.50", "gray.900");
   const cardBg = useColorModeValue("white", "gray.800");
@@ -199,7 +211,7 @@ const SignUp = () => {
   useEffect(() => {
     const fetchGrades = async () => {
       try {
-        const subdomain = getTenantSubdomain();
+        const subdomain = resolveTenantSubdomain();
         if (!subdomain) {
           const fallbackRes = await baseUrl.get("/api/users/grades");
           setGrades(Array.isArray(fallbackRes?.data?.grades) ? fallbackRes.data.grades : []);
@@ -308,9 +320,16 @@ const SignUp = () => {
     // إرسال الأرقام كما أدخلها المستخدم دون إضافة +20
     setLoading(true);
     try {
-      const subdomain = getTenantSubdomain();
+      const subdomain = resolveTenantSubdomain();
+      if (!subdomain) {
+        toast.error(
+          "افتح رابط منصة المدرس أولاً (مثل اسم-المدرس.em-online.online) ثم أنشئ الحساب من هناك.",
+        );
+        setLoading(false);
+        return;
+      }
       const res = await baseUrl.post("/api/users/register", {
-        subdomain: subdomain || "teacher-a",
+        subdomain,
         phone: cleanPhone,
         password: password,
         name: nameCheck.normalized,
@@ -613,7 +632,7 @@ const SignUp = () => {
               {colorMode === "dark" ? <FaSun className="text-sm" /> : <FaMoon className="text-sm" />}
             </button>
             <Link
-              to="/signup"
+              to={withTenantQuery("/signup", tenantSubdomain)}
               className="rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:hover:text-white"
             >
               إنشاء حساب
@@ -650,7 +669,7 @@ const SignUp = () => {
           <div className="border-t border-slate-200 bg-white/95 px-4 pb-4 pt-3 shadow-sm backdrop-blur-lg dark:border-slate-800 dark:bg-slate-900/95 sm:hidden">
             <div className="grid grid-cols-2 gap-2">
               <Link
-                to="/signup"
+                to={withTenantQuery("/signup", tenantSubdomain)}
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
               >

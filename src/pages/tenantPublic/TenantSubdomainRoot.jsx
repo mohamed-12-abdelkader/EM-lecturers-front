@@ -6,16 +6,23 @@ import TenantPublicLanding from "./TenantPublicLanding";
 import ProtectedRoute from "../../components/protectedRoute/ProtectedRoute";
 import UserType from "../../Hooks/auth/userType";
 import { getTenantSubdomain } from "../../utils/tenantHost";
+import {
+  clearExpiredAuthQuietly,
+  hasValidAuthSession,
+} from "../../utils/authStorage";
 
 /**
- * على نطاق المستأجر: غلاف `/` — للمدرّس المسجّل يعرض HomeLogin ويمرّر المحتوى للـ Outlet؛ وإلا يمرّر الفهرس للّاندنج.
+ * على نطاق المستأجر: غلاف `/` — للمدرّس/الطالب بجلسة صالحة فقط؛
+ * وإلا اللاندنج العام (مهم: التوكن المنتهي ما يفتحش لوحة بيضا/معلّقة).
  */
 export function TenantRootLayout() {
-  const [, , isTeacher, student] = UserType();
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  // امسح الجلسات المنتهية فورًا قبل قرار العرض
+  clearExpiredAuthQuietly();
 
-  if ((isTeacher || student) && token) {
+  const [, , isTeacher, student] = UserType();
+  const loggedIn = hasValidAuthSession() && (isTeacher || student);
+
+  if (loggedIn) {
     return (
       <ProtectedRoute auth={isTeacher || student}>
         <HomeLogin />
@@ -27,15 +34,16 @@ export function TenantRootLayout() {
 
 /** محتوى الفهرس لمسار `/` على نطاق المستأجر */
 export function TenantRootIndex() {
-  const [, , isTeacher, student] = UserType();
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("token") : null;
-  const subdomain = getTenantSubdomain();
+  clearExpiredAuthQuietly();
 
-  if (isTeacher && token) {
+  const [, , isTeacher, student] = UserType();
+  const subdomain = getTenantSubdomain();
+  const loggedIn = hasValidAuthSession();
+
+  if (loggedIn && isTeacher) {
     return <TeacherDashboardHome />;
   }
-  if (student && token) {
+  if (loggedIn && student) {
     return <HomePage />;
   }
   return <TenantPublicLanding subdomain={subdomain} />;

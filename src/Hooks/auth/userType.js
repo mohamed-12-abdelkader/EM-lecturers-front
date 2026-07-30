@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { safeLocalGet } from "../../utils/safeStorage";
 
 function readStoredUser() {
   try {
-    const raw = localStorage.getItem("user");
+    const raw = safeLocalGet("user");
     if (raw == null || raw === "") return null;
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === "object" ? parsed : null;

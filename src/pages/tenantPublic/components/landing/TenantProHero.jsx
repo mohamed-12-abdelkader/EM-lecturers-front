@@ -1,330 +1,460 @@
-import { motion, useReducedMotion } from "framer-motion";
-import { FaArrowLeft, FaGraduationCap, FaPlay, FaWhatsapp } from "react-icons/fa";
+import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { FaGraduationCap, FaPlay, FaWhatsapp } from "react-icons/fa";
 import {
-  CountUp,
   HeroGlowOrb,
   HeroStagger,
   HeroStaggerItem,
-  PulseRing,
-  ShimmerCTA,
+  Tilt3D,
 } from "../../tenantLandingMotion";
 import {
-  TL_BLUE,
-  TL_ORANGE,
-  tlBtnOutlineDark,
-  tlBtnPrimary,
+  getBlurPlaceholderUrl,
+  getPortraitImageSrcSet,
+} from "../../../../utils/highQualityImageUrl";
+import {
+  TL_CYAN as CYAN,
+  TL_NAVY as NAVY,
+  TL_TAGLINE as TAGLINE,
   tlContainer,
-  tlEyebrow,
 } from "../../tenantLandingTheme";
+import TenantAppLink from "../TenantAppLink";
 
 const EASE = [0.22, 1, 0.36, 1];
 
-function highlightTitle(title, teacherName) {
-  if (!teacherName?.trim() || !title) return title;
-  const name = teacherName.trim();
-  const idx = title.indexOf(name);
-  if (idx === -1) return title;
+function useIsDesktop(breakpoint = 768) {
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia(`(min-width: ${breakpoint}px)`).matches : false,
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia(`(min-width: ${breakpoint}px)`);
+    const onChange = () => setIsDesktop(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [breakpoint]);
+
+  return isDesktop;
+}
+
+function SpecialtyBadge({ specialty, className = "" }) {
+  if (!specialty) return null;
   return (
-    <>
-      {title.slice(0, idx)}
+    <motion.span
+      className={`inline-flex max-w-full items-center gap-2 rounded-full border border-white/25 bg-white/5 px-3.5 py-1.5 text-[11px] font-semibold leading-snug text-white/90 backdrop-blur-sm md:text-xs ${className}`}
+      whileHover={{ scale: 1.04, y: -2 }}
+      transition={{ type: "spring", stiffness: 400, damping: 18 }}
+    >
       <motion.span
-        className="inline-block text-blue-500"
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.35, duration: 0.55, ease: EASE }}
-      >
-        {name}
-      </motion.span>
-      {title.slice(idx + name.length)}
-    </>
+        className="h-2 w-2 shrink-0 rounded-full"
+        style={{ background: CYAN }}
+        animate={{ scale: [1, 1.35, 1], opacity: [1, 0.7, 1] }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        aria-hidden
+      />
+      <span>{specialty}</span>
+    </motion.span>
   );
 }
 
-function HeroPortrait({ src, alt, teacherName, specialty }) {
-  const reduceMotion = useReducedMotion();
-
+function HighlightsCard({ highlights }) {
+  if (!highlights?.length) return null;
   return (
-    <div className="relative mx-auto w-full max-w-[360px] sm:max-w-[400px]" dir="ltr">
-      <motion.div
-        className="pointer-events-none absolute -inset-6 rounded-[2.5rem] opacity-70 blur-2xl"
-        style={{
-          background: `radial-gradient(ellipse at 50% 40%, ${TL_BLUE}22 0%, transparent 65%)`,
-        }}
-        animate={
-          reduceMotion
-            ? undefined
-            : { opacity: [0.45, 0.75, 0.45], scale: [1, 1.04, 1] }
-        }
-        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-        aria-hidden
-      />
-
-      <div
-        className="pointer-events-none absolute inset-x-3 bottom-0 top-6 rounded-[1.75rem]"
-        style={{
-          background: `linear-gradient(145deg, ${TL_ORANGE}18 0%, ${TL_BLUE}12 100%)`,
-          transform: "translate(10px, 12px)",
-        }}
-        aria-hidden
-      />
-
-      <motion.div
-        initial={{ opacity: 0, y: 36, rotate: -2 }}
-        animate={{ opacity: 1, y: 0, rotate: 0 }}
-        transition={{ duration: 0.85, ease: EASE }}
-        className="relative"
-      >
-        <motion.div
-          animate={reduceMotion ? undefined : { y: [0, -7, 0] }}
-          whileHover={reduceMotion ? undefined : { scale: 1.015 }}
-          transition={
-            reduceMotion
-              ? { duration: 0.35 }
-              : { duration: 5.5, repeat: Infinity, ease: "easeInOut" }
-          }
-          className="relative overflow-hidden rounded-[1.75rem] border border-white/80 bg-slate-100 shadow-[0_24px_48px_-18px_rgba(15,23,42,0.35)] dark:border-slate-700 dark:bg-slate-800"
+    <motion.ul
+      className="rounded-2xl border border-white/15 px-4 py-4 text-right md:px-5 md:py-5"
+      style={{ background: "rgba(255,255,255,0.06)", transformStyle: "preserve-3d" }}
+      initial={{ rotateX: 12, opacity: 0.6 }}
+      animate={{ rotateX: 0, opacity: 1 }}
+      transition={{ duration: 0.8, ease: EASE }}
+    >
+      {highlights.map((item, i) => (
+        <motion.li
+          key={item}
+          className="flex items-start gap-2.5 border-b border-white/5 py-2.5 last:border-0 last:pb-0 first:pt-0 md:py-3"
+          initial={{ opacity: 0, x: 16 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.35 + i * 0.1, duration: 0.45 }}
+          whileHover={{ x: -4, scale: 1.01 }}
         >
-          <div className="relative aspect-[4/5] w-full overflow-hidden">
-            {src ? (
-              <motion.img
-                src={src}
-                alt={alt}
-                className="h-full w-full object-cover object-top"
-                loading="eager"
-                fetchpriority="high"
-                decoding="async"
-                draggable={false}
-                initial={{ scale: 1.12 }}
-                animate={{ scale: reduceMotion ? 1 : [1.08, 1, 1.03] }}
-                transition={
-                  reduceMotion
-                    ? { duration: 0.8, ease: EASE }
-                    : { duration: 14, repeat: Infinity, ease: "easeInOut" }
-                }
-              />
-            ) : (
-              <div
-                className="flex h-full w-full items-center justify-center"
-                style={{
-                  background: `linear-gradient(160deg, #60A5FA 0%, ${TL_BLUE} 55%, #1E40AF 100%)`,
-                }}
-              >
-                <FaGraduationCap className="text-7xl text-white/35" aria-hidden />
-              </div>
-            )}
+          <motion.span
+            className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
+            style={{ background: CYAN }}
+            animate={{ scale: [1, 1.4, 1] }}
+            transition={{ duration: 2.4, repeat: Infinity, delay: i * 0.3 }}
+            aria-hidden
+          />
+          <span className="flex-1 text-[13px] font-medium leading-6 text-white/90 md:text-sm md:leading-7">
+            {item}
+          </span>
+        </motion.li>
+      ))}
+    </motion.ul>
+  );
+}
 
-            <div
-              className="pointer-events-none absolute inset-x-0 bottom-0 h-[42%] bg-gradient-to-t from-slate-950/80 via-slate-950/35 to-transparent"
-              aria-hidden
-            />
-
-            <div
-              className="pointer-events-none absolute inset-0 rounded-[1.75rem] ring-1 ring-inset ring-white/25"
-              aria-hidden
-            />
-
-            {/* Soft light sweep */}
-            {!reduceMotion ? (
-              <motion.div
-                aria-hidden
-                className="pointer-events-none absolute inset-0"
-                style={{
-                  background:
-                    "linear-gradient(115deg, transparent 35%, rgba(255,255,255,0.18) 50%, transparent 65%)",
-                  backgroundSize: "220% 100%",
-                }}
-                animate={{ backgroundPosition: ["120% 0", "-40% 0"] }}
-                transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut", repeatDelay: 3 }}
-              />
-            ) : null}
-
-            <motion.div
-              className="absolute inset-x-0 bottom-0 p-5 text-right sm:p-6"
-              dir="rtl"
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.45, duration: 0.55, ease: EASE }}
-            >
-              <p className="font-heading text-lg font-bold tracking-tight text-white sm:text-xl">
-                {teacherName}
-              </p>
-              {specialty ? (
-                <p className="mt-1 text-sm font-medium text-orange-300">{specialty}</p>
-              ) : null}
-            </motion.div>
-          </div>
+function HeroActions({ signupHref, loginHref, whatsappHref, showFreeVideos }) {
+  const reduceMotion = useReducedMotion();
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-2 gap-3 md:flex md:flex-wrap md:justify-start">
+        <motion.div
+          whileHover={reduceMotion ? undefined : { y: -4, scale: 1.04, rotateX: 6 }}
+          whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+          transition={{ type: "spring", stiffness: 400, damping: 18 }}
+          className="contents md:block"
+        >
+          <TenantAppLink
+            href={signupHref}
+            className="inline-flex items-center justify-center rounded-xl px-4 py-3.5 text-sm font-bold text-white shadow-lg transition hover:brightness-110 active:scale-[0.98] md:min-w-[160px] md:px-8"
+            style={{
+              background: CYAN,
+              boxShadow: `0 10px 28px -8px ${CYAN}99`,
+            }}
+          >
+            إنشاء حساب
+          </TenantAppLink>
         </motion.div>
-      </motion.div>
+        <motion.div
+          whileHover={reduceMotion ? undefined : { y: -4, scale: 1.03, rotateX: 4 }}
+          whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+          className="contents md:block"
+        >
+          <TenantAppLink
+            href={loginHref}
+            className="inline-flex items-center justify-center rounded-xl border border-white/30 bg-transparent px-4 py-3.5 text-sm font-bold text-white transition hover:bg-white/10 active:scale-[0.98] md:min-w-[160px] md:px-8"
+          >
+            تسجيل دخول
+          </TenantAppLink>
+        </motion.div>
+        {whatsappHref ? (
+          <motion.a
+            href={whatsappHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-[#25D366]/40 bg-[#25D366]/15 px-4 py-3.5 text-sm font-bold text-[#6EFFA0] transition hover:bg-[#25D366]/25 active:scale-[0.98] md:col-span-1 md:min-w-[180px]"
+            whileHover={reduceMotion ? undefined : { y: -4, scale: 1.03 }}
+            whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+          >
+            <FaWhatsapp className="text-lg text-[#25D366]" />
+            تواصل واتساب
+          </motion.a>
+        ) : null}
+      </div>
+
+      {showFreeVideos ? (
+        <motion.a
+          href="#videos"
+          className="inline-flex items-center justify-center gap-2.5 text-sm font-semibold text-white/60 transition hover:text-white md:justify-start"
+          whileHover={reduceMotion ? undefined : { x: -4 }}
+        >
+          <motion.span
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/5"
+            animate={reduceMotion ? undefined : { scale: [1, 1.12, 1] }}
+            transition={{ duration: 2.2, repeat: Infinity }}
+          >
+            <FaPlay className="mr-[-1px] text-[10px]" style={{ color: CYAN }} />
+          </motion.span>
+          شاهد محاضرة مجانية
+        </motion.a>
+      ) : null}
     </div>
   );
 }
 
+function HeroCopy({
+  specialty,
+  teacherName,
+  tagline,
+  highlights,
+  signupHref,
+  loginHref,
+  whatsappHref,
+  showFreeVideos,
+  align = "center",
+}) {
+  const isCenter = align === "center";
+
+  return (
+    <HeroStagger>
+      {specialty ? (
+        <HeroStaggerItem
+          className={`mb-4 flex ${isCenter ? "justify-center" : "justify-start"}`}
+        >
+          <SpecialtyBadge specialty={specialty} />
+        </HeroStaggerItem>
+      ) : null}
+
+      <HeroStaggerItem className={isCenter ? "text-center" : "text-right"}>
+        <h1 className="font-heading text-[2rem] font-bold leading-tight tracking-tight text-white sm:text-[2.35rem] lg:text-[2.85rem]">
+          {teacherName}
+        </h1>
+        <motion.span
+          className={`mt-3 block h-[3px] w-14 rounded-full ${isCenter ? "mx-auto" : "ms-0"}`}
+          style={{ background: CYAN, originX: isCenter ? 0.5 : 1 }}
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: 1 }}
+          transition={{ delay: 0.45, duration: 0.6, ease: EASE }}
+          aria-hidden
+        />
+      </HeroStaggerItem>
+
+      {tagline ? (
+        <HeroStaggerItem className={`mt-4 ${isCenter ? "text-center" : "text-right"}`}>
+          <p
+            className="max-w-xl text-[0.95rem] font-medium leading-7 md:text-base md:leading-8"
+            style={{ color: TAGLINE }}
+          >
+            {tagline}
+          </p>
+        </HeroStaggerItem>
+      ) : null}
+
+      {highlights.length > 0 ? (
+        <HeroStaggerItem className={`mt-6 ${isCenter ? "" : "max-w-xl"}`}>
+          <HighlightsCard highlights={highlights} />
+        </HeroStaggerItem>
+      ) : null}
+
+      <HeroStaggerItem className="mt-6 md:mt-8">
+        <HeroActions
+          signupHref={signupHref}
+          loginHref={loginHref}
+          whatsappHref={whatsappHref}
+          showFreeVideos={showFreeVideos}
+        />
+      </HeroStaggerItem>
+    </HeroStagger>
+  );
+}
+
+function TeacherImage({ src, alt, className = "", fade = "bottom", priority = true }) {
+  const [loaded, setLoaded] = useState(false);
+  const imgRef = useRef(null);
+  const blurSrc = src ? getBlurPlaceholderUrl(src) : null;
+  const srcSet = src ? getPortraitImageSrcSet(src) : undefined;
+
+  useEffect(() => {
+    setLoaded(false);
+    const img = imgRef.current;
+    if (img?.complete && img.naturalWidth > 0) setLoaded(true);
+  }, [src]);
+
+  return (
+    <div className={`relative overflow-hidden bg-[#12263F] ${className}`}>
+      {src ? (
+        <>
+          {blurSrc ? (
+            <img
+              src={blurSrc}
+              alt=""
+              aria-hidden
+              className="absolute inset-0 h-full w-full scale-110 object-cover object-top"
+              style={{ filter: "blur(16px)" }}
+              loading="eager"
+              decoding="async"
+            />
+          ) : !loaded ? (
+            <div className="absolute inset-0 animate-pulse bg-white/10" aria-hidden />
+          ) : null}
+          <img
+            ref={imgRef}
+            src={src}
+            srcSet={srcSet}
+            sizes="(min-width: 768px) min(520px, 45vw), 100vw"
+            alt={alt}
+            className={`absolute inset-0 h-full w-full object-cover object-top transition-opacity duration-200 ${
+              loaded ? "opacity-100" : "opacity-0"
+            }`}
+            loading={priority ? "eager" : "lazy"}
+            fetchpriority={priority ? "high" : "auto"}
+            decoding="async"
+            draggable={false}
+            onLoad={() => setLoaded(true)}
+          />
+        </>
+      ) : (
+        <div
+          className="absolute inset-0 flex items-center justify-center"
+          style={{ background: `linear-gradient(160deg, #1e3a5f 0%, ${NAVY} 100%)` }}
+        >
+          <FaGraduationCap className="text-7xl text-white/25 lg:text-8xl" aria-hidden />
+        </div>
+      )}
+
+      {fade === "bottom" ? (
+        <>
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-[50%]"
+            style={{
+              background: `linear-gradient(to top, ${NAVY} 0%, ${NAVY}b8 30%, transparent 100%)`,
+            }}
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 z-[2] h-20"
+            style={{
+              background: `linear-gradient(to bottom, ${NAVY}88 0%, transparent 100%)`,
+            }}
+            aria-hidden
+          />
+        </>
+      ) : (
+        <>
+          <div
+            className="pointer-events-none absolute inset-y-0 right-0 z-[2] w-[28%]"
+            style={{
+              background: `linear-gradient(to left, ${NAVY} 0%, transparent 100%)`,
+            }}
+            aria-hidden
+          />
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-[18%]"
+            style={{
+              background: `linear-gradient(to top, ${NAVY} 0%, transparent 100%)`,
+            }}
+            aria-hidden
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * هيرو سينمائي موحّد — موبايل (عمودي) + لابتوب/ديسكتوب (أفقي)
+ * بنفس الألوان: كحلي / سماوي / أصفر + إحساس 3D
+ */
 export default function TenantProHero({
   specialty,
   teacherName,
-  heroTitle,
   bioText,
+  tagline,
+  highlights = [],
   signupHref,
   loginHref,
   whatsappHref,
   showFreeVideos = true,
-  heroStats = [],
   teacherImageUrl,
 }) {
+  const sectionRef = useRef(null);
   const reduceMotion = useReducedMotion();
+  const isDesktop = useIsDesktop(768);
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start start", "end start"],
+  });
+  const imgY = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : 90]);
+  const imgScale = useTransform(scrollYProgress, [0, 1], [1, reduceMotion ? 1 : 1.08]);
+  const copyY = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : -40]);
+  const copyOpacity = useTransform(scrollYProgress, [0, 0.7], [1, reduceMotion ? 1 : 0.35]);
+
+  const resolvedTagline =
+    (tagline && String(tagline).trim()) ||
+    (bioText && String(bioText).trim().slice(0, 100)) ||
+    "";
+
+  const copyProps = {
+    specialty,
+    teacherName,
+    tagline: resolvedTagline,
+    highlights,
+    signupHref,
+    loginHref,
+    whatsappHref,
+    showFreeVideos,
+  };
+
+  const portrait = (
+    <TeacherImage
+      src={teacherImageUrl}
+      alt={teacherName}
+      fade={isDesktop ? "side" : "bottom"}
+      priority
+      className={
+        isDesktop
+          ? "aspect-[3/4] w-full max-h-[min(72vh,680px)] rounded-3xl ring-1 ring-white/10 shadow-[0_32px_70px_-18px_rgba(0,0,0,0.65)]"
+          : "aspect-[4/5] max-h-[58vh] min-h-[280px] w-full"
+      }
+    />
+  );
 
   return (
     <section
       id="home"
-      className="relative overflow-hidden border-b border-slate-200/80 pt-[4.75rem] dark:border-slate-800"
+      ref={sectionRef}
+      className="relative overflow-hidden"
+      style={{ background: NAVY, perspective: 1400 }}
       dir="rtl"
     >
-      <div
-        className="pointer-events-none absolute inset-0 bg-[linear-gradient(165deg,#F1F7FF_0%,#F8FBFF_42%,#FFFFFF_78%)] dark:bg-[linear-gradient(165deg,#0B1220_0%,#0f172a_50%,#020617_100%)]"
-        aria-hidden
-      />
-      <motion.div
-        className="pointer-events-none absolute inset-0 opacity-[0.35] [background-image:radial-gradient(#3182CE22_1px,transparent_1px)] [background-size:22px_22px] dark:opacity-20"
-        aria-hidden
-        animate={reduceMotion ? undefined : { backgroundPosition: ["0px 0px", "22px 22px"] }}
-        transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-      />
+      {/* Floating depth orbs */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <HeroGlowOrb
+          className="absolute -left-20 top-24 h-64 w-64 rounded-full blur-3xl"
+          style={{ background: CYAN }}
+          delay={0}
+        />
+        <HeroGlowOrb
+          className="absolute -right-16 bottom-20 h-72 w-72 rounded-full blur-3xl"
+          style={{ background: "#1e5a8a" }}
+          delay={1.2}
+        />
+        <HeroGlowOrb
+          className="absolute left-1/3 top-1/2 h-40 w-40 -translate-y-1/2 rounded-full blur-2xl"
+          style={{ background: "#7EB8D9" }}
+          delay={0.6}
+        />
+      </div>
 
-      <HeroGlowOrb
-        className="pointer-events-none absolute -left-28 top-20 h-80 w-80 rounded-full bg-blue-400/15 blur-3xl dark:bg-blue-500/10"
-        delay={0}
-      />
-      <HeroGlowOrb
-        className="pointer-events-none absolute -right-24 bottom-0 h-72 w-72 rounded-full bg-orange-400/10 blur-3xl dark:bg-orange-500/8"
-        delay={1.2}
-      />
+      {!isDesktop ? (
+        <div className="relative">
+          <motion.div className="relative w-full overflow-hidden pt-16" style={{ y: imgY, scale: imgScale }}>
+            {portrait}
+          </motion.div>
+          <motion.div className="relative -mt-10 px-5 pb-8 pt-2" style={{ y: copyY, opacity: copyOpacity }}>
+            <HeroCopy {...copyProps} align="center" />
+          </motion.div>
+        </div>
+      ) : (
+        <div className="relative">
+          <div
+            className={`${tlContainer} grid items-center gap-8 pt-24 pb-14 lg:grid-cols-2 lg:gap-10 lg:pb-16 xl:gap-14`}
+          >
+            <motion.div
+              className="relative z-10 flex flex-col justify-center py-4 lg:py-8"
+              style={{ y: copyY, opacity: copyOpacity, transformStyle: "preserve-3d" }}
+            >
+              <HeroCopy {...copyProps} align="start" />
+            </motion.div>
 
-      <div className={`${tlContainer} relative py-12 md:py-16 lg:py-20`}>
-        <div
-          className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:gap-14 xl:gap-20"
-          dir="ltr"
-        >
-          <div className="order-2 text-right lg:order-none" dir="rtl">
-            <HeroStagger>
-              {specialty ? (
-                <HeroStaggerItem className="mb-4">
-                  <motion.span
-                    className={tlEyebrow}
-                    whileHover={reduceMotion ? undefined : { scale: 1.04 }}
-                  >
-                    {specialty}
-                  </motion.span>
-                </HeroStaggerItem>
-              ) : null}
-
-              <HeroStaggerItem as="h1">
-                <h1 className="font-heading text-[1.9rem] font-bold leading-[1.32] tracking-tight text-slate-900 dark:text-white sm:text-4xl lg:text-[2.75rem] lg:leading-[1.25]">
-                  {highlightTitle(heroTitle, teacherName)}
-                </h1>
-              </HeroStaggerItem>
-
-              <HeroStaggerItem
-                as="p"
-                className="mt-5 max-w-xl text-[0.98rem] leading-8 text-slate-600 dark:text-slate-300 sm:text-base"
-              >
-                {bioText}
-              </HeroStaggerItem>
-
-              <HeroStaggerItem className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
-                <ShimmerCTA>
-                  <motion.a
-                    href={signupHref}
-                    className={`${tlBtnPrimary} !px-8 !py-3.5`}
-                    whileHover={{ y: -2, scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    ابدأ التعلّم الآن
-                    <FaArrowLeft className="text-[10px]" />
-                  </motion.a>
-                </ShimmerCTA>
-                {whatsappHref ? (
-                  <motion.a
-                    href={whatsappHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-6 py-3.5 text-sm font-bold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70"
-                    whileHover={{ y: -2 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    <FaWhatsapp className="text-base text-[#25D366]" />
-                    تواصل واتساب
-                  </motion.a>
-                ) : null}
-                <motion.a
-                  href={loginHref}
-                  className={tlBtnOutlineDark}
-                  whileHover={{ y: -2 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  تسجيل الدخول
-                </motion.a>
-              </HeroStaggerItem>
-
-              {showFreeVideos ? (
-                <HeroStaggerItem className="mt-4 flex justify-end">
-                  <motion.a
-                    href="#videos"
-                    className="inline-flex cursor-pointer items-center gap-2.5 text-sm font-semibold text-slate-500 transition-colors hover:text-blue-500 dark:text-slate-400"
-                    whileHover={{ x: -4 }}
-                  >
-                    <span className="relative flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                      <PulseRing delay={0.2} colorClass="bg-blue-400/30" />
-                      <FaPlay className="mr-[-1px] text-[10px] text-blue-500" />
-                    </span>
-                    شاهد محاضرة مجانية
-                  </motion.a>
-                </HeroStaggerItem>
-              ) : null}
-
-              {heroStats.length > 0 ? (
-                <HeroStaggerItem className="mt-10">
+            <motion.div
+              className="relative mx-auto w-full max-w-[520px] lg:mx-0 lg:max-w-none"
+              style={{ y: imgY, scale: imgScale }}
+            >
+              {!reduceMotion && (
+                <>
                   <motion.div
-                    className="flex flex-wrap items-stretch justify-end gap-0 divide-x-0 rounded-2xl border border-slate-200/90 bg-white/70 p-1 shadow-sm backdrop-blur-sm dark:border-slate-700 dark:bg-slate-900/60 sm:divide-x sm:divide-x-reverse sm:divide-slate-200 dark:sm:divide-slate-700"
-                    initial={reduceMotion ? false : { opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.5, duration: 0.55, ease: EASE }}
-                  >
-                    {heroStats.map((item, i) => {
-                      const Icon = item.icon;
-                      return (
-                        <motion.div
-                          key={item.label}
-                          className="flex min-w-[6.5rem] flex-1 flex-col items-end gap-1 px-4 py-3 sm:px-5"
-                          whileHover={reduceMotion ? undefined : { y: -3 }}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Icon
-                              className={`text-xs ${i % 2 === 0 ? "text-blue-500" : "text-orange-500"}`}
-                            />
-                            <p className="font-heading text-xl font-bold text-slate-900 dark:text-white">
-                              <CountUp value={item.value} />
-                            </p>
-                          </div>
-                          <p className="text-[11px] text-slate-500 sm:text-xs">{item.label}</p>
-                        </motion.div>
-                      );
-                    })}
-                  </motion.div>
-                </HeroStaggerItem>
-              ) : null}
-            </HeroStagger>
-          </div>
-
-          <div className="order-1 flex justify-center lg:order-none lg:justify-end">
-            <HeroPortrait
-              src={teacherImageUrl}
-              alt={teacherName}
-              teacherName={teacherName}
-              specialty={specialty}
-            />
+                    className="pointer-events-none absolute -left-6 top-12 h-20 w-20 rounded-full blur-md"
+                    style={{ background: `${CYAN}55` }}
+                    animate={{ y: [0, -16, 0], x: [0, 10, 0] }}
+                    transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
+                    aria-hidden
+                  />
+                  <motion.div
+                    className="pointer-events-none absolute -right-4 bottom-20 h-16 w-16 rounded-full blur-sm"
+                    style={{ background: `${CYAN}50` }}
+                    animate={{ y: [0, 12, 0], x: [0, -8, 0] }}
+                    transition={{ duration: 4.8, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}
+                    aria-hidden
+                  />
+                </>
+              )}
+              <Tilt3D maxTilt={14} floatPx={12} floatDuration={5.2}>
+                {portrait}
+              </Tilt3D>
+            </motion.div>
           </div>
         </div>
-      </div>
+      )}
     </section>
   );
 }

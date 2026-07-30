@@ -5,14 +5,15 @@ import "./index.css";
 import { ChakraProvider, useColorMode, Box } from "@chakra-ui/react";
 import { BrowserRouter as Router, useLocation } from "react-router-dom";
 import "react-toastify/dist/ReactToastify.css";
-import WhatsButton from "./components/whatsButton/WhatsButton.jsx";
 import SidebarWithHeader from "./components/navbar/Navbar.jsx";
 import BottomNavItems from "./components/Footer/BottomNavItems.jsx";
 import UserType from "./Hooks/auth/userType.js";
 import { getTenantSubdomain } from "./utils/tenantHost.js";
 import { NotificationProvider } from "./context/NotificationProvider.jsx";
 import { forceArabicDocumentLocale } from "./utils/forceArabicLocale.js";
-import theme from "./theme/chakraTheme.js";
+import theme, { SHELL_DESKTOP_BP } from "./theme/chakraTheme.js";
+import SessionExpiredModal from "./components/auth/SessionExpiredModal.jsx";
+import AppErrorBoundary from "./components/AppErrorBoundary.jsx";
 
 // فرض العربية قبل أي رندر — مستقل عن لغة الجهاز
 forceArabicDocumentLocale();
@@ -66,11 +67,11 @@ const RootContent = () => {
       <ForceArabicLocale />
       <SyncTheme />
       {showSidebar && <SidebarWithHeader />}
-      <Box pb={showStudentBottomNav ? { base: "76px", lg: 0 } : 0} dir="rtl" lang="ar">
+      <Box pb={showStudentBottomNav ? { base: "76px", [SHELL_DESKTOP_BP]: 0 } : 0} dir="rtl" lang="ar">
         <App />
       </Box>
       {showStudentBottomNav ? <BottomNavItems /> : null}
-      {!tenantSubdomain && <WhatsButton />}
+      <SessionExpiredModal />
     </NotificationProvider>
   );
 };
@@ -79,7 +80,9 @@ const Root = () => (
   <React.StrictMode>
     <ChakraProvider theme={theme}>
       <Router>
-        <RootContent />
+        <AppErrorBoundary>
+          <RootContent />
+        </AppErrorBoundary>
       </Router>
     </ChakraProvider>
   </React.StrictMode>

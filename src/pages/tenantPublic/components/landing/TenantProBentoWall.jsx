@@ -1,42 +1,63 @@
 import { FaArrowLeft, FaCheck, FaGraduationCap } from "react-icons/fa";
-import { Reveal } from "../../tenantLandingMotion";
-import { tlContainer } from "../../tenantLandingTheme";
+import { motion } from "framer-motion";
+import { Reveal, Tilt3D } from "../../tenantLandingMotion";
+import { TL_CYAN, TL_LIME, TL_NAVY, tlBtnPrimary, tlContainer } from "../../tenantLandingTheme";
+import TenantAppLink from "../TenantAppLink";
 
 function AboutTeacherImage({ src, alt }) {
   return (
-    <div className="relative mx-auto w-full max-w-[400px]" dir="ltr">
-      <div
-        className="pointer-events-none absolute -bottom-5 -left-5 h-[88%] w-[78%] rounded-2xl bg-orange-200/70 dark:bg-orange-900/25"
+    <div className="relative mx-auto w-full max-w-[380px] md:max-w-[420px]" dir="ltr">
+      <motion.div
+        className="pointer-events-none absolute -bottom-4 -left-4 h-[90%] w-[80%] rounded-[1.75rem] opacity-80"
+        style={{ background: `${TL_CYAN}33` }}
+        animate={{ y: [0, 8, 0], rotate: [0, 2, 0] }}
+        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
         aria-hidden
       />
-      <div
-        className="pointer-events-none absolute -right-4 top-8 h-20 w-20 rounded-full border border-blue-200 bg-blue-50/80 dark:border-blue-800 dark:bg-blue-950/40"
+      <motion.div
+        className="pointer-events-none absolute -right-3 top-10 h-16 w-16 rounded-full border md:h-20 md:w-20"
+        style={{ borderColor: `${TL_LIME}55`, background: `${TL_LIME}14` }}
+        animate={{ scale: [1, 1.12, 1], y: [0, -10, 0] }}
+        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
         aria-hidden
       />
 
-      <div className="relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_20px_50px_rgba(49,130,206,0.12)] dark:border-slate-700 dark:bg-slate-900">
-        <div className="absolute inset-x-0 top-0 z-10 h-1 bg-gradient-to-l from-blue-500 via-blue-400 to-orange-400" aria-hidden />
+      <Tilt3D maxTilt={12} floatPx={8} floatDuration={5.5}>
+        <div className="relative overflow-hidden rounded-[1.75rem] border border-white/15 bg-white/5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.55)]">
+          <div
+            className="absolute inset-x-0 top-0 z-10 h-1"
+            style={{ background: `linear-gradient(to left, ${TL_CYAN}, ${TL_LIME})` }}
+            aria-hidden
+          />
 
-        <div className="aspect-[4/5] overflow-hidden bg-gradient-to-b from-blue-50 to-slate-100 dark:from-slate-800 dark:to-slate-900">
-          {src ? (
-            <img
-              src={src}
-              alt={alt}
-              className="h-full w-full object-cover object-top"
-              loading="lazy"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <FaGraduationCap className="text-6xl text-blue-200 dark:text-slate-600" aria-hidden />
-            </div>
-          )}
+          <div
+            className="aspect-[4/5] overflow-hidden"
+            style={{ background: `linear-gradient(160deg, #1e3a5f 0%, ${TL_NAVY} 100%)` }}
+          >
+            {src ? (
+              <motion.img
+                src={src}
+                alt={alt}
+                className="h-full w-full object-cover object-top"
+                loading="eager"
+                decoding="async"
+                fetchpriority="low"
+                whileHover={{ scale: 1.05 }}
+                transition={{ duration: 0.6 }}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center">
+                <FaGraduationCap className="text-6xl text-white/25" aria-hidden />
+              </div>
+            )}
+          </div>
+
+          <div
+            className="pointer-events-none absolute inset-0 rounded-[1.75rem] ring-1 ring-inset ring-white/10"
+            aria-hidden
+          />
         </div>
-
-        <div
-          className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/20"
-          aria-hidden
-        />
-      </div>
+      </Tilt3D>
     </div>
   );
 }
@@ -53,48 +74,68 @@ export default function TenantProBentoWall({
   return (
     <section
       id="services"
-      className="scroll-mt-20 bg-white py-16 dark:bg-slate-950 md:py-20"
+      className="scroll-mt-20 py-12 md:py-20"
+      style={{ background: TL_NAVY, perspective: 1200 }}
       dir="rtl"
     >
       <div className={`${tlContainer} max-w-6xl`}>
-        <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16" dir="ltr">
-          <div className="order-1 flex justify-center lg:order-none">
-            <Reveal variant="blurUp">
+        <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16" dir="ltr">
+          <div className="order-1 flex justify-center px-2 sm:px-0 lg:order-none">
+            <Reveal variant="depthIn">
               <AboutTeacherImage src={teacherImageUrl} alt={teacherName} />
             </Reveal>
           </div>
 
           <div className="order-2 text-right lg:order-none" dir="rtl">
-            <Reveal variant="blurUp">
-              <p className="text-sm font-semibold text-blue-500">تعرّف علينا</p>
-              <h2 className="font-heading mt-2 text-2xl font-bold text-slate-900 dark:text-white md:text-3xl">
+            <Reveal variant="slideFromEnd">
+              <p className="text-sm font-semibold" style={{ color: TL_CYAN }}>
+                تعرّف علينا
+              </p>
+              <h2 className="font-heading mt-2 text-2xl font-bold text-white md:text-3xl">
                 لماذا {teacherName}؟
               </h2>
-              <p className="mt-5 text-sm leading-8 text-slate-600 dark:text-slate-300 sm:text-base">
+              <p className="mt-5 text-sm leading-8 text-[#7EB8D9] sm:text-base sm:leading-8">
                 {bioText}
               </p>
 
               {benefitItems.length > 0 && (
-                <ul className="mt-6 space-y-3">
-                  {benefitItems.map((title) => (
-                    <li
+                <ul className="mt-6 space-y-3" style={{ perspective: 900 }}>
+                  {benefitItems.map((title, i) => (
+                    <motion.li
                       key={title}
-                      className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-200"
+                      className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-white/90"
+                      initial={{ opacity: 0, x: 28, rotateY: -12 }}
+                      whileInView={{ opacity: 1, x: 0, rotateY: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ delay: 0.08 * i, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                      whileHover={{
+                        y: -4,
+                        scale: 1.02,
+                        rotateX: 4,
+                        borderColor: "rgba(0,160,227,0.4)",
+                        backgroundColor: "rgba(255,255,255,0.09)",
+                      }}
+                      style={{ transformStyle: "preserve-3d" }}
                     >
-                      <FaCheck className="mt-0.5 shrink-0 text-blue-500" aria-hidden />
-                      <span>{title}</span>
-                    </li>
+                      <span
+                        className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
+                        style={{ background: `${TL_LIME}22`, color: TL_LIME }}
+                      >
+                        <FaCheck className="text-[10px]" aria-hidden />
+                      </span>
+                      <span className="leading-6">{title}</span>
+                    </motion.li>
                   ))}
                 </ul>
               )}
 
-              <a
+              <TenantAppLink
                 href={signupHref}
-                className="mt-8 inline-flex cursor-pointer items-center gap-2 rounded-full bg-blue-500 px-7 py-3 text-sm font-bold text-white shadow-sm transition-colors duration-200 hover:bg-blue-600"
+                className={`mt-8 w-full sm:w-auto ${tlBtnPrimary}`}
               >
                 ابدأ الآن
                 <FaArrowLeft className="text-xs" />
-              </a>
+              </TenantAppLink>
             </Reveal>
           </div>
         </div>

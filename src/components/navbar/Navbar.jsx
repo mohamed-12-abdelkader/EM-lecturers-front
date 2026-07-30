@@ -34,12 +34,14 @@ import {
   readCachedTenantBrandLogo,
   resolveTenantBrandLogo,
 } from "../../utils/tenantBrandLogo";
+import { SHELL_DESKTOP_BP } from "../../theme/chakraTheme";
 
 export default function Nav() {
   const user = JSON.parse(localStorage.getItem("user"));
   const { colorMode, toggleColorMode } = useColorMode();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const isMobile = useBreakpointValue({ base: true, lg: false });
+  // Tablets (e.g. 10.4") stay mobile: hamburger drawer until 2xl
+  const isMobile = useBreakpointValue({ base: true, [SHELL_DESKTOP_BP]: false });
   const tenantSubdomain = getTenantSubdomain();
 
   const [teacherLogo, setTeacherLogo] = useState(() =>

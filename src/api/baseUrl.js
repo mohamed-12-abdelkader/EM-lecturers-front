@@ -1,10 +1,39 @@
 import axios from "axios";
 import {
-  clearAuthSession,
+  clearExpiredAuthQuietly,
+  markSessionExpired,
   normalizeAuthToken,
+  isAuthTokenExpired,
 } from "../utils/authStorage";
-import { getTenantSubdomain } from "../utils/tenantHost";
+import { getTenantSubdomain, resolveTenantSubdomain } from "../utils/tenantHost";
 import { getApiBaseURL } from "./apiConfig";
+import { safeLocalGet, safeLocalSet } from "../utils/safeStorage";
+
+function isPublicAuthRequest(config) {
+  const url = String(config?.url || "").toLowerCase();
+  return (
+    url.includes("/login") ||
+    url.includes("/signup") ||
+    url.includes("/register") ||
+    url.includes("/auth/forgot") ||
+    url.includes("/auth/reset")
+  );
+}
+
+function isSessionExpiredMessage(apiMessage) {
+  if (apiMessage == null || apiMessage === "") return false;
+  const msg = String(apiMessage);
+  return (
+    msg === "Session expired or replaced" ||
+    msg.toLowerCase().includes("expired") ||
+    msg.toLowerCase().includes("unauthenticated") ||
+    msg.toLowerCase().includes("unauthorized") ||
+    msg.includes("انتهت") ||
+    msg.includes("غير صالح") ||
+    msg.includes("غير مصرح") ||
+    msg.includes("يجب تسجيل الدخول")
+  );
+}
 
 const baseUrl = axios.create({
   baseURL: getApiBaseURL(),
@@ -13,11 +42,7 @@ const baseUrl = axios.create({
 function persistToken(token) {
   const normalized = normalizeAuthToken(token);
   if (!normalized) return;
-  try {
-    localStorage.setItem("token", normalized);
-  } catch {
-    // ignore storage errors
-  }
+  safeLocalSet("token", normalized);
 }
 
 function setHeader(headers, key, value) {
@@ -42,22 +67,22 @@ function getHeader(headers, key) {
 // Always attach a fresh, normalized Bearer token + tenant context
 baseUrl.interceptors.request.use((config) => {
   const headers = config.headers || {};
-  let rawStored = "";
-  try {
-    rawStored = localStorage.getItem("token") || "";
-  } catch {
-    rawStored = "";
+  const rawStored = safeLocalGet("token", "") || "";
+  let token = normalizeAuthToken(rawStored);
+
+  // لا ترسل توكن منتهي — يمنع 401 المتسلسل وتعطل اللاندنج
+  if (token && isAuthTokenExpired(token)) {
+    clearExpiredAuthQuietly();
+    token = "";
   }
-  const token = normalizeAuthToken(rawStored);
-  // أصلح التوكن المخزّن لو كان فيه Bearer مكرر أو اقتباسات
+
   if (token && token !== rawStored) persistToken(token);
 
   if (token) {
-    // Always overwrite — callers often send lowercase/double Bearer or stale values
     setHeader(headers, "Authorization", `Bearer ${token}`);
   }
 
-  const tenant = getTenantSubdomain();
+  const tenant = resolveTenantSubdomain() || getTenantSubdomain();
   if (tenant && !getHeader(headers, "X-Tenant-Subdomain")) {
     setHeader(headers, "X-Tenant-Subdomain", tenant);
   }
@@ -82,28 +107,25 @@ baseUrl.interceptors.response.use(
     if (refreshed) persistToken(refreshed);
 
     if (error.response && error.response.status === 401) {
-      const apiMessage = error?.response?.data?.message;
+      const apiMessage =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        error?.response?.data?.errors?.[0];
+      const onAuthPage =
+        typeof window !== "undefined" &&
+        (window.location.pathname === "/login" ||
+          window.location.pathname === "/signup" ||
+          window.location.pathname === "/teacher-login");
 
-      if (
-        apiMessage === "Session expired or replaced" ||
-        apiMessage?.includes("expired") ||
-        apiMessage?.includes("انتهت") ||
-        apiMessage?.includes("غير صالح")
-      ) {
-        try {
-          clearAuthSession();
-          localStorage.removeItem("examAnswers");
-          localStorage.removeItem("examTimeLeft");
-        } catch (e) {
-          console.error("Error clearing localStorage:", e);
-        }
+      const hadToken = Boolean(readAuthToken());
+      const shouldExpireSession =
+        !isPublicAuthRequest(error.config) &&
+        !onAuthPage &&
+        (isSessionExpiredMessage(apiMessage) || hadToken);
 
-        if (
-          window.location.pathname !== "/login" &&
-          window.location.pathname !== "/signup"
-        ) {
-          error.sessionExpired = true;
-        }
+      if (shouldExpireSession) {
+        markSessionExpired();
+        error.sessionExpired = true;
       }
     }
 

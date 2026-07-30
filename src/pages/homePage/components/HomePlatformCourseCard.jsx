@@ -8,9 +8,10 @@ import {
   useColorModeValue,
 } from "@chakra-ui/react";
 import { FaChevronLeft, FaUserGraduate, FaLock, FaCheckCircle } from "react-icons/fa";
+import { HP_BLUE, HP_BLUE_DARK, HP_ORANGE, HP_ORANGE_DARK } from "../homeTheme";
 
 /**
- * كارت كورس المنصة — عرض أعرض وتصميم أوضح للطالب
+ * كارت كورس المنصة — براند أزرق / برتقالي موحّد
  */
 export default function HomePlatformCourseCard({
   course,
@@ -21,9 +22,8 @@ export default function HomePlatformCourseCard({
   onSubscribe,
 }) {
   const cardBg = useColorModeValue("white", "gray.800");
-  const border = useColorModeValue("slate.200", "whiteAlpha.150");
+  const border = useColorModeValue("gray.200", "whiteAlpha.150");
   const muted = useColorModeValue("gray.500", "gray.400");
-  const titleColor = useColorModeValue("gray.900", "white");
   const imageBg = useColorModeValue("gray.100", "gray.700");
   const footerBg = useColorModeValue("gray.50", "whiteAlpha.50");
 
@@ -32,7 +32,7 @@ export default function HomePlatformCourseCard({
     "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200&q=80";
 
   const statusLabel = isEnrolled ? "مشترك" : isFree ? "مجاني" : "مدفوع";
-  const statusScheme = isEnrolled ? "green" : isFree ? "teal" : "orange";
+  const statusBg = isEnrolled ? "#38A169" : isFree ? HP_BLUE : HP_ORANGE;
 
   return (
     <Box
@@ -45,16 +45,15 @@ export default function HomePlatformCourseCard({
       h="full"
       display="flex"
       flexDirection="column"
-      transition="transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease"
-      boxShadow="0 10px 30px -18px rgba(15, 23, 42, 0.35)"
+      transition="transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease"
+      boxShadow="0 8px 28px -14px rgba(26, 32, 44, 0.2)"
       _hover={{
-        transform: "translateY(-5px)",
-        boxShadow: "0 22px 44px -20px rgba(49, 130, 206, 0.45)",
-        borderColor: "blue.300",
+        transform: "translateY(-4px)",
+        boxShadow: "0 18px 40px -16px rgba(49, 130, 206, 0.35)",
+        borderColor: "blue.200",
       }}
     >
-      {/* Cover — أطول على الموبايل لاستغلال العرض */}
-      <Box position="relative" h={{ base: "200px", md: "168px" }} bg={imageBg} flexShrink={0}>
+      <Box position="relative" h={{ base: "190px", md: "160px" }} bg={imageBg} flexShrink={0}>
         <Box
           as="img"
           src={cover}
@@ -66,12 +65,12 @@ export default function HomePlatformCourseCard({
         <Box
           position="absolute"
           inset={0}
-          bgGradient="linear(to-t, blackAlpha.800 0%, blackAlpha.200 45%, transparent 70%)"
+          bgGradient="linear(to-t, blackAlpha.800 0%, blackAlpha.200 50%, transparent 75%)"
         />
 
         <HStack position="absolute" top={3} insetInline={3} justify="space-between">
           <Badge
-            bg="whiteAlpha.950"
+            bg="white"
             color="blue.700"
             borderRadius="full"
             px={3}
@@ -83,8 +82,8 @@ export default function HomePlatformCourseCard({
             {course?.grade?.name || "عام"}
           </Badge>
           <Badge
-            colorScheme={statusScheme}
-            variant="solid"
+            bg={statusBg}
+            color="white"
             borderRadius="full"
             px={3}
             py={1}
@@ -103,20 +102,18 @@ export default function HomePlatformCourseCard({
         <Box position="absolute" bottom={3} insetInline={3}>
           <Text
             color="white"
-            fontSize={{ base: "lg", md: "xl" }}
-            fontWeight="900"
+            fontSize={{ base: "md", md: "lg" }}
+            fontWeight="800"
             noOfLines={2}
-            lineHeight="1.35"
-            letterSpacing="-0.02em"
-            textShadow="0 2px 12px rgba(0,0,0,0.5)"
+            lineHeight="1.4"
+            letterSpacing="-0.01em"
           >
             {course.title}
           </Text>
         </Box>
       </Box>
 
-      {/* Body */}
-      <Box p={{ base: 4, md: 5 }} flex="1" display="flex" flexDirection="column" gap={3}>
+      <Box p={{ base: 4, md: 4 }} flex="1" display="flex" flexDirection="column" gap={3}>
         <HStack justify="space-between" align="center" spacing={3}>
           <HStack spacing={2} minW={0} color={muted}>
             <Icon as={FaUserGraduate} boxSize={3.5} color="blue.500" flexShrink={0} />
@@ -126,7 +123,7 @@ export default function HomePlatformCourseCard({
           </HStack>
           <Text
             fontSize="md"
-            fontWeight="900"
+            fontWeight="800"
             color={isFree || isEnrolled ? "green.500" : "orange.500"}
             whiteSpace="nowrap"
           >
@@ -135,11 +132,11 @@ export default function HomePlatformCourseCard({
         </HStack>
 
         {course.description ? (
-          <Text fontSize="sm" color={muted} noOfLines={2} lineHeight="1.75">
+          <Text fontSize="sm" color={muted} noOfLines={2} lineHeight="1.7">
             {course.description}
           </Text>
         ) : (
-          <Box flex="1" minH="8px" />
+          <Box flex="1" minH="4px" />
         )}
 
         <Box
@@ -148,18 +145,18 @@ export default function HomePlatformCourseCard({
           borderTopWidth="1px"
           borderColor={border}
           bg={footerBg}
-          mx={{ base: -4, md: -5 }}
-          mb={{ base: -4, md: -5 }}
-          px={{ base: 4, md: 5 }}
-          pb={{ base: 4, md: 5 }}
+          mx={{ base: -4, md: -4 }}
+          mb={{ base: -4, md: -4 }}
+          px={{ base: 4, md: 4 }}
+          pb={{ base: 4, md: 4 }}
         >
           {isEnrolled || isFree ? (
             <Button
               w="full"
-              h="44px"
-              bg="blue.500"
+              h="42px"
+              bg={HP_BLUE}
               color="white"
-              _hover={{ bg: "blue.600" }}
+              _hover={{ bg: HP_BLUE_DARK }}
               borderRadius="xl"
               fontSize="sm"
               fontWeight="800"
@@ -171,10 +168,10 @@ export default function HomePlatformCourseCard({
           ) : (
             <Button
               w="full"
-              h="44px"
-              bg="orange.500"
+              h="42px"
+              bg={HP_ORANGE}
               color="white"
-              _hover={{ bg: "orange.600" }}
+              _hover={{ bg: HP_ORANGE_DARK }}
               borderRadius="xl"
               fontSize="sm"
               fontWeight="800"

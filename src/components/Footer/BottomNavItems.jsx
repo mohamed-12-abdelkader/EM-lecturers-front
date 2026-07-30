@@ -2,6 +2,7 @@ import React from "react";
 import { Box, HStack, VStack, Icon, Text, useColorModeValue } from "@chakra-ui/react";
 import { Link, useLocation } from "react-router-dom";
 import { FaHome, FaBookOpen, FaRobot, FaClipboardList } from "react-icons/fa";
+import { SHELL_DESKTOP_BP } from "../../theme/chakraTheme";
 
 const STUDENT_NAV_ITEMS = [
   { label: "الرئيسية", href: "/home", icon: FaHome },
@@ -31,7 +32,7 @@ const BottomNavItems = () => {
     <Box
       as="nav"
       aria-label="التنقل السفلي"
-      display={{ base: "block", lg: "none" }}
+      display={{ base: "block", [SHELL_DESKTOP_BP]: "none" }}
       position="fixed"
       bottom={0}
       left={0}

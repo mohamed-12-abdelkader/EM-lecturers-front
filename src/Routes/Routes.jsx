@@ -111,6 +111,12 @@ import ChatPage from "../pages/chat/ChatPage";
 import TeacherChat from "../pages/chat/TeacherChatPage";
 import ChatbotPage from "../pages/chatbot/ChatbotPage";
 import TeamChat from "../pages/teamChatPage/TeamChat";
+import SupportChatAdmin from "../pages/support/SupportChatAdmin";
+import SupportChatStudent from "../pages/support/SupportChatStudent";
+import SupportChatTeacher from "../pages/support/SupportChatTeacher";
+import SupportGuestPage from "../pages/support/SupportGuestPage";
+import SupportEntry from "../pages/support/SupportEntry";
+
 // Other Components
 import Code from "../pages/code/Code";
 import TeacherCode from "../pages/code/TeacherCode";
@@ -176,6 +182,8 @@ const AppRouter = () => {
           ) : null}
         </Route>
         <Route path="/landing" element={<LandingPage />} />
+        <Route path="/support-guest" element={<SupportGuestPage />} />
+        <Route path="/support" element={<SupportEntry />} />
         {!tenantSubdomain ? <Route path="/search" element={<GlobalSearchPage />} /> : null}
         {renderTenantPublicRoutes(tenantSubdomain)}
 
@@ -242,6 +250,14 @@ const AppRouter = () => {
           element={
             <ProtectedRoute auth={isAdmin}>
               <PackagesManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/support-chat"
+          element={
+            <ProtectedRoute auth={isAdmin}>
+              <SupportChatAdmin />
             </ProtectedRoute>
           }
         />
@@ -558,6 +574,7 @@ const AppRouter = () => {
           </Route>
           <Route path="teacher-students/:studentId" element={<StudentReport />} />
           <Route path="platform-students" element={<PlatformStudents />} />
+          <Route path="support-teacher" element={<SupportChatTeacher />} />
           <Route path="teacher-my-files" element={<TeacherMyFilesPage />} />
           <Route path="teacher-assignments" element={<TeacherAssignmentsPage />} />
           <Route path="teacher-exams" element={<TeacherCourseExamsPage />} />

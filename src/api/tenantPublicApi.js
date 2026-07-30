@@ -5,7 +5,8 @@ async function fetchPublicJson(path, { cacheKey } = {}) {
   const url = base ? `${base}${path}` : path;
   const res = await fetch(url, {
     method: "GET",
-    cache: "no-store",
+    // السماح لكاش المتصفح على البيانات العامة يسرّع إعادة الزيارة
+    cache: "default",
     headers: { Accept: "application/json" },
   });
 
@@ -44,6 +45,16 @@ async function fetchPublicJson(path, { cacheKey } = {}) {
 /**
  * GET /api/tenants/public/:subdomain — بيانات الصفحة العامة للمدرس (بدون توكن).
  */
+export function readCachedTenantPublic(subdomain) {
+  if (!subdomain || typeof sessionStorage === "undefined") return undefined;
+  try {
+    const raw = sessionStorage.getItem(`tenant-public:${subdomain}`);
+    return raw ? JSON.parse(raw) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function fetchTenantPublic(subdomain) {
   return fetchPublicJson(`/api/tenants/public/${encodeURIComponent(subdomain)}`, {
     cacheKey: `tenant-public:${subdomain}`,

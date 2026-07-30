@@ -10,12 +10,15 @@ import {
   motion,
 } from "../../tenantLandingMotion";
 import {
+  TL_CYAN,
+  TL_LIME,
+  TL_NAVY_SOFT,
+  tlBtnPrimary,
   tlContainer,
   tlEyebrow,
   tlHeading,
-  tlSectionMuted,
 } from "../../tenantLandingTheme";
-
+import TenantAppLink from "../TenantAppLink";
 const STEPS = [
   {
     icon: FaBookOpen,
@@ -37,43 +40,43 @@ const STEPS = [
 function StepCard({ step, index }) {
   const reduceMotion = useReducedMotion();
   const Icon = step.icon;
-  const isOrange = index % 2 === 1;
+  const isLime = index % 2 === 1;
+  const accent = isLime ? TL_LIME : TL_CYAN;
 
   return (
     <StaggerItem variant="blur" className="relative text-center">
       <motion.div
-        className="group relative mx-auto"
-        whileHover={reduceMotion ? undefined : { y: -8 }}
-        transition={{ type: "spring", stiffness: 320, damping: 22 }}
+        className="group relative mx-auto rounded-3xl border border-white/10 bg-white/[0.05] px-4 py-6 md:border-0 md:bg-transparent md:px-0 md:py-0"
+        style={{ transformStyle: "preserve-3d", perspective: 900 }}
+        whileHover={reduceMotion ? undefined : { y: -12, rotateX: 10, scale: 1.04, z: 40 }}
+        transition={{ type: "spring", stiffness: 280, damping: 20 }}
       >
-        <div className="relative z-[1] mx-auto mb-5 flex h-[4.25rem] w-[4.25rem] items-center justify-center">
-          <PulseRing
-            delay={index * 0.35}
-            colorClass={isOrange ? "bg-orange-400/35" : "bg-blue-400/35"}
-          />
+        <div className="relative z-[1] mx-auto mb-4 flex h-[4.25rem] w-[4.25rem] items-center justify-center md:mb-5">
+          <PulseRing delay={index * 0.35} colorClass={isLime ? "bg-[#D4E157]/35" : "bg-[#00A0E3]/35"} />
           <motion.span
-            className={`absolute inset-0 rounded-full ${
-              isOrange ? "bg-orange-100 dark:bg-orange-950/50" : "bg-blue-100 dark:bg-blue-950/50"
-            }`}
+            className="absolute inset-0 rounded-full"
+            style={{ background: `${accent}22` }}
             aria-hidden
             animate={
-              reduceMotion
-                ? undefined
-                : { scale: [1, 1.06, 1], opacity: [0.85, 1, 0.85] }
+              reduceMotion ? undefined : { scale: [1, 1.06, 1], opacity: [0.85, 1, 0.85] }
             }
             transition={{ duration: 3.2, repeat: Infinity, delay: index * 0.4, ease: "easeInOut" }}
           />
           <motion.span
-            className={`relative flex h-14 w-14 items-center justify-center rounded-full text-white shadow-md ${
-              isOrange ? "bg-orange-500 shadow-orange-500/25" : "bg-blue-500 shadow-blue-500/25"
-            }`}
+            className="relative flex h-14 w-14 items-center justify-center rounded-full text-white shadow-md"
+            style={{
+              background: accent,
+              color: isLime ? "#0A1628" : "#fff",
+              boxShadow: `0 10px 24px -8px ${accent}88`,
+            }}
             whileHover={reduceMotion ? undefined : { rotate: [0, -8, 8, 0], scale: 1.08 }}
             transition={{ duration: 0.55 }}
           >
             <Icon className="text-lg" aria-hidden />
           </motion.span>
           <motion.span
-            className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-slate-900 text-[10px] font-bold text-white dark:border-slate-950"
+            className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#0A1628] text-[10px] font-bold text-white"
+            style={{ background: TL_NAVY_SOFT }}
             initial={reduceMotion ? false : { scale: 0, rotate: -20 }}
             whileInView={reduceMotion ? undefined : { scale: 1, rotate: 0 }}
             viewport={{ once: true }}
@@ -83,10 +86,10 @@ function StepCard({ step, index }) {
           </motion.span>
         </div>
 
-        <h3 className="font-heading text-lg font-bold text-slate-900 transition-colors group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400">
+        <h3 className="font-heading text-lg font-bold text-white transition-colors group-hover:text-[#00A0E3]">
           {step.title}
         </h3>
-        <p className="mx-auto mt-2 max-w-[16rem] text-sm leading-7 text-slate-600 dark:text-slate-400">
+        <p className="mx-auto mt-2 max-w-[16rem] text-sm leading-7 text-[#7EB8D9]">
           {step.description}
         </p>
       </motion.div>
@@ -95,51 +98,48 @@ function StepCard({ step, index }) {
 }
 
 export default function TenantProHowItWorks({ teacherName, specialty, signupHref }) {
-  const reduceMotion = useReducedMotion();
   const subtitle = specialty
     ? `ثلاث خطوات واضحة توصلك لنتيجة أفضل في ${specialty} مع ${teacherName}.`
     : `ثلاث خطوات واضحة توصلك لنتيجة أفضل مع ${teacherName}.`;
 
   return (
-    <section id="how-it-works" className={`scroll-mt-20 py-16 md:py-20 ${tlSectionMuted}`} dir="rtl">
+    <section
+      id="how-it-works"
+      className="scroll-mt-20 py-12 md:py-20"
+      style={{ background: TL_NAVY_SOFT, perspective: 1200 }}
+      dir="rtl"
+    >
       <div className={tlContainer}>
-        <Reveal variant="blurUp" className="mx-auto max-w-2xl text-center">
+        <Reveal variant="depthIn" className="mx-auto max-w-2xl text-center">
           <span className={tlEyebrow}>كيف تبدأ؟</span>
           <h2 className={`${tlHeading} mt-3`}>رحلة التعلّم خطوة بخطوة</h2>
-          <p className="mt-3 text-sm leading-7 text-slate-600 dark:text-slate-400 sm:text-base">
-            {subtitle}
-          </p>
+          <p className="mt-3 text-sm leading-7 text-[#7EB8D9] sm:text-base">{subtitle}</p>
         </Reveal>
 
-        <div className="relative mt-12">
+        <div className="relative mt-10 md:mt-12">
           <DrawLine
             delay={0.15}
-            className="pointer-events-none absolute left-[12%] right-[12%] top-[2.15rem] hidden h-[2px] bg-gradient-to-l from-blue-300 via-orange-300 to-blue-300 dark:from-blue-800 dark:via-orange-800/60 dark:to-blue-800 md:block"
+            className="pointer-events-none absolute left-[12%] right-[12%] top-[2.15rem] hidden h-[2px] bg-gradient-to-l from-[#00A0E3]/70 via-[#D4E157]/70 to-[#00A0E3]/70 md:block"
           />
 
-          <StaggerGrid className="relative grid gap-8 md:grid-cols-3 md:gap-6">
+          <StaggerGrid className="relative grid gap-4 md:grid-cols-3 md:gap-6">
             {STEPS.map((step, index) => (
               <StepCard key={step.title} step={step} index={index} />
             ))}
           </StaggerGrid>
         </div>
 
-        <Reveal variant="springPop" delay={0.2} className="mt-12 flex justify-center">
+        <Reveal variant="springPop" delay={0.2} className="mt-10 flex justify-center md:mt-12">
           <ShimmerCTA>
-            <motion.a
+            <TenantAppLink
               href={signupHref}
-              className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-blue-500 px-7 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-500/25 transition-colors hover:bg-blue-600"
-              whileHover={reduceMotion ? undefined : { y: -3, scale: 1.03 }}
-              whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+              className={`w-full max-w-sm sm:w-auto ${tlBtnPrimary}`}
             >
-              <motion.span
-                animate={reduceMotion ? undefined : { y: [0, -3, 0], rotate: [0, -12, 0] }}
-                transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-              >
+              <span className="inline-flex items-center gap-2">
                 <FaRocket className="text-xs opacity-95" aria-hidden />
-              </motion.span>
-              ابدأ رحلتك الآن
-            </motion.a>
+                ابدأ رحلتك الآن
+              </span>
+            </TenantAppLink>
           </ShimmerCTA>
         </Reveal>
       </div>

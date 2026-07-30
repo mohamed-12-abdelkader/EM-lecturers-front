@@ -1,4 +1,4 @@
-import { getTenantSubdomain } from "../../../utils/tenantHost";
+import { getTenantSubdomain, buildTenantAuthUrl } from "../../../utils/tenantHost";
 
 export function formatStudentCode(code) {
   return String(code || "").replace(/\D/g, "") || String(code || "");
@@ -14,6 +14,7 @@ export function isTeacherRegistrationMode(mode) {
 
 export function buildCodeOnlyLoginMessage(studentName, studentCode, subdomain) {
   const code = formatStudentCode(studentCode);
+  const loginUrl = subdomain ? buildTenantAuthUrl(subdomain, "/login") : "";
   const lines = [
     "السلام عليكم،",
     "",
@@ -23,9 +24,12 @@ export function buildCodeOnlyLoginMessage(studentName, studentCode, subdomain) {
   ];
 
   if (subdomain) {
-    lines.push(`منصة المدرس (subdomain): ${subdomain}`);
+    lines.push(`منصة المدرس: ${subdomain}`);
+    if (loginUrl) {
+      lines.push(`رابط تسجيل الدخول: ${loginUrl}`);
+    }
     lines.push("");
-    lines.push("طريقة الدخول: صفحة تسجيل الدخول ← رقم الطالب فقط (بدون كلمة مرور).");
+    lines.push("ادخل من الرابط أعلاه ثم استخدم رقم الطالب فقط (بدون كلمة مرور).");
   } else {
     lines.push("");
     lines.push(
@@ -37,7 +41,7 @@ export function buildCodeOnlyLoginMessage(studentName, studentCode, subdomain) {
   return lines.join("\n");
 }
 
-export function buildPasswordLoginMessage(studentName, credentials) {
+export function buildPasswordLoginMessage(studentName, credentials, subdomain) {
   const lines = [
     "السلام عليكم،",
     "",
@@ -46,6 +50,11 @@ export function buildPasswordLoginMessage(studentName, credentials) {
     `رقم الطالب: ${formatStudentCode(credentials.student_code)}`,
     `كلمة المرور: ${credentials.temporary_password}`,
   ];
+
+  const loginUrl = subdomain ? buildTenantAuthUrl(subdomain, "/login") : "";
+  if (loginUrl) {
+    lines.push(`رابط تسجيل الدخول: ${loginUrl}`);
+  }
 
   if (credentials.must_change_password) {
     lines.push("", "يُرجى تغيير كلمة المرور عند أول تسجيل دخول.");

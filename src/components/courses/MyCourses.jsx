@@ -43,6 +43,7 @@ import {
 import { Link } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import baseUrl from '../../api/baseUrl';
+import { readAuthToken } from '../../utils/authStorage';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const MotionCard = motion(Card);
@@ -73,9 +74,10 @@ const MyCourses = ({ embedded = false, onLoadingChange }) => {
     total: 0,
   });
 
-  const authHeader = useMemo(() => ({
-    Authorization: `Bearer ${localStorage.getItem('token') || ''}`,
-  }), []);
+  const authHeader = useMemo(() => {
+    const token = readAuthToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }, []);
 
   const toggleDescription = (courseId) => {
     setExpandedCards(prev => ({ ...prev, [courseId]: !prev[courseId] }));

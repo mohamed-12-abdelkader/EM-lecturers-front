@@ -5,6 +5,7 @@ import {
   fetchTenantPublic,
   fetchPlatformPublicFreeLectures,
   fetchPlatformPublicCourses,
+  readCachedTenantPublic,
 } from "../../api/tenantPublicApi";
 import FreeLecturePlayerModal from "./components/FreeLecturePlayerModal";
 import TenantProHero from "./components/landing/TenantProHero";
@@ -21,8 +22,9 @@ import {
 } from "./components/TenantPublicNavbar";
 import { motion, ScrollProgress } from "./tenantLandingMotion";
 import { useTenantPageMetadata } from "../../Hooks/tenantPublic/useTenantPageMetadata";
-import { getPortraitImageUrl } from "../../utils/highQualityImageUrl";
+import { getCardImageUrl, getPortraitImageUrl } from "../../utils/highQualityImageUrl";
 import TenantSeoHead from "./components/TenantSeoHead";
+import TenantLandingLoader from "./components/landing/TenantLandingLoader";
 
 const TENANT_FONT_LINK_ID = "tenant-public-arabic-fonts";
 const TENANT_FONT_BODY = "'Noto Sans Arabic', 'Segoe UI', Tahoma, sans-serif";
@@ -111,26 +113,38 @@ export default function TenantPublicLanding({ subdomain }) {
   const [activeFreeLecture, setActiveFreeLecture] = useState(null);
   useTenantArabicFonts();
 
+  const cachedTenant = useMemo(
+    () => (subdomain ? readCachedTenantPublic(subdomain) : undefined),
+    [subdomain],
+  );
+
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["tenant-public", subdomain],
     queryFn: () => fetchTenantPublic(subdomain),
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    initialData: cachedTenant,
+    // اعتبر الكاش قديماً قليلاً ليعمل refetch هادئ في الخلفية
+    initialDataUpdatedAt: cachedTenant ? Date.now() - 60_000 : undefined,
   });
 
-  const platformQueryEnabled = Boolean(subdomain) && !isLoading && !isError;
+  // الكورسات والمحاضرات بالتوازي مع بيانات المنصة (مش بعد ما تخلص)
+  const platformQueryEnabled = Boolean(subdomain);
 
   const { data: freeLecturesResponse, isLoading: freeLecturesLoading } = useQuery({
     queryKey: ["platform-free-lectures", subdomain],
     queryFn: () => fetchPlatformPublicFreeLectures(subdomain),
     enabled: platformQueryEnabled,
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 
   const { data: coursesResponse, isLoading: coursesLoading } = useQuery({
     queryKey: ["platform-courses", subdomain],
     queryFn: () => fetchPlatformPublicCourses(subdomain),
     enabled: platformQueryEnabled,
-    staleTime: 60_000,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
   });
 
   const payload = data?.data;
@@ -154,6 +168,39 @@ export default function TenantPublicLanding({ subdomain }) {
     const raw = hero.image_url || tenant?.avatar_url || null;
     return raw ? getPortraitImageUrl(raw) : null;
   }, [landing, tenant]);
+
+  // Preload LCP portrait as early as possible
+  useEffect(() => {
+    if (!teacherPortraitUrl || typeof document === "undefined") return undefined;
+    const id = "tenant-hero-image-preload";
+    let link = document.getElementById(id);
+    if (!link) {
+      link = document.createElement("link");
+      link.id = id;
+      link.rel = "preload";
+      link.as = "image";
+      document.head.appendChild(link);
+    }
+    link.href = teacherPortraitUrl;
+    link.setAttribute("fetchpriority", "high");
+    return undefined;
+  }, [teacherPortraitUrl]);
+
+  // Warm cache for first visible course / lecture thumbs
+  useEffect(() => {
+    const urls = [
+      ...freeLectures.slice(0, 3).map((l) => l.image_url),
+      ...courses.slice(0, 4).map((c) => c.image_url || c.cover_url || c.thumbnail || c.avatar),
+    ]
+      .filter(Boolean)
+      .map((u) => getCardImageUrl(u));
+
+    urls.forEach((href) => {
+      const img = new Image();
+      img.decoding = "async";
+      img.src = href;
+    });
+  }, [freeLectures, courses]);
 
   const teacher = payload?.teacher;
   const seoFallback = useMemo(
@@ -191,33 +238,45 @@ export default function TenantPublicLanding({ subdomain }) {
     };
   }, [activeFreeLecture]);
 
-  if (isLoading) {
-    return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="flex min-h-screen flex-col items-center justify-center gap-6 bg-[#0F172A]"
-        dir="rtl"
-      >
-        <div className="relative h-14 w-14">
-          <div className="absolute inset-0 rounded-full border-2 border-white/10" />
-          <div className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[#A16207] border-r-[#2563EB]" />
-        </div>
-        <p className="text-sm font-medium text-slate-400">جاري تحميل الصفحة…</p>
-      </motion.div>
-    );
+  // امنع حجب الصفحة بالكامل لو عندنا كاش جاهز (حتى لو في refetch بالخلفية)
+  const waitingForFirstPaint = isLoading && !data?.data?.tenant;
+
+  if (waitingForFirstPaint) {
+    // الشاشة الفاخرة مرة واحدة عند أول دخول للمنصة — مش مع كل تنقّل/رجوع
+    let showSplash = true;
+    try {
+      const key = subdomain ? `em-tenant-splash:${subdomain}` : "";
+      if (key && sessionStorage.getItem(key) === "1") {
+        showSplash = false;
+      } else if (key) {
+        sessionStorage.setItem(key, "1");
+      }
+    } catch {
+      /* ignore */
+    }
+    if (!showSplash) {
+      return (
+        <div
+          className="min-h-screen"
+          style={{ background: "#0A1628" }}
+          aria-busy="true"
+          aria-label="جاري التحميل"
+        />
+      );
+    }
+    return <TenantLandingLoader subdomain={subdomain} />;
   }
 
-  if (isError || !payload?.tenant) {
+  if ((isError && !payload?.tenant) || !payload?.tenant) {
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#F8FAFC] px-4 text-center dark:bg-slate-950"
+        className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#0A1628] px-4 text-center"
         dir="rtl"
       >
-        <p className="text-lg font-semibold text-slate-800 dark:text-slate-100">لم نتمكن من تحميل هذه الصفحة</p>
-        <p className="max-w-md text-slate-600 dark:text-slate-400">
+        <p className="text-lg font-semibold text-white">لم نتمكن من تحميل هذه الصفحة</p>
+        <p className="max-w-md text-[#7EB8D9]">
           {error?.message || "تأكد أن النطاق الفرعي صحيح وأن الخادم يعمل."}
         </p>
       </motion.div>
@@ -244,9 +303,57 @@ export default function TenantPublicLanding({ subdomain }) {
     teacher?.description ||
     "شرح منظم، متابعة مستمرة، وتدريب مكثف يساعدك تحقق أفضل النتائج.";
 
-  const placeholderPhoto =
-    "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=3840&q=100&auto=format";
-  const courseFallbackImage = hero.image_url || tenant.avatar_url || placeholderPhoto;
+  const heroTagline =
+    (hero.subtitle && String(hero.subtitle).trim()) ||
+    (about.tagline && String(about.tagline).trim()) ||
+    "";
+
+  const heroHighlights = (() => {
+    const fromArray = (v) =>
+      Array.isArray(v)
+        ? v
+            .map((item) =>
+              typeof item === "string"
+                ? item.trim()
+                : item?.title || item?.text || item?.label || "",
+            )
+            .filter(Boolean)
+        : [];
+
+    const direct =
+      [
+        fromArray(about.highlights),
+        fromArray(about.achievements),
+        fromArray(about.points),
+        fromArray(hero.highlights),
+      ].find((list) => list.length > 0) || [];
+
+    if (direct.length) return direct.slice(0, 4);
+
+    const qual = about.qualifications || about.experience;
+    if (typeof qual === "string" && qual.trim()) {
+      const lines = qual
+        .split(/\n|•|●|-|–/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 3);
+      if (lines.length) return lines.slice(0, 4);
+    }
+
+    if (services.length) {
+      return services
+        .slice(0, 3)
+        .map((s) => s.title || s.description)
+        .filter(Boolean);
+    }
+    return [];
+  })();
+
+  const placeholderPhoto = getCardImageUrl(
+    "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=480&q=70&auto=format",
+  );
+  const courseFallbackImage = getCardImageUrl(
+    hero.image_url || tenant.avatar_url || placeholderPhoto,
+  );
 
   const displayServices = services.length > 0 ? services.slice(0, 4) : DEFAULT_SERVICES;
   const displayTestimonials = testimonials.length > 0 ? testimonials.slice(0, 3) : DEFAULT_TESTIMONIALS;
@@ -284,9 +391,8 @@ export default function TenantPublicLanding({ subdomain }) {
     },
   ];
 
-  const siteOrigin = typeof window !== "undefined" ? window.location.origin : "";
-  const loginHref = `${siteOrigin}/login`;
-  const signupHref = `${siteOrigin}/signup`;
+  const loginHref = "/login";
+  const signupHref = "/signup";
   const joinHref = socialLinks.whatsapp || socialLinks.telegram || "#contact";
   const whatsappHref = socialLinks.whatsapp;
 
@@ -319,13 +425,15 @@ export default function TenantPublicLanding({ subdomain }) {
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
       dir="rtl"
       data-theme={isDarkMode ? "dark" : "light"}
-      className={`tenant-public-page ${isDarkMode ? "dark tenant-dark" : "tenant-light"} min-h-screen overflow-x-hidden bg-[#F8FAFC] text-[var(--t-text)] antialiased`}
+      className={`tenant-public-page ${isDarkMode ? "dark tenant-dark" : "tenant-light"} min-h-screen overflow-x-hidden bg-[#0A1628] text-white antialiased`}
       style={{
         ...cssVars,
         fontFamily: TENANT_FONT_BODY,
         fontSize: "var(--t-font-body)",
         lineHeight: "var(--t-line-body)",
         WebkitFontSmoothing: "antialiased",
+        background: "#0A1628",
+        color: "#F8FAFC",
       }}
     >
       <TenantSeoHead subdomain={subdomain} />
@@ -336,9 +444,14 @@ export default function TenantPublicLanding({ subdomain }) {
         .tenant-public-page .font-heading {
           font-family: ${TENANT_FONT_HEADING};
         }
-        .tenant-public-page.tenant-dark { background: #020617; color: #e2e8f0; }
+        .tenant-public-page,
+        .tenant-public-page.tenant-dark,
+        .tenant-public-page.tenant-light {
+          background: #0A1628 !important;
+          color: #F8FAFC;
+        }
         html { scroll-behavior: smooth; }
-        body:has(.tenant-public-page) { overflow-x: hidden; }
+        body:has(.tenant-public-page) { overflow-x: hidden; background: #0A1628; }
         @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
       `}</style>
 
@@ -365,6 +478,8 @@ export default function TenantPublicLanding({ subdomain }) {
           teacherName={teacherName}
           heroTitle={heroTitle}
           bioText={bioText}
+          tagline={heroTagline}
+          highlights={heroHighlights}
           signupHref={signupHref}
           loginHref={loginHref}
           whatsappHref={whatsappHref}
