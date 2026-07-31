@@ -215,6 +215,14 @@ export default function WhatsAppSessionsPage() {
             <HStack>
               <Button
                 as={RouterLink}
+                to="/admin/whatsapp/inbox"
+                size="sm"
+                variant="outline"
+              >
+                صندوق الوارد
+              </Button>
+              <Button
+                as={RouterLink}
                 to="/admin/whatsapp/services"
                 size="sm"
                 variant="outline"

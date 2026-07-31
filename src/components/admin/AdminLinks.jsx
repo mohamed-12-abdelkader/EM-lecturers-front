@@ -44,7 +44,7 @@ const AdminLinks = ({ currentLink, setCurrentLink }) => {
     {
       id: Math.random(),
       link: "واتساب",
-      path: "/admin/whatsapp/sessions",
+      path: "/admin/whatsapp/inbox",
       icon: <FaWhatsapp size={22} />,
     },
     {

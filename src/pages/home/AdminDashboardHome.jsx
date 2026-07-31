@@ -170,7 +170,7 @@ const AdminDashboardHome = () => {
               </Button>
               <Button
                 as={RouterLink}
-                to="/admin/whatsapp/sessions"
+                to="/admin/whatsapp/inbox"
                 size="sm"
                 variant="outline"
                 borderColor="green.500"

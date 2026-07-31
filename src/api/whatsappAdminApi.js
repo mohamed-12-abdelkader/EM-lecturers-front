@@ -135,3 +135,39 @@ export async function sendWhatsAppTestMessage({ service_key, to, body }) {
   );
   return data;
 }
+
+export async function fetchWhatsAppConversation(id) {
+  const { data } = await baseUrl.get(`${API}/conversations/${id}`, {
+    headers: authHeaders(getToken()),
+  });
+  return data?.data || data;
+}
+
+export async function fetchWhatsAppConversationMessages(id, params = {}) {
+  const query = new URLSearchParams();
+  if (params.limit) query.set("limit", String(params.limit));
+  const qs = query.toString();
+  const { data } = await baseUrl.get(
+    `${API}/conversations/${id}/messages${qs ? `?${qs}` : ""}`,
+    { headers: authHeaders(getToken()) },
+  );
+  return data?.data || { messages: [], conversation_id: id };
+}
+
+export async function patchWhatsAppConversation(id, payload) {
+  const { data } = await baseUrl.patch(
+    `${API}/conversations/${id}`,
+    payload,
+    { headers: authHeaders(getToken(), "application/json") },
+  );
+  return data?.data || data;
+}
+
+export async function sendWhatsAppConversationMessage({ conversation_id, body }) {
+  const { data } = await baseUrl.post(
+    `${API}/messages/send`,
+    { conversation_id, body },
+    { headers: authHeaders(getToken(), "application/json") },
+  );
+  return data;
+}

@@ -135,6 +135,7 @@ import AdminAllStudentsPage from "../pages/Admin/AdminAllStudentsPage";
 import WhatsAppSessionsPage from "../pages/Admin/whatsapp/WhatsAppSessionsPage";
 import WhatsAppServicesPage from "../pages/Admin/whatsapp/WhatsAppServicesPage";
 import WhatsAppMonitorPage from "../pages/Admin/whatsapp/WhatsAppMonitorPage";
+import WhatsAppInboxPage from "../pages/Admin/whatsapp/WhatsAppInboxPage";
 import TeacherInvoicesPage from "../pages/teacher/TeacherInvoicesPage";
 import AdminDashboardHome from "../pages/home/AdminDashboardHome";
 import TeacherDashboardHome from "../pages/home/TeacherDashboardHome";
@@ -360,6 +361,16 @@ const AppRouter = () => {
           }
         >
           <Route index element={<WhatsAppMonitorPage />} />
+        </Route>
+        <Route
+          path="/admin/whatsapp/inbox"
+          element={
+            <ProtectedRoute auth={isAdmin}>
+              <HomeLogin />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<WhatsAppInboxPage />} />
         </Route>
 
         {/* إنشاء/تعديل منصة مدرس — صفحة مستقلة خارج لياوت الأدمن */}

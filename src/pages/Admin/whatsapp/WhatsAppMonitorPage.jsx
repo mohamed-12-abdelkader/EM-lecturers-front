@@ -28,7 +28,7 @@ import {
   Alert,
   AlertIcon,
 } from "@chakra-ui/react";
-import { Link as RouterLink } from "react-router-dom";
+import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { MdRefresh, MdSend } from "react-icons/md";
 import { FaWhatsapp } from "react-icons/fa";
 import {
@@ -57,6 +57,7 @@ function StatCard({ label, value, color }) {
 
 export default function WhatsAppMonitorPage() {
   const toast = useToast();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [configured, setConfigured] = useState(true);
   const [stats, setStats] = useState({});
@@ -160,6 +161,9 @@ export default function WhatsAppMonitorPage() {
               </Text>
             </Box>
             <HStack>
+              <Button as={RouterLink} to="/admin/whatsapp/inbox" size="sm" variant="outline" colorScheme="green">
+                صندوق الوارد
+              </Button>
               <Button as={RouterLink} to="/admin/whatsapp/sessions" size="sm" variant="outline">
                 الجلسات
               </Button>
@@ -300,7 +304,12 @@ export default function WhatsAppMonitorPage() {
                   </Thead>
                   <Tbody>
                     {conversations.map((c) => (
-                      <Tr key={c.id}>
+                      <Tr
+                        key={c.id}
+                        cursor="pointer"
+                        _hover={{ bg: "blackAlpha.50" }}
+                        onClick={() => navigate(`/admin/whatsapp/inbox?id=${c.id}`)}
+                      >
                         <Td dir="ltr">{c.contact_phone}</Td>
                         <Td>{c.service_name || c.service_key || "—"}</Td>
                         <Td dir="ltr">{c.session_slug}</Td>

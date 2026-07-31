@@ -204,6 +204,9 @@ export default function WhatsAppServicesPage() {
               </Text>
             </Box>
             <HStack>
+              <Button as={RouterLink} to="/admin/whatsapp/inbox" size="sm" variant="outline">
+                صندوق الوارد
+              </Button>
               <Button as={RouterLink} to="/admin/whatsapp/sessions" size="sm" variant="outline">
                 الجلسات
               </Button>
