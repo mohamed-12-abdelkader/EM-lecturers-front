@@ -5,7 +5,9 @@
  * - Runtime caching للصور والخطوط الخارجية.
  * - صفحة offline.html عند انقطاع الإنترنت أثناء التنقل.
  * - Web Push + النقر على الإشعارات (منطق موجود مسبقاً — لا تغيير).
- * - التحديثات: لا skipWaiting تلقائي — ينتظر موافقة المستخدم (رسالة SKIP_WAITING).
+ * - التحديثات: skipWaiting تلقائي — النسخة الجديدة تتفعّل فوراً.
+ *   (ضروري: لو النسخة المخزّنة عند المستخدم معطوبة فلن يعمل أي JS في الصفحة،
+ *   وبالتالي لن يستطيع الضغط على "تحديث" أبداً — التفعيل التلقائي يضمن التعافي.)
  */
 
 import { clientsClaim } from "workbox-core";
@@ -27,9 +29,12 @@ self.__WB_DISABLE_DEV_LOGS = true;
 /* --------------------------- Precache (البناء) --------------------------- */
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
+
+// تفعيل فوري للنسخة الجديدة + السيطرة على كل التبويبات المفتوحة
+self.skipWaiting();
 clientsClaim();
 
-/** التحديث بموافقة المستخدم — UpdatePrompt يرسل SKIP_WAITING عند ضغط "تحديث" */
+/** توافق خلفي — UpdatePrompt القديم قد يرسل SKIP_WAITING */
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") {
     self.skipWaiting();

@@ -33,6 +33,21 @@ export async function initPWA() {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
   if (!import.meta.env.PROD) return; // في التطوير لا يوجد SW مبني
 
+  // النسخة الجديدة تتفعّل تلقائياً (skipWaiting في sw.js). عند تغيّر الـ SW
+  // المسيطر نعيد تحميل التبويب مرة واحدة حتى لا تطلب الصفحة القديمة chunks
+  // بأسماء قديمة لم تعد موجودة. لا نعيد التحميل عند أول تسجيل (تبويب غير مُدار).
+  let hadController = Boolean(navigator.serviceWorker.controller);
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController) {
+      hadController = true;
+      return;
+    }
+    if (reloading) return;
+    reloading = true;
+    window.location.reload();
+  });
+
   try {
     const { registerSW } = await import("virtual:pwa-register");
     const update = registerSW({
