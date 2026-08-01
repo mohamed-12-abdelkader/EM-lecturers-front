@@ -33,6 +33,8 @@ import {
   Flex,
 } from "@chakra-ui/react";
 import UserType from "../../Hooks/auth/userType";
+import { logoutRequest } from "../../services/authService";
+import { clearAuthSession } from "../../utils/authStorage";
 
 const NavLinkItem = ({ to, Icon: LinkIcon, label, onClick, isSidebarOpen }) => {
   const location = useLocation();
@@ -161,10 +163,17 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
     onClose?.();
   };
 
-  const handleLogout = () => {
-    ["token", "user", "examAnswers", "examTimeLeft"].forEach((item) =>
+  const handleLogout = async () => {
+    // يمسح كوكي الـ refresh على الخادم ثم ينظف الجلسة محلياً ويبلغ بقية التبويبات
+    try {
+      await logoutRequest();
+    } catch {
+      // الخروج محلياً يتم في كل الأحوال
+    }
+    ["examAnswers", "examTimeLeft"].forEach((item) =>
       localStorage.removeItem(item),
     );
+    clearAuthSession({ broadcast: true });
     window.location.href = "/login";
   };
 

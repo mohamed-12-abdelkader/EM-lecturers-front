@@ -1,3 +1,4 @@
+import "./authBootstrap.js";
 import React, { useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
@@ -14,9 +15,19 @@ import { forceArabicDocumentLocale } from "./utils/forceArabicLocale.js";
 import theme, { SHELL_DESKTOP_BP } from "./theme/chakraTheme.js";
 import SessionExpiredModal from "./components/auth/SessionExpiredModal.jsx";
 import AppErrorBoundary from "./components/AppErrorBoundary.jsx";
+import AuthProvider from "./providers/AuthProvider.jsx";
+import SessionProvider from "./providers/SessionProvider.jsx";
+import AxiosProvider from "./providers/AxiosProvider.jsx";
+import OfflineScreen from "./components/network/OfflineScreen.jsx";
+import UpdatePrompt from "./components/pwa/UpdatePrompt.jsx";
+import InstallAppPrompt from "./components/pwa/InstallAppPrompt.jsx";
+import { initPWA } from "./pwa/registerPWA.js";
 
 // فرض العربية قبل أي رندر — مستقل عن لغة الجهاز
 forceArabicDocumentLocale();
+
+// PWA: تسجيل الـ Service Worker + كشف الإصدارات الجديدة (إنتاج فقط)
+initPWA();
 
 // Sync Chakra color mode to data-theme + class "dark" for Tailwind dark: classes
 const SyncTheme = () => {
@@ -72,6 +83,9 @@ const RootContent = () => {
       </Box>
       {showStudentBottomNav ? <BottomNavItems /> : null}
       <SessionExpiredModal />
+      <OfflineScreen />
+      <UpdatePrompt />
+      <InstallAppPrompt />
     </NotificationProvider>
   );
 };
@@ -81,7 +95,13 @@ const Root = () => (
     <ChakraProvider theme={theme}>
       <Router>
         <AppErrorBoundary>
-          <RootContent />
+          <AuthProvider>
+            <SessionProvider>
+              <AxiosProvider>
+                <RootContent />
+              </AxiosProvider>
+            </SessionProvider>
+          </AuthProvider>
         </AppErrorBoundary>
       </Router>
     </ChakraProvider>

@@ -29,7 +29,11 @@ const LoginTeacher = () => {
 
       // إذا كان المستخدم نوع "user"، قم بإرسال الـ IP
 
-      const response = await baseUrl.post(`api/teacher/login`, { mail, pass });
+      const response = await baseUrl.post(`api/teacher/login`, {
+        mail,
+        pass,
+        remember_me: true,
+      });
 
       persistLoginSession(response.data);
 

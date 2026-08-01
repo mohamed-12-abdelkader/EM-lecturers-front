@@ -42,10 +42,11 @@ const studentLogin = () => {
       }
 
       // تحديد ما إذا كان المدخل بريدًا إلكترونيًا أو رقم هاتف
+      // remember_me: جلسة طويلة عبر كوكي HttpOnly — تجربة تطبيق حقيقي
       const isEmail = identifier.includes('@');
-      const requestData = isEmail 
-        ? { email: identifier, password: pass }
-        : { phone: identifier.replace(/[^0-9]/g, ''), password: pass };
+      const requestData = isEmail
+        ? { email: identifier, password: pass, remember_me: true }
+        : { phone: identifier.replace(/[^0-9]/g, ''), password: pass, remember_me: true };
 
       const response = await baseUrl.post(`api/login`, requestData);
 

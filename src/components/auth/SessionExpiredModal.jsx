@@ -16,13 +16,9 @@ import { useLocation } from "react-router-dom";
 import { getTenantSubdomain } from "../../utils/tenantHost";
 import {
   SESSION_EXPIRED_EVENT,
-  clearExpiredAuthQuietly,
   clearSessionExpiredFlag,
   forceLogoutToLogin,
-  isAuthTokenExpired,
   isSessionExpiredFlagSet,
-  markSessionExpired,
-  readAuthToken,
 } from "../../utils/authStorage";
 
 /** صفحات عامة — لا نعرض مودال الجلسة عليها */
@@ -60,8 +56,8 @@ function isPublicSurface(pathname = "") {
 }
 
 /**
- * يظهر عند انتهاء التوكن / الجلسة ويفرض تسجيل الخروج.
- * على الصفحات العامة يُمسح التوكن المنتهي بهدوء بدون مودال.
+ * يظهر فقط عند فشل تجديد الجلسة نهائياً (كوكي الـ refresh انتهى أو أُلغي).
+ * انتهاء الـ Access Token القصير أمر طبيعي ويُجدَّد تلقائياً بدون هذا المودال.
  */
 export default function SessionExpiredModal() {
   const location = useLocation();
@@ -73,22 +69,11 @@ export default function SessionExpiredModal() {
   const evaluate = useCallback(() => {
     try {
       if (isPublicSurface(location.pathname)) {
-        clearExpiredAuthQuietly();
         clearSessionExpiredFlag();
         setIsOpen(false);
         return;
       }
-
-      if (isSessionExpiredFlagSet()) {
-        setIsOpen(true);
-        return;
-      }
-
-      const token = readAuthToken();
-      if (token && isAuthTokenExpired(token)) {
-        markSessionExpired();
-        setIsOpen(true);
-      }
+      setIsOpen(isSessionExpiredFlagSet());
     } catch (err) {
       console.error("SessionExpiredModal evaluate failed", err);
       setIsOpen(false);
@@ -100,29 +85,16 @@ export default function SessionExpiredModal() {
 
     const onExpired = () => {
       if (isPublicSurface(window.location.pathname)) {
-        clearExpiredAuthQuietly();
         clearSessionExpiredFlag();
         setIsOpen(false);
         return;
       }
       setIsOpen(true);
     };
-    const onFocus = () => evaluate();
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") evaluate();
-    };
 
     window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onVisibility);
-
-    const intervalId = window.setInterval(evaluate, 30_000);
-
     return () => {
       window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onVisibility);
-      window.clearInterval(intervalId);
     };
   }, [evaluate]);
 
@@ -169,8 +141,7 @@ export default function SessionExpiredModal() {
         </ModalHeader>
         <ModalBody textAlign="center" pb={2}>
           <Text color="gray.600" _dark={{ color: "gray.300" }} lineHeight="1.9">
-            انتهت صلاحية تسجيل الدخول الخاص بك. سجّل الخروج ثم سجّل الدخول من جديد
-            للمتابعة بأمان.
+            يرجى تسجيل الدخول مرة أخرى للمتابعة بأمان.
           </Text>
         </ModalBody>
         <ModalFooter justifyContent="center" pb={6}>

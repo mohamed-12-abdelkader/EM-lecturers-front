@@ -60,6 +60,7 @@ import { FaMoon, FaSun, FaBars, FaTimes } from "react-icons/fa";
 
 import "react-toastify/dist/ReactToastify.css";
 import baseUrl from "../../api/baseUrl";
+import { persistLoginSession } from "../../utils/authStorage";
 import {
   ensureTenantAuthContext,
   resolveTenantSubdomain,
@@ -335,12 +336,11 @@ const SignUp = () => {
         name: nameCheck.normalized,
         parent_phone: cleanParentPhone,
         grade_id: parseInt(gradeId),
+        remember_me: true,
       });
 
-      const { token, user } = res.data;
-
-      localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(user));
+      // التوكن → الذاكرة فقط، والمستخدم → localStorage (بدون أسرار)
+      persistLoginSession(res.data);
 
       toast.success("تم إنشاء الحساب بنجاح!");
       void playAuthSuccessSound();

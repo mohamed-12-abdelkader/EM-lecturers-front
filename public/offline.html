@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>لا يوجد اتصال بالإنترنت</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        padding: 24px;
+        text-align: center;
+        font-family: system-ui, -apple-system, "Segoe UI", Tahoma, sans-serif;
+        color: #e2e8f0;
+        background:
+          radial-gradient(ellipse 80% 60% at 50% 0%, rgba(49, 130, 206, 0.12) 0%, transparent 60%),
+          linear-gradient(180deg, #0b1220 0%, #0f1a2e 100%);
+      }
+      .icon {
+        width: 88px;
+        height: 88px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(99, 179, 237, 0.12);
+        border: 1px solid rgba(99, 179, 237, 0.25);
+        animation: pulse 2s ease-in-out infinite;
+      }
+      @keyframes pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+      h1 { font-size: 20px; font-weight: 800; }
+      p { font-size: 14px; opacity: 0.75; line-height: 1.9; max-width: 340px; }
+      button {
+        margin-top: 6px;
+        padding: 12px 34px;
+        border: none;
+        border-radius: 14px;
+        font-size: 15px;
+        font-weight: 700;
+        color: #fff;
+        cursor: pointer;
+        background: linear-gradient(135deg, #3182ce 0%, #2b6cb0 100%);
+        box-shadow: 0 10px 26px rgba(49, 130, 206, 0.35);
+      }
+      button:active { transform: scale(0.98); }
+      @media (prefers-reduced-motion: reduce) { .icon { animation: none; } }
+    </style>
+  </head>
+  <body>
+    <div class="icon">
+      <svg width="42" height="42" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M1 1l22 22M8.5 16.5a5 5 0 017 0M5 12.55a10 10 0 015.17-2.39M10.71 5.05A16 16 0 0122.58 9M1.42 9a15.9 15.9 0 014.7-2.88M16.5 12.55a10 10 0 012.5 1.85M12 20h.01"
+          stroke="#63B3ED" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </div>
+    <h1>لا يوجد اتصال بالإنترنت</h1>
+    <p>تحقق من الشبكة ثم أعد المحاولة — سنعيد تحميل المنصة تلقائياً فور عودة الاتصال.</p>
+    <button type="button" onclick="location.reload()">إعادة المحاولة</button>
+    <script>
+      window.addEventListener("online", function () { location.reload(); });
+    </script>
+  </body>
+</html>

@@ -64,6 +64,10 @@ function getApiErrorMessage(error, fallback = "حدث خطأ غير متوقع")
 }
 
 export async function registerServiceWorker() {
+  // في التطوير لا يوجد SW حقيقي — الإشعارات تُختبر على نسخة الإنتاج (build/preview)
+  if (import.meta.env.DEV) {
+    throw new Error("إشعارات Push متاحة في نسخة الإنتاج فقط");
+  }
   const registration = await navigator.serviceWorker.register("/sw.js", {
     scope: "/",
   });

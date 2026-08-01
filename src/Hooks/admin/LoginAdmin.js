@@ -27,7 +27,11 @@ const LoginAdmin = () => {
     try {
       setLoading(true);
 
-      const response = await baseUrl.post(`api/admin/login`, { mail, pass });
+      const response = await baseUrl.post(`api/admin/login`, {
+        mail,
+        pass,
+        remember_me: true,
+      });
 
       persistLoginSession(response.data);
 

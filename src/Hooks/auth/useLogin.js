@@ -54,8 +54,8 @@ const useLogin = () => {
       // إذا كان المستخدم نوع "user"، قم بإرسال الـ IP
       const requestData =
         userType === "user"
-          ? { mail, pass, ip: localStorage.getItem("ip") }
-          : { mail, pass };
+          ? { mail, pass, ip: localStorage.getItem("ip"), remember_me: true }
+          : { mail, pass, remember_me: true };
 
       const response = await baseUrl.post(`${loginApi}`, requestData);
 

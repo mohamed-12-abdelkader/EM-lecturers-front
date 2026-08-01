@@ -132,6 +132,25 @@ import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import CourseStreams from "../../components/stream/courseStreams";
 import StudentStreamsList from "../../components/stream/studentStreamsList";
 import eduPlatformLogo from "../../img/2 (5).png";
+import { getTenantSubdomain } from "../../utils/tenantHost";
+import { fetchTenantPublic } from "../../api/tenantPublicApi";
+import {
+  readCachedTenantBrandLogo,
+  resolveTenantBrandLogo,
+} from "../../utils/tenantBrandLogo";
+
+/** يحوّل صورة (رابط خارجي) إلى Data URL حتى لا يفشل html2canvas بسبب CORS */
+async function fetchImageAsDataUrl(url) {
+  const response = await fetch(url, { mode: "cors" });
+  if (!response.ok) throw new Error(`فشل تحميل اللوجو: ${response.status}`);
+  const blob = await response.blob();
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
 
 // Modal Components
 const LectureModal = ({ isOpen, onClose, type, data, onSubmit, loading }) => {
@@ -2601,9 +2620,32 @@ D) has made`}
       const codesPerPage = 12; // 3 columns × 4 rows
       const pageWidth = 297; // mm
       const pageHeight = 210; // mm
-      const logoUrl = eduPlatformLogo.startsWith("http")
+      const defaultLogoUrl = eduPlatformLogo.startsWith("http")
         ? eduPlatformLogo
         : `${window.location.origin}${eduPlatformLogo}`;
+
+      // لوجو المدرس صاحب المنصة — لو مش متاح نرجع للوجو الافتراضي
+      let logoUrl = defaultLogoUrl;
+      const tenantSubdomain = getTenantSubdomain();
+      if (tenantSubdomain) {
+        try {
+          let teacherLogo = readCachedTenantBrandLogo(tenantSubdomain);
+          if (!teacherLogo) {
+            const res = await fetchTenantPublic(tenantSubdomain);
+            teacherLogo = resolveTenantBrandLogo(
+              res?.data?.tenant,
+              res?.data?.teacher,
+            );
+          }
+          if (teacherLogo) {
+            logoUrl = teacherLogo.startsWith("data:")
+              ? teacherLogo
+              : await fetchImageAsDataUrl(teacherLogo);
+          }
+        } catch {
+          logoUrl = defaultLogoUrl;
+        }
+      }
       const courseName = courseData?.course?.title || "الكورس";
       const teacherName = user?.name || "المدرس";
       const pdf = new jsPDF("l", "mm", "a4");
@@ -2726,10 +2768,10 @@ border:1px solid #dbeafe;
 border-radius:10px;
 padding:6px 10px;
 ">
-<img src="${logoUrl}" alt="Edu Platform" style="
-width:150px;
-max-height:48px;
-height:auto;
+<img src="${logoUrl}" alt="لوجو المنصة" style="
+height:48px;
+width:auto;
+max-width:150px;
 object-fit:contain;
 opacity:1;
 "/>

@@ -1,8 +1,8 @@
 /**
- * يوحّد شكل التوكن قبل التخزين/الإرسال:
- * - يشيل Bearer المكرر
- * - يشيل علامات الاقتباس الزائدة
- * - يرفض قيم null/undefined كنص
+ * واجهة الجلسة الموحّدة (Facade) — نفس الدوال القديمة لكن:
+ * - الـ Access Token في الذاكرة فقط (services/tokenStore) — لا يُكتب على القرص أبداً.
+ * - بيانات المستخدم (بروفايل بدون أسرار) تبقى في localStorage لتوافق الكود القديم.
+ * - الـ Refresh Token في كوكي HttpOnly يديره الخادم بالكامل.
  */
 import {
   safeLocalGet,
@@ -12,27 +12,27 @@ import {
   safeSessionRemove,
   safeSessionSet,
 } from "./safeStorage";
+import {
+  normalizeAuthToken as normalizeJwt,
+  getJwtPayload as decodeJwtPayload,
+  isJwtExpired,
+} from "./jwt";
+import {
+  clearAccessToken,
+  getAccessToken,
+  setAccessToken,
+} from "../services/tokenStore";
+import { postAuthMessage } from "../services/authChannel";
 
 export function normalizeAuthToken(raw) {
-  if (raw == null) return "";
-  let token = String(raw).trim();
-  if (
-    (token.startsWith('"') && token.endsWith('"')) ||
-    (token.startsWith("'") && token.endsWith("'"))
-  ) {
-    token = token.slice(1, -1).trim();
-  }
-  token = token.replace(/^Bearer\s+/i, "").trim();
-  if (!token || token === "null" || token === "undefined") return "";
-  return token;
+  return normalizeJwt(raw);
 }
 
 /**
- * حفظ نتيجة تسجيل الدخول في localStorage بشكل موحّد.
- * يدعم الشكل المسطّح { token, user, employee_data, employee_permissions }
- * أو الغلاف الشائع { data: { token, user, ... } }.
+ * حفظ نتيجة تسجيل الدخول: التوكن → الذاكرة، المستخدم → localStorage.
+ * يدعم الشكل المسطّح { token, user, ... } أو الغلاف { data: { token, user } }.
  */
-export function persistLoginSession(payload) {
+export function persistLoginSession(payload, { broadcast = true } = {}) {
   if (!payload || typeof payload !== "object") return;
 
   const inner =
@@ -46,7 +46,7 @@ export function persistLoginSession(payload) {
   const user = inner.user ?? inner.Data ?? inner.data;
 
   if (token) {
-    safeLocalSet("token", token);
+    setAccessToken(token, { broadcast: false });
   }
 
   if (user != null && typeof user === "object") {
@@ -68,21 +68,32 @@ export function persistLoginSession(payload) {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("auth-storage-update"));
   }
+
+  if (broadcast) {
+    postAuthMessage({
+      type: "login",
+      token: token || getAccessToken(),
+      user: user != null && typeof user === "object" ? user : null,
+    });
+  }
 }
 
-export function clearAuthSession() {
-  safeLocalRemove("token");
+export function clearAuthSession({ broadcast = false } = {}) {
+  clearAccessToken({ broadcast: false });
   safeLocalRemove("user");
   safeLocalRemove("employee_data");
   safeLocalRemove("employee_permissions");
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("auth-storage-update"));
   }
+  if (broadcast) {
+    postAuthMessage({ type: "logout" });
+  }
 }
 
-/** يقرأ توكن صالح من التخزين (بدون بادئة Bearer). */
+/** يقرأ التوكن الحالي من الذاكرة (بدون بادئة Bearer). */
 export function readAuthToken() {
-  return normalizeAuthToken(safeLocalGet("token", ""));
+  return getAccessToken();
 }
 
 export const SESSION_EXPIRED_FLAG = "auth_session_expired";
@@ -99,63 +110,50 @@ export function clearSessionExpiredFlag() {
 
 /** يفك payload الـ JWT بدون مكتبات خارجية */
 export function getJwtPayload(rawToken) {
-  const token = normalizeAuthToken(rawToken ?? readAuthToken());
-  if (!token) return null;
-  const parts = token.split(".");
-  if (parts.length < 2) return null;
-  try {
-    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
-    const json = decodeURIComponent(
-      atob(padded)
-        .split("")
-        .map((c) => `%${`00${c.charCodeAt(0).toString(16)}`.slice(-2)}`)
-        .join(""),
-    );
-    return JSON.parse(json);
-  } catch {
-    return null;
-  }
+  return decodeJwtPayload(rawToken ?? readAuthToken());
 }
 
 /** true لو التوكن موجود وانتهت صلاحية exp */
 export function isAuthTokenExpired(rawToken) {
-  const token = normalizeAuthToken(rawToken ?? readAuthToken());
-  if (!token) return false;
-  const payload = getJwtPayload(token);
-  if (!payload || payload.exp == null) return false;
-  const expMs = Number(payload.exp) * 1000;
-  if (!Number.isFinite(expMs)) return false;
-  return Date.now() >= expMs - 5000;
+  return isJwtExpired(rawToken ?? readAuthToken());
 }
 
-/** جلسة صالحة للدخول للوحة التحكم (توكن موجود وغير منتهي) */
+/**
+ * جلسة صالحة للدخول للوحة التحكم.
+ * ملاحظة: مع نظام الكوكي، انتهاء الـ Access Token لا يعني انتهاء الجلسة —
+ * لذا نعتمد على وجود مستخدم محفوظ أو توكن حي في الذاكرة.
+ */
 export function hasValidAuthSession() {
   const token = readAuthToken();
-  if (!token) return false;
-  if (isAuthTokenExpired(token)) return false;
-  return true;
+  if (token && !isJwtExpired(token)) return true;
+  // التوكن يعيش في الذاكرة فقط؛ وجود user محفوظ يعني أن AuthProvider
+  // إما استعاد الجلسة بالفعل أو سيستعيدها عبر كوكي الـ refresh.
+  try {
+    const raw = safeLocalGet("user");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") return true;
+    }
+  } catch {
+    // ignore
+  }
+  return false;
 }
 
 /**
- * على الصفحات العامة: امسح التوكن المنتهي بهدوء بدون مودال.
- * يمنع فتح لوحة الطالب/المدرس على أجهزة فيها جلسة قديمة.
+ * (توافق قديم) — كان يمسح التوكن المنتهي على الصفحات العامة.
+ * مع نظام الـ refresh بالكوكي، انتهاء الـ Access Token طبيعي ويُجدَّد تلقائياً،
+ * لذا لم يعد هناك ما يُمسح هنا.
  */
 export function clearExpiredAuthQuietly() {
-  const token = readAuthToken();
-  if (!token) return false;
-  if (!isAuthTokenExpired(token)) return false;
-  clearSessionExpiredFlag();
-  clearAuthSession();
-  safeLocalRemove("examAnswers");
-  safeLocalRemove("examTimeLeft");
-  return true;
+  return false;
 }
 
 /**
- * يعلّم انتهاء الجلسة، يمسح بيانات الدخول، وينبّه الواجهة لعرض المودال.
+ * يعلّم انتهاء الجلسة نهائياً (فشل الـ refresh)، يمسح بيانات الدخول،
+ * وينبّه الواجهة + بقية التبويبات.
  */
-export function markSessionExpired() {
+export function markSessionExpired({ broadcast = true } = {}) {
   let redirect = "/login";
   try {
     const user = JSON.parse(safeLocalGet("user", "null") || "null");
@@ -168,6 +166,9 @@ export function markSessionExpired() {
   safeLocalRemove("examAnswers");
   safeLocalRemove("examTimeLeft");
   clearAuthSession();
+  if (broadcast) {
+    postAuthMessage({ type: "session-expired" });
+  }
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
   }
@@ -178,7 +179,7 @@ export function forceLogoutToLogin(loginPath) {
   const redirect =
     loginPath || safeSessionGet("auth_logout_redirect") || "/login";
   clearSessionExpiredFlag();
-  clearAuthSession();
+  clearAuthSession({ broadcast: true });
   safeLocalRemove("examAnswers");
   safeLocalRemove("examTimeLeft");
   if (typeof window !== "undefined") {

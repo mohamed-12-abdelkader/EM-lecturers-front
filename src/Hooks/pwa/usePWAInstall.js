@@ -48,6 +48,8 @@ export async function ensurePwaServiceWorker() {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
     return null;
   }
+  // في التطوير لا يوجد SW حقيقي — /sw.js يقدّم منظّف الكاش فقط (لا تسجّله من التطبيق)
+  if (import.meta.env.DEV) return null;
   try {
     const registration = await navigator.serviceWorker.register("/sw.js", {
       scope: "/",
