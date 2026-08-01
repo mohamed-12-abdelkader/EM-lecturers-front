@@ -46,6 +46,8 @@ async function performRefresh() {
   } catch (error) {
     const status = error?.response?.status;
     if (status === 401 || status === 403) return null;
+    // الباك اند لا يوفر /auth/refresh بعد (404) — لا يمكن التجديد
+    if (status === 404 || status === 405) return null;
     // خطأ شبكة أو خادم — لا نعتبر الجلسة منتهية
     throw error;
   }

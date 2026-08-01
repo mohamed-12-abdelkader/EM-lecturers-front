@@ -15,6 +15,24 @@ import {
   requestTokenFromPeers,
 } from "./tokenStore";
 import { refreshSession } from "./refreshManager";
+import { safeLocalGet } from "../utils/safeStorage";
+
+/** الباك اند لم يطبّق الـ endpoint بعد (/auth/me أو /auth/refresh ترجع 404) */
+function isEndpointMissing(error) {
+  const status = error?.response?.status;
+  return status === 404 || status === 405;
+}
+
+function readStoredUser() {
+  try {
+    const raw = safeLocalGet("user");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 function bearerConfig() {
   const token = getAccessToken();
@@ -66,6 +84,10 @@ export async function bootstrapSession() {
       const user = await fetchMe();
       if (user) return { user };
     } catch (error) {
+      // الباك اند بدون /auth/me بعد: توكن صالح + مستخدم محفوظ = جلسة سارية
+      if (isEndpointMissing(error)) {
+        return { user: readStoredUser() };
+      }
       if (!isAuthRejection(error)) throw error;
       // TOKEN_EXPIRED → نكمل للـ refresh
     }
@@ -85,6 +107,7 @@ export async function bootstrapSession() {
     const user = await fetchMe();
     return { user: user || null };
   } catch (error) {
+    if (isEndpointMissing(error)) return { user: readStoredUser() };
     if (isAuthRejection(error)) return { user: null };
     throw error;
   }
