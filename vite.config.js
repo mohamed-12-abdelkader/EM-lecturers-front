@@ -83,34 +83,10 @@ export default defineConfig(({ mode }) => {
       // دعم أوسع لأجهزة/متصفحات أقدم — يقلل أعطال الشاشة البيضاء من syntax حديث
       target: ["es2019", "safari13"],
       cssTarget: ["chrome80", "safari13"],
-      rollupOptions: {
-        output: {
-          // تقسيم المكتبات الكبيرة لتحميل أسرع وكاش أفضل بين الإصدارات
-          manualChunks(id) {
-            if (!id.includes("node_modules")) return undefined;
-            if (id.includes("@chakra-ui") || id.includes("@emotion")) {
-              return "vendor-chakra";
-            }
-            if (id.includes("framer-motion")) return "vendor-motion";
-            if (
-              id.includes("chart.js") ||
-              id.includes("react-chartjs") ||
-              id.includes("recharts")
-            ) {
-              return "vendor-charts";
-            }
-            if (
-              id.includes("/react/") ||
-              id.includes("/react-dom/") ||
-              id.includes("react-router") ||
-              id.includes("/scheduler/")
-            ) {
-              return "vendor-react";
-            }
-            return "vendor";
-          },
-        },
-      },
+      // ملاحظة: لا نستخدم manualChunks يدوياً — التقسيم اليدوي السابق أنتج
+      // chunks دائرية (vendor <-> vendor-react) فكان framer-motion يتنفّذ قبل
+      // جاهزية React ويرمي "Cannot read properties of undefined (reading 'createContext')".
+      // التقسيم الفعلي يتم تلقائياً عبر lazy loading لصفحات الراوتر.
     },
     plugins: [
       react(),

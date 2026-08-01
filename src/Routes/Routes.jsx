@@ -1,169 +1,205 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 
-// Auth & Login Components
-import SingUp from "../pages/signup/SingUp";
-import WelcomePage from "../pages/signup/WelcomePage";
-import LoginPage from "../pages/login/LoginPage";
-import TeacherLoginPage from "../pages/login/TeacherLoginPage";
-import VerifyCode from "../pages/password/VerifyCode";
-import ResetPassword from "../pages/password/ResetPassword";
-// Main Pages
-import Home from "../pages/home/Home";
-import HomePage from "../pages/homePage/HomePage";
-import HomeLogin from "../pages/homeLogin/HomeLogin";
-import LandingPage from "../pages/landingPage/LandingPage";
-import NotFound from "../components/not found/NotFound";
-
-// Admin Components
-import Admin from "../pages/Admin/Admin";
-import AdminMange from "../components/admin/AdminMange";
-import AdminCreateCode from "../components/admin/AdminCreateCode";
-import AdminActivationCodes from "../components/admin/AdminActivationCodes";
-import AdminTeacherBalances from "../components/admin/AdminTeacherBalances";
-import AddTeacher from "../components/admin/AddTeacher";
-import AddEmployees from "../components/admin/AddEmployees";
-import { MangeEmployees } from "../components/admin/MangeEmployees";
-import OpenPhone from "../components/admin/OpenPhone";
-import CreateComp from "../components/admin/CreateComp";
-import AllComps from "../components/admin/AllComps";
-import PackagesManagement from "../components/admin/PackagesManagement";
-import PackageDetails from "../pages/package/PackageDetails";
-import SubjectDetails from "../pages/package/SubjectDetails";
-import GroupDetails from "../pages/package/GroupDetails";
-import AssignmentQuestions from "../pages/package/AssignmentQuestions";
-import AdminStreamsList from "../components/stream/adminList";
-import GeneralCourses from "../components/admin/GeneralCourses";
-import GeneralCourseDetailsPage from "../pages/generalCourse/GeneralCourseDetailsPage";
-import GeneralCourseGroupPage from "../pages/generalCourse/GeneralCourseGroupPage";
-
-// Teacher Components
-
-// Student Components
-import Profile from "../pages/profile/Profile";
-import Wallet from "../pages/wallet/Wallet";
-import TeacherWallet from "../pages/wallet/TeacherWallet";
-import TeacherDetails from "../pages/teacher/TeacherDetails";
-
-import Vedio from "../pages/leacter/Vedio";
-
-import AllTeacherLogin from "../components/teacher/AllTeacherLogin";
-
-import MyTeacher from "../pages/myTeacher/MyTeacher";
-import SuggestedTeachers from "../pages/suggested-teachers/SuggestedTeachers";
-import TeacherStudents from "../pages/teacher/TeacherStudents";
-import ManagedStudentsPage from "../pages/teacher/managedStudents/ManagedStudentsPage";
-import StudentReport from "../pages/teacher/StudentReport";
-import PlatformStudents from "../pages/teacher/PlatformStudents";
-
-// Center Management (teacher-center API)
-import CenterLayout from "../pages/centerMgmt/components/CenterLayout";
-import CenterDashboardPage from "../pages/centerMgmt/CenterDashboardPage";
-import GroupsPage from "../pages/centerMgmt/GroupsPage";
-import GroupDetailsPage from "../pages/centerMgmt/GroupDetailsPage";
-import StudentsPage from "../pages/centerMgmt/StudentsPage";
-import StudentDetailsPage from "../pages/centerMgmt/StudentDetailsPage";
-import AttendancePage from "../pages/centerMgmt/AttendancePage";
-import SubscriptionsPage from "../pages/centerMgmt/SubscriptionsPage";
-import PaymentsPage from "../pages/centerMgmt/PaymentsPage";
-
-// Exam Components
-import Exam from "../pages/exam/Exam";
-import ExamTeacher from "../pages/exam/ExamTeacher";
-import ComprehensiveExam from "../pages/exam/ComprehensiveExam";
-import ExamGrades from "../pages/exam/ExamGrades";
-import TeacherAnalyticsIntelligence from "../pages/analytics/TeacherAnalyticsIntelligence";
-import TeacherMyFilesPage from "../pages/myFiles/TeacherMyFilesPage";
-import TeacherAssignmentsPage from "../pages/assignments/TeacherAssignmentsPage";
-import TeacherCourseExamsPage from "../pages/exams/TeacherCourseExamsPage";
-import TeacherFreeLecturesPage from "../pages/freeLectures/TeacherFreeLecturesPage";
-import ScientificChatPage from "../pages/scientificChat/ScientificChatPage";
-import ScientificTeacherFilesPage from "../pages/scientificChat/ScientificTeacherFilesPage";
-import ExamBuilderChatPage from "../pages/examBuilder/ExamBuilderChatPage";
-import PlatformExams from "../pages/PlatformExams/PlatformExams";
-
-
-// Question Bank Components
-import QuestionBank from "../pages/Question Bank/QuestionBank";
-import ChapterQuestion from "../pages/Question Bank/ChapterQuestion";
-import SubjectPage from "../pages/Question Bank/SubjectPage";
-import QuestionsPage from "../pages/Question Bank/QuestionsPage";
-import QuestionBankDashboard from "../pages/Question Bank/QuestionBankDashboard";
-import QuestionLibraryPage from "../pages/Question Bank/QuestionLibraryPage";
-import QuestionLibraryLessonPage from "../pages/Question Bank/QuestionLibraryLessonPage";
-import Lesson from "../pages/Question Bank/Lesson";
-import TeacherSubject from "../pages/Question Bank/TeacherSubject";
-
-// Competition Components
-import Competitions from "../pages/competitions/Competitions";
-import CompetitionDetails from "../pages/competitions/CompetitionDetails";
-import TheFirsts from "../pages/theFirsts/TheFirsts";
-
-// Course Components
-import TeacherCourses from "../pages/teacherCourses/TeacherCourses";
-import AllCourses from "../pages/teacherCourses/AllCourses";
-import CourseDetailsPage from "../pages/course/CourseDetailsPage";
-import CourseStatisticsPage from "../pages/course/CourseStatisticsPage";
-import CourseStatistics from "../pages/courseStatistics/CourseStatistics";
-import CourseStudentsPage from "../pages/course/CourseStudentsPage";
-
-// Chat Components
-import ChatPage from "../pages/chat/ChatPage";
-import TeacherChat from "../pages/chat/TeacherChatPage";
-import ChatbotPage from "../pages/chatbot/ChatbotPage";
-import TeamChat from "../pages/teamChatPage/TeamChat";
-import SupportChatAdmin from "../pages/support/SupportChatAdmin";
-import SupportChatStudent from "../pages/support/SupportChatStudent";
-import SupportChatTeacher from "../pages/support/SupportChatTeacher";
-import SupportGuestPage from "../pages/support/SupportGuestPage";
-import SupportEntry from "../pages/support/SupportEntry";
-
-// Other Components
-import Code from "../pages/code/Code";
-import TeacherCode from "../pages/code/TeacherCode";
-
-import StudentStats from "../pages/myStatistics/MyStatistics";
-import AllUsers from "../pages/allUsers/AllUsers";
-import TasksPage from "../pages/tasks/TasksPage";
-import AllStudents from "../pages/allStudents/AllStudents";
-import LecturCommints from "../pages/lecturCommints/LecturCommints";
-import Social from "../pages/social/Social";
-import PlatfourmLeagues from "../pages/league/PlatfourmLeagues";
-import League from "../pages/league/League";
-import LecturesSchedule from "../pages/lecturesSchedule/LecturesSchedule";
-import FinanceManagementPage from "../pages/finance/FinanceManagementPage";
-import AdminAllStudentsPage from "../pages/Admin/AdminAllStudentsPage";
-import WhatsAppSessionsPage from "../pages/Admin/whatsapp/WhatsAppSessionsPage";
-import WhatsAppServicesPage from "../pages/Admin/whatsapp/WhatsAppServicesPage";
-import WhatsAppMonitorPage from "../pages/Admin/whatsapp/WhatsAppMonitorPage";
-import WhatsAppInboxPage from "../pages/Admin/whatsapp/WhatsAppInboxPage";
-import TeacherInvoicesPage from "../pages/teacher/TeacherInvoicesPage";
-import AdminDashboardHome from "../pages/home/AdminDashboardHome";
-import TeacherDashboardHome from "../pages/home/TeacherDashboardHome";
-
-// Hooks & Utils
+// Hooks & Utils (خفيفة — تبقى eager)
 import UserType from "../Hooks/auth/userType";
 import ProtectedRoute from "../components/protectedRoute/ProtectedRoute";
 import ProtectedLogin from "../components/protectedRoute/ProtectedLogin";
 import { getTenantSubdomain } from "../utils/tenantHost";
-import TenantPublicLanding from "../pages/tenantPublic/TenantPublicLanding";
-import {
-  TenantRootLayout,
-  TenantRootIndex,
-} from "../pages/tenantPublic/TenantSubdomainRoot";
 import {
   renderTenantPublicRoutes,
   TenantPublicNotFoundRoute,
 } from "../pages/tenantPublic/TenantPublicRoutes";
 import TenantSeoHead from "../pages/tenantPublic/components/TenantSeoHead";
-import GlobalSearchPage from "../pages/search/GlobalSearchPage";
-import Match from "../pages/league/Match";
-import EssayExam from "../pages/exam/EssayExam";
-import ChallengeEMAcademy from "../pages/challengeEMAcademy/ChallengeEMAcademy";
-import LecturesTaple from "../pages/lecturesTaple/LecturesTaple";
-import MeetingRoom from "../pages/meeting/MeetingRoom";
-import MyEnrollmentsPage from "../pages/myEnrollments/MyEnrollmentsPage";
-import NotificationCenterPage from "../pages/notifications/NotificationCenterPage";
 
+/*
+ * كل الصفحات lazy — تُحمَّل عند فتحها فقط.
+ * قبل كده كانت 127 صفحة بتتحمّل كلها مقدمًا فتأخر أول عرض جدًا.
+ */
+
+// Auth & Login
+const SingUp = lazy(() => import("../pages/signup/SingUp"));
+const WelcomePage = lazy(() => import("../pages/signup/WelcomePage"));
+const LoginPage = lazy(() => import("../pages/login/LoginPage"));
+const TeacherLoginPage = lazy(() => import("../pages/login/TeacherLoginPage"));
+const VerifyCode = lazy(() => import("../pages/password/VerifyCode"));
+const ResetPassword = lazy(() => import("../pages/password/ResetPassword"));
+
+// Main Pages
+const Home = lazy(() => import("../pages/home/Home"));
+const HomePage = lazy(() => import("../pages/homePage/HomePage"));
+const HomeLogin = lazy(() => import("../pages/homeLogin/HomeLogin"));
+const LandingPage = lazy(() => import("../pages/landingPage/LandingPage"));
+const NotFound = lazy(() => import("../components/not found/NotFound"));
+
+// Tenant root
+const TenantRootLayout = lazy(() =>
+  import("../pages/tenantPublic/TenantSubdomainRoot").then((m) => ({
+    default: m.TenantRootLayout,
+  }))
+);
+const TenantRootIndex = lazy(() =>
+  import("../pages/tenantPublic/TenantSubdomainRoot").then((m) => ({
+    default: m.TenantRootIndex,
+  }))
+);
+
+// Admin
+const Admin = lazy(() => import("../pages/Admin/Admin"));
+const AdminMange = lazy(() => import("../components/admin/AdminMange"));
+const AdminCreateCode = lazy(() => import("../components/admin/AdminCreateCode"));
+const AdminActivationCodes = lazy(() => import("../components/admin/AdminActivationCodes"));
+const AdminTeacherBalances = lazy(() => import("../components/admin/AdminTeacherBalances"));
+const AddTeacher = lazy(() => import("../components/admin/AddTeacher"));
+const AddEmployees = lazy(() => import("../components/admin/AddEmployees"));
+const MangeEmployees = lazy(() =>
+  import("../components/admin/MangeEmployees").then((m) => ({
+    default: m.MangeEmployees,
+  }))
+);
+const OpenPhone = lazy(() => import("../components/admin/OpenPhone"));
+const CreateComp = lazy(() => import("../components/admin/CreateComp"));
+const AllComps = lazy(() => import("../components/admin/AllComps"));
+const PackagesManagement = lazy(() => import("../components/admin/PackagesManagement"));
+const PackageDetails = lazy(() => import("../pages/package/PackageDetails"));
+const SubjectDetails = lazy(() => import("../pages/package/SubjectDetails"));
+const GroupDetails = lazy(() => import("../pages/package/GroupDetails"));
+const AssignmentQuestions = lazy(() => import("../pages/package/AssignmentQuestions"));
+const AdminStreamsList = lazy(() => import("../components/stream/adminList"));
+const GeneralCourses = lazy(() => import("../components/admin/GeneralCourses"));
+const GeneralCourseDetailsPage = lazy(() => import("../pages/generalCourse/GeneralCourseDetailsPage"));
+const GeneralCourseGroupPage = lazy(() => import("../pages/generalCourse/GeneralCourseGroupPage"));
+
+// Student
+const Profile = lazy(() => import("../pages/profile/Profile"));
+const Wallet = lazy(() => import("../pages/wallet/Wallet"));
+const TeacherWallet = lazy(() => import("../pages/wallet/TeacherWallet"));
+const TeacherDetails = lazy(() => import("../pages/teacher/TeacherDetails"));
+const Vedio = lazy(() => import("../pages/leacter/Vedio"));
+const AllTeacherLogin = lazy(() => import("../components/teacher/AllTeacherLogin"));
+const MyTeacher = lazy(() => import("../pages/myTeacher/MyTeacher"));
+const SuggestedTeachers = lazy(() => import("../pages/suggested-teachers/SuggestedTeachers"));
+const TeacherStudents = lazy(() => import("../pages/teacher/TeacherStudents"));
+const ManagedStudentsPage = lazy(() => import("../pages/teacher/managedStudents/ManagedStudentsPage"));
+const StudentReport = lazy(() => import("../pages/teacher/StudentReport"));
+const PlatformStudents = lazy(() => import("../pages/teacher/PlatformStudents"));
+
+// Center Management
+const CenterLayout = lazy(() => import("../pages/centerMgmt/components/CenterLayout"));
+const CenterDashboardPage = lazy(() => import("../pages/centerMgmt/CenterDashboardPage"));
+const GroupsPage = lazy(() => import("../pages/centerMgmt/GroupsPage"));
+const GroupDetailsPage = lazy(() => import("../pages/centerMgmt/GroupDetailsPage"));
+const StudentsPage = lazy(() => import("../pages/centerMgmt/StudentsPage"));
+const StudentDetailsPage = lazy(() => import("../pages/centerMgmt/StudentDetailsPage"));
+const AttendancePage = lazy(() => import("../pages/centerMgmt/AttendancePage"));
+const SubscriptionsPage = lazy(() => import("../pages/centerMgmt/SubscriptionsPage"));
+const PaymentsPage = lazy(() => import("../pages/centerMgmt/PaymentsPage"));
+
+// Exams
+const Exam = lazy(() => import("../pages/exam/Exam"));
+const ExamTeacher = lazy(() => import("../pages/exam/ExamTeacher"));
+const ComprehensiveExam = lazy(() => import("../pages/exam/ComprehensiveExam"));
+const ExamGrades = lazy(() => import("../pages/exam/ExamGrades"));
+const TeacherAnalyticsIntelligence = lazy(() => import("../pages/analytics/TeacherAnalyticsIntelligence"));
+const TeacherMyFilesPage = lazy(() => import("../pages/myFiles/TeacherMyFilesPage"));
+const TeacherAssignmentsPage = lazy(() => import("../pages/assignments/TeacherAssignmentsPage"));
+const TeacherCourseExamsPage = lazy(() => import("../pages/exams/TeacherCourseExamsPage"));
+const TeacherFreeLecturesPage = lazy(() => import("../pages/freeLectures/TeacherFreeLecturesPage"));
+const ScientificChatPage = lazy(() => import("../pages/scientificChat/ScientificChatPage"));
+const ScientificTeacherFilesPage = lazy(() => import("../pages/scientificChat/ScientificTeacherFilesPage"));
+const ExamBuilderChatPage = lazy(() => import("../pages/examBuilder/ExamBuilderChatPage"));
+const PlatformExams = lazy(() => import("../pages/PlatformExams/PlatformExams"));
+const EssayExam = lazy(() => import("../pages/exam/EssayExam"));
+
+// Question Bank
+const QuestionBank = lazy(() => import("../pages/Question Bank/QuestionBank"));
+const ChapterQuestion = lazy(() => import("../pages/Question Bank/ChapterQuestion"));
+const SubjectPage = lazy(() => import("../pages/Question Bank/SubjectPage"));
+const QuestionsPage = lazy(() => import("../pages/Question Bank/QuestionsPage"));
+const QuestionBankDashboard = lazy(() => import("../pages/Question Bank/QuestionBankDashboard"));
+const QuestionLibraryPage = lazy(() => import("../pages/Question Bank/QuestionLibraryPage"));
+const QuestionLibraryLessonPage = lazy(() => import("../pages/Question Bank/QuestionLibraryLessonPage"));
+const Lesson = lazy(() => import("../pages/Question Bank/Lesson"));
+const TeacherSubject = lazy(() => import("../pages/Question Bank/TeacherSubject"));
+
+// Competitions
+const Competitions = lazy(() => import("../pages/competitions/Competitions"));
+const CompetitionDetails = lazy(() => import("../pages/competitions/CompetitionDetails"));
+const TheFirsts = lazy(() => import("../pages/theFirsts/TheFirsts"));
+
+// Courses
+const TeacherCourses = lazy(() => import("../pages/teacherCourses/TeacherCourses"));
+const AllCourses = lazy(() => import("../pages/teacherCourses/AllCourses"));
+const CourseDetailsPage = lazy(() => import("../pages/course/CourseDetailsPage"));
+const CourseStatisticsPage = lazy(() => import("../pages/course/CourseStatisticsPage"));
+const CourseStatistics = lazy(() => import("../pages/courseStatistics/CourseStatistics"));
+const CourseStudentsPage = lazy(() => import("../pages/course/CourseStudentsPage"));
+
+// Chat & Support
+const ChatPage = lazy(() => import("../pages/chat/ChatPage"));
+const TeacherChat = lazy(() => import("../pages/chat/TeacherChatPage"));
+const ChatbotPage = lazy(() => import("../pages/chatbot/ChatbotPage"));
+const TeamChat = lazy(() => import("../pages/teamChatPage/TeamChat"));
+const SupportChatAdmin = lazy(() => import("../pages/support/SupportChatAdmin"));
+const SupportChatTeacher = lazy(() => import("../pages/support/SupportChatTeacher"));
+const SupportGuestPage = lazy(() => import("../pages/support/SupportGuestPage"));
+const SupportEntry = lazy(() => import("../pages/support/SupportEntry"));
+
+// Other Pages
+const Code = lazy(() => import("../pages/code/Code"));
+const TeacherCode = lazy(() => import("../pages/code/TeacherCode"));
+const StudentStats = lazy(() => import("../pages/myStatistics/MyStatistics"));
+const AllUsers = lazy(() => import("../pages/allUsers/AllUsers"));
+const TasksPage = lazy(() => import("../pages/tasks/TasksPage"));
+const AllStudents = lazy(() => import("../pages/allStudents/AllStudents"));
+const LecturCommints = lazy(() => import("../pages/lecturCommints/LecturCommints"));
+const Social = lazy(() => import("../pages/social/Social"));
+const PlatfourmLeagues = lazy(() => import("../pages/league/PlatfourmLeagues"));
+const League = lazy(() => import("../pages/league/League"));
+const Match = lazy(() => import("../pages/league/Match"));
+const LecturesSchedule = lazy(() => import("../pages/lecturesSchedule/LecturesSchedule"));
+const FinanceManagementPage = lazy(() => import("../pages/finance/FinanceManagementPage"));
+const AdminAllStudentsPage = lazy(() => import("../pages/Admin/AdminAllStudentsPage"));
+const WhatsAppSessionsPage = lazy(() => import("../pages/Admin/whatsapp/WhatsAppSessionsPage"));
+const WhatsAppServicesPage = lazy(() => import("../pages/Admin/whatsapp/WhatsAppServicesPage"));
+const WhatsAppMonitorPage = lazy(() => import("../pages/Admin/whatsapp/WhatsAppMonitorPage"));
+const WhatsAppInboxPage = lazy(() => import("../pages/Admin/whatsapp/WhatsAppInboxPage"));
+const TeacherInvoicesPage = lazy(() => import("../pages/teacher/TeacherInvoicesPage"));
+const AdminDashboardHome = lazy(() => import("../pages/home/AdminDashboardHome"));
+const TeacherDashboardHome = lazy(() => import("../pages/home/TeacherDashboardHome"));
+const GlobalSearchPage = lazy(() => import("../pages/search/GlobalSearchPage"));
+const ChallengeEMAcademy = lazy(() => import("../pages/challengeEMAcademy/ChallengeEMAcademy"));
+const LecturesTaple = lazy(() => import("../pages/lecturesTaple/LecturesTaple"));
+const MeetingRoom = lazy(() => import("../pages/meeting/MeetingRoom"));
+const MyEnrollmentsPage = lazy(() => import("../pages/myEnrollments/MyEnrollmentsPage"));
+const NotificationCenterPage = lazy(() => import("../pages/notifications/NotificationCenterPage"));
+
+/* مؤشر تحميل خفيف يظهر أثناء جلب كود الصفحة أول مرة فقط */
+const RouteFallback = () => (
+  <div
+    role="status"
+    aria-label="جاري التحميل"
+    style={{
+      minHeight: "60vh",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+    }}
+  >
+    <span
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: "50%",
+        border: "3px solid rgba(0,160,227,0.2)",
+        borderTopColor: "#00a0e3",
+        display: "inline-block",
+        animation: "em-route-spin 0.8s linear infinite",
+      }}
+    />
+    <style>{`@keyframes em-route-spin { to { transform: rotate(360deg); } }`}</style>
+  </div>
+);
 
 const AppRouter = () => {
   const [userData, isAdmin, isTeacher, student] = UserType();
@@ -172,6 +208,7 @@ const AppRouter = () => {
   return (
     <div>
       {tenantSubdomain ? <TenantSeoHead subdomain={tenantSubdomain} /> : null}
+      <Suspense fallback={<RouteFallback />}>
       <Routes>
         {/* Public Routes — على النطاق الفرعي للمستأجر: الرئيسية = لاندنج العميل؛ باقي المسارات (login, home, …) مشتركة لنفس الـ origin وللـ localStorage */}
         <Route
@@ -463,16 +500,6 @@ const AppRouter = () => {
           <Route path="scientific-chat" element={<ScientificChatPage />} />
           <Route path="teacher-scientific-files" element={<ScientificTeacherFilesPage />} />
 
-          {/* Courses */}
-
-
-
-
-
-
-          {/* Groups */}
-
-
           {/* Competitions */}
           <Route path="competitions" element={<Competitions />} />
           <Route path="competition/:id" element={<CompetitionDetails />} />
@@ -499,13 +526,7 @@ const AppRouter = () => {
 
           {/* Exams */}
           <Route path="Platform_exams" element={<PlatformExams />} />
-
-
           <Route path="essay-exam/:id" element={<EssayExam />} />
-
-
-
-
           <Route path="exam/:examId" element={<Exam />} />
           <Route path="exam_grades" element={<ExamGrades />} />
           <Route path="teacher-analytics" element={<TeacherAnalyticsIntelligence />} />
@@ -615,6 +636,7 @@ const AppRouter = () => {
           }
         />
       </Routes>
+      </Suspense>
     </div>
   );
 };
