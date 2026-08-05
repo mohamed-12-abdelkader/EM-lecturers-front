@@ -138,6 +138,20 @@ export default function AuthProvider({ children }) {
     runBootstrap();
   }, [applyAuthenticated, applyGuest]);
 
+  /* -------------- مزامنة نفس التبويب (بعد login/signup) -------------- */
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const onAuthUpdate = () => {
+      const next = readStoredUser();
+      if (next) {
+        setUser(next);
+        setStatus("authenticated");
+      }
+    };
+    window.addEventListener("auth-storage-update", onAuthUpdate);
+    return () => window.removeEventListener("auth-storage-update", onAuthUpdate);
+  }, []);
+
   /* ----------------------- مزامنة بقية التبويبات ---------------------- */
   useEffect(() => {
     const unsubscribe = subscribeAuthMessages((msg) => {

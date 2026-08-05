@@ -12,7 +12,6 @@ import {
 import {
   TL_CYAN,
   TL_LIME,
-  TL_NAVY_SOFT,
   tlBtnPrimary,
   tlContainer,
   tlEyebrow,
@@ -46,7 +45,7 @@ function StepCard({ step, index }) {
   return (
     <StaggerItem variant="blur" className="relative text-center">
       <motion.div
-        className="group relative mx-auto rounded-3xl border border-white/10 bg-white/[0.05] px-4 py-6 md:border-0 md:bg-transparent md:px-0 md:py-0"
+        className="group relative mx-auto rounded-3xl border border-[color:var(--tl-border)] bg-[var(--tl-card)] px-4 py-6 shadow-sm md:border-0 md:bg-transparent md:px-0 md:py-0 md:shadow-none"
         style={{ transformStyle: "preserve-3d", perspective: 900 }}
         whileHover={reduceMotion ? undefined : { y: -12, rotateX: 10, scale: 1.04, z: 40 }}
         transition={{ type: "spring", stiffness: 280, damping: 20 }}
@@ -75,8 +74,8 @@ function StepCard({ step, index }) {
             <Icon className="text-lg" aria-hidden />
           </motion.span>
           <motion.span
-            className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#0A1628] text-[10px] font-bold text-white"
-            style={{ background: TL_NAVY_SOFT }}
+            className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white text-[10px] font-bold text-white"
+            style={{ background: TL_CYAN }}
             initial={reduceMotion ? false : { scale: 0, rotate: -20 }}
             whileInView={reduceMotion ? undefined : { scale: 1, rotate: 0 }}
             viewport={{ once: true }}
@@ -86,10 +85,10 @@ function StepCard({ step, index }) {
           </motion.span>
         </div>
 
-        <h3 className="font-heading text-lg font-bold text-white transition-colors group-hover:text-[#00A0E3]">
+        <h3 className="font-heading text-lg font-bold text-[var(--tl-fg)] transition-colors group-hover:text-[#00A0E3]">
           {step.title}
         </h3>
-        <p className="mx-auto mt-2 max-w-[16rem] text-sm leading-7 text-[#7EB8D9]">
+        <p className="mx-auto mt-2 max-w-[16rem] text-sm leading-7 text-[var(--tl-muted)]">
           {step.description}
         </p>
       </motion.div>
@@ -105,15 +104,15 @@ export default function TenantProHowItWorks({ teacherName, specialty, signupHref
   return (
     <section
       id="how-it-works"
-      className="scroll-mt-20 py-12 md:py-20"
-      style={{ background: TL_NAVY_SOFT, perspective: 1200 }}
+      className="scroll-mt-20 bg-[var(--tl-section-alt)] py-12 md:py-20"
+      style={{ perspective: 1200 }}
       dir="rtl"
     >
       <div className={tlContainer}>
         <Reveal variant="depthIn" className="mx-auto max-w-2xl text-center">
           <span className={tlEyebrow}>كيف تبدأ؟</span>
           <h2 className={`${tlHeading} mt-3`}>رحلة التعلّم خطوة بخطوة</h2>
-          <p className="mt-3 text-sm leading-7 text-[#7EB8D9] sm:text-base">{subtitle}</p>
+          <p className="mt-3 text-sm leading-7 text-[var(--tl-muted)] sm:text-base">{subtitle}</p>
         </Reveal>
 
         <div className="relative mt-10 md:mt-12">

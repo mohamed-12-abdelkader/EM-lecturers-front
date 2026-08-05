@@ -345,8 +345,9 @@ const SignUp = () => {
       toast.success("تم إنشاء الحساب بنجاح!");
       void playAuthSuccessSound();
       setShowSuccessModal(true);
+      // تنقّل SPA مرة واحدة — بدون full reload
       setTimeout(() => {
-        window.location = "/";
+        navigate("/home", { replace: true });
       }, 1900);
     } catch (err) {
       console.error(err);
@@ -960,7 +961,7 @@ const SignUp = () => {
               px={10}
               onClick={() => {
                 setShowSuccessModal(false);
-                window.location = "/";
+                navigate("/home", { replace: true });
               }}
             >
               متابعة

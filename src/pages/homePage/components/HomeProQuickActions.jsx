@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import {
   FaBookOpen,
   FaClipboardList,
+  FaFire,
   FaQrcode,
   FaRobot,
 } from "react-icons/fa";
@@ -14,6 +15,12 @@ const ACTIONS = [
     label: "كورساتي",
     desc: "المحتوى المشترك",
     icon: FaBookOpen,
+  },
+  {
+    to: "/student-daily-quizzes",
+    label: "المسابقة",
+    desc: "تحدي يومي وترتيب",
+    icon: FaFire,
   },
   {
     to: "/lectures_taple",
@@ -46,7 +53,7 @@ export default function HomeProQuickActions({ onActivateWithQr }) {
           <p className="mt-0.5 text-sm text-slate-500">اختصارات لأهم أدواتك</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3 lg:grid-cols-6">
           {ACTIONS.map((item) => {
             const Icon = item.icon;
             return (

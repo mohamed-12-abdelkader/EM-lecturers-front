@@ -74,8 +74,8 @@ export default function TenantProBentoWall({
   return (
     <section
       id="services"
-      className="scroll-mt-20 py-12 md:py-20"
-      style={{ background: TL_NAVY, perspective: 1200 }}
+      className="scroll-mt-20 bg-[var(--tl-section)] py-12 md:py-20"
+      style={{ perspective: 1200 }}
       dir="rtl"
     >
       <div className={`${tlContainer} max-w-6xl`}>
@@ -91,10 +91,10 @@ export default function TenantProBentoWall({
               <p className="text-sm font-semibold" style={{ color: TL_CYAN }}>
                 تعرّف علينا
               </p>
-              <h2 className="font-heading mt-2 text-2xl font-bold text-white md:text-3xl">
+              <h2 className="font-heading mt-2 text-2xl font-bold text-[var(--tl-fg)] md:text-3xl">
                 لماذا {teacherName}؟
               </h2>
-              <p className="mt-5 text-sm leading-8 text-[#7EB8D9] sm:text-base sm:leading-8">
+              <p className="mt-5 text-sm leading-8 text-[var(--tl-muted)] sm:text-base sm:leading-8">
                 {bioText}
               </p>
 
@@ -103,7 +103,7 @@ export default function TenantProBentoWall({
                   {benefitItems.map((title, i) => (
                     <motion.li
                       key={title}
-                      className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-white/90"
+                      className="flex items-start gap-3 rounded-2xl border border-[color:var(--tl-border)] bg-[var(--tl-card)] px-4 py-3 text-sm text-[var(--tl-fg)] shadow-sm"
                       initial={{ opacity: 0, x: 28, rotateY: -12 }}
                       whileInView={{ opacity: 1, x: 0, rotateY: 0 }}
                       viewport={{ once: true }}
@@ -113,7 +113,6 @@ export default function TenantProBentoWall({
                         scale: 1.02,
                         rotateX: 4,
                         borderColor: "rgba(0,160,227,0.4)",
-                        backgroundColor: "rgba(255,255,255,0.09)",
                       }}
                       style={{ transformStyle: "preserve-3d" }}
                     >

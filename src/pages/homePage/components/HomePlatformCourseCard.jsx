@@ -53,22 +53,17 @@ export default function HomePlatformCourseCard({
         borderColor: "blue.200",
       }}
     >
-      <Box position="relative" h={{ base: "190px", md: "160px" }} bg={imageBg} flexShrink={0}>
+      <Box position="relative" bg={imageBg} flexShrink={0}>
         <Box
           as="img"
           src={cover}
           alt={course.title || "كورس"}
           w="full"
-          h="full"
-          objectFit="cover"
-        />
-        <Box
-          position="absolute"
-          inset={0}
-          bgGradient="linear(to-t, blackAlpha.800 0%, blackAlpha.200 50%, transparent 75%)"
+          h="auto"
+          display="block"
         />
 
-        <HStack position="absolute" top={3} insetInline={3} justify="space-between">
+        <HStack position="absolute" top={3} insetInline={3} justify="space-between" zIndex={1}>
           <Badge
             bg="white"
             color="blue.700"
@@ -98,22 +93,19 @@ export default function HomePlatformCourseCard({
             {statusLabel}
           </Badge>
         </HStack>
-
-        <Box position="absolute" bottom={3} insetInline={3}>
-          <Text
-            color="white"
-            fontSize={{ base: "md", md: "lg" }}
-            fontWeight="800"
-            noOfLines={2}
-            lineHeight="1.4"
-            letterSpacing="-0.01em"
-          >
-            {course.title}
-          </Text>
-        </Box>
       </Box>
 
       <Box p={{ base: 4, md: 4 }} flex="1" display="flex" flexDirection="column" gap={3}>
+        <Text
+          fontSize={{ base: "md", md: "lg" }}
+          fontWeight="800"
+          noOfLines={2}
+          lineHeight="1.4"
+          letterSpacing="-0.01em"
+        >
+          {course.title}
+        </Text>
+
         <HStack justify="space-between" align="center" spacing={3}>
           <HStack spacing={2} minW={0} color={muted}>
             <Icon as={FaUserGraduate} boxSize={3.5} color="blue.500" flexShrink={0} />

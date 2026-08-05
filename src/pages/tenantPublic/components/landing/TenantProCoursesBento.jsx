@@ -1,12 +1,10 @@
 import { FaArrowLeft, FaBookOpen } from "react-icons/fa";
-import { motion } from "framer-motion";
 import { DepthCard, Reveal, StaggerGrid, StaggerItem } from "../../tenantLandingMotion";
 import { getCardImageUrl } from "../../../../utils/highQualityImageUrl";
 import {
   TL_CYAN,
   TL_LIME,
   TL_NAVY,
-  TL_NAVY_SOFT,
   tlBtnPrimary,
   tlCard,
   tlCardHover,
@@ -43,7 +41,7 @@ function SimpleCourseCard({ course, fallbackImage, loginHref }) {
   return (
     <DepthCard maxTilt={11} floatPx={0}>
       <article className={`flex flex-col overflow-hidden ${tlCard} ${tlCardHover}`}>
-        <div className="relative h-40 overflow-hidden bg-[#12263F] sm:h-36">
+        <div className="relative h-40 overflow-hidden bg-[var(--tl-card-solid)] sm:h-36">
           <img
             src={img}
             alt={title}
@@ -51,7 +49,7 @@ function SimpleCourseCard({ course, fallbackImage, loginHref }) {
             loading="lazy"
             decoding="async"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0A1628]/70 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/50 via-transparent to-transparent" />
           {grade ? (
             <span
               className="absolute right-2 top-2 rounded-lg px-2 py-0.5 text-[10px] font-semibold text-white"
@@ -73,11 +71,11 @@ function SimpleCourseCard({ course, fallbackImage, loginHref }) {
         </div>
 
         <div className="flex flex-1 flex-col p-4">
-          <h3 className="font-heading line-clamp-2 text-sm font-bold leading-snug text-white">
+          <h3 className="font-heading line-clamp-2 text-sm font-bold leading-snug text-[var(--tl-fg)]">
             {title}
           </h3>
 
-          <div className="mt-3 flex items-center justify-between gap-2 border-t border-white/10 pt-3">
+          <div className="mt-3 flex items-center justify-between gap-2 border-t border-[color:var(--tl-border)] pt-3">
             <div>
               <p
                 className="text-sm font-bold"
@@ -86,7 +84,7 @@ function SimpleCourseCard({ course, fallbackImage, loginHref }) {
                 {priceLabel}
               </p>
               {lessons != null ? (
-                <p className="text-[10px] text-[#7EB8D9]">
+                <p className="text-[10px] text-[var(--tl-muted)]">
                   {Number(lessons).toLocaleString("ar-EG")} درس
                 </p>
               ) : null}
@@ -110,15 +108,15 @@ export default function TenantProCoursesBento({ courses, loading, fallbackImage,
   return (
     <section
       id="courses"
-      className="scroll-mt-20 py-12 md:py-20"
-      style={{ background: TL_NAVY_SOFT, perspective: 1200 }}
+      className="scroll-mt-20 bg-[var(--tl-section-alt)] py-12 md:py-20"
+      style={{ perspective: 1200 }}
       dir="rtl"
     >
       <div className={tlContainer}>
         <Reveal variant="depthIn" className="text-center">
           <span className={tlEyebrow}>الكورسات</span>
           <h2 className={`${tlHeading} mt-3`}>الكورسات المتاحة</h2>
-          <p className="mx-auto mt-2 max-w-md text-sm text-[#7EB8D9]">
+          <p className="mx-auto mt-2 max-w-md text-sm text-[var(--tl-muted)]">
             اختر الكورس المناسب وابدأ التعلّم
           </p>
         </Reveal>
@@ -126,12 +124,12 @@ export default function TenantProCoursesBento({ courses, loading, fallbackImage,
         {loading ? (
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-52 animate-pulse rounded-2xl bg-white/10" />
+              <div key={i} className="h-52 animate-pulse rounded-2xl bg-[var(--tl-card-solid)]" />
             ))}
           </div>
         ) : courses.length > 0 ? (
           <>
-            <p className="mt-5 text-center text-sm text-[#7EB8D9]">
+            <p className="mt-5 text-center text-sm text-[var(--tl-muted)]">
               <span className="font-bold" style={{ color: TL_CYAN }}>
                 {courses.length.toLocaleString("ar-EG")}
               </span>{" "}
@@ -157,14 +155,14 @@ export default function TenantProCoursesBento({ courses, loading, fallbackImage,
           </>
         ) : (
           <Reveal variant="springPop" className="mt-8">
-            <div className="rounded-2xl border border-dashed border-white/20 bg-white/[0.04] px-6 py-12 text-center">
+            <div className="rounded-2xl border border-dashed border-[color:var(--tl-border)] bg-[var(--tl-card)] px-6 py-12 text-center">
               <div
                 className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl text-xl"
                 style={{ background: `${TL_CYAN}22`, color: TL_CYAN }}
               >
                 <FaBookOpen />
               </div>
-              <p className="font-heading font-bold text-white">لا توجد كورسات حالياً</p>
+              <p className="font-heading font-bold text-[var(--tl-fg)]">لا توجد كورسات حالياً</p>
               <TenantAppLink href={signupHref} className={`mt-4 ${tlBtnPrimary}`}>
                 أنشئ حسابك
                 <FaArrowLeft className="text-xs" />

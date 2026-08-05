@@ -24,8 +24,8 @@ function LectureFrame({ lecture, fallbackImage, onPlay }) {
       whileTap={{ scale: 0.97 }}
       transition={{ type: "spring", stiffness: 320, damping: 22 }}
     >
-      <div className="overflow-hidden rounded-2xl border border-white/12 bg-white/[0.06] p-1.5 shadow-[0_20px_50px_-16px_rgba(0,0,0,0.6)] sm:p-2">
-        <div className="relative overflow-hidden rounded-xl bg-[#12263F]">
+      <div className="overflow-hidden rounded-2xl border border-[color:var(--tl-border)] bg-[var(--tl-card)] p-1.5 shadow-[0_16px_40px_-16px_rgba(15,23,42,0.2)] sm:p-2">
+        <div className="relative overflow-hidden rounded-xl bg-[var(--tl-card-solid)]">
           <img
             src={thumb}
             alt={lecture.title}
@@ -33,9 +33,9 @@ function LectureFrame({ lecture, fallbackImage, onPlay }) {
             loading="lazy"
             decoding="async"
           />
-          <div className="absolute inset-0 flex items-center justify-center bg-[#0A1628]/45 transition-colors duration-200 group-hover:bg-[#0A1628]/55">
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-900/35 transition-colors duration-200 group-hover:bg-slate-900/45">
             <motion.span
-              className="flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-md"
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--tl-card)] shadow-md"
               style={{ color: TL_CYAN }}
               whileHover={{ scale: 1.15 }}
               animate={{ scale: [1, 1.08, 1] }}
@@ -52,7 +52,7 @@ function LectureFrame({ lecture, fallbackImage, onPlay }) {
           </span>
         </div>
       </div>
-      <p className="mt-3 line-clamp-2 font-heading text-sm font-bold text-white">{lecture.title}</p>
+      <p className="mt-3 line-clamp-2 font-heading text-sm font-bold text-[var(--tl-fg)]">{lecture.title}</p>
     </motion.button>
   );
 }
@@ -73,8 +73,7 @@ export default function TenantProVideoStrip({
   return (
     <section
       id="videos"
-      className="scroll-mt-20 py-12 md:py-20"
-      style={{ background: TL_NAVY }}
+      className="scroll-mt-20 bg-[var(--tl-section)] py-12 md:py-20"
       dir="rtl"
     >
       <div className={tlContainer}>
@@ -82,7 +81,7 @@ export default function TenantProVideoStrip({
           <Reveal variant="blurUp">
             <span className={tlEyebrow}>محاضرات مجانية</span>
             <h2 className={`${tlHeading} mt-3`}>جرّب قبل الاشتراك</h2>
-            <p className="mt-2 max-w-lg text-sm leading-7 text-[#7EB8D9]">
+            <p className="mt-2 max-w-lg text-sm leading-7 text-[var(--tl-muted)]">
               شاهد محاضرات مجانية وتعرّف على أسلوب الشرح
             </p>
           </Reveal>
@@ -91,7 +90,7 @@ export default function TenantProVideoStrip({
               <button
                 type="button"
                 onClick={() => scroll(-1)}
-                className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white/80 transition-colors duration-200 hover:border-[#00A0E3]/50 hover:text-[#00A0E3]"
+                className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-[color:var(--tl-border)] bg-[var(--tl-card)] text-[var(--tl-muted)] transition-colors duration-200 hover:border-[#00A0E3]/50 hover:text-[#00A0E3]"
                 aria-label="السابق"
               >
                 <FaChevronRight />
@@ -99,7 +98,7 @@ export default function TenantProVideoStrip({
               <button
                 type="button"
                 onClick={() => scroll(1)}
-                className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-white/15 bg-white/5 text-white/80 transition-colors duration-200 hover:border-[#00A0E3]/50 hover:text-[#00A0E3]"
+                className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-[color:var(--tl-border)] bg-[var(--tl-card)] text-[var(--tl-muted)] transition-colors duration-200 hover:border-[#00A0E3]/50 hover:text-[#00A0E3]"
                 aria-label="التالي"
               >
                 <FaChevronLeft />
@@ -113,7 +112,7 @@ export default function TenantProVideoStrip({
             {Array.from({ length: 3 }).map((_, i) => (
               <div
                 key={i}
-                className="h-48 w-[min(300px,82vw)] shrink-0 animate-pulse rounded-2xl bg-white/10 sm:h-52 sm:w-[min(340px,85vw)]"
+                className="h-48 w-[min(300px,82vw)] shrink-0 animate-pulse rounded-2xl bg-[var(--tl-card-solid)] sm:h-52 sm:w-[min(340px,85vw)]"
               />
             ))}
           </div>
@@ -131,9 +130,9 @@ export default function TenantProVideoStrip({
           </div>
         ) : (
           <Reveal variant="springPop" className="mt-10">
-            <div className="rounded-2xl border border-dashed border-white/20 bg-white/[0.04] px-6 py-14 text-center">
-              <p className="font-heading text-lg font-bold text-white">لا توجد محاضرات مجانية حالياً</p>
-              <p className="mt-2 text-sm text-[#7EB8D9]">سيتم إضافة محاضرات قريباً</p>
+            <div className="rounded-2xl border border-dashed border-[color:var(--tl-border)] bg-[var(--tl-soft)] px-6 py-14 text-center">
+              <p className="font-heading text-lg font-bold text-[var(--tl-fg)]">لا توجد محاضرات مجانية حالياً</p>
+              <p className="mt-2 text-sm text-[var(--tl-muted)]">سيتم إضافة محاضرات قريباً</p>
             </div>
           </Reveal>
         )}

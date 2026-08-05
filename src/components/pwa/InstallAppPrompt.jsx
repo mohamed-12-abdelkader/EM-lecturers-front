@@ -2,11 +2,8 @@
  * InstallAppPrompt — نافذة تثبيت مخصصة تظهر تلقائياً عند دخول منصة أي مدرس
  * (subdomain) بعد فترة قصيرة من التصفح.
  *
- * القواعد:
- * - لا تظهر داخل التطبيق المثبّت (standalone) أو بعد التثبيت.
- * - قابلة للإغلاق — ولا تعود قبل مرور فترة التهدئة (3 أيام).
- * - iOS: دليل "الإضافة للشاشة الرئيسية". Chromium: النافذة الأصلية مباشرة.
- * - يمكن فتحها يدوياً من أي مكان عبر: window.dispatchEvent(new Event("pwa:open-install"))
+ * الاسم واللوجو يأتيان من منصة المدرس (مش الشركة الأم).
+ * كل subdomain = تطبيق مستقل يمكن تثبيته بجانب منصات مدرسين آخرين.
  */
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -15,16 +12,29 @@ import usePWAInstall from "../../Hooks/pwa/usePWAInstall";
 import IOSInstallGuideModal from "./IOSInstallGuideModal";
 import DesktopInstallGuideModal from "./DesktopInstallGuideModal";
 import { getTenantSubdomain } from "../../utils/tenantHost";
-import { readCachedTenantBrandLogo } from "../../utils/tenantBrandLogo";
+import {
+  readCachedTenantBrandLogo,
+  resolveTenantBrandLogo,
+} from "../../utils/tenantBrandLogo";
+import { readCachedTenantPublic } from "../../api/tenantPublicApi";
+import {
+  readCachedTenantPwaName,
+  resolveTenantPwaBranding,
+} from "../../utils/tenantPwaManifest";
 import { safeLocalGet, safeLocalSet } from "../../utils/safeStorage";
 
-const DISMISSED_AT_KEY = "pwa_install_prompt_dismissed_at";
 const COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000; // 3 أيام
 const AUTO_SHOW_DELAY_MS = 14_000;
 export const OPEN_INSTALL_PROMPT_EVENT = "pwa:open-install";
 
-function isInCooldown() {
-  const raw = safeLocalGet(DISMISSED_AT_KEY);
+function dismissKey(subdomain) {
+  return subdomain
+    ? `pwa_install_prompt_dismissed_at:${subdomain}`
+    : "pwa_install_prompt_dismissed_at";
+}
+
+function isInCooldown(subdomain) {
+  const raw = safeLocalGet(dismissKey(subdomain));
   if (!raw) return false;
   const at = Number(raw);
   return Number.isFinite(at) && Date.now() - at < COOLDOWN_MS;
@@ -36,6 +46,27 @@ const FEATURES = [
   { Icon: FaBell, text: "إشعارات فورية" },
 ];
 
+function readTenantBrand(subdomain) {
+  if (!subdomain) {
+    return { name: "المنصة", logo: null };
+  }
+  const cached = readCachedTenantPublic(subdomain);
+  const branding = cached?.data?.tenant
+    ? resolveTenantPwaBranding(cached.data.tenant, cached.data.teacher, subdomain)
+    : null;
+  return {
+    name:
+      branding?.name ||
+      readCachedTenantPwaName(subdomain) ||
+      subdomain.replace(/[-_]+/g, " "),
+    logo:
+      branding?.iconUrl ||
+      readCachedTenantBrandLogo(subdomain) ||
+      resolveTenantBrandLogo(cached?.data?.tenant, cached?.data?.teacher) ||
+      null,
+  };
+}
+
 export default function InstallAppPrompt() {
   const { canShowInstallButton, canInstallNative, isIos, promptInstall } =
     usePWAInstall();
@@ -43,18 +74,25 @@ export default function InstallAppPrompt() {
   const [iosOpen, setIosOpen] = useState(false);
   const [desktopOpen, setDesktopOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [brandTick, setBrandTick] = useState(0);
 
   const tenantSubdomain = getTenantSubdomain();
-  const teacherLogo = useMemo(
-    () => (tenantSubdomain ? readCachedTenantBrandLogo(tenantSubdomain) : null),
-    [tenantSubdomain],
+  const brand = useMemo(
+    () => readTenantBrand(tenantSubdomain),
+    [tenantSubdomain, brandTick],
   );
+
+  useEffect(() => {
+    const onReady = () => setBrandTick((n) => n + 1);
+    window.addEventListener("pwa:tenant-manifest-ready", onReady);
+    return () => window.removeEventListener("pwa:tenant-manifest-ready", onReady);
+  }, []);
 
   // ظهور تلقائي على منصة المدرس بعد فترة من التصفح
   useEffect(() => {
     if (!tenantSubdomain) return undefined;
     if (!canShowInstallButton) return undefined;
-    if (isInCooldown()) return undefined;
+    if (isInCooldown(tenantSubdomain)) return undefined;
 
     const timer = setTimeout(() => setOpen(true), AUTO_SHOW_DELAY_MS);
     return () => clearTimeout(timer);
@@ -70,7 +108,7 @@ export default function InstallAppPrompt() {
   }, [canShowInstallButton]);
 
   const dismiss = () => {
-    safeLocalSet(DISMISSED_AT_KEY, String(Date.now()));
+    safeLocalSet(dismissKey(tenantSubdomain), String(Date.now()));
     setOpen(false);
   };
 
@@ -92,8 +130,9 @@ export default function InstallAppPrompt() {
     else setDesktopOpen(true);
   };
 
-  // بعد التثبيت أو داخل التطبيق: لا شيء يُعرض
   const shouldRender = open && canShowInstallButton;
+  const appName = brand.name || "المنصة";
+  const logoSrc = brand.logo || "/icons/icon-192.png";
 
   return (
     <>
@@ -114,7 +153,7 @@ export default function InstallAppPrompt() {
               exit={{ y: 90, opacity: 0, scale: 0.98 }}
               transition={{ type: "spring", stiffness: 340, damping: 32 }}
               role="dialog"
-              aria-label="تنزيل المنصة"
+              aria-label={`تنزيل ${appName}`}
               onClick={(e) => e.stopPropagation()}
               style={{ paddingBottom: "max(env(safe-area-inset-bottom), 16px)" }}
               className="w-full max-w-md rounded-t-3xl bg-white p-5 shadow-2xl dark:bg-slate-800 sm:rounded-3xl"
@@ -124,17 +163,17 @@ export default function InstallAppPrompt() {
               <div className="flex items-center gap-3.5">
                 <span className="flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-md dark:border-slate-600">
                   <img
-                    src={teacherLogo || "/icons/icon-192.png"}
+                    src={logoSrc}
                     alt=""
                     className="h-full w-full object-contain p-1"
                   />
                 </span>
                 <div className="min-w-0">
-                  <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100">
-                    ثبّت المنصة على جهازك
+                  <h3 className="truncate text-base font-extrabold text-slate-800 dark:text-slate-100">
+                    ثبّت «{appName}» على جهازك
                   </h3>
                   <p className="mt-0.5 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                    افتحها من الشاشة الرئيسية كتطبيق حقيقي — بدون متصفح.
+                    هتظهر باسم المدرس ولوجوه على الشاشة الرئيسية — كتطبيق مستقل.
                   </p>
                 </div>
               </div>
@@ -164,7 +203,7 @@ export default function InstallAppPrompt() {
                     <FaDownload className="absolute text-[13px]" />
                     <FaMobileAlt className="absolute translate-x-[7px] translate-y-[6px] text-[9px] text-orange-300" />
                   </span>
-                  {busy ? "جاري التنزيل..." : "تنزيل المنصة"}
+                  {busy ? "جاري التنزيل..." : `تنزيل ${appName}`}
                 </button>
                 <button
                   type="button"
@@ -179,10 +218,15 @@ export default function InstallAppPrompt() {
         ) : null}
       </AnimatePresence>
 
-      <IOSInstallGuideModal isOpen={iosOpen} onClose={() => setIosOpen(false)} />
+      <IOSInstallGuideModal
+        isOpen={iosOpen}
+        onClose={() => setIosOpen(false)}
+        appName={appName}
+      />
       <DesktopInstallGuideModal
         isOpen={desktopOpen}
         onClose={() => setDesktopOpen(false)}
+        appName={appName}
       />
     </>
   );

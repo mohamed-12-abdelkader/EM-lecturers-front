@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import baseUrl from "../../api/baseUrl";
 import { toast } from "react-toastify";
 import { persistLoginSession } from "../../utils/authStorage";
 
 const useLogin = () => {
+  const navigate = useNavigate();
   const [mail, setMail] = useState("");
   const [pass, setPass] = useState("");
   const [loading, setLoading] = useState(false);
@@ -65,7 +67,7 @@ const useLogin = () => {
       console.log(response);
       toast.success("تم تسجيل الدخول بنجاح");
       setTimeout(() => {
-        window.location.href = "/home";
+        navigate("/home", { replace: true });
       }, 500);
     } catch (error) {
       // يمكنك إظهار رسالة خطأ باستخدام toast

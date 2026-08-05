@@ -14,7 +14,6 @@ import {
 import {
   TL_CYAN as CYAN,
   TL_NAVY as NAVY,
-  TL_TAGLINE as TAGLINE,
   tlContainer,
 } from "../../tenantLandingTheme";
 import TenantAppLink from "../TenantAppLink";
@@ -41,7 +40,7 @@ function SpecialtyBadge({ specialty, className = "" }) {
   if (!specialty) return null;
   return (
     <motion.span
-      className={`inline-flex max-w-full items-center gap-2 rounded-full border border-white/25 bg-white/5 px-3.5 py-1.5 text-[11px] font-semibold leading-snug text-white/90 backdrop-blur-sm md:text-xs ${className}`}
+      className={`inline-flex max-w-full items-center gap-2 rounded-full border border-[color:var(--tl-border)] bg-[var(--tl-card)] px-3.5 py-1.5 text-[11px] font-semibold leading-snug text-[var(--tl-fg)] backdrop-blur-sm md:text-xs ${className}`}
       whileHover={{ scale: 1.04, y: -2 }}
       transition={{ type: "spring", stiffness: 400, damping: 18 }}
     >
@@ -61,8 +60,8 @@ function HighlightsCard({ highlights }) {
   if (!highlights?.length) return null;
   return (
     <motion.ul
-      className="rounded-2xl border border-white/15 px-4 py-4 text-right md:px-5 md:py-5"
-      style={{ background: "rgba(255,255,255,0.06)", transformStyle: "preserve-3d" }}
+      className="rounded-2xl border border-[color:var(--tl-border)] bg-[var(--tl-card)] px-4 py-4 text-right shadow-sm md:px-5 md:py-5"
+      style={{ transformStyle: "preserve-3d" }}
       initial={{ rotateX: 12, opacity: 0.6 }}
       animate={{ rotateX: 0, opacity: 1 }}
       transition={{ duration: 0.8, ease: EASE }}
@@ -70,7 +69,7 @@ function HighlightsCard({ highlights }) {
       {highlights.map((item, i) => (
         <motion.li
           key={item}
-          className="flex items-start gap-2.5 border-b border-white/5 py-2.5 last:border-0 last:pb-0 first:pt-0 md:py-3"
+          className="flex items-start gap-2.5 border-b border-[color:var(--tl-border)] py-2.5 last:border-0 last:pb-0 first:pt-0 md:py-3"
           initial={{ opacity: 0, x: 16 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.35 + i * 0.1, duration: 0.45 }}
@@ -83,7 +82,7 @@ function HighlightsCard({ highlights }) {
             transition={{ duration: 2.4, repeat: Infinity, delay: i * 0.3 }}
             aria-hidden
           />
-          <span className="flex-1 text-[13px] font-medium leading-6 text-white/90 md:text-sm md:leading-7">
+          <span className="flex-1 text-[13px] font-medium leading-6 text-[var(--tl-fg)] md:text-sm md:leading-7">
             {item}
           </span>
         </motion.li>
@@ -121,7 +120,7 @@ function HeroActions({ signupHref, loginHref, whatsappHref, showFreeVideos }) {
         >
           <TenantAppLink
             href={loginHref}
-            className="inline-flex items-center justify-center rounded-xl border border-white/30 bg-transparent px-4 py-3.5 text-sm font-bold text-white transition hover:bg-white/10 active:scale-[0.98] md:min-w-[160px] md:px-8"
+            className="inline-flex items-center justify-center rounded-xl border border-[color:var(--tl-border)] bg-[var(--tl-card)] px-4 py-3.5 text-sm font-bold text-[var(--tl-fg)] shadow-sm transition hover:bg-[var(--tl-soft)] active:scale-[0.98] md:min-w-[160px] md:px-8"
           >
             تسجيل دخول
           </TenantAppLink>
@@ -131,7 +130,7 @@ function HeroActions({ signupHref, loginHref, whatsappHref, showFreeVideos }) {
             href={whatsappHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-[#25D366]/40 bg-[#25D366]/15 px-4 py-3.5 text-sm font-bold text-[#6EFFA0] transition hover:bg-[#25D366]/25 active:scale-[0.98] md:col-span-1 md:min-w-[180px]"
+            className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-[#25D366]/50 bg-[#25D366]/12 px-4 py-3.5 text-sm font-bold text-[#128C7E] transition hover:bg-[#25D366]/20 active:scale-[0.98] md:col-span-1 md:min-w-[180px] [.tenant-dark_&]:border-[#25D366]/40 [.tenant-dark_&]:bg-[#25D366]/15 [.tenant-dark_&]:text-[#6EFFA0]"
             whileHover={reduceMotion ? undefined : { y: -4, scale: 1.03 }}
             whileTap={reduceMotion ? undefined : { scale: 0.97 }}
           >
@@ -144,11 +143,11 @@ function HeroActions({ signupHref, loginHref, whatsappHref, showFreeVideos }) {
       {showFreeVideos ? (
         <motion.a
           href="#videos"
-          className="inline-flex items-center justify-center gap-2.5 text-sm font-semibold text-white/60 transition hover:text-white md:justify-start"
+          className="inline-flex items-center justify-center gap-2.5 text-sm font-semibold text-[var(--tl-muted)] transition hover:text-[var(--tl-fg)] md:justify-start"
           whileHover={reduceMotion ? undefined : { x: -4 }}
         >
           <motion.span
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/5"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-[color:var(--tl-border)] bg-[var(--tl-soft)]"
             animate={reduceMotion ? undefined : { scale: [1, 1.12, 1] }}
             transition={{ duration: 2.2, repeat: Infinity }}
           >
@@ -185,7 +184,7 @@ function HeroCopy({
       ) : null}
 
       <HeroStaggerItem className={isCenter ? "text-center" : "text-right"}>
-        <h1 className="font-heading text-[2rem] font-bold leading-tight tracking-tight text-white sm:text-[2.35rem] lg:text-[2.85rem]">
+        <h1 className="font-heading text-[2rem] font-bold leading-tight tracking-tight text-[var(--tl-fg)] sm:text-[2.35rem] lg:text-[2.85rem]">
           {teacherName}
         </h1>
         <motion.span
@@ -201,8 +200,7 @@ function HeroCopy({
       {tagline ? (
         <HeroStaggerItem className={`mt-4 ${isCenter ? "text-center" : "text-right"}`}>
           <p
-            className="max-w-xl text-[0.95rem] font-medium leading-7 md:text-base md:leading-8"
-            style={{ color: TAGLINE }}
+            className="max-w-xl text-[0.95rem] font-medium leading-7 text-[var(--tl-muted)] md:text-base md:leading-8"
           >
             {tagline}
           </p>
@@ -240,7 +238,7 @@ function TeacherImage({ src, alt, className = "", fade = "bottom", priority = tr
   }, [src]);
 
   return (
-    <div className={`relative overflow-hidden bg-[#12263F] ${className}`}>
+    <div className={`relative overflow-hidden bg-[var(--tl-card-solid)] ${className}`}>
       {src ? (
         <>
           {blurSrc ? (
@@ -286,14 +284,16 @@ function TeacherImage({ src, alt, className = "", fade = "bottom", priority = tr
           <div
             className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-[50%]"
             style={{
-              background: `linear-gradient(to top, ${NAVY} 0%, ${NAVY}b8 30%, transparent 100%)`,
+              background:
+                "linear-gradient(to top, var(--tl-hero-fade) 0%, color-mix(in srgb, var(--tl-hero-fade) 72%, transparent) 30%, transparent 100%)",
             }}
             aria-hidden
           />
           <div
             className="pointer-events-none absolute inset-x-0 top-0 z-[2] h-20"
             style={{
-              background: `linear-gradient(to bottom, ${NAVY}88 0%, transparent 100%)`,
+              background:
+                "linear-gradient(to bottom, color-mix(in srgb, var(--tl-hero-fade) 55%, transparent) 0%, transparent 100%)",
             }}
             aria-hidden
           />
@@ -303,14 +303,16 @@ function TeacherImage({ src, alt, className = "", fade = "bottom", priority = tr
           <div
             className="pointer-events-none absolute inset-y-0 right-0 z-[2] w-[28%]"
             style={{
-              background: `linear-gradient(to left, ${NAVY} 0%, transparent 100%)`,
+              background:
+                "linear-gradient(to left, var(--tl-hero-fade) 0%, transparent 100%)",
             }}
             aria-hidden
           />
           <div
             className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-[18%]"
             style={{
-              background: `linear-gradient(to top, ${NAVY} 0%, transparent 100%)`,
+              background:
+                "linear-gradient(to top, var(--tl-hero-fade) 0%, transparent 100%)",
             }}
             aria-hidden
           />
@@ -382,8 +384,8 @@ export default function TenantProHero({
     <section
       id="home"
       ref={sectionRef}
-      className="relative overflow-hidden"
-      style={{ background: NAVY, perspective: 1400 }}
+      className="relative overflow-hidden bg-[var(--tl-page-bg)]"
+      style={{ perspective: 1400 }}
       dir="rtl"
     >
       {/* Floating depth orbs */}

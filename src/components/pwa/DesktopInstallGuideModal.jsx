@@ -38,7 +38,7 @@ const STEPS = [
   },
 ];
 
-export default function DesktopInstallGuideModal({ isOpen, onClose }) {
+export default function DesktopInstallGuideModal({ isOpen, onClose, appName = "التطبيق" }) {
   const cardBg = useColorModeValue("orange.50", "whiteAlpha.100");
   const border = useColorModeValue("orange.100", "whiteAlpha.200");
 
@@ -48,12 +48,13 @@ export default function DesktopInstallGuideModal({ isOpen, onClose }) {
       <ModalContent dir="rtl" mx={4} borderRadius="2xl" overflow="hidden">
         <Box h="4px" bgGradient="linear(to-l, blue.500, orange.500)" />
         <ModalHeader pb={1} fontSize="lg" fontWeight="800">
-          تثبيت التطبيق على جهازك
+          تثبيت «{appName}» على جهازك
         </ModalHeader>
         <ModalCloseButton />
         <ModalBody pb={2}>
           <Text fontSize="sm" color="gray.500" mb={4} lineHeight="1.8">
-            نافذة التثبيت المباشرة غير جاهزة حالياً. يمكنك تثبيت الموقع من قائمة المتصفح:
+            نافذة التثبيت المباشرة غير جاهزة حالياً. يمكنك تثبيت «{appName}» من قائمة المتصفح
+            وستظهر باسم ولوجو المنصة:
           </Text>
           <VStack align="stretch" spacing={3}>
             {STEPS.map((step, index) => {

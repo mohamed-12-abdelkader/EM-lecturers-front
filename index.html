@@ -352,6 +352,66 @@
     <div id="root"></div>
     <script>
       (function () {
+        function applyTenantPwaFromCache(sub) {
+          try {
+            if (!sub) return;
+            var raw = sessionStorage.getItem("tenant-public:" + sub);
+            if (!raw) return;
+            var json = JSON.parse(raw);
+            var t = json && json.data && json.data.tenant;
+            var teacher = json && json.data && json.data.teacher;
+            var logo =
+              (t && (t.favicon_url || t.icon_url || t.logo_url || t.avatar_url)) ||
+              (teacher && (teacher.avatar || teacher.image)) ||
+              null;
+            var nice = String(sub).replace(/[-_]+/g, " ");
+            var appTitle =
+              (t && (t.display_name || t.name)) ||
+              (teacher && teacher.name) ||
+              nice;
+            if (!appTitle && !logo) return;
+
+            var metaApp = document.querySelector('meta[name="application-name"]');
+            var metaApple = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+            if (metaApp) metaApp.setAttribute("content", appTitle);
+            if (metaApple) metaApple.setAttribute("content", String(appTitle).slice(0, 40));
+            if (logo) {
+              document.querySelectorAll('link[rel="apple-touch-icon"]').forEach(function (el) {
+                el.href = logo;
+              });
+              var fav = document.querySelector('link[rel="icon"]');
+              if (fav) fav.href = logo;
+            }
+            var manifest = {
+              id: location.origin + "/?pwa=" + encodeURIComponent(sub),
+              name: appTitle,
+              short_name: appTitle.length > 12 ? appTitle.slice(0, 11) + "…" : appTitle,
+              description: "منصة " + appTitle + " التعليمية",
+              lang: "ar",
+              dir: "rtl",
+              start_url: location.origin + "/",
+              scope: location.origin + "/",
+              display: "standalone",
+              background_color: "#ffffff",
+              theme_color: "#3182CE",
+              icons: logo
+                ? [
+                    { src: logo, sizes: "192x192", type: "image/png", purpose: "any" },
+                    { src: logo, sizes: "512x512", type: "image/png", purpose: "any" },
+                  ]
+                : [
+                    { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+                    { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+                  ],
+            };
+            var blob = new Blob([JSON.stringify(manifest)], {
+              type: "application/manifest+json",
+            });
+            var mlink = document.querySelector('link[rel="manifest"]');
+            if (mlink) mlink.href = URL.createObjectURL(blob);
+          } catch (e) {}
+        }
+
         try {
           var host = (location.hostname || "").toLowerCase();
           var parts = host.split(".");
@@ -364,6 +424,9 @@
           var isLandingRoot = path === "/";
           var splashKey = isTenant ? "em-tenant-splash:" + sub : "";
           var alreadyShown = splashKey ? sessionStorage.getItem(splashKey) === "1" : true;
+
+          // PWA مبكراً من الكاش (حتى لو ما ظهرت شاشة التحميل)
+          if (isTenant) applyTenantPwaFromCache(sub);
 
           // شاشة التحميل الفاخرة: أول فتح لـ / على منصة مدرس فقط
           var showFancy =

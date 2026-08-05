@@ -3,16 +3,18 @@
  * Always visible when not running as an installed app.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaDownload, FaMobileAlt } from "react-icons/fa";
 import { toast } from "react-toastify";
 import usePWAInstall from "../../Hooks/pwa/usePWAInstall";
 import IOSInstallGuideModal from "./IOSInstallGuideModal";
 import DesktopInstallGuideModal from "./DesktopInstallGuideModal";
+import { getTenantSubdomain } from "../../utils/tenantHost";
+import { readCachedTenantPwaName } from "../../utils/tenantPwaManifest";
 
 export default function InstallPWAButton({
-  label = "تنزيل المنصة",
+  label,
   className = "",
   variant = "hero", // "hero" | "solid" | "link"
 }) {
@@ -22,16 +24,23 @@ export default function InstallPWAButton({
   const [desktopOpen, setDesktopOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  const subdomain = getTenantSubdomain();
+  const appName = useMemo(
+    () => readCachedTenantPwaName(subdomain) || "المنصة",
+    [subdomain],
+  );
+  const resolvedLabel = label || `تنزيل ${appName}`;
+
   useEffect(() => {
     const onInstalled = () => {
-      toast.success("تم تنزيل المنصة بنجاح 🎉", {
+      toast.success(`تم تنزيل «${appName}» بنجاح 🎉`, {
         position: "top-center",
         autoClose: 3500,
       });
     };
     window.addEventListener("appinstalled", onInstalled);
     return () => window.removeEventListener("appinstalled", onInstalled);
-  }, []);
+  }, [appName]);
 
   const handleClick = async () => {
     if (busy) return;
@@ -87,22 +96,27 @@ export default function InstallPWAButton({
               whileHover={{ scale: 1.03, y: -1 }}
               whileTap={{ scale: 0.97 }}
               className={buttonClass}
-              aria-label={label}
+              aria-label={resolvedLabel}
             >
               <span className="relative flex h-5 w-5 items-center justify-center">
                 <FaDownload className="absolute text-[13px] opacity-90" />
                 <FaMobileAlt className="absolute translate-x-[7px] translate-y-[6px] text-[9px] text-orange-500" />
               </span>
-              {busy ? "جاري التنزيل..." : label}
+              {busy ? "جاري التنزيل..." : resolvedLabel}
             </motion.button>
           </motion.div>
         ) : null}
       </AnimatePresence>
 
-      <IOSInstallGuideModal isOpen={iosOpen} onClose={() => setIosOpen(false)} />
+      <IOSInstallGuideModal
+        isOpen={iosOpen}
+        onClose={() => setIosOpen(false)}
+        appName={appName}
+      />
       <DesktopInstallGuideModal
         isOpen={desktopOpen}
         onClose={() => setDesktopOpen(false)}
+        appName={appName}
       />
     </>
   );

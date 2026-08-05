@@ -15,7 +15,13 @@ import TenantProCoursesBento from "./components/landing/TenantProCoursesBento";
 import { TenantProReviews, TenantProCta } from "./components/landing/TenantProReviewsCta";
 import TenantProHowItWorks from "./components/landing/TenantProHowItWorks";
 import TenantProFooter from "./components/landing/TenantProFooter";
-import { TL_ACCENT, TL_PRIMARY, TL_SECONDARY, TL_BORDER } from "./tenantLandingTheme";
+import {
+  TL_ACCENT,
+  TL_PRIMARY,
+  TL_SECONDARY,
+  TL_BORDER,
+  getTenantThemeCssVars,
+} from "./tenantLandingTheme";
 import {
   TenantPublicNavbar,
   useTenantPublicTheme,
@@ -418,6 +424,8 @@ export default function TenantPublicLanding({ subdomain }) {
   const bioSnippet = (tenant.bio || about.bio || "منصة تعليمية متكاملة تساعدك تحقق أفضل النتائج.").slice(0, 140);
   const bioSuffix = (tenant.bio || about.bio || "").length > 140 ? "…" : "";
 
+  const themeCssVars = getTenantThemeCssVars(isDarkMode);
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -425,15 +433,16 @@ export default function TenantPublicLanding({ subdomain }) {
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
       dir="rtl"
       data-theme={isDarkMode ? "dark" : "light"}
-      className={`tenant-public-page ${isDarkMode ? "dark tenant-dark" : "tenant-light"} min-h-screen overflow-x-hidden bg-[#0A1628] text-white antialiased`}
+      className={`tenant-public-page ${isDarkMode ? "tenant-dark" : "tenant-light"} min-h-screen overflow-x-hidden antialiased transition-colors duration-300`}
       style={{
         ...cssVars,
+        ...themeCssVars,
         fontFamily: TENANT_FONT_BODY,
         fontSize: "var(--t-font-body)",
         lineHeight: "var(--t-line-body)",
         WebkitFontSmoothing: "antialiased",
-        background: "#0A1628",
-        color: "#F8FAFC",
+        background: "var(--tl-page-bg)",
+        color: "var(--tl-fg)",
       }}
     >
       <TenantSeoHead subdomain={subdomain} />
@@ -444,14 +453,19 @@ export default function TenantPublicLanding({ subdomain }) {
         .tenant-public-page .font-heading {
           font-family: ${TENANT_FONT_HEADING};
         }
-        .tenant-public-page,
-        .tenant-public-page.tenant-dark,
-        .tenant-public-page.tenant-light {
-          background: #0A1628 !important;
-          color: #F8FAFC;
+        .tenant-public-page {
+          background: var(--tl-page-bg) !important;
+          color: var(--tl-fg);
         }
         html { scroll-behavior: smooth; }
-        body:has(.tenant-public-page) { overflow-x: hidden; background: #0A1628; }
+        body:has(.tenant-public-page.tenant-light) {
+          overflow-x: hidden;
+          background: #F4F7FB;
+        }
+        body:has(.tenant-public-page.tenant-dark) {
+          overflow-x: hidden;
+          background: #0A1628;
+        }
         @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
       `}</style>
 

@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import baseUrl from "../../api/baseUrl";
 import { toast } from "react-toastify";
 import { persistLoginSession } from "../../utils/authStorage";
 
 const studentLogin = () => {
+  const navigate = useNavigate();
   const [identifier, setIdentifier] = useState(""); // تغيير من mail إلى identifier
   const [pass, setPass] = useState("");
   const [loading, setLoading] = useState(false);
@@ -53,12 +55,16 @@ const studentLogin = () => {
       persistLoginSession(response.data);
 
       toast.success("تم تسجيل الدخول بنجاح");
-      // Redirect back if redirect param exists
       const params = new URLSearchParams(window.location.search);
       const redirectTarget = params.get("redirect");
-      const destination = redirectTarget && redirectTarget.startsWith("/") ? redirectTarget : "/";
+      const destination =
+        redirectTarget &&
+        redirectTarget.startsWith("/") &&
+        !redirectTarget.startsWith("//")
+          ? redirectTarget
+          : "/home";
       setTimeout(() => {
-        window.location.href = destination;
+        navigate(destination, { replace: true });
       }, 500);
     } catch (error) {
       if (error.response) {

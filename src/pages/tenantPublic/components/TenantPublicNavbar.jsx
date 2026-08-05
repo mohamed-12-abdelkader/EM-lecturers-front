@@ -40,29 +40,29 @@ function useTenantArabicFonts() {
 
 export function useTenantPublicTheme() {
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     try {
       const savedMode = safeLocalGet("tenant-public-theme");
       if (savedMode === "dark") {
         setIsDarkMode(true);
-        return;
-      }
-      if (savedMode === "light") {
+      } else if (savedMode === "light") {
         setIsDarkMode(false);
-        return;
-      }
-      if (typeof window !== "undefined" && window.matchMedia) {
+      } else if (typeof window !== "undefined" && window.matchMedia) {
         setIsDarkMode(window.matchMedia("(prefers-color-scheme: dark)").matches);
       }
     } catch {
       setIsDarkMode(false);
+    } finally {
+      setHydrated(true);
     }
   }, []);
 
   useEffect(() => {
+    if (!hydrated) return;
     safeLocalSet("tenant-public-theme", isDarkMode ? "dark" : "light");
-  }, [isDarkMode]);
+  }, [isDarkMode, hydrated]);
 
   const toggleTheme = () => setIsDarkMode((prev) => !prev);
 

@@ -38,7 +38,7 @@ const STEPS = [
   },
 ];
 
-export default function IOSInstallGuideModal({ isOpen, onClose }) {
+export default function IOSInstallGuideModal({ isOpen, onClose, appName = "التطبيق" }) {
   const cardBg = useColorModeValue("blue.50", "whiteAlpha.100");
   const border = useColorModeValue("blue.100", "whiteAlpha.200");
 
@@ -48,13 +48,13 @@ export default function IOSInstallGuideModal({ isOpen, onClose }) {
       <ModalContent dir="rtl" mx={4} borderRadius="2xl" overflow="hidden">
         <Box h="4px" bgGradient="linear(to-l, blue.500, orange.500)" />
         <ModalHeader pb={1} fontSize="lg" fontWeight="800">
-          تثبيت التطبيق على الآيفون
+          تثبيت «{appName}» على الآيفون
         </ModalHeader>
         <ModalCloseButton />
         <ModalBody pb={2}>
           <Text fontSize="sm" color="gray.500" mb={4} lineHeight="1.8">
             على Safari لا تظهر نافذة التثبيت تلقائياً. اتبع الخطوات التالية لإضافة
-            التطبيق إلى الشاشة الرئيسية:
+            «{appName}» إلى الشاشة الرئيسية باسم ولوجو المنصة:
           </Text>
           <VStack align="stretch" spacing={3}>
             {STEPS.map((step, index) => {

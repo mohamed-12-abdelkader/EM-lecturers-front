@@ -147,6 +147,18 @@ export function useTenantPageMetadata(subdomain, page = "home", slug, fallback) 
   useEffect(() => {
     if (!subdomain || !resolvedMeta) return undefined;
     applyPageMetadata(resolvedMeta);
+    // مزامنة مانيفست PWA مع اسم/لوجو المنصة
+    import("../../utils/tenantPwaManifest")
+      .then(({ applyTenantPwaManifest }) =>
+        applyTenantPwaManifest({
+          subdomain,
+          name: resolvedMeta.siteName || resolvedMeta.title,
+          description: resolvedMeta.description,
+          iconUrl: resolvedMeta.favicon || resolvedMeta.appleTouchIcon,
+          themeColor: resolvedMeta.themeColor,
+        }),
+      )
+      .catch(() => null);
     return undefined;
   }, [subdomain, resolvedMeta]);
 

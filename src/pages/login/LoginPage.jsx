@@ -179,17 +179,19 @@ const LoginPage = () => {
       // Show success modal
       setShowSuccessModal(true);
       void playAuthSuccessSound();
-      
-        const params = new URLSearchParams(window.location.search);
+
+      const params = new URLSearchParams(window.location.search);
       const redirectTarget = params.get("redirect");
-      const destination = redirectTarget && redirectTarget.startsWith("/") ? redirectTarget : "/home";
+      const destination =
+        redirectTarget &&
+        redirectTarget.startsWith("/") &&
+        !redirectTarget.startsWith("//")
+          ? redirectTarget
+          : "/home";
+      // تنقّل SPA مرة واحدة — بدون reload (كان يسبب إعادة تحميل متكررة)
       setTimeout(() => {
-       window.location.reload();
-        navigate(destination);
+        navigate(destination, { replace: true });
       }, 1400);
-      
-      // Redirect after 2 seconds
-    
     } catch (error) {
       console.error('Login error:', error);
       // فتح مودال الخطأ تلقائياً

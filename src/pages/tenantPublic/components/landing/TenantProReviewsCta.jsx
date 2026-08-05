@@ -10,8 +10,6 @@ import {
 import {
   TL_CYAN,
   TL_LIME,
-  TL_NAVY,
-  TL_NAVY_SOFT,
   tlBtnOutline,
   tlBtnPrimary,
   tlCard,
@@ -26,7 +24,7 @@ function ReviewCard({ item }) {
   return (
     <DepthCard maxTilt={12} floatPx={4} className="h-full">
       <article className={`${tlCard} relative h-full p-5 text-right md:p-6`} dir="rtl">
-        <FaQuoteRight className="absolute right-4 top-4 text-2xl text-white/10" aria-hidden />
+        <FaQuoteRight className="absolute right-4 top-4 text-2xl text-[var(--tl-muted)]" aria-hidden />
         <div className="mb-3 flex justify-start gap-0.5" style={{ color: TL_LIME }}>
           {Array.from({ length: 5 }).map((_, i) => (
             <motion.span
@@ -40,8 +38,8 @@ function ReviewCard({ item }) {
             </motion.span>
           ))}
         </div>
-        <p className="relative text-sm leading-8 text-[#7EB8D9]">"{item.text}"</p>
-        <div className="mt-4 flex items-center justify-start gap-3 border-t border-white/10 pt-4">
+        <p className="relative text-sm leading-8 text-[var(--tl-muted)]">"{item.text}"</p>
+        <div className="mt-4 flex items-center justify-start gap-3 border-t border-[color:var(--tl-border)] pt-4">
           <motion.span
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
             style={{ background: TL_CYAN }}
@@ -50,8 +48,8 @@ function ReviewCard({ item }) {
             {(item.name || "ط").slice(0, 1)}
           </motion.span>
           <div className="text-right">
-            <p className="text-sm font-bold text-white">{item.name}</p>
-            <p className="text-xs text-[#7EB8D9]/80">طالب</p>
+            <p className="text-sm font-bold text-[var(--tl-fg)]">{item.name}</p>
+            <p className="text-xs text-[var(--tl-muted)]">طالب</p>
           </div>
         </div>
       </article>
@@ -63,13 +61,13 @@ export function TenantProReviews({ testimonials }) {
   if (!testimonials?.length) return null;
 
   return (
-    <section className="py-12 md:py-20" style={{ background: TL_NAVY, perspective: 1200 }} dir="rtl">
+    <section className="bg-[var(--tl-section)] py-12 md:py-20" style={{ perspective: 1200 }} dir="rtl">
       <div className={tlContainer}>
         <Reveal variant="depthIn" className="text-right">
           <span className={tlEyebrowOrange}>آراء الطلاب</span>
           <h2 className={`${tlHeading} mt-3`}>ماذا يقول طلابنا؟</h2>
           <motion.div
-            className="mt-4 inline-flex items-center gap-3 rounded-2xl border border-[#D4E157]/25 bg-[#D4E157]/10 px-5 py-2.5"
+            className="mt-4 inline-flex items-center gap-3 rounded-2xl border border-[#D4E157]/35 bg-[#D4E157]/12 px-5 py-2.5"
             whileHover={{ scale: 1.05, rotateX: 8, y: -4 }}
             transition={{ type: "spring", stiffness: 360, damping: 20 }}
             style={{ transformStyle: "preserve-3d" }}
@@ -83,7 +81,7 @@ export function TenantProReviews({ testimonials }) {
                   <FaStar key={i} className="text-xs" />
                 ))}
               </div>
-              <p className="text-[10px] text-[#7EB8D9]">تقييم الطلاب</p>
+              <p className="text-[10px] text-[var(--tl-muted)]">تقييم الطلاب</p>
             </div>
           </motion.div>
         </Reveal>
@@ -115,8 +113,8 @@ export function TenantProCta({ signupHref, loginHref }) {
   return (
     <section
       id="cta"
-      className="relative overflow-hidden py-12 md:py-20"
-      style={{ background: TL_NAVY_SOFT, perspective: 1400 }}
+      className="relative overflow-hidden bg-[var(--tl-section-alt)] py-12 md:py-20"
+      style={{ perspective: 1400 }}
       dir="rtl"
     >
       <motion.div
@@ -137,7 +135,7 @@ export function TenantProCta({ signupHref, loginHref }) {
       <div className={`${tlContainer} relative`}>
         <Reveal variant="depthIn">
           <motion.div
-            className="relative overflow-hidden rounded-3xl border border-white/12 bg-white/[0.06] p-6 shadow-[0_24px_60px_-24px_rgba(0,0,0,0.5)] backdrop-blur-sm md:p-12"
+            className="relative overflow-hidden rounded-3xl border border-[color:var(--tl-border)] bg-[var(--tl-card)] p-6 shadow-[0_24px_60px_-24px_rgba(15,23,42,0.18)] md:p-12"
             whileHover={{ rotateX: 4, y: -6, scale: 1.01 }}
             transition={{ type: "spring", stiffness: 220, damping: 20 }}
             style={{ transformStyle: "preserve-3d" }}
@@ -149,10 +147,10 @@ export function TenantProCta({ signupHref, loginHref }) {
             />
             <div className="relative grid items-center gap-8 lg:grid-cols-2">
               <div className="text-right">
-                <h2 className="font-heading text-2xl font-bold text-white md:text-3xl">
+                <h2 className="font-heading text-2xl font-bold text-[var(--tl-fg)] md:text-3xl">
                   ابدأ رحلة التعلم اليوم
                 </h2>
-                <p className="mt-3 text-sm leading-7 text-[#7EB8D9] md:text-base">
+                <p className="mt-3 text-sm leading-7 text-[var(--tl-muted)] md:text-base">
                   انضم الآن واستفد من الشرح المنظم والمتابعة المستمرة.
                 </p>
                 <div className="mt-6 grid grid-cols-1 gap-3 sm:flex sm:flex-wrap">
@@ -176,7 +174,7 @@ export function TenantProCta({ signupHref, loginHref }) {
                 ].map((chip, i) => (
                   <motion.div
                     key={chip.label}
-                    className="rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-3.5 text-center"
+                    className="rounded-2xl border border-[color:var(--tl-border)] bg-[var(--tl-soft)] px-3 py-3.5 text-center"
                     initial={{ opacity: 0, y: 20, rotateX: 24 }}
                     whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
                     viewport={{ once: true }}
@@ -187,7 +185,7 @@ export function TenantProCta({ signupHref, loginHref }) {
                     <p className="font-heading text-base font-bold" style={{ color: chip.color }}>
                       {chip.value}
                     </p>
-                    <p className="mt-0.5 text-[10px] text-[#7EB8D9]">{chip.label}</p>
+                    <p className="mt-0.5 text-[10px] text-[var(--tl-muted)]">{chip.label}</p>
                   </motion.div>
                 ))}
               </div>

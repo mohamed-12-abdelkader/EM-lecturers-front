@@ -6,6 +6,7 @@ import { useEffect } from "react";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ensurePwaServiceWorker } from "./Hooks/pwa/usePWAInstall";
+import TenantPwaBranding from "./components/pwa/TenantPwaBranding";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,6 +27,7 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <TenantPwaBranding />
       <AppRouter />
       <ToastContainer rtl newestOnTop position="top-center" />
     </QueryClientProvider>

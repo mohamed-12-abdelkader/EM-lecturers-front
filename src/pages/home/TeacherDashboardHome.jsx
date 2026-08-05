@@ -69,6 +69,7 @@ import {
   FaFolderOpen,
   FaSync,
   FaBuilding,
+  FaFire,
 } from "react-icons/fa";
 import { MdAssignment, MdQuiz } from "react-icons/md";
 import { Link } from "react-router-dom";
@@ -379,6 +380,14 @@ const TeacherDashboardHome = () => {
       link: "/exam-builder-chat",
     },
     {
+      id: 11,
+      title: "المسابقات اليومية",
+      description: "إنشاء ونشر مسابقات يومية مع ترتيب",
+      icon: FaFire,
+      color: "orange",
+      link: "/teacher-daily-quizzes",
+    },
+    {
       id: 6,
       title: "محلل البيانات",
       description: "تقارير وتحليل الأداء",
@@ -497,6 +506,7 @@ const TeacherDashboardHome = () => {
   );
   const sectionCardBg = useColorModeValue("white", "gray.800");
   const sectionBorder = useColorModeValue("gray.200", "gray.700");
+  const courseImageBg = useColorModeValue("gray.100", "gray.700");
   const inputBorderColor = useColorModeValue("gray.200", "gray.600");
   const mutedTextColor = useColorModeValue("gray.500", "gray.400");
   const dividerBorderColor = useColorModeValue("gray.100", "gray.600");
@@ -1220,20 +1230,15 @@ const TeacherDashboardHome = () => {
                       boxShadow: "0 14px 28px -16px rgba(49,130,206,0.45)",
                     }}
                   >
-                    <Box position="relative" h={{ base: "140px", md: "150px" }} overflow="hidden">
+                    <Box position="relative" bg={courseImageBg} overflow="hidden">
                       <Image
                         src={course.avatar || "https://placehold.co/600x400/e2e8f0/475569?text=Course"}
                         alt={course.title}
                         w="full"
-                        h="full"
-                        objectFit="cover"
+                        h="auto"
+                        display="block"
                       />
-                      <Box
-                        position="absolute"
-                        inset={0}
-                        bg="linear-gradient(180deg, transparent 35%, rgba(15,23,42,0.45) 100%)"
-                      />
-                      <Flex position="absolute" top={2} right={2} left={2} justify="space-between" align="center">
+                      <Flex position="absolute" top={2} right={2} left={2} justify="space-between" align="center" zIndex={1}>
                         <Badge
                           bg={isCourseFree(course) ? "green.500" : "white"}
                           color={isCourseFree(course) ? "white" : "blue.700"}
@@ -1241,6 +1246,7 @@ const TeacherDashboardHome = () => {
                           fontSize="xs"
                           fontWeight="800"
                           px={2}
+                          boxShadow="sm"
                         >
                           {isCourseFree(course) ? "مجاني" : `${course.price} ج.م`}
                         </Badge>

@@ -12,6 +12,7 @@ import {
   MdQuestionAnswer,
   MdVideoLibrary,
   MdQuiz,
+  MdWhatshot,
   MdLogout,
   MdHome,
   MdPublic,
@@ -229,6 +230,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
         { to: "/teacher-my-files", Icon: FaFolderOpen, label: "ملفاتي" },
         { to: "/teacher-assignments", Icon: MdAssignment, label: "الواجبات" },
         { to: "/teacher-exams", Icon: MdQuiz, label: "الامتحانات" },
+        { to: "/teacher-daily-quizzes", Icon: MdWhatshot, label: "المسابقات اليومية" },
         { to: "/exam-builder-chat", Icon: MdQuiz, label: "مساعد الامتحانات" },
         { to: "/teacher-free-lectures", Icon: MdVideoLibrary, label: "المحاضرات المجانية" },
       ],
@@ -257,6 +259,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
       title: "التعلم",
       links: [
         { to: "/my-courses", Icon: MdCollectionsBookmark, label: "كورساتي" },
+        { to: "/student-daily-quizzes", Icon: MdWhatshot, label: "المسابقات اليومية" },
         { to: "/lectures_taple", Icon: MdSchedule, label: "جدول المحاضرات" },
         { to: "/exam_grades", Icon: MdGrading, label: "درجات الامتحانات" },
         { to: "/scientific-chat", Icon: FaRobot, label: "المساعد العلمي" },

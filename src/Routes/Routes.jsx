@@ -105,6 +105,25 @@ const TeacherMyFilesPage = lazy(() => import("../pages/myFiles/TeacherMyFilesPag
 const TeacherAssignmentsPage = lazy(() => import("../pages/assignments/TeacherAssignmentsPage"));
 const TeacherCourseExamsPage = lazy(() => import("../pages/exams/TeacherCourseExamsPage"));
 const TeacherFreeLecturesPage = lazy(() => import("../pages/freeLectures/TeacherFreeLecturesPage"));
+const TeacherDailyQuizzesPage = lazy(() => import("../pages/dailyQuiz/TeacherDailyQuizzesPage"));
+const TeacherDailyQuizDetailPage = lazy(() =>
+  import("../pages/dailyQuiz/TeacherDailyQuizDetailPage"),
+);
+const StudentDailyQuizzesHomePage = lazy(() =>
+  import("../pages/dailyQuiz/StudentDailyQuizzesHomePage"),
+);
+const StudentDailyQuizPlayPage = lazy(() =>
+  import("../pages/dailyQuiz/StudentDailyQuizPlayPage"),
+);
+const StudentDailyQuizResultPage = lazy(() =>
+  import("../pages/dailyQuiz/StudentDailyQuizResultPage"),
+);
+const StudentDailyQuizLeaderboardPage = lazy(() =>
+  import("../pages/dailyQuiz/StudentDailyQuizLeaderboardPage"),
+);
+const StudentDailyQuizHubPage = lazy(() =>
+  import("../pages/dailyQuiz/StudentDailyQuizHubPage"),
+);
 const ScientificChatPage = lazy(() => import("../pages/scientificChat/ScientificChatPage"));
 const ScientificTeacherFilesPage = lazy(() => import("../pages/scientificChat/ScientificTeacherFilesPage"));
 const ExamBuilderChatPage = lazy(() => import("../pages/examBuilder/ExamBuilderChatPage"));
@@ -612,11 +631,18 @@ const AppRouter = () => {
           <Route path="teacher-exams" element={<TeacherCourseExamsPage />} />
           <Route path="exam-builder-chat" element={<ExamBuilderChatPage />} />
           <Route path="teacher-free-lectures" element={<TeacherFreeLecturesPage />} />
+          <Route path="teacher-daily-quizzes" element={<TeacherDailyQuizzesPage />} />
+          <Route path="teacher-daily-quizzes/:id" element={<TeacherDailyQuizDetailPage />} />
         </Route>
         {/* Student Specific Routes */}
         <Route element={<ProtectedRoute auth={student} />}>
           <Route path="studentStats" element={<StudentStats />} />
           <Route path="course_statistics" element={<CourseStatistics />} />
+          <Route path="student-daily-quizzes" element={<StudentDailyQuizzesHomePage />} />
+          <Route path="student-daily-quizzes/hub" element={<StudentDailyQuizHubPage />} />
+          <Route path="student-daily-quizzes/attempt/:attemptId" element={<StudentDailyQuizPlayPage />} />
+          <Route path="student-daily-quizzes/:id/result" element={<StudentDailyQuizResultPage />} />
+          <Route path="student-daily-quizzes/:id/leaderboard" element={<StudentDailyQuizLeaderboardPage />} />
         </Route>
 
         {/* Shared Routes (طالب + مدرس) */}

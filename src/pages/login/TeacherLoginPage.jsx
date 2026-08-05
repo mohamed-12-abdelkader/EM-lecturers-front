@@ -72,9 +72,9 @@ const TeacherLoginPage = () => {
       const destination =
         redirectTarget && redirectTarget.startsWith("/") ? redirectTarget : "/home";
 
+      // تنقّل SPA مرة واحدة — بدون reload
       setTimeout(() => {
-        window.location.reload();
-        navigate(destination);
+        navigate(destination, { replace: true });
       }, 800);
     } catch (error) {
       console.error("Teacher login error:", error);

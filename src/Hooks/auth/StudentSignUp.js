@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import baseUrl from "../../api/baseUrl";
 import { toast } from "react-toastify";
 import { persistLoginSession } from "../../utils/authStorage";
 const StudentSignUp = () => {
+  const navigate = useNavigate();
   const [name, setname] = useState("");
 
   
@@ -66,7 +68,7 @@ const StudentSignUp = () => {
       // يمكنك إظهار رسالة نجاح باستخدام toast
       toast.success("تم  انشاء الحساب بنجاح  بنجاح");
       setTimeout(() => {
-        window.location.href = "/home";
+        navigate("/home", { replace: true });
       }, 500);
     } catch (error) {
       // يمكنك إظهار رسالة خطأ باستخدام toast
