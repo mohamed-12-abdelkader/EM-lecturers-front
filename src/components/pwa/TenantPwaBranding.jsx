@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchTenantPublic, readCachedTenantPublic } from "../../api/tenantPublicApi";
 import { getTenantSubdomain } from "../../utils/tenantHost";
+import { ensurePwaServiceWorker } from "../../Hooks/pwa/usePWAInstall";
 import {
   applyTenantPwaManifest,
   applyTenantPwaManifestFromCache,
@@ -17,8 +18,15 @@ export default function TenantPwaBranding() {
 
   useEffect(() => {
     if (!subdomain) return undefined;
-    applyTenantPwaManifestFromCache(subdomain);
-    return undefined;
+    let cancelled = false;
+    (async () => {
+      await ensurePwaServiceWorker();
+      if (cancelled) return;
+      await applyTenantPwaManifestFromCache(subdomain);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [subdomain]);
 
   const { data } = useQuery({
@@ -32,13 +40,20 @@ export default function TenantPwaBranding() {
 
   useEffect(() => {
     if (!subdomain || !data?.data?.tenant) return undefined;
-    const branding = resolveTenantPwaBranding(
-      data.data.tenant,
-      data.data.teacher,
-      subdomain,
-    );
-    applyTenantPwaManifest(branding);
-    return undefined;
+    let cancelled = false;
+    (async () => {
+      await ensurePwaServiceWorker();
+      if (cancelled) return;
+      const branding = resolveTenantPwaBranding(
+        data.data.tenant,
+        data.data.teacher,
+        subdomain,
+      );
+      await applyTenantPwaManifest(branding);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [subdomain, data]);
 
   return null;

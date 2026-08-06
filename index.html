@@ -382,33 +382,47 @@
               var fav = document.querySelector('link[rel="icon"]');
               if (fav) fav.href = logo;
             }
-            var manifest = {
-              id: location.origin + "/?pwa=" + encodeURIComponent(sub),
+
+            var branding = {
+              subdomain: sub,
               name: appTitle,
-              short_name: appTitle.length > 12 ? appTitle.slice(0, 11) + "…" : appTitle,
+              shortName: appTitle.length > 12 ? appTitle.slice(0, 11) + "…" : appTitle,
               description: "منصة " + appTitle + " التعليمية",
-              lang: "ar",
-              dir: "rtl",
-              start_url: location.origin + "/",
-              scope: location.origin + "/",
-              display: "standalone",
-              background_color: "#ffffff",
-              theme_color: "#3182CE",
-              icons: logo
-                ? [
-                    { src: logo, sizes: "192x192", type: "image/png", purpose: "any" },
-                    { src: logo, sizes: "512x512", type: "image/png", purpose: "any" },
-                  ]
-                : [
-                    { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-                    { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-                  ],
+              iconUrl: logo,
+              themeColor: "#3182CE",
+              backgroundColor: "#ffffff",
             };
-            var blob = new Blob([JSON.stringify(manifest)], {
-              type: "application/manifest+json",
-            });
+
+            // نفس الأصل — Chrome يعتمد عليه عند التثبيت (blob غير موثوق)
             var mlink = document.querySelector('link[rel="manifest"]');
-            if (mlink) mlink.href = URL.createObjectURL(blob);
+            if (mlink) {
+              mlink.href =
+                "/manifest.webmanifest?tenant=" +
+                encodeURIComponent(sub) +
+                "&v=" +
+                encodeURIComponent(String(appTitle).slice(0, 16));
+              mlink.setAttribute("data-tenant-pwa-manifest", "true");
+            }
+
+            if (typeof caches !== "undefined") {
+              caches.open("em-tenant-pwa-branding-v1").then(function (cache) {
+                return cache.put(
+                  "/__em_tenant_pwa_branding__.json",
+                  new Response(JSON.stringify(branding), {
+                    headers: {
+                      "Content-Type": "application/json",
+                      "Cache-Control": "no-store",
+                    },
+                  }),
+                );
+              }).catch(function () {});
+            }
+            if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+              navigator.serviceWorker.controller.postMessage({
+                type: "SET_TENANT_PWA_BRANDING",
+                branding: branding,
+              });
+            }
           } catch (e) {}
         }
 

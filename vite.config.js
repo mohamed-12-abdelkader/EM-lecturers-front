@@ -106,7 +106,8 @@ export default defineConfig(({ mode }) => {
         injectRegister: false,
         injectManifest: {
           globPatterns: [
-            "**/*.{js,css,html,woff2,webmanifest}",
+            // لا ن precache الـ webmanifest — الـ SW يقدّم مانيفست ديناميكي لكل منصة مدرس
+            "**/*.{js,css,html,woff2}",
             "icons/*.png",
             "offline.html",
           ],

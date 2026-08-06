@@ -1,12 +1,18 @@
 /**
  * PWA manifest ديناميكي حسب منصة المدرس (الاسم + اللوجو).
- * كل subdomain أصل (origin) منفصل → يمكن تثبيت أكثر من مدرس كتطبيقات مستقلة.
+ *
+ * مهم: Chrome Android يتجاهل غالباً blob: manifests عند التثبيت ويستخدم
+ * /manifest.webmanifest الأصلي. لذلك نكتب الهوية في Cache Storage والـ SW
+ * يعيد المانيفست من نفس الأصل.
  */
 import { getTenantSubdomain } from "./tenantHost";
 import { resolveTenantBrandLogo } from "./tenantBrandLogo";
 import { readCachedTenantPublic } from "../api/tenantPublicApi";
 
-const MANIFEST_LINK_ATTR = "data-tenant-pwa-manifest";
+export const TENANT_PWA_BRANDING_CACHE = "em-tenant-pwa-branding-v1";
+export const TENANT_PWA_BRANDING_URL = "/__em_tenant_pwa_branding__.json";
+export const TENANT_MANIFEST_PATH = "/manifest.webmanifest";
+
 const DEFAULT_ICONS = [
   { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
   { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
@@ -14,9 +20,7 @@ const DEFAULT_ICONS = [
   { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
 ];
 
-let activeBlobUrl = null;
 let lastSignature = "";
-const iconBlobCache = new Map();
 
 function absoluteUrl(url) {
   if (!url) return "";
@@ -32,7 +36,7 @@ function absoluteUrl(url) {
   }
 }
 
-function shortAppName(name, fallback = "منصتي") {
+export function shortAppName(name, fallback = "منصتي") {
   const raw = String(name || "").trim() || fallback;
   if (raw.length <= 12) return raw;
   return `${raw.slice(0, 11)}…`;
@@ -51,11 +55,9 @@ function upsertMeta(name, content) {
 
 function upsertAppleTouchIcon(href) {
   if (!href) return;
-  document
-    .querySelectorAll('link[rel="apple-touch-icon"]')
-    .forEach((el) => {
-      el.href = href;
-    });
+  document.querySelectorAll('link[rel="apple-touch-icon"]').forEach((el) => {
+    el.href = href;
+  });
   let link = document.querySelector('link[rel="apple-touch-icon"]');
   if (!link) {
     link = document.createElement("link");
@@ -65,95 +67,115 @@ function upsertAppleTouchIcon(href) {
   link.href = href;
 }
 
-/** يرسم اللوجو داخل مربع ثابت لتوافق متطلبات أيقونات PWA */
-async function rasterizeIcon(src, size) {
-  const cacheKey = `${src}::${size}`;
-  if (iconBlobCache.has(cacheKey)) return iconBlobCache.get(cacheKey);
-
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext("2d");
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, size, size);
-        const pad = Math.round(size * 0.1);
-        const box = size - pad * 2;
-        const scale = Math.min(box / img.width, box / img.height);
-        const w = img.width * scale;
-        const h = img.height * scale;
-        const x = (size - w) / 2;
-        const y = (size - h) / 2;
-        ctx.drawImage(img, x, y, w, h);
-        canvas.toBlob(
-          (blob) => {
-            if (!blob) {
-              resolve(absoluteUrl(src));
-              return;
-            }
-            const url = URL.createObjectURL(blob);
-            iconBlobCache.set(cacheKey, url);
-            resolve(url);
-          },
-          "image/png",
-          0.92,
-        );
-      } catch {
-        resolve(absoluteUrl(src));
-      }
-    };
-    img.onerror = () => resolve(absoluteUrl(src));
-    img.src = absoluteUrl(src);
-  });
-}
-
-async function buildIconEntries(iconUrl) {
+function buildIconEntries(iconUrl) {
   if (!iconUrl) return DEFAULT_ICONS;
   const abs = absoluteUrl(iconUrl);
-  // أيقونات HTTPS المباشرة أدوم عند التثبيت من blob: بعد revoke
-  const sameOrigin = abs.startsWith(window.location.origin);
-  if (!sameOrigin) {
-    return [
-      { src: abs, sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: abs, sizes: "512x512", type: "image/png", purpose: "any" },
-      { src: abs, sizes: "192x192", type: "image/png", purpose: "maskable" },
-      { src: abs, sizes: "512x512", type: "image/png", purpose: "maskable" },
-    ];
-  }
+  return [
+    { src: abs, sizes: "192x192", type: "image/png", purpose: "any" },
+    { src: abs, sizes: "512x512", type: "image/png", purpose: "any" },
+    { src: abs, sizes: "192x192", type: "image/png", purpose: "maskable" },
+    { src: abs, sizes: "512x512", type: "image/png", purpose: "maskable" },
+  ];
+}
+
+/** يبني كائن المانيفست النهائي للتثبيت */
+export function buildTenantManifestObject(branding = {}, origin = "") {
+  const base =
+    origin ||
+    (typeof window !== "undefined" ? window.location.origin : "");
+  const subdomain = branding.subdomain || "";
+  const name =
+    String(branding.name || "").trim() ||
+    subdomain.replace(/[-_]+/g, " ") ||
+    "منصتي";
+  const shortName = shortAppName(branding.shortName || name);
+  const description =
+    String(branding.description || "").trim() ||
+    `منصة ${name} التعليمية — كورسات ومحاضرات وامتحانات أونلاين.`;
+  const themeColor = branding.themeColor || "#3182CE";
+  const backgroundColor = branding.backgroundColor || "#ffffff";
+  const icons = buildIconEntries(branding.iconUrl);
+  const startUrl = `${base}/`;
+
+  return {
+    id: `${base}/?pwa=${encodeURIComponent(subdomain || "app")}`,
+    name,
+    short_name: shortName,
+    description,
+    lang: "ar",
+    dir: "rtl",
+    start_url: startUrl,
+    scope: `${base}/`,
+    display: "standalone",
+    display_override: ["standalone", "minimal-ui"],
+    orientation: "any",
+    background_color: backgroundColor,
+    theme_color: themeColor,
+    categories: ["education", "productivity"],
+    icons,
+    shortcuts: [
+      {
+        name: "الصفحة الرئيسية",
+        short_name: "الرئيسية",
+        url: `${base}/home`,
+        icons: [{ src: icons[0]?.src || "/icons/icon-192.png", sizes: "192x192" }],
+      },
+      {
+        name: "كورساتي",
+        short_name: "كورساتي",
+        url: `${base}/my-courses`,
+        icons: [{ src: icons[0]?.src || "/icons/icon-192.png", sizes: "192x192" }],
+      },
+    ],
+  };
+}
+
+async function persistBranding(branding) {
+  if (typeof caches === "undefined") return;
   try {
-    const [icon192, icon512] = await Promise.all([
-      rasterizeIcon(iconUrl, 192),
-      rasterizeIcon(iconUrl, 512),
-    ]);
-    return [
-      { src: icon192, sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: icon512, sizes: "512x512", type: "image/png", purpose: "any" },
-      { src: icon192, sizes: "192x192", type: "image/png", purpose: "maskable" },
-      { src: icon512, sizes: "512x512", type: "image/png", purpose: "maskable" },
-    ];
+    const cache = await caches.open(TENANT_PWA_BRANDING_CACHE);
+    const body = JSON.stringify({
+      ...branding,
+      updatedAt: Date.now(),
+    });
+    await cache.put(
+      new Request(TENANT_PWA_BRANDING_URL, { method: "GET" }),
+      new Response(body, {
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
+      }),
+    );
   } catch {
-    return [
-      { src: abs, sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: abs, sizes: "512x512", type: "image/png", purpose: "any" },
-    ];
+    /* ignore quota / private mode */
+  }
+
+  try {
+    const reg = await navigator.serviceWorker?.ready;
+    reg?.active?.postMessage({
+      type: "SET_TENANT_PWA_BRANDING",
+      branding,
+    });
+  } catch {
+    /* ignore */
   }
 }
 
-function setManifestHref(href) {
-  let link =
-    document.querySelector(`link[rel="manifest"][${MANIFEST_LINK_ATTR}]`) ||
-    document.querySelector('link[rel="manifest"]');
-  if (!link) {
-    link = document.createElement("link");
-    link.rel = "manifest";
-    document.head.appendChild(link);
-  }
-  link.setAttribute(MANIFEST_LINK_ATTR, "true");
+function setManifestHref(subdomain, signature) {
+  const qs = new URLSearchParams({
+    tenant: subdomain || "app",
+    v: signature.slice(0, 24),
+  });
+  const href = `${TENANT_MANIFEST_PATH}?${qs.toString()}`;
+
+  // إعادة إنشاء الرابط يجبر Chromium على إعادة جلب المانيفست قبل التثبيت
+  document.querySelectorAll('link[rel="manifest"]').forEach((el) => el.remove());
+  const link = document.createElement("link");
+  link.rel = "manifest";
   link.href = href;
+  link.setAttribute("data-tenant-pwa-manifest", "true");
+  document.head.appendChild(link);
 }
 
 /**
@@ -183,67 +205,30 @@ export async function applyTenantPwaManifest(branding = {}) {
   const themeColor = branding.themeColor || "#3182CE";
   const backgroundColor = branding.backgroundColor || "#ffffff";
   const iconUrl = branding.iconUrl || null;
-  const origin = window.location.origin;
-  const startUrl = `${origin}/`;
+
+  const payload = {
+    subdomain,
+    name,
+    shortName,
+    description,
+    iconUrl,
+    themeColor,
+    backgroundColor,
+  };
 
   const signature = [subdomain, name, shortName, iconUrl || "", themeColor].join("|");
   if (signature === lastSignature) return;
   lastSignature = signature;
 
-  const icons = await buildIconEntries(iconUrl);
-
-  const manifest = {
-    // id فريد لكل منصة → تثبيت مستقل حتى لو تشابهت الإعدادات
-    id: `${origin}/?pwa=${encodeURIComponent(subdomain)}`,
-    name,
-    short_name: shortName,
-    description,
-    lang: "ar",
-    dir: "rtl",
-    start_url: startUrl,
-    scope: `${origin}/`,
-    display: "standalone",
-    display_override: ["standalone", "minimal-ui"],
-    orientation: "any",
-    background_color: backgroundColor,
-    theme_color: themeColor,
-    categories: ["education", "productivity"],
-    icons,
-    shortcuts: [
-      {
-        name: "الصفحة الرئيسية",
-        short_name: "الرئيسية",
-        url: `${origin}/home`,
-        icons: [{ src: icons[0]?.src || "/icons/icon-192.png", sizes: "192x192" }],
-      },
-      {
-        name: "كورساتي",
-        short_name: "كورساتي",
-        url: `${origin}/my-courses`,
-        icons: [{ src: icons[0]?.src || "/icons/icon-192.png", sizes: "192x192" }],
-      },
-    ],
-  };
-
-  const blob = new Blob([JSON.stringify(manifest)], {
-    type: "application/manifest+json",
-  });
-  if (activeBlobUrl) {
-    try {
-      URL.revokeObjectURL(activeBlobUrl);
-    } catch {
-      /* ignore */
-    }
-  }
-  activeBlobUrl = URL.createObjectURL(blob);
-  setManifestHref(activeBlobUrl);
+  await persistBranding(payload);
+  setManifestHref(subdomain, signature.replace(/\|/g, "-"));
 
   upsertMeta("application-name", name);
   upsertMeta("apple-mobile-web-app-title", String(name).slice(0, 40));
   upsertMeta("theme-color", themeColor);
   if (iconUrl) {
     const absIcon = absoluteUrl(iconUrl);
-    upsertAppleTouchIcon(icons[0]?.src || absIcon);
+    upsertAppleTouchIcon(absIcon);
     const fav = document.querySelector('link[rel="icon"]');
     if (fav) fav.href = absIcon;
   }

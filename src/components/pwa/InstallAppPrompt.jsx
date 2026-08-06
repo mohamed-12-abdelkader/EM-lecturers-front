@@ -75,6 +75,7 @@ export default function InstallAppPrompt() {
   const [desktopOpen, setDesktopOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [brandTick, setBrandTick] = useState(0);
+  const [manifestReady, setManifestReady] = useState(false);
 
   const tenantSubdomain = getTenantSubdomain();
   const brand = useMemo(
@@ -83,20 +84,28 @@ export default function InstallAppPrompt() {
   );
 
   useEffect(() => {
-    const onReady = () => setBrandTick((n) => n + 1);
+    const onReady = () => {
+      setBrandTick((n) => n + 1);
+      setManifestReady(true);
+    };
     window.addEventListener("pwa:tenant-manifest-ready", onReady);
+    // لو الهوية موجودة مسبقاً في الكاش اعتبر المانيفست جاهزاً
+    if (tenantSubdomain && readTenantBrand(tenantSubdomain).name) {
+      setManifestReady(true);
+    }
     return () => window.removeEventListener("pwa:tenant-manifest-ready", onReady);
-  }, []);
+  }, [tenantSubdomain]);
 
-  // ظهور تلقائي على منصة المدرس بعد فترة من التصفح
+  // ظهور تلقائي بعد جاهزية مانيفست المدرس (مش شركة الأم)
   useEffect(() => {
     if (!tenantSubdomain) return undefined;
     if (!canShowInstallButton) return undefined;
     if (isInCooldown(tenantSubdomain)) return undefined;
+    if (!manifestReady) return undefined;
 
     const timer = setTimeout(() => setOpen(true), AUTO_SHOW_DELAY_MS);
     return () => clearTimeout(timer);
-  }, [tenantSubdomain, canShowInstallButton]);
+  }, [tenantSubdomain, canShowInstallButton, manifestReady]);
 
   // فتح يدوي (من الإعدادات أو أي زر)
   useEffect(() => {
