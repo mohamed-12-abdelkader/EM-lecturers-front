@@ -1352,12 +1352,12 @@ const CourseExamsTab = ({
             <ModalBody
               px={{ base: 4, md: 5 }}
               py={5}
-              bg={modalSectionBg}
+                  bg={modalSectionBg}
               flex="1"
               minH={0}
               overflowY="auto"
               overscrollBehavior="contain"
-            >
+                >
               <VStack spacing={4} align="stretch">
                 <ExamModalSection icon={FaRegFileAlt} title="المعلومات الأساسية" accent="blue">
                   <VStack spacing={4} align="stretch">
@@ -1414,46 +1414,46 @@ const CourseExamsTab = ({
                     <ExamSwitchRow
                       label="إظهار الامتحان للطلاب"
                       hint="الطلاب يشوفوا الامتحان فور إنشائه"
-                      colorScheme="green"
-                      isChecked={form.is_visible_to_students}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          is_visible_to_students: e.target.checked,
-                          visibility_end_date: e.target.checked ? "" : f.visibility_end_date,
-                        }))
-                      }
-                    />
-                    {!form.is_visible_to_students && (
-                      <FormControl isRequired>
-                        <FormLabel fontSize="sm" fontWeight="600">
-                          موعد انتهاء الظهور
-                        </FormLabel>
-                        <Input
-                          type="datetime-local"
-                          value={toDateTimeLocalValue(form.visibility_end_date)}
+                          colorScheme="green"
+                          isChecked={form.is_visible_to_students}
                           onChange={(e) =>
                             setForm((f) => ({
                               ...f,
-                              visibility_end_date: fromDateTimeLocalValue(e.target.value),
+                              is_visible_to_students: e.target.checked,
+                              visibility_end_date: e.target.checked ? "" : f.visibility_end_date,
                             }))
                           }
-                          borderRadius="lg"
                         />
-                      </FormControl>
-                    )}
+                      {!form.is_visible_to_students && (
+                        <FormControl isRequired>
+                        <FormLabel fontSize="sm" fontWeight="600">
+                          موعد انتهاء الظهور
+                        </FormLabel>
+                          <Input
+                            type="datetime-local"
+                            value={toDateTimeLocalValue(form.visibility_end_date)}
+                            onChange={(e) =>
+                              setForm((f) => ({
+                                ...f,
+                                visibility_end_date: fromDateTimeLocalValue(e.target.value),
+                              }))
+                            }
+                          borderRadius="lg"
+                          />
+                        </FormControl>
+                      )}
                     <ExamSwitchRow
                       label="إظهار الإجابات فور التسليم"
                       hint="لو اتقفل، حدد موعد إظهار الإجابات"
-                      colorScheme="blue"
-                      isChecked={form.show_answers_immediately}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          show_answers_immediately: e.target.checked,
-                        }))
-                      }
-                    />
+                        colorScheme="blue"
+                        isChecked={form.show_answers_immediately}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            show_answers_immediately: e.target.checked,
+                          }))
+                        }
+                      />
                     {!form.show_answers_immediately && (
                       <FormControl isRequired>
                         <FormLabel fontSize="sm" fontWeight="600">
@@ -1480,12 +1480,12 @@ const CourseExamsTab = ({
                     <ExamSwitchRow
                       label="الامتحان نشط"
                       hint="الامتحان غير النشط لا يمكن للطلاب دخوله"
-                      colorScheme="green"
-                      isChecked={form.is_active}
-                      onChange={(e) =>
+                        colorScheme="green"
+                        isChecked={form.is_active}
+                        onChange={(e) =>
                         setForm((f) => ({ ...f, is_active: e.target.checked }))
-                      }
-                    />
+                        }
+                      />
                     <FormControl>
                       <FormLabel fontSize="sm" fontWeight="600">
                         حد المحاولات
@@ -1564,7 +1564,7 @@ const CourseExamsTab = ({
         <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={{ base: 3, md: 5 }}>
           {courseExams.map((exam) => (
             <ExamCard
-              key={exam.id}
+                key={exam.id}
               exam={exam}
               isTeacher={isTeacher}
               formatDate={formatDate}

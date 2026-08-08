@@ -1,6 +1,5 @@
 /**
- * DesktopInstallGuideModal — when beforeinstallprompt is not available yet
- * (common on desktop / first visit), guide the user to the browser install menu.
+ * دليل سطح المكتب مختصر — خطوتان فقط عند غياب نافذة التثبيت الأصلية.
  */
 
 import {
@@ -18,51 +17,42 @@ import {
   Box,
   useColorModeValue,
 } from "@chakra-ui/react";
-import { FaChrome, FaEllipsisV, FaDownload } from "react-icons/fa";
+import { FaEllipsisV, FaDownload } from "react-icons/fa";
 
 const STEPS = [
   {
     icon: FaEllipsisV,
-    title: "افتح قائمة المتصفح",
-    desc: "اضغط على ⋮ أو ⋯ في أعلى المتصفح (Chrome / Edge).",
+    title: "افتح قائمة المتصفح ⋮",
+    desc: "من أعلى يمين Chrome أو Edge.",
   },
   {
     icon: FaDownload,
-    title: "اختر تثبيت التطبيق",
-    desc: "من القائمة اختر «تثبيت التطبيق» أو Install app / Add to Home screen.",
-  },
-  {
-    icon: FaChrome,
-    title: "أكّد التثبيت",
-    desc: "اضغط تثبيت — وسيظهر التطبيق كتطبيق مستقل على جهازك.",
+    title: "اختر «تثبيت التطبيق»",
+    desc: "ثم أكّد التثبيت.",
   },
 ];
 
-export default function DesktopInstallGuideModal({ isOpen, onClose, appName = "التطبيق" }) {
+export default function DesktopInstallGuideModal({ isOpen, onClose, appName = "المنصة" }) {
   const cardBg = useColorModeValue("orange.50", "whiteAlpha.100");
   const border = useColorModeValue("orange.100", "whiteAlpha.200");
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} isCentered size="md" motionPreset="slideInBottom">
-      <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
+    <Modal isOpen={isOpen} onClose={onClose} isCentered size="sm" motionPreset="slideInBottom">
+      <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(3px)" />
       <ModalContent dir="rtl" mx={4} borderRadius="2xl" overflow="hidden">
-        <Box h="4px" bgGradient="linear(to-l, blue.500, orange.500)" />
-        <ModalHeader pb={1} fontSize="lg" fontWeight="800">
-          تثبيت «{appName}» على جهازك
+        <Box h="3px" bgGradient="linear(to-l, blue.500, orange.500)" />
+        <ModalHeader pb={1} fontSize="md" fontWeight="800">
+          تنزيل منصة {appName}
         </ModalHeader>
         <ModalCloseButton />
         <ModalBody pb={2}>
-          <Text fontSize="sm" color="gray.500" mb={4} lineHeight="1.8">
-            نافذة التثبيت المباشرة غير جاهزة حالياً. يمكنك تثبيت «{appName}» من قائمة المتصفح
-            وستظهر باسم ولوجو المنصة:
-          </Text>
-          <VStack align="stretch" spacing={3}>
+          <VStack align="stretch" spacing={2.5}>
             {STEPS.map((step, index) => {
               const Icon = step.icon;
               return (
                 <HStack
                   key={step.title}
-                  align="flex-start"
+                  align="center"
                   spacing={3}
                   p={3}
                   bg={cardBg}
@@ -72,10 +62,10 @@ export default function DesktopInstallGuideModal({ isOpen, onClose, appName = "�
                 >
                   <Box
                     flexShrink={0}
-                    w="36px"
-                    h="36px"
+                    w="32px"
+                    h="32px"
                     borderRadius="lg"
-                    bg={index === 2 ? "orange.500" : "blue.500"}
+                    bg={index === 0 ? "blue.500" : "orange.500"}
                     color="white"
                     display="flex"
                     alignItems="center"
@@ -86,13 +76,13 @@ export default function DesktopInstallGuideModal({ isOpen, onClose, appName = "�
                     {index + 1}
                   </Box>
                   <Box flex="1" minW={0}>
-                    <HStack spacing={2} mb={1}>
-                      <Icon className="text-blue-500" />
+                    <HStack spacing={2}>
+                      <Icon className="text-blue-500 text-sm" />
                       <Text fontWeight="700" fontSize="sm">
                         {step.title}
                       </Text>
                     </HStack>
-                    <Text fontSize="xs" color="gray.500" lineHeight="1.7">
+                    <Text fontSize="xs" color="gray.500" mt={0.5}>
                       {step.desc}
                     </Text>
                   </Box>
@@ -101,15 +91,9 @@ export default function DesktopInstallGuideModal({ isOpen, onClose, appName = "�
             })}
           </VStack>
         </ModalBody>
-        <ModalFooter>
-          <Button
-            colorScheme="blue"
-            borderRadius="xl"
-            w="full"
-            onClick={onClose}
-            fontWeight="700"
-          >
-            فهمت
+        <ModalFooter pt={2}>
+          <Button colorScheme="blue" borderRadius="xl" w="full" onClick={onClose} fontWeight="700">
+            تم
           </Button>
         </ModalFooter>
       </ModalContent>

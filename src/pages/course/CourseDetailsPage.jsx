@@ -2626,6 +2626,7 @@ D) has made`}
 
       // لوجو المدرس صاحب المنصة — لو مش متاح نرجع للوجو الافتراضي
       let logoUrl = defaultLogoUrl;
+      let usesDefaultLogo = true;
       const tenantSubdomain = getTenantSubdomain();
       if (tenantSubdomain) {
         try {
@@ -2641,11 +2642,21 @@ D) has made`}
             logoUrl = teacherLogo.startsWith("data:")
               ? teacherLogo
               : await fetchImageAsDataUrl(teacherLogo);
+            usesDefaultLogo = false;
           }
         } catch {
           logoUrl = defaultLogoUrl;
         }
       }
+
+      const headerFontSize = usesDefaultLogo ? "9px" : "11px";
+      const courseNameFontSize = usesDefaultLogo ? "8px" : "10px";
+      const teacherNameFontSize = usesDefaultLogo ? "10px" : "12px";
+      const activationLabelFontSize = usesDefaultLogo ? "9px" : "11px";
+      const activationCodeFontSize = usesDefaultLogo ? "13px" : "16px";
+      const footerFontSize = usesDefaultLogo ? "10px" : "12px";
+      const logoHeight = usesDefaultLogo ? "36px" : "48px";
+
       const courseName = courseData?.course?.title || "الكورس";
       const teacherName = user?.name || "المدرس";
       const pdf = new jsPDF("l", "mm", "a4");
@@ -2686,14 +2697,14 @@ padding:8px 10px;
 display:flex;
 justify-content:space-between;
 align-items:center;
-font-size:11px;
+font-size:${headerFontSize};
 font-weight:700;
 ">
 
 <span>${code.grade_name || "الصف الثالث الثانوي"}</span>
 
 <span style="
-font-size:10px;
+font-size:${courseNameFontSize};
 background:rgba(255,255,255,0.2);
 padding:3px 8px;
 border-radius:6px;
@@ -2703,7 +2714,7 @@ ${courseName}
 
 <span style="
 font-weight:800;
-font-size:12px;
+font-size:${teacherNameFontSize};
 ">
 ${teacherName}
 </span>
@@ -2769,7 +2780,7 @@ border-radius:10px;
 padding:6px 10px;
 ">
 <img src="${logoUrl}" alt="لوجو المنصة" style="
-height:48px;
+height:${logoHeight};
 width:auto;
 max-width:150px;
 object-fit:contain;
@@ -2790,7 +2801,7 @@ margin-right:10px;
 ">
 
 <div style="
-font-size:11px;
+font-size:${activationLabelFontSize};
 font-weight:700;
 color:#fd7305;
 margin-bottom:6px;
@@ -2799,7 +2810,7 @@ margin-bottom:6px;
 </div>
 
 <div style="
-font-size:16px;
+font-size:${activationCodeFontSize};
 font-weight:800;
 font-family:monospace;
 letter-spacing:2px;
@@ -2821,7 +2832,7 @@ text-align:center;
 
 <span style="
 color:#fff;
-font-size:12px;
+font-size:${footerFontSize};
 font-weight:800;
 letter-spacing:0.3px;
 display:block;

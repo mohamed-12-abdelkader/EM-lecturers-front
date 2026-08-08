@@ -1,3 +1,6 @@
+/**
+ * هيرو سينمائي موحّد — موبايل/تابلت مضغوط + ديسكتوب أفقي
+ */
 import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { FaGraduationCap, FaPlay, FaWhatsapp } from "react-icons/fa";
@@ -20,9 +23,12 @@ import TenantAppLink from "../TenantAppLink";
 
 const EASE = [0.22, 1, 0.36, 1];
 
-function useIsDesktop(breakpoint = 768) {
+/** ديسكتوب من lg فقط — التابلت يبقى تخطيط مضغوط */
+function useIsDesktop(breakpoint = 1024) {
   const [isDesktop, setIsDesktop] = useState(() =>
-    typeof window !== "undefined" ? window.matchMedia(`(min-width: ${breakpoint}px)`).matches : false,
+    typeof window !== "undefined"
+      ? window.matchMedia(`(min-width: ${breakpoint}px)`).matches
+      : false,
   );
 
   useEffect(() => {
@@ -40,7 +46,7 @@ function SpecialtyBadge({ specialty, className = "" }) {
   if (!specialty) return null;
   return (
     <motion.span
-      className={`inline-flex max-w-full items-center gap-2 rounded-full border border-[color:var(--tl-border)] bg-[var(--tl-card)] px-3.5 py-1.5 text-[11px] font-semibold leading-snug text-[var(--tl-fg)] backdrop-blur-sm md:text-xs ${className}`}
+      className={`inline-flex max-w-full items-center gap-2 rounded-full border border-[color:var(--tl-border)] bg-[var(--tl-card)] px-3 py-1 text-[11px] font-semibold leading-snug text-[var(--tl-fg)] backdrop-blur-sm sm:px-3.5 sm:py-1.5 sm:text-xs ${className}`}
       whileHover={{ scale: 1.04, y: -2 }}
       transition={{ type: "spring", stiffness: 400, damping: 18 }}
     >
@@ -51,38 +57,46 @@ function SpecialtyBadge({ specialty, className = "" }) {
         transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
         aria-hidden
       />
-      <span>{specialty}</span>
+      <span className="truncate">{specialty}</span>
     </motion.span>
   );
 }
 
-function HighlightsCard({ highlights }) {
+function HighlightsCard({ highlights, compact = false }) {
   if (!highlights?.length) return null;
+  const items = compact ? highlights.slice(0, 2) : highlights;
   return (
     <motion.ul
-      className="rounded-2xl border border-[color:var(--tl-border)] bg-[var(--tl-card)] px-4 py-4 text-right shadow-sm md:px-5 md:py-5"
+      className={`rounded-2xl border border-[color:var(--tl-border)] bg-[var(--tl-card)] text-right shadow-sm ${
+        compact ? "px-3.5 py-3" : "px-4 py-4 md:px-5 md:py-5"
+      }`}
       style={{ transformStyle: "preserve-3d" }}
       initial={{ rotateX: 12, opacity: 0.6 }}
       animate={{ rotateX: 0, opacity: 1 }}
       transition={{ duration: 0.8, ease: EASE }}
     >
-      {highlights.map((item, i) => (
+      {items.map((item, i) => (
         <motion.li
           key={item}
-          className="flex items-start gap-2.5 border-b border-[color:var(--tl-border)] py-2.5 last:border-0 last:pb-0 first:pt-0 md:py-3"
+          className={`flex items-start gap-2.5 border-b border-[color:var(--tl-border)] last:border-0 last:pb-0 first:pt-0 ${
+            compact ? "py-2" : "py-2.5 md:py-3"
+          }`}
           initial={{ opacity: 0, x: 16 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.35 + i * 0.1, duration: 0.45 }}
-          whileHover={{ x: -4, scale: 1.01 }}
         >
-          <motion.span
+          <span
             className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
             style={{ background: CYAN }}
-            animate={{ scale: [1, 1.4, 1] }}
-            transition={{ duration: 2.4, repeat: Infinity, delay: i * 0.3 }}
             aria-hidden
           />
-          <span className="flex-1 text-[13px] font-medium leading-6 text-[var(--tl-fg)] md:text-sm md:leading-7">
+          <span
+            className={`flex-1 font-medium text-[var(--tl-fg)] ${
+              compact
+                ? "line-clamp-2 text-[12.5px] leading-6"
+                : "text-[13px] leading-6 md:text-sm md:leading-7"
+            }`}
+          >
             {item}
           </span>
         </motion.li>
@@ -91,20 +105,27 @@ function HighlightsCard({ highlights }) {
   );
 }
 
-function HeroActions({ signupHref, loginHref, whatsappHref, showFreeVideos }) {
+function HeroActions({ signupHref, loginHref, whatsappHref, showFreeVideos, stacked = false }) {
   const reduceMotion = useReducedMotion();
   return (
-    <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-2 gap-3 md:flex md:flex-wrap md:justify-start">
+    <div className="flex w-full flex-col gap-2.5">
+      <div
+        className={
+          stacked
+            ? "flex w-full flex-col gap-2.5"
+            : "grid w-full grid-cols-2 gap-2.5 md:flex md:flex-wrap md:justify-start md:gap-3"
+        }
+      >
         <motion.div
-          whileHover={reduceMotion ? undefined : { y: -4, scale: 1.04, rotateX: 6 }}
+          whileHover={reduceMotion ? undefined : { y: -3, scale: 1.02 }}
           whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-          transition={{ type: "spring", stiffness: 400, damping: 18 }}
-          className="contents md:block"
+          className={stacked ? "w-full" : "contents md:block"}
         >
           <TenantAppLink
             href={signupHref}
-            className="inline-flex items-center justify-center rounded-xl px-4 py-3.5 text-sm font-bold text-white shadow-lg transition hover:brightness-110 active:scale-[0.98] md:min-w-[160px] md:px-8"
+            className={`inline-flex items-center justify-center rounded-xl px-4 py-3.5 text-sm font-bold text-white shadow-lg transition hover:brightness-110 active:scale-[0.98] ${
+              stacked ? "w-full" : "w-full md:min-w-[160px] md:w-auto md:px-8"
+            }`}
             style={{
               background: CYAN,
               boxShadow: `0 10px 28px -8px ${CYAN}99`,
@@ -114,13 +135,15 @@ function HeroActions({ signupHref, loginHref, whatsappHref, showFreeVideos }) {
           </TenantAppLink>
         </motion.div>
         <motion.div
-          whileHover={reduceMotion ? undefined : { y: -4, scale: 1.03, rotateX: 4 }}
+          whileHover={reduceMotion ? undefined : { y: -3, scale: 1.02 }}
           whileTap={reduceMotion ? undefined : { scale: 0.97 }}
-          className="contents md:block"
+          className={stacked ? "w-full" : "contents md:block"}
         >
           <TenantAppLink
             href={loginHref}
-            className="inline-flex items-center justify-center rounded-xl border border-[color:var(--tl-border)] bg-[var(--tl-card)] px-4 py-3.5 text-sm font-bold text-[var(--tl-fg)] shadow-sm transition hover:bg-[var(--tl-soft)] active:scale-[0.98] md:min-w-[160px] md:px-8"
+            className={`inline-flex items-center justify-center rounded-xl border border-[color:var(--tl-border)] bg-[var(--tl-card)] px-4 py-3.5 text-sm font-bold text-[var(--tl-fg)] shadow-sm transition hover:bg-[var(--tl-soft)] active:scale-[0.98] ${
+              stacked ? "w-full" : "w-full md:min-w-[160px] md:w-auto md:px-8"
+            }`}
           >
             تسجيل دخول
           </TenantAppLink>
@@ -130,8 +153,12 @@ function HeroActions({ signupHref, loginHref, whatsappHref, showFreeVideos }) {
             href={whatsappHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="col-span-2 inline-flex items-center justify-center gap-2 rounded-xl border border-[#25D366]/50 bg-[#25D366]/12 px-4 py-3.5 text-sm font-bold text-[#128C7E] transition hover:bg-[#25D366]/20 active:scale-[0.98] md:col-span-1 md:min-w-[180px] [.tenant-dark_&]:border-[#25D366]/40 [.tenant-dark_&]:bg-[#25D366]/15 [.tenant-dark_&]:text-[#6EFFA0]"
-            whileHover={reduceMotion ? undefined : { y: -4, scale: 1.03 }}
+            className={`inline-flex items-center justify-center gap-2 rounded-xl border border-[#25D366]/50 bg-[#25D366]/12 px-4 py-3.5 text-sm font-bold text-[#128C7E] transition hover:bg-[#25D366]/20 active:scale-[0.98] [.tenant-dark_&]:border-[#25D366]/40 [.tenant-dark_&]:bg-[#25D366]/15 [.tenant-dark_&]:text-[#6EFFA0] ${
+              stacked
+                ? "w-full"
+                : "col-span-2 w-full md:col-span-1 md:w-auto md:min-w-[180px]"
+            }`}
+            whileHover={reduceMotion ? undefined : { y: -3, scale: 1.02 }}
             whileTap={reduceMotion ? undefined : { scale: 0.97 }}
           >
             <FaWhatsapp className="text-lg text-[#25D366]" />
@@ -143,16 +170,14 @@ function HeroActions({ signupHref, loginHref, whatsappHref, showFreeVideos }) {
       {showFreeVideos ? (
         <motion.a
           href="#videos"
-          className="inline-flex items-center justify-center gap-2.5 text-sm font-semibold text-[var(--tl-muted)] transition hover:text-[var(--tl-fg)] md:justify-start"
+          className={`inline-flex items-center gap-2.5 pt-0.5 text-sm font-semibold text-[var(--tl-muted)] transition hover:text-[var(--tl-fg)] ${
+            stacked ? "justify-center" : "justify-center md:justify-start"
+          }`}
           whileHover={reduceMotion ? undefined : { x: -4 }}
         >
-          <motion.span
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-[color:var(--tl-border)] bg-[var(--tl-soft)]"
-            animate={reduceMotion ? undefined : { scale: [1, 1.12, 1] }}
-            transition={{ duration: 2.2, repeat: Infinity }}
-          >
+          <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[color:var(--tl-border)] bg-[var(--tl-soft)]">
             <FaPlay className="mr-[-1px] text-[10px]" style={{ color: CYAN }} />
-          </motion.span>
+          </span>
           شاهد محاضرة مجانية
         </motion.a>
       ) : null}
@@ -170,6 +195,7 @@ function HeroCopy({
   whatsappHref,
   showFreeVideos,
   align = "center",
+  compact = false,
 }) {
   const isCenter = align === "center";
 
@@ -177,18 +203,26 @@ function HeroCopy({
     <HeroStagger>
       {specialty ? (
         <HeroStaggerItem
-          className={`mb-4 flex ${isCenter ? "justify-center" : "justify-start"}`}
+          className={`mb-3 flex sm:mb-4 ${isCenter ? "justify-center" : "justify-start"}`}
         >
           <SpecialtyBadge specialty={specialty} />
         </HeroStaggerItem>
       ) : null}
 
       <HeroStaggerItem className={isCenter ? "text-center" : "text-right"}>
-        <h1 className="font-heading text-[2rem] font-bold leading-tight tracking-tight text-[var(--tl-fg)] sm:text-[2.35rem] lg:text-[2.85rem]">
+        <h1
+          className={`font-heading font-bold leading-[1.25] tracking-tight text-[var(--tl-fg)] ${
+            compact
+              ? "text-[1.55rem] sm:text-[1.85rem]"
+              : "text-[1.75rem] sm:text-[2.15rem] lg:text-[2.85rem]"
+          }`}
+        >
           {teacherName}
         </h1>
         <motion.span
-          className={`mt-3 block h-[3px] w-14 rounded-full ${isCenter ? "mx-auto" : "ms-0"}`}
+          className={`mt-2 block h-[3px] w-11 rounded-full sm:mt-2.5 sm:w-14 ${
+            isCenter ? "mx-auto" : "ms-0"
+          }`}
           style={{ background: CYAN, originX: isCenter ? 0.5 : 1 }}
           initial={{ scaleX: 0 }}
           animate={{ scaleX: 1 }}
@@ -198,9 +232,13 @@ function HeroCopy({
       </HeroStaggerItem>
 
       {tagline ? (
-        <HeroStaggerItem className={`mt-4 ${isCenter ? "text-center" : "text-right"}`}>
+        <HeroStaggerItem className={`mt-3 ${isCenter ? "text-center" : "text-right"}`}>
           <p
-            className="max-w-xl text-[0.95rem] font-medium leading-7 text-[var(--tl-muted)] md:text-base md:leading-8"
+            className={`font-medium text-[var(--tl-muted)] ${
+              compact
+                ? "mx-auto line-clamp-3 max-w-none text-[0.875rem] leading-7"
+                : "max-w-xl text-[0.95rem] leading-7 md:text-base md:leading-8"
+            }`}
           >
             {tagline}
           </p>
@@ -208,24 +246,32 @@ function HeroCopy({
       ) : null}
 
       {highlights.length > 0 ? (
-        <HeroStaggerItem className={`mt-6 ${isCenter ? "" : "max-w-xl"}`}>
-          <HighlightsCard highlights={highlights} />
+        <HeroStaggerItem className={`mt-4 w-full ${compact ? "" : "max-w-xl"} sm:mt-5`}>
+          <HighlightsCard highlights={highlights} compact={compact} />
         </HeroStaggerItem>
       ) : null}
 
-      <HeroStaggerItem className="mt-6 md:mt-8">
+      <HeroStaggerItem className="mt-4 w-full sm:mt-5 lg:mt-8">
         <HeroActions
           signupHref={signupHref}
           loginHref={loginHref}
           whatsappHref={whatsappHref}
           showFreeVideos={showFreeVideos}
+          stacked={compact}
         />
       </HeroStaggerItem>
     </HeroStagger>
   );
 }
 
-function TeacherImage({ src, alt, className = "", fade = "bottom", priority = true }) {
+function TeacherImage({
+  src,
+  alt,
+  className = "",
+  fade = "bottom",
+  priority = true,
+  objectPosition = "center 18%",
+}) {
   const [loaded, setLoaded] = useState(false);
   const imgRef = useRef(null);
   const blurSrc = src ? getBlurPlaceholderUrl(src) : null;
@@ -246,8 +292,8 @@ function TeacherImage({ src, alt, className = "", fade = "bottom", priority = tr
               src={blurSrc}
               alt=""
               aria-hidden
-              className="absolute inset-0 h-full w-full scale-110 object-cover object-top"
-              style={{ filter: "blur(16px)" }}
+              className="absolute inset-0 h-full w-full scale-110 object-cover"
+              style={{ filter: "blur(16px)", objectPosition }}
               loading="eager"
               decoding="async"
             />
@@ -258,11 +304,12 @@ function TeacherImage({ src, alt, className = "", fade = "bottom", priority = tr
             ref={imgRef}
             src={src}
             srcSet={srcSet}
-            sizes="(min-width: 768px) min(520px, 45vw), 100vw"
+            sizes="(min-width: 1024px) min(520px, 45vw), 100vw"
             alt={alt}
-            className={`absolute inset-0 h-full w-full object-cover object-top transition-opacity duration-200 ${
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-200 ${
               loaded ? "opacity-100" : "opacity-0"
             }`}
+            style={{ objectPosition }}
             loading={priority ? "eager" : "lazy"}
             fetchpriority={priority ? "high" : "auto"}
             decoding="async"
@@ -275,30 +322,30 @@ function TeacherImage({ src, alt, className = "", fade = "bottom", priority = tr
           className="absolute inset-0 flex items-center justify-center"
           style={{ background: `linear-gradient(160deg, #1e3a5f 0%, ${NAVY} 100%)` }}
         >
-          <FaGraduationCap className="text-7xl text-white/25 lg:text-8xl" aria-hidden />
+          <FaGraduationCap className="text-6xl text-white/25 sm:text-7xl" aria-hidden />
         </div>
       )}
 
       {fade === "bottom" ? (
         <>
           <div
-            className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-[50%]"
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-[42%]"
             style={{
               background:
-                "linear-gradient(to top, var(--tl-hero-fade) 0%, color-mix(in srgb, var(--tl-hero-fade) 72%, transparent) 30%, transparent 100%)",
+                "linear-gradient(to top, var(--tl-hero-fade) 0%, color-mix(in srgb, var(--tl-hero-fade) 70%, transparent) 40%, transparent 100%)",
             }}
             aria-hidden
           />
           <div
-            className="pointer-events-none absolute inset-x-0 top-0 z-[2] h-20"
+            className="pointer-events-none absolute inset-x-0 top-0 z-[2] h-14"
             style={{
               background:
-                "linear-gradient(to bottom, color-mix(in srgb, var(--tl-hero-fade) 55%, transparent) 0%, transparent 100%)",
+                "linear-gradient(to bottom, color-mix(in srgb, var(--tl-hero-fade) 50%, transparent) 0%, transparent 100%)",
             }}
             aria-hidden
           />
         </>
-      ) : (
+      ) : fade === "side" ? (
         <>
           <div
             className="pointer-events-none absolute inset-y-0 right-0 z-[2] w-[28%]"
@@ -317,15 +364,11 @@ function TeacherImage({ src, alt, className = "", fade = "bottom", priority = tr
             aria-hidden
           />
         </>
-      )}
+      ) : null}
     </div>
   );
 }
 
-/**
- * هيرو سينمائي موحّد — موبايل (عمودي) + لابتوب/ديسكتوب (أفقي)
- * بنفس الألوان: كحلي / سماوي / أصفر + إحساس 3D
- */
 export default function TenantProHero({
   specialty,
   teacherName,
@@ -340,19 +383,23 @@ export default function TenantProHero({
 }) {
   const sectionRef = useRef(null);
   const reduceMotion = useReducedMotion();
-  const isDesktop = useIsDesktop(768);
+  const isDesktop = useIsDesktop(1024);
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ["start start", "end start"],
   });
-  const imgY = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : 90]);
-  const imgScale = useTransform(scrollYProgress, [0, 1], [1, reduceMotion ? 1 : 1.08]);
-  const copyY = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : -40]);
-  const copyOpacity = useTransform(scrollYProgress, [0, 0.7], [1, reduceMotion ? 1 : 0.35]);
+  const imgY = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : isDesktop ? 90 : 40]);
+  const imgScale = useTransform(
+    scrollYProgress,
+    [0, 1],
+    [1, reduceMotion ? 1 : isDesktop ? 1.08 : 1.04],
+  );
+  const copyY = useTransform(scrollYProgress, [0, 1], [0, reduceMotion ? 0 : -28]);
+  const copyOpacity = useTransform(scrollYProgress, [0, 0.75], [1, reduceMotion ? 1 : 0.45]);
 
   const resolvedTagline =
     (tagline && String(tagline).trim()) ||
-    (bioText && String(bioText).trim().slice(0, 100)) ||
+    (bioText && String(bioText).trim().slice(0, 110)) ||
     "";
 
   const copyProps = {
@@ -366,20 +413,6 @@ export default function TenantProHero({
     showFreeVideos,
   };
 
-  const portrait = (
-    <TeacherImage
-      src={teacherImageUrl}
-      alt={teacherName}
-      fade={isDesktop ? "side" : "bottom"}
-      priority
-      className={
-        isDesktop
-          ? "aspect-[3/4] w-full max-h-[min(72vh,680px)] rounded-3xl ring-1 ring-white/10 shadow-[0_32px_70px_-18px_rgba(0,0,0,0.65)]"
-          : "aspect-[4/5] max-h-[58vh] min-h-[280px] w-full"
-      }
-    />
-  );
-
   return (
     <section
       id="home"
@@ -388,7 +421,6 @@ export default function TenantProHero({
       style={{ perspective: 1400 }}
       dir="rtl"
     >
-      {/* Floating depth orbs */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
         <HeroGlowOrb
           className="absolute -left-20 top-24 h-64 w-64 rounded-full blur-3xl"
@@ -409,27 +441,44 @@ export default function TenantProHero({
 
       {!isDesktop ? (
         <div className="relative">
-          <motion.div className="relative w-full overflow-hidden pt-16" style={{ y: imgY, scale: imgScale }}>
-            {portrait}
+          {/* بانر بعرض كامل وارتفاع ثابت */}
+          <motion.div
+            className="relative w-full overflow-hidden pt-14"
+            style={{ y: imgY, scale: imgScale }}
+          >
+            <TeacherImage
+              src={teacherImageUrl}
+              alt={teacherName}
+              fade="bottom"
+              priority
+              objectPosition="center 12%"
+              className="h-[min(42vw,210px)] min-h-[168px] w-full max-h-[230px] sm:h-[220px] sm:max-h-[240px]"
+            />
           </motion.div>
-          <motion.div className="relative -mt-10 px-5 pb-8 pt-2" style={{ y: copyY, opacity: copyOpacity }}>
-            <HeroCopy {...copyProps} align="center" />
+
+          <motion.div
+            className="relative z-[1] -mt-8 px-4 pb-8 sm:-mt-10 sm:px-6"
+            style={{ y: copyY, opacity: copyOpacity }}
+          >
+            <div className="mx-auto w-full max-w-lg">
+              <HeroCopy {...copyProps} align="center" compact />
+            </div>
           </motion.div>
         </div>
       ) : (
         <div className="relative">
           <div
-            className={`${tlContainer} grid items-center gap-8 pt-24 pb-14 lg:grid-cols-2 lg:gap-10 lg:pb-16 xl:gap-14`}
+            className={`${tlContainer} grid items-center gap-10 pb-16 pt-24 lg:grid-cols-2 lg:gap-12 xl:gap-16`}
           >
             <motion.div
-              className="relative z-10 flex flex-col justify-center py-4 lg:py-8"
+              className="relative z-10 flex max-w-xl flex-col justify-center py-6 lg:max-w-none"
               style={{ y: copyY, opacity: copyOpacity, transformStyle: "preserve-3d" }}
             >
               <HeroCopy {...copyProps} align="start" />
             </motion.div>
 
             <motion.div
-              className="relative mx-auto w-full max-w-[520px] lg:mx-0 lg:max-w-none"
+              className="relative mx-auto w-full max-w-[460px] lg:mx-0 lg:justify-self-end lg:max-w-[500px]"
               style={{ y: imgY, scale: imgScale }}
             >
               {!reduceMotion && (
@@ -451,7 +500,14 @@ export default function TenantProHero({
                 </>
               )}
               <Tilt3D maxTilt={14} floatPx={12} floatDuration={5.2}>
-                {portrait}
+                <TeacherImage
+                  src={teacherImageUrl}
+                  alt={teacherName}
+                  fade="side"
+                  priority
+                  objectPosition="center 15%"
+                  className="aspect-[3/4] max-h-[min(64vh,580px)] w-full rounded-3xl shadow-[0_32px_70px_-18px_rgba(0,0,0,0.65)] ring-1 ring-white/10"
+                />
               </Tilt3D>
             </motion.div>
           </div>

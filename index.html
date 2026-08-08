@@ -77,6 +77,12 @@
   <body dir="rtl" lang="ar" translate="no">
     <style>
       #app-boot {
+        --boot-bg: #0b1524;
+        --boot-fg: #f4f8fc;
+        --boot-muted: #9db6cc;
+        --boot-accent: #4db3e8;
+        --boot-accent-soft: rgba(77, 179, 232, 0.18);
+        --boot-warm: #f0b35a;
         position: fixed;
         inset: 0;
         z-index: 99999;
@@ -87,14 +93,14 @@
         align-items: center;
         justify-content: center;
         gap: 0;
-        padding: 24px;
+        padding: max(20px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
         box-sizing: border-box;
         background:
-          radial-gradient(ellipse 70% 55% at 50% 32%, rgba(0, 160, 227, 0.22) 0%, transparent 55%),
-          radial-gradient(ellipse 45% 40% at 88% 82%, rgba(212, 225, 87, 0.14) 0%, transparent 50%),
-          radial-gradient(ellipse 40% 35% at 8% 78%, rgba(0, 160, 227, 0.12) 0%, transparent 45%),
-          #0a1628;
-        color: #7eb8d9;
+          radial-gradient(ellipse 90% 60% at 50% -10%, rgba(77, 179, 232, 0.28) 0%, transparent 55%),
+          radial-gradient(ellipse 50% 40% at 100% 100%, rgba(240, 179, 90, 0.1) 0%, transparent 50%),
+          radial-gradient(ellipse 45% 35% at 0% 85%, rgba(77, 179, 232, 0.12) 0%, transparent 50%),
+          linear-gradient(165deg, #0e1a2c 0%, var(--boot-bg) 45%, #08101c 100%);
+        color: var(--boot-muted);
         font-family: "Noto Sans Arabic", Tahoma, "Segoe UI", sans-serif;
         direction: rtl;
         overflow: hidden;
@@ -103,34 +109,43 @@
         content: "";
         position: absolute;
         inset: 0;
-        opacity: 0.28;
-        background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.14) 1px, transparent 0);
-        background-size: 22px 22px;
-        mask-image: radial-gradient(ellipse 80% 70% at 50% 45%, black, transparent);
+        opacity: 0.35;
+        background-image:
+          radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.09) 1px, transparent 0);
+        background-size: 28px 28px;
+        mask-image: radial-gradient(ellipse 75% 65% at 50% 42%, black 20%, transparent 75%);
         pointer-events: none;
       }
       #app-boot .boot-orb {
         position: absolute;
         border-radius: 50%;
-        filter: blur(48px);
+        filter: blur(56px);
         pointer-events: none;
-        animation: em-float 7s ease-in-out infinite;
+        animation: em-float 9s ease-in-out infinite;
       }
       #app-boot .boot-orb-a {
-        width: 220px;
-        height: 220px;
-        top: 10%;
-        right: 6%;
-        background: rgba(0, 160, 227, 0.2);
+        width: 260px;
+        height: 260px;
+        top: 6%;
+        right: -4%;
+        background: rgba(77, 179, 232, 0.22);
       }
       #app-boot .boot-orb-b {
-        width: 180px;
-        height: 180px;
-        bottom: 12%;
-        left: 8%;
-        background: rgba(212, 225, 87, 0.14);
-        animation-duration: 8.5s;
+        width: 200px;
+        height: 200px;
+        bottom: 8%;
+        left: -6%;
+        background: rgba(240, 179, 90, 0.12);
+        animation-duration: 11s;
         animation-direction: reverse;
+      }
+      #app-boot .boot-orb-c {
+        width: 140px;
+        height: 140px;
+        top: 48%;
+        left: 42%;
+        background: rgba(77, 179, 232, 0.1);
+        animation-duration: 8s;
       }
       #app-boot .boot-inner {
         position: relative;
@@ -139,14 +154,23 @@
         flex-direction: column;
         align-items: center;
         text-align: center;
-        max-width: 320px;
-        width: 100%;
+        width: min(360px, 100%);
+        padding: 36px 28px 32px;
+        border-radius: 28px;
+        background:
+          linear-gradient(160deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.03) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow:
+          0 30px 60px -24px rgba(0, 0, 0, 0.55),
+          inset 0 1px 0 rgba(255, 255, 255, 0.12);
+        backdrop-filter: blur(18px);
+        -webkit-backdrop-filter: blur(18px);
       }
       #app-boot .boot-logo-wrap {
         position: relative;
-        width: 132px;
-        height: 132px;
-        margin-bottom: 28px;
+        width: 118px;
+        height: 118px;
+        margin-bottom: 26px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -156,44 +180,47 @@
         inset: 0;
         border-radius: 50%;
         border: 2px solid transparent;
-        border-top-color: #00a0e3;
-        border-right-color: rgba(0, 160, 227, 0.35);
-        animation: em-spin 1.2s linear infinite;
+        border-top-color: var(--boot-accent);
+        border-right-color: rgba(77, 179, 232, 0.25);
+        animation: em-spin 1.35s linear infinite;
       }
       #app-boot .boot-ring-outer {
-        inset: -6px;
+        inset: -8px;
         border-width: 1px;
-        border-color: rgba(255, 255, 255, 0.1);
-        border-top-color: rgba(255, 255, 255, 0.28);
-        animation-duration: 10s;
+        border-color: rgba(255, 255, 255, 0.08);
+        border-top-color: rgba(255, 255, 255, 0.22);
+        animation-duration: 12s;
       }
       #app-boot .boot-ring-inner {
-        inset: 14px;
-        border-bottom-color: #d4e157;
-        border-left-color: rgba(212, 225, 87, 0.4);
+        inset: 12px;
+        border-bottom-color: var(--boot-warm);
+        border-left-color: rgba(240, 179, 90, 0.35);
         border-top-color: transparent;
         border-right-color: transparent;
         animation-direction: reverse;
-        animation-duration: 2.2s;
+        animation-duration: 2.4s;
       }
       #app-boot .boot-mark {
-        width: 84px;
-        height: 84px;
+        width: 76px;
+        height: 76px;
         border-radius: 22px;
-        background: rgba(255, 255, 255, 0.08);
-        border: 1px solid rgba(255, 255, 255, 0.14);
-        box-shadow: 0 20px 48px -16px rgba(0, 160, 227, 0.55);
+        background:
+          linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04));
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        box-shadow:
+          0 16px 36px -14px rgba(77, 179, 232, 0.55),
+          0 0 0 6px var(--boot-accent-soft);
         display: flex;
         align-items: center;
         justify-content: center;
         overflow: hidden;
-        animation: em-pulse 2.2s ease-in-out infinite;
+        animation: em-pulse 2.6s ease-in-out infinite;
       }
       #app-boot .boot-mark img {
         width: 100%;
         height: 100%;
         object-fit: contain;
-        padding: 10px;
+        padding: 9px;
         display: none;
       }
       #app-boot .boot-mark.has-logo img {
@@ -203,82 +230,108 @@
         display: none;
       }
       #app-boot .boot-letter {
-        font-size: 2rem;
+        font-size: 1.85rem;
         font-weight: 800;
-        color: #fff;
+        color: var(--boot-fg);
         letter-spacing: -0.02em;
-        text-shadow: 0 0 24px rgba(0, 160, 227, 0.7);
+        text-shadow: 0 0 20px rgba(77, 179, 232, 0.55);
         font-family: "Noto Naskh Arabic", "Noto Sans Arabic", Tahoma, sans-serif;
       }
       #app-boot .boot-eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
         font-size: 11px;
         font-weight: 700;
-        letter-spacing: 0.2em;
-        text-transform: uppercase;
-        color: #7eb8d9;
-        margin: 0 0 8px;
+        letter-spacing: 0.08em;
+        color: var(--boot-accent);
+        margin: 0 0 10px;
+        padding: 5px 12px;
+        border-radius: 999px;
+        background: var(--boot-accent-soft);
+        border: 1px solid rgba(77, 179, 232, 0.22);
+      }
+      #app-boot .boot-eyebrow::before {
+        content: "";
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--boot-accent);
+        box-shadow: 0 0 10px var(--boot-accent);
+        animation: em-dot 1.4s ease-in-out infinite;
       }
       #app-boot .boot-title {
         margin: 0;
-        font-size: 1.35rem;
+        font-size: clamp(1.2rem, 4.5vw, 1.45rem);
         font-weight: 800;
-        color: #fff;
-        line-height: 1.35;
+        color: var(--boot-fg);
+        line-height: 1.4;
         font-family: "Noto Naskh Arabic", "Noto Sans Arabic", Tahoma, sans-serif;
+        text-wrap: balance;
       }
       #app-boot .boot-sub {
-        margin: 10px 0 0;
-        font-size: 0.9rem;
-        line-height: 1.7;
-        color: #7eb8d9;
-        animation: em-fade 2s ease-in-out infinite;
+        margin: 12px 0 0;
+        max-width: 260px;
+        font-size: 0.92rem;
+        line-height: 1.85;
+        color: var(--boot-muted);
+        animation: em-fade 2.4s ease-in-out infinite;
       }
       #app-boot .boot-bar {
-        margin-top: 28px;
-        width: min(220px, 70vw);
-        height: 6px;
+        margin-top: 26px;
+        width: min(200px, 62vw);
+        height: 5px;
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.08);
         overflow: hidden;
         position: relative;
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
       }
       #app-boot .boot-bar-fill {
         position: absolute;
         top: 0;
         bottom: 0;
-        width: 42%;
+        width: 40%;
         border-radius: 999px;
-        background: linear-gradient(90deg, #00a0e3, #d4e157, #00a0e3);
-        background-size: 200% 100%;
-        animation: em-bar 1.35s ease-in-out infinite;
+        background: linear-gradient(90deg, var(--boot-accent), #7ec8ef, var(--boot-warm), var(--boot-accent));
+        background-size: 220% 100%;
+        box-shadow: 0 0 14px rgba(77, 179, 232, 0.45);
+        animation: em-bar 1.5s ease-in-out infinite;
       }
       #app-boot .boot-dots {
         display: flex;
-        gap: 6px;
-        margin-top: 14px;
+        gap: 7px;
+        margin-top: 16px;
         justify-content: center;
       }
       #app-boot .boot-dots span {
         width: 6px;
         height: 6px;
         border-radius: 50%;
-        background: #00a0e3;
-        animation: em-dot 1.1s ease-in-out infinite;
+        background: var(--boot-accent);
+        animation: em-dot 1.25s ease-in-out infinite;
       }
       #app-boot .boot-dots span:nth-child(2) {
-        background: #d4e157;
-        animation-delay: 0.18s;
+        background: #7ec8ef;
+        animation-delay: 0.2s;
       }
       #app-boot .boot-dots span:nth-child(3) {
-        animation-delay: 0.36s;
+        background: var(--boot-warm);
+        animation-delay: 0.4s;
       }
       #app-boot .boot-line {
         position: absolute;
-        left: 0;
-        right: 0;
+        left: 12%;
+        right: 12%;
         bottom: 0;
         height: 1px;
-        background: linear-gradient(90deg, transparent, rgba(0, 160, 227, 0.55), rgba(212, 225, 87, 0.55), transparent);
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(77, 179, 232, 0.45),
+          rgba(240, 179, 90, 0.35),
+          transparent
+        );
         pointer-events: none;
       }
       @keyframes em-spin {
@@ -290,17 +343,21 @@
         0%,
         100% {
           transform: scale(1);
-          box-shadow: 0 20px 48px -16px rgba(0, 160, 227, 0.45);
+          box-shadow:
+            0 16px 36px -14px rgba(77, 179, 232, 0.45),
+            0 0 0 6px var(--boot-accent-soft);
         }
         50% {
-          transform: scale(1.04);
-          box-shadow: 0 24px 56px -14px rgba(212, 225, 87, 0.35);
+          transform: scale(1.035);
+          box-shadow:
+            0 20px 42px -12px rgba(77, 179, 232, 0.55),
+            0 0 0 10px rgba(77, 179, 232, 0.1);
         }
       }
       @keyframes em-fade {
         0%,
         100% {
-          opacity: 0.55;
+          opacity: 0.62;
         }
         50% {
           opacity: 1;
@@ -308,7 +365,7 @@
       }
       @keyframes em-bar {
         0% {
-          left: -45%;
+          left: -42%;
         }
         100% {
           left: 105%;
@@ -331,7 +388,7 @@
           transform: translate(0, 0);
         }
         50% {
-          transform: translate(-12px, 16px);
+          transform: translate(-10px, 14px);
         }
       }
       @media (prefers-reduced-motion: reduce) {
@@ -340,7 +397,8 @@
         #app-boot .boot-sub,
         #app-boot .boot-bar-fill,
         #app-boot .boot-dots span,
-        #app-boot .boot-orb {
+        #app-boot .boot-orb,
+        #app-boot .boot-eyebrow::before {
           animation: none !important;
         }
         #app-boot .boot-bar-fill {
@@ -446,8 +504,8 @@
           var showFancy =
             isTenant && isLandingRoot && !alreadyShown;
 
-          document.documentElement.style.background = isTenant ? "#0a1628" : "";
-          document.body.style.background = isTenant ? "#0a1628" : "";
+          document.documentElement.style.background = isTenant ? "#0b1524" : "";
+          document.body.style.background = isTenant ? "#0b1524" : "";
 
           if (!showFancy) return;
 
@@ -460,6 +518,7 @@
             '<div id="app-boot" role="status" aria-live="polite" aria-busy="true" aria-label="جاري تجهيز المنصة">' +
             '<div class="boot-orb boot-orb-a" aria-hidden="true"></div>' +
             '<div class="boot-orb boot-orb-b" aria-hidden="true"></div>' +
+            '<div class="boot-orb boot-orb-c" aria-hidden="true"></div>' +
             '<div class="boot-inner">' +
             '<div class="boot-logo-wrap" aria-hidden="true">' +
             '<div class="boot-ring boot-ring-outer"></div>' +
@@ -471,7 +530,7 @@
             "</div></div>" +
             '<p class="boot-eyebrow">جاري التجهيز</p>' +
             '<h1 class="boot-title" id="app-boot-title">منصتك التعليمية</h1>' +
-            '<p class="boot-sub">نجهّز تجربتك… لحظات ويظهر المحتوى</p>' +
+            '<p class="boot-sub">نجهّز تجربتك بهدوء… لحظات قليلة ويظهر المحتوى</p>' +
             '<div class="boot-bar" aria-hidden="true"><div class="boot-bar-fill"></div></div>' +
             '<div class="boot-dots" aria-hidden="true"><span></span><span></span><span></span></div>' +
             "</div>" +

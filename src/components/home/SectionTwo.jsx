@@ -1,28 +1,35 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useColorModeValue } from "@chakra-ui/react";
 import {
-  FaUsers,
+  FaGlobe,
   FaFileAlt,
+  FaClipboardCheck,
+  FaUserFriends,
+  FaChartLine,
+  FaVideo,
   FaClipboardList,
-  FaBookOpen,
-  FaBell,
-  FaMobileAlt,
-  FaChartBar,
-  FaCreditCard,
+  FaCogs,
+  FaRobot,
+  FaHeadset,
+  FaCheck,
 } from "react-icons/fa";
-import { BRAND, landingFont } from "./landingTheme.js";
-import { DotGrid, MeshGlow } from "./landingDecor.jsx";
+import { landingFont } from "./landingTheme.js";
+import { DotGrid } from "./landingDecor.jsx";
+
+const BLUE = "#3182CE";
+const ORANGE = "#DD6B20";
 
 const features = [
   {
     id: 1,
-    name: "إدارة الطلاب",
+    name: "منصة خاصة بيك",
     description:
-      "لوحة ذكية لمتابعة الحضور والنتائج وتقدم كل طالب — كل البيانات في مكان واحد واضح.",
-    icon: FaUsers,
-    gradient: "from-blue-500 to-cyan-400",
-    accent: "#22d3ee",
-    stat: "تتبع لحظي",
+      "منصتك باسمك وهويتك — تبني براند قوي لنفسك قدام الطلاب وأولياء الأمور، وتبقى وجهتك التعليمية الرسمية.",
+    icon: FaGlobe,
+    accent: BLUE,
+    tag: "براند قوي",
+    points: ["هوية باسمك", "حضور احترافي", "ثقة أعلى"],
   },
   {
     id: 2,
@@ -30,151 +37,202 @@ const features = [
     description:
       "خزّن أسئلتك مرة واحدة واستخدمها في أي امتحان أو كويز بضغطة — وفّر ساعات من التحضير.",
     icon: FaFileAlt,
-    gradient: "from-emerald-500 to-teal-400",
-    accent: "#34d399",
-    stat: "إعادة استخدام",
+    accent: ORANGE,
+    tag: "مكتبة جاهزة",
+    points: ["تصنيف ذكي", "إعادة استخدام", "توفير وقت"],
   },
   {
     id: 3,
-    name: "نظام الاختبارات",
+    name: "إدارة السنتر والحضور",
     description:
-      "امتحانات بتوقيت تلقائي وتصحيح فوري — تجربة احترافية للطالب ونتائج فورية لك.",
-    icon: FaClipboardList,
-    gradient: "from-violet-500 to-purple-500",
-    accent: "#a78bfa",
-    stat: "تصحيح آلي",
+      "سيستم متكامل لإدارة السنتر ومتابعة الحضور والغياب بسهولة — تنظيم يومي بدون ورق أو فوضى.",
+    icon: FaClipboardCheck,
+    accent: BLUE,
+    tag: "تنظيم يومي",
+    points: ["حضور وغياب", "إدارة السنتر", "سجل واضح"],
   },
   {
     id: 4,
-    name: "إدارة الدورات",
+    name: "متابعة تلقائية لولي الأمر",
     description:
-      "ارفع الدروس المرئية والمكتوبة ونظّمها في مسارات تعليمية جذابة ومنظمة.",
-    icon: FaBookOpen,
-    gradient: "from-amber-500 to-orange-400",
-    accent: "#fbbf24",
-    stat: "محتوى منظم",
+      "ولي الأمر دايمًا على اطلاع — بنبعت تقرير أسبوعي أوتوماتيك بمستوى الطالب وحضوره وتقدمه.",
+    icon: FaUserFriends,
+    accent: ORANGE,
+    tag: "تقرير أسبوعي",
+    points: ["تقرير أسبوعي", "شفافية كاملة", "ثقة الأهالي"],
   },
   {
     id: 5,
-    name: "تنبيهات فورية",
+    name: "محلل بيانات الطلاب",
     description:
-      "أبلغ طلابك بلحظة عن الدروس والامتحانات والنتائج — تواصل مستمر بلا مجهود.",
-    icon: FaBell,
-    gradient: "from-rose-500 to-pink-500",
-    accent: "#fb7185",
-    stat: "إشعار لحظي",
+      "محلل بيانات بيساعدك تفهم مستوى طلابك بوضوح — نقاط القوة والضعف، وتاخد قرارات مبنية على أرقام.",
+    icon: FaChartLine,
+    accent: BLUE,
+    tag: "رؤية تحليلية",
+    points: ["نقاط القوة", "نقاط الضعف", "قرارات أدق"],
   },
   {
     id: 6,
-    name: "تطبيق موبايل",
+    name: "محاضرات مسجلة ولايف",
     description:
-      "تطبيق مخصص لطلابك يتابعون منه المحتوى والامتحانات من أي مكان وفي أي وقت.",
-    icon: FaMobileAlt,
-    gradient: "from-cyan-500 to-sky-400",
-    accent: "#38bdf8",
-    stat: "تعلم متنقل",
+      "ارفع محاضرات مسجلة أو اعمل لايف يتم تسجيله وحفظه تلقائيًا — المحتوى يفضل متاح للطالب في أي وقت.",
+    icon: FaVideo,
+    accent: ORANGE,
+    tag: "محتوى دائم",
+    points: ["لايف مباشر", "تسجيل وحفظ", "مشاهدة لاحقًا"],
   },
   {
     id: 7,
-    name: "تقارير متقدمة",
+    name: "نظام الاختبارات",
     description:
-      "تحليلات تفصيلية لأداء الطلاب ونمو منصتك — قرارات مبنية على أرقام حقيقية.",
-    icon: FaChartBar,
-    gradient: "from-indigo-500 to-blue-500",
-    accent: "#818cf8",
-    stat: "رؤية تحليلية",
+      "امتحانات بتوقيت تلقائي وتصحيح فوري — تجربة احترافية للطالب ونتائج واضحة ليك في لحظتها.",
+    icon: FaClipboardList,
+    accent: BLUE,
+    tag: "تصحيح آلي",
+    points: ["مؤقت ذكي", "تصحيح فوري", "نتائج سريعة"],
   },
   {
     id: 8,
-    name: "المدفوعات",
+    name: "إدارة ذكية للمنصة",
     description:
-      "تحصيل الرسوم عبر بوابات محلية ودولية بأمان وسلاسة — أرباحك تصلك بسهولة.",
-    icon: FaCreditCard,
-    gradient: "from-slate-500 to-slate-700",
-    accent: "#94a3b8",
-    stat: "دفع آمن",
+      "نظام إدارة ذكي يخلّي تشغيل منصتك أسهل — تحكم في الطلاب والمحتوى والإعدادات من مكان واحد.",
+    icon: FaCogs,
+    accent: ORANGE,
+    tag: "تحكم كامل",
+    points: ["لوحة واحدة", "إعدادات مرنة", "تشغيل أسهل"],
+  },
+  {
+    id: 9,
+    name: "مساعد AI للسوشيال",
+    description:
+      "مساعد ذكاء اصطناعي يساعدك تبني صفحة سوشيال قوية جدًا — محتوى، أفكار، وصياغة تخلي براندك يلفت الانتباه.",
+    icon: FaRobot,
+    accent: BLUE,
+    tag: "سوشيال قوي",
+    points: ["أفكار محتوى", "صياغة احترافية", "براند أقوى"],
+  },
+  {
+    id: 10,
+    name: "دعم فني 24/7",
+    description:
+      "فريق دعم فني متاح على مدار الساعة — أي مشكلة أو استفسار، هنكون معاك في أي وقت بدون انتظار.",
+    icon: FaHeadset,
+    accent: ORANGE,
+    tag: "متاح دائمًا",
+    points: ["دعم فوري", "على مدار الساعة", "استجابة سريعة"],
   },
 ];
 
-const AUTO_PLAY_MS = 4500;
+const AUTO_PLAY_MS = 5000;
 
-function FeatureSpotlight({ feature, index }) {
+function DetailPanel({ feature, index, isLight }) {
   const Icon = feature.icon;
+  const title = isLight ? "#0f172a" : "#ffffff";
+  const muted = isLight ? "#64748b" : "#94a3b8";
+  const surface = isLight ? "#ffffff" : "rgba(12, 24, 44, 0.9)";
+  const border = isLight ? "rgba(15,23,42,0.08)" : "rgba(255,255,255,0.09)";
+  const pointBg = isLight ? "rgba(15,23,42,0.03)" : "rgba(255,255,255,0.04)";
 
   return (
     <AnimatePresence mode="wait">
-      <motion.div
+      <motion.article
         key={feature.id}
-        initial={{ opacity: 0, x: 30 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: -30 }}
-        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="relative flex h-full min-h-[320px] flex-col justify-between overflow-hidden rounded-3xl border border-white/10 p-8 sm:min-h-[380px] sm:p-10"
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -8 }}
+        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+        className="relative overflow-hidden rounded-2xl border p-5 sm:p-7 lg:p-8"
+        style={{
+          background: surface,
+          borderColor: border,
+          boxShadow: isLight
+            ? "0 20px 48px -28px rgba(15,23,42,0.18)"
+            : "0 24px 48px -24px rgba(0,0,0,0.5)",
+        }}
       >
-        {/* خلفية ديناميكية */}
         <div
-          className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-[0.12]`}
+          className="pointer-events-none absolute inset-x-0 top-0 h-1"
+          style={{
+            background: `linear-gradient(90deg, ${BLUE}, ${ORANGE})`,
+          }}
         />
         <div
-          className="pointer-events-none absolute -right-10 -top-10 h-56 w-56 rounded-full blur-3xl"
-          style={{ backgroundColor: `${feature.accent}33` }}
-        />
-        <div
-          className="pointer-events-none absolute -bottom-16 -left-16 h-48 w-48 rounded-full blur-3xl"
-          style={{ backgroundColor: `${feature.accent}22` }}
-        />
-
-        {/* رقم ضخم خلفي */}
-        <span
-          className="pointer-events-none absolute left-6 top-4 select-none text-[8rem] font-black leading-none opacity-[0.04] sm:text-[10rem]"
-          style={{ color: feature.accent }}
+          className="pointer-events-none absolute -left-8 top-8 select-none text-[7rem] font-black leading-none sm:text-[8.5rem]"
+          style={{ color: feature.accent, opacity: isLight ? 0.05 : 0.07 }}
+          aria-hidden
         >
           {String(index + 1).padStart(2, "0")}
-        </span>
-
-        <div className="relative z-10">
-          <div className="mb-6 flex items-start justify-between gap-4">
-            <motion.div
-              initial={{ scale: 0.8, rotate: -10 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: "spring", stiffness: 260, damping: 20 }}
-              className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${feature.gradient} text-white shadow-2xl`}
-              style={{ boxShadow: `0 20px 40px ${feature.accent}40` }}
-            >
-              <Icon className="text-2xl" />
-            </motion.div>
-            <span
-              className="rounded-full border px-3 py-1 text-xs font-bold backdrop-blur-sm"
-              style={{
-                borderColor: `${feature.accent}44`,
-                color: feature.accent,
-                backgroundColor: `${feature.accent}15`,
-              }}
-            >
-              {feature.stat}
-            </span>
-          </div>
-
-          <h3 className="mb-3 text-2xl font-extrabold text-white sm:text-3xl">
-            {feature.name}
-          </h3>
-          <p className="max-w-lg text-base leading-relaxed text-slate-300 sm:text-lg">
-            {feature.description}
-          </p>
         </div>
 
-        {/* شريط تقدم زخرفي */}
-        <div className="relative z-10 mt-8">
-          <div className="h-1 overflow-hidden rounded-full bg-white/10">
+        <div className="relative z-10">
+          <div className="mb-4 flex items-center gap-3 sm:mb-5">
+            <div
+              className="flex h-12 w-12 items-center justify-center rounded-xl text-white sm:h-14 sm:w-14 sm:rounded-2xl"
+              style={{
+                background: feature.accent,
+                boxShadow: `0 12px 28px ${feature.accent}40`,
+              }}
+            >
+              <Icon className="text-lg sm:text-xl" />
+            </div>
+            <div className="min-w-0">
+              <span
+                className="mb-1 inline-block text-[11px] font-bold"
+                style={{ color: feature.accent }}
+              >
+                {feature.tag}
+              </span>
+              <h3
+                className="text-xl font-extrabold leading-snug sm:text-2xl lg:text-[1.75rem]"
+                style={{ color: title }}
+              >
+                {feature.name}
+              </h3>
+            </div>
+          </div>
+
+          <p
+            className="mb-5 text-sm leading-7 sm:mb-6 sm:text-[15px] sm:leading-8"
+            style={{ color: muted }}
+          >
+            {feature.description}
+          </p>
+
+          <ul className="grid gap-2 sm:grid-cols-3 sm:gap-2.5">
+            {feature.points.map((point) => (
+              <li
+                key={point}
+                className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-[12px] font-bold sm:text-[13px]"
+                style={{ background: pointBg, color: title }}
+              >
+                <span
+                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
+                  style={{ background: `${feature.accent}18`, color: feature.accent }}
+                >
+                  <FaCheck className="text-[9px]" />
+                </span>
+                {point}
+              </li>
+            ))}
+          </ul>
+
+          <div
+            className="mt-5 h-[3px] overflow-hidden rounded-full sm:mt-6"
+            style={{
+              background: isLight ? "rgba(15,23,42,0.06)" : "rgba(255,255,255,0.08)",
+            }}
+          >
             <motion.div
-              className={`h-full rounded-full bg-gradient-to-l ${feature.gradient}`}
+              key={`bar-${feature.id}`}
+              className="h-full rounded-full"
               initial={{ width: "0%" }}
               animate={{ width: "100%" }}
               transition={{ duration: AUTO_PLAY_MS / 1000, ease: "linear" }}
+              style={{ background: `linear-gradient(90deg, ${BLUE}, ${ORANGE})` }}
             />
           </div>
         </div>
-      </motion.div>
+      </motion.article>
     </AnimatePresence>
   );
 }
@@ -182,6 +240,21 @@ function FeatureSpotlight({ feature, index }) {
 const SectionTwo = () => {
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
+  const chipRefs = useRef([]);
+
+  const isLight = useColorModeValue(true, false);
+  const pageBg = useColorModeValue("#F7FAFC", "#0a1628");
+  const titleColor = useColorModeValue("#0f172a", "#ffffff");
+  const mutedText = useColorModeValue("#64748b", "#94a3b8");
+  const badgeBorder = useColorModeValue("rgba(221,107,32,0.3)", "rgba(221,107,32,0.4)");
+  const badgeBg = useColorModeValue("rgba(221,107,32,0.08)", "rgba(221,107,32,0.12)");
+  const badgeColor = useColorModeValue("#C05621", "#F6AD55");
+  const railBg = useColorModeValue("#ffffff", "rgba(12, 24, 44, 0.85)");
+  const railBorder = useColorModeValue("rgba(15,23,42,0.08)", "rgba(255,255,255,0.09)");
+  const idleText = useColorModeValue("#475569", "#94a3b8");
+  const idleIconBg = useColorModeValue("rgba(15,23,42,0.05)", "rgba(255,255,255,0.06)");
+  const chipIdleBg = useColorModeValue("#ffffff", "rgba(255,255,255,0.05)");
+  const chipIdleBorder = useColorModeValue("rgba(15,23,42,0.1)", "rgba(255,255,255,0.1)");
 
   const goNext = useCallback(() => {
     setActive((i) => (i + 1) % features.length);
@@ -193,54 +266,142 @@ const SectionTwo = () => {
     return () => window.clearInterval(timer);
   }, [paused, goNext, active]);
 
+  useEffect(() => {
+    const el = chipRefs.current[active];
+    if (el?.scrollIntoView) {
+      el.scrollIntoView({
+        behavior: "smooth",
+        inline: "center",
+        block: "nearest",
+      });
+    }
+  }, [active]);
+
   return (
     <section
       id="teacher-features"
       dir="rtl"
-      className="relative overflow-hidden py-20 sm:py-24 lg:py-28"
-      style={{ ...landingFont, background: BRAND.navy }}
+      className="relative overflow-hidden py-14 sm:py-20 lg:py-24"
+      style={{ ...landingFont, background: pageBg }}
     >
-      <MeshGlow />
-      <DotGrid dark />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-cyan-400/30 to-transparent" />
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <div
+          className="absolute -top-20 right-[-12%] h-[300px] w-[300px] rounded-full blur-[100px]"
+          style={{ background: `${BLUE}${isLight ? "1A" : "28"}` }}
+        />
+        <div
+          className="absolute bottom-[-8%] left-[-10%] h-[260px] w-[260px] rounded-full blur-[90px]"
+          style={{ background: `${ORANGE}${isLight ? "14" : "1C"}` }}
+        />
+      </div>
+      <DotGrid dark={!isLight} />
 
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        {/* الهيدر */}
-        <motion.div
-          className="mb-12 text-center sm:mb-14"
-          initial={{ opacity: 0, y: 24 }}
+      <div className="relative mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+        {/* Header — مضغوط خاصة على الموبايل */}
+        <motion.header
+          className="mb-6 flex flex-col items-center gap-3 text-center sm:mb-8 sm:gap-4 md:mb-10 md:flex-row md:items-center md:gap-5 md:text-right"
+          initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.55 }}
+          transition={{ duration: 0.45 }}
         >
-          <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-300">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-400" />
-            منظومة تشغيل متكاملة
-          </span>
-          <h2 className="text-3xl font-extrabold text-white sm:text-4xl lg:text-5xl">
-            أدواتك في
-            <span className="mt-1 block bg-gradient-to-l from-cyan-300 to-blue-400 bg-clip-text text-transparent">
-              مسرح واحد تفاعلي
+          <div className="relative shrink-0">
+            <span
+              className="absolute left-1/2 top-1/2 h-[108%] w-[108%] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-50 blur-xl"
+              style={{
+                background: `radial-gradient(circle, ${ORANGE}36 0%, ${BLUE}24 55%, transparent 72%)`,
+              }}
+              aria-hidden
+            />
+            <div className="relative z-[1] h-[88px] w-[88px] overflow-hidden rounded-full sm:h-[112px] sm:w-[112px] md:h-[124px] md:w-[124px]">
+              <img
+                src="/images/section-two-thinking.png"
+                alt=""
+                className="h-full w-full scale-[1.08] object-cover object-center"
+                loading="eager"
+              />
+            </div>
+          </div>
+
+          <div className="min-w-0 max-w-xl">
+            <span
+              className="mb-1.5 inline-flex rounded-full border px-2.5 py-0.5 text-[10px] font-bold sm:mb-2 sm:text-[11px]"
+              style={{
+                borderColor: badgeBorder,
+                background: badgeBg,
+                color: badgeColor,
+              }}
+            >
+              مستعد تتفاجئ؟
             </span>
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-base text-slate-400 sm:text-lg">
-            اختر أي أداة واستكشفها — 8 قدرات تعمل معاً لبناء منصتك التعليمية.
-          </p>
-        </motion.div>
+            <h2
+              className="text-lg font-extrabold leading-snug sm:text-xl md:text-2xl"
+              style={{ color: titleColor }}
+            >
+              هنقدملك إيه يا مستر{" "}
+              <span style={{ color: ORANGE }}>داخل المنصة؟</span>
+            </h2>
+            <p
+              className="mx-auto mt-1.5 max-w-md text-[13px] leading-6 sm:mt-2 sm:text-sm sm:leading-7 md:mx-0"
+              style={{ color: mutedText }}
+            >
+              أدوات قوية هتخلي شغلك أسهل وأسرع — اختار أي ميزة واستكشفها بنفسك
+            </p>
+          </div>
+        </motion.header>
 
         <div
-          className="grid gap-8 lg:grid-cols-[1fr_1.4fr] lg:gap-10"
           onMouseEnter={() => setPaused(true)}
           onMouseLeave={() => setPaused(false)}
+          onTouchStart={() => setPaused(true)}
         >
-          {/* شريط الأدوات — عمودي على الديسكتوب */}
-          <div className="flex flex-col gap-2">
-            <p className="mb-2 hidden text-xs font-semibold uppercase tracking-widest text-slate-500 lg:block">
-              اختر الأداة
-            </p>
+          {/* موبايل: شريط اختيار أفقي */}
+          <div className="mb-4 lg:hidden">
+            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] snap-x snap-mandatory [&::-webkit-scrollbar]:hidden">
+              {features.map((item, i) => {
+                const Icon = item.icon;
+                const isActive = active === i;
+                return (
+                  <button
+                    key={item.id}
+                    ref={(el) => {
+                      chipRefs.current[i] = el;
+                    }}
+                    type="button"
+                    onClick={() => setActive(i)}
+                    className="flex shrink-0 snap-center items-center gap-2 rounded-full border px-3.5 py-2 transition-colors"
+                    style={{
+                      borderColor: isActive ? `${item.accent}66` : chipIdleBorder,
+                      background: isActive ? `${item.accent}14` : chipIdleBg,
+                      color: isActive ? titleColor : idleText,
+                      boxShadow: isActive
+                        ? `0 8px 20px -12px ${item.accent}88`
+                        : "none",
+                    }}
+                  >
+                    <span
+                      className="flex h-7 w-7 items-center justify-center rounded-full text-white"
+                      style={{ background: isActive ? item.accent : idleIconBg, color: isActive ? "#fff" : idleText }}
+                    >
+                      <Icon className="text-[11px]" />
+                    </span>
+                    <span className="whitespace-nowrap text-[12px] font-bold">
+                      {item.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-            {/* موبايل: scroll أفقي */}
-            <div className="flex gap-2 overflow-x-auto pb-2 lg:hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {/* المحتوى */}
+          <div className="grid gap-4 lg:grid-cols-[240px_1fr] lg:gap-5 xl:grid-cols-[260px_1fr]">
+            {/* ديسكتوب: قائمة جانبية */}
+            <nav
+              className="hidden overflow-hidden rounded-2xl border p-2 lg:block"
+              style={{ background: railBg, borderColor: railBorder }}
+              aria-label="قائمة الخدمات"
+            >
               {features.map((item, i) => {
                 const Icon = item.icon;
                 const isActive = active === i;
@@ -249,98 +410,76 @@ const SectionTwo = () => {
                     key={item.id}
                     type="button"
                     onClick={() => setActive(i)}
-                    className={`flex shrink-0 flex-col items-center gap-2 rounded-2xl border px-4 py-3 transition-all ${
-                      isActive
-                        ? "border-cyan-400/40 bg-white/10"
-                        : "border-white/10 bg-white/[0.03]"
-                    }`}
+                    className="relative mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-right last:mb-0"
+                    style={{
+                      background: isActive
+                        ? isLight
+                          ? `${item.accent}12`
+                          : `${item.accent}1A`
+                        : "transparent",
+                      color: isActive ? titleColor : idleText,
+                    }}
                   >
-                    <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${item.gradient} text-white`}
+                    {isActive ? (
+                      <motion.span
+                        layoutId="featureRailActive"
+                        className="absolute inset-y-1 right-0 w-[3px] rounded-full"
+                        style={{ background: item.accent }}
+                      />
+                    ) : null}
+                    <span
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+                      style={{
+                        background: isActive ? item.accent : idleIconBg,
+                        color: isActive ? "#fff" : idleText,
+                      }}
                     >
                       <Icon className="text-sm" />
-                    </div>
-                    <span className="whitespace-nowrap text-[11px] font-semibold text-slate-300">
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[13px] font-bold">
                       {item.name}
+                    </span>
+                    <span
+                      className="text-[10px] font-black tabular-nums"
+                      style={{
+                        color: isActive ? item.accent : isLight ? "#cbd5e1" : "#475569",
+                      }}
+                    >
+                      {String(i + 1).padStart(2, "0")}
                     </span>
                   </button>
                 );
               })}
-            </div>
+            </nav>
 
-            {/* ديسكتوب: قائمة تفاعلية */}
-            <div className="hidden space-y-1.5 lg:block">
-              {features.map((item, i) => {
-                const Icon = item.icon;
-                const isActive = active === i;
-                return (
-                  <motion.button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setActive(i)}
-                    whileHover={{ x: -4 }}
-                    className={`group relative flex w-full items-center gap-3 overflow-hidden rounded-2xl border px-4 py-3.5 text-right transition-all duration-300 ${
-                      isActive
-                        ? "border-cyan-400/30 bg-white/10 shadow-lg shadow-cyan-500/10"
-                        : "border-transparent bg-transparent hover:border-white/10 hover:bg-white/[0.04]"
-                    }`}
-                  >
-                    {isActive ? (
-                      <motion.div
-                        layoutId="activeFeatureBar"
-                        className={`absolute right-0 top-2 bottom-2 w-1 rounded-full bg-gradient-to-b ${item.gradient}`}
-                      />
-                    ) : null}
-                    <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all ${
-                        isActive
-                          ? `bg-gradient-to-br ${item.gradient} text-white shadow-md`
-                          : "bg-white/10 text-slate-400 group-hover:bg-white/15"
-                      }`}
-                    >
-                      <Icon className="text-sm" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className={`truncate text-sm font-bold ${
-                          isActive ? "text-white" : "text-slate-400 group-hover:text-slate-200"
-                        }`}
-                      >
-                        {item.name}
-                      </p>
-                    </div>
-                    <span className="text-[10px] font-black text-slate-600">
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                  </motion.button>
-                );
-              })}
-            </div>
+            <DetailPanel
+              feature={features[active]}
+              index={active}
+              isLight={isLight}
+            />
           </div>
 
-          {/* لوحة العرض الكبيرة */}
-          <div className="relative">
-            <div
-              className="pointer-events-none absolute -inset-3 rounded-[2rem] opacity-30 blur-2xl transition-colors duration-500"
-              style={{ backgroundColor: `${features[active].accent}44` }}
-            />
-            <FeatureSpotlight feature={features[active]} index={active} />
+          {/* نقاط الموبايل */}
+          <div className="mt-4 flex items-center justify-center gap-1.5 lg:hidden">
+            {features.map((item, i) => (
+              <button
+                key={item.id}
+                type="button"
+                aria-label={item.name}
+                onClick={() => setActive(i)}
+                className="h-1.5 rounded-full transition-all duration-300"
+                style={{
+                  width: active === i ? 22 : 6,
+                  background:
+                    active === i
+                      ? `linear-gradient(90deg, ${BLUE}, ${ORANGE})`
+                      : isLight
+                        ? "rgba(15,23,42,0.15)"
+                        : "rgba(255,255,255,0.2)",
+                }}
+              />
+            ))}
           </div>
-        </div>
-
-        {/* نقاط التنقل */}
-        <div className="mt-8 flex items-center justify-center gap-2">
-          {features.map((item, i) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setActive(i)}
-              aria-label={item.name}
-              className={`h-2 rounded-full transition-all duration-300 ${
-                active === i ? "w-8 bg-cyan-400" : "w-2 bg-white/20 hover:bg-white/40"
-              }`}
-            />
-          ))}
         </div>
       </div>
     </section>

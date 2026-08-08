@@ -29,7 +29,7 @@ export default function InstallPWAButton({
     () => readCachedTenantPwaName(subdomain) || "المنصة",
     [subdomain],
   );
-  const resolvedLabel = label || `تنزيل ${appName}`;
+  const resolvedLabel = label || `تنزيل منصة ${appName}`;
 
   useEffect(() => {
     const onInstalled = () => {

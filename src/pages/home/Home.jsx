@@ -26,7 +26,7 @@ const Home = () => {
           <HomeLogin />
         </div>
       ) : (
-        <div className="mt-[80px]">
+        <div className="">
           <SectionOne />
           <SectionTwo />
           <AboutUsSection />

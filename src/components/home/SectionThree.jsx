@@ -1,6 +1,7 @@
-import React from "react";
-import { motion } from "framer-motion";
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
+import { useColorModeValue } from "@chakra-ui/react";
 import {
   FaCheckCircle,
   FaTimesCircle,
@@ -10,9 +11,15 @@ import {
   FaCrown,
   FaArrowLeft,
   FaBolt,
+  FaUser,
+  FaBuilding,
+  FaChalkboardTeacher,
+  FaUserGraduate,
 } from "react-icons/fa";
-import { BRAND, landingFont } from "./landingTheme.js";
-import { DotGrid, MeshGlow } from "./landingDecor.jsx";
+import { landingFont } from "./landingTheme.js";
+
+const BLUE = "#3182CE";
+const ORANGE = "#DD6B20";
 
 const featureCatalog = [
   { id: "support", label: "دعم فني" },
@@ -25,68 +32,92 @@ const featureCatalog = [
   { id: "aiSocial", label: "مساعد السوشيال ميديا بالـ AI" },
 ];
 
-const plans = [
+const basePlans = [
   {
     id: "bronze",
     name: "الانطلاقة",
     tagline: "ابدأ رحلتك بثقة",
-    price: "1,500",
-    students: "80 طالب",
     icon: FaSeedling,
-    gradient: "from-emerald-400 to-teal-500",
-    border: "border-emerald-500/30",
-    btnClass: "from-emerald-500 to-teal-600",
+    accent: BLUE,
     liveSessions: 6,
     availableFeatures: ["support", "courses", "bank", "live"],
+    individual: { price: "1,000", students: "100 طالب" },
+    center: {
+      price: "2,000",
+      students: "150 طالب",
+      teachers: "10 معلمين",
+    },
   },
   {
     id: "silver",
     name: "التوسّع",
     tagline: "انمو بسرعة وبذكاء",
-    price: "2,000",
-    students: "150 طالب",
     icon: FaChartLine,
-    gradient: "from-slate-400 to-slate-600",
-    border: "border-slate-500/30",
-    btnClass: "from-slate-600 to-slate-700",
+    accent: ORANGE,
     liveSessions: 10,
     availableFeatures: ["support", "courses", "bank", "live"],
+    individual: { price: "2,000", students: "200 طالب" },
+    center: {
+      price: "4,000",
+      students: "300 طالب",
+      teachers: "15 معلم",
+    },
   },
   {
     id: "gold",
     name: "الاحتراف",
     tagline: "الخيار الأقوى للمدرسين",
-    price: "3,000",
-    students: "300 طالب",
     icon: FaStar,
-    gradient: "from-cyan-400 to-blue-600",
-    border: "border-cyan-400/50",
-    btnClass: "from-cyan-500 to-blue-600",
+    accent: BLUE,
     featured: true,
     liveSessions: 16,
     availableFeatures: [
-      "support", "courses", "bank", "live", "aiExams", "aiAcademic",
+      "support",
+      "courses",
+      "bank",
+      "live",
+      "aiExams",
+      "aiAcademic",
     ],
+    individual: { price: "2,500", students: "300 طالب" },
+    center: {
+      price: "5,000",
+      students: "500 طالب",
+      teachers: "50 معلم",
+    },
   },
   {
     id: "diamond",
     name: "التميّز",
     tagline: "للعلامات الرائدة",
-    price: "4,000",
-    students: "غير محدود",
     icon: FaCrown,
-    gradient: "from-violet-400 to-indigo-600",
-    border: "border-violet-500/30",
-    btnClass: "from-violet-500 to-indigo-600",
+    accent: ORANGE,
     liveSessions: "unlimited",
     availableFeatures: [
-      "support", "courses", "bank", "live",
-      "aiExams", "aiAcademic", "aiAnalytics", "aiSocial",
+      "support",
+      "courses",
+      "bank",
+      "live",
+      "aiExams",
+      "aiAcademic",
+      "aiAnalytics",
+      "aiSocial",
     ],
+    individual: { price: "3,000", students: "غير محدود" },
+    center: {
+      price: "6,000",
+      students: "عدد غير محدود",
+      teachers: "عدد غير محدود",
+    },
   },
 ];
 
-function PlanFeatures({ plan }) {
+const PLAN_TYPES = [
+  { id: "individual", label: "باقات أفراد", Icon: FaUser },
+  { id: "center", label: "باقات السناتر", Icon: FaBuilding },
+];
+
+function PlanFeatures({ plan, isLight, muted, titleColor }) {
   const getLiveLabel = () => {
     if (plan.liveSessions === "unlimited") return "لايف غير محدود";
     if (plan.liveSessions) return `${plan.liveSessions} لايف في الشهر`;
@@ -102,15 +133,27 @@ function PlanFeatures({ plan }) {
         return (
           <li
             key={feature.id}
-            className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm ${
-              isAvailable ? "text-slate-300" : "text-slate-600"
-            }`}
+            className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm"
+            style={{
+              color: isAvailable
+                ? titleColor
+                : isLight
+                  ? "#94a3b8"
+                  : "#475569",
+              opacity: isAvailable ? 1 : 0.7,
+            }}
           >
             <span>{label}</span>
             {isAvailable ? (
-              <FaCheckCircle className="shrink-0 text-emerald-400" />
+              <FaCheckCircle
+                className="shrink-0"
+                style={{ color: plan.accent }}
+              />
             ) : (
-              <FaTimesCircle className="shrink-0 text-slate-600" />
+              <FaTimesCircle
+                className="shrink-0"
+                style={{ color: muted, opacity: 0.45 }}
+              />
             )}
           </li>
         );
@@ -119,122 +162,297 @@ function PlanFeatures({ plan }) {
   );
 }
 
-const SectionThree = () => (
-  <section
-    id="pricing"
-    dir="rtl"
-    className="relative overflow-hidden py-20 sm:py-24 lg:py-28"
-    style={{ ...landingFont, background: BRAND.navy }}
-  >
-    <MeshGlow />
-    <DotGrid dark />
+const SectionThree = () => {
+  const [planType, setPlanType] = useState("individual");
 
-    <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <motion.div
-        className="mb-14 text-center sm:mb-16"
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-      >
-        <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-300">
-          <FaBolt className="text-cyan-400" />
-          خطط مرنة لكل مرحلة
-        </span>
-        <h2 className="mb-4 text-3xl font-extrabold text-white sm:text-4xl lg:text-5xl">
-          اختر باقة
-          <span className="bg-gradient-to-l from-cyan-300 to-blue-400 bg-clip-text text-transparent">
-            {" "}تناسب طموحك
+  const isLight = useColorModeValue(true, false);
+  const pageBg = useColorModeValue("#F8FAFC", "#0a1628");
+  const titleColor = useColorModeValue("#0f172a", "#ffffff");
+  const muted = useColorModeValue("#64748b", "#94a3b8");
+  const cardBg = useColorModeValue("#ffffff", "rgba(12, 24, 44, 0.9)");
+  const cardBorder = useColorModeValue(
+    "rgba(15,23,42,0.08)",
+    "rgba(255,255,255,0.1)",
+  );
+  const softBg = useColorModeValue("rgba(15,23,42,0.03)", "rgba(255,255,255,0.04)");
+  const badgeBg = useColorModeValue("rgba(49,130,206,0.08)", "rgba(49,130,206,0.14)");
+  const chipBg = useColorModeValue("rgba(15,23,42,0.04)", "rgba(255,255,255,0.06)");
+  const toggleBg = useColorModeValue("#ffffff", "rgba(12, 24, 44, 0.95)");
+  const toggleIdle = useColorModeValue("#64748b", "#94a3b8");
+
+  const isCenter = planType === "center";
+
+  return (
+    <section
+      id="pricing"
+      dir="rtl"
+      className="relative overflow-hidden py-16 sm:py-20 lg:py-24"
+      style={{ ...landingFont, background: pageBg }}
+    >
+      <div
+        className="pointer-events-none absolute inset-0"
+        aria-hidden
+        style={{
+          background: isLight
+            ? `radial-gradient(ellipse 60% 40% at 50% 0%, ${BLUE}12, transparent 60%)`
+            : `radial-gradient(ellipse 60% 40% at 50% 0%, ${BLUE}22, transparent 60%)`,
+        }}
+      />
+
+      <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <motion.div
+          className="mb-8 text-center sm:mb-10"
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+        >
+          <span
+            className="mb-3 inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[12px] font-bold sm:text-[13px]"
+            style={{
+              borderColor: `${BLUE}44`,
+              background: badgeBg,
+              color: BLUE,
+            }}
+          >
+            <FaBolt style={{ color: ORANGE }} />
+            خطط مرنة لكل مرحلة
           </span>
-        </h2>
-        <p className="mx-auto max-w-xl text-base text-slate-400 sm:text-lg">
-          من الانطلاقة الأولى حتى التميّز الكامل — كل باقة تشمل منصة باسمك وبراندك.
-        </p>
-      </motion.div>
+          <h2
+            className="mb-3 text-2xl font-extrabold sm:text-3xl lg:text-[2.35rem]"
+            style={{ color: titleColor }}
+          >
+            اختر باقة{" "}
+            <span style={{ color: ORANGE }}>تناسب طموحك</span>
+          </h2>
+          <p
+            className="mx-auto max-w-xl text-[14px] leading-7 sm:text-[15px]"
+            style={{ color: muted }}
+          >
+            باقات للأفراد وباقات للسناتر — نفس الأسماء والخدمات، بأسعار تناسب
+            حجم شغلك.
+          </p>
+        </motion.div>
 
-      <div className="grid items-stretch gap-5 md:grid-cols-2 xl:grid-cols-4">
-        {plans.map((plan, idx) => {
-          const Icon = plan.icon;
-          const isFeatured = plan.featured;
+        {/* تبديل النوع */}
+        <div className="mb-8 flex justify-center sm:mb-10">
+          <div
+            className="inline-flex rounded-2xl border p-1"
+            style={{ borderColor: cardBorder, background: toggleBg }}
+            role="tablist"
+            aria-label="نوع الباقة"
+          >
+            {PLAN_TYPES.map(({ id, label, Icon }) => {
+              const active = planType === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setPlanType(id)}
+                  className="relative flex items-center gap-2 rounded-xl px-4 py-2.5 text-[13px] font-bold transition-colors sm:px-5 sm:text-sm"
+                  style={{ color: active ? "#fff" : toggleIdle }}
+                >
+                  {active ? (
+                    <motion.span
+                      layoutId="pricingTypePill"
+                      className="absolute inset-0 rounded-xl"
+                      style={{
+                        background:
+                          id === "center"
+                            ? ORANGE
+                            : BLUE,
+                      }}
+                      transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                    />
+                  ) : null}
+                  <Icon className="relative z-[1] text-[12px]" />
+                  <span className="relative z-[1]">{label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-          return (
-            <motion.article
-              key={plan.id}
-              initial={{ opacity: 0, y: 28 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-30px" }}
-              transition={{ duration: 0.5, delay: idx * 0.07 }}
-              className={`relative flex flex-col overflow-hidden rounded-2xl border ${plan.border} ${
-                isFeatured
-                  ? "z-10 scale-[1.03] shadow-[0_0_60px_rgba(34,211,238,0.15)] xl:-mt-3 xl:mb-3"
-                  : "bg-white/[0.03] backdrop-blur-sm"
-              }`}
-              style={
-                isFeatured
-                  ? { background: "linear-gradient(160deg, rgba(34,211,238,0.08), rgba(0,86,179,0.12))" }
-                  : undefined
-              }
-            >
-              {isFeatured ? (
-                <div className="bg-gradient-to-l from-cyan-500 to-blue-600 py-2 text-center text-xs font-bold text-white">
-                  ⭐ الأكثر طلباً
-                </div>
-              ) : (
-                <div className={`h-1 bg-gradient-to-l ${plan.gradient}`} />
-              )}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={planType}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.28 }}
+            className="grid items-stretch gap-4 md:grid-cols-2 xl:grid-cols-4 xl:gap-5"
+          >
+            {basePlans.map((plan, idx) => {
+              const Icon = plan.icon;
+              const isFeatured = plan.featured;
+              const pricing = isCenter ? plan.center : plan.individual;
 
-              <div className="flex flex-1 flex-col p-6">
-                <div className="mb-4 flex items-start justify-between">
-                  <div
-                    className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${plan.gradient} text-white shadow-lg`}
-                  >
-                    <Icon className="text-xl" />
+              return (
+                <motion.article
+                  key={`${planType}-${plan.id}`}
+                  initial={{ opacity: 0, y: 18 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35, delay: idx * 0.05 }}
+                  className={`relative flex flex-col overflow-hidden rounded-2xl border ${
+                    isFeatured ? "z-10 xl:-mt-2 xl:mb-2" : ""
+                  }`}
+                  style={{
+                    borderColor: isFeatured ? `${plan.accent}66` : cardBorder,
+                    background: cardBg,
+                    boxShadow: isFeatured
+                      ? isLight
+                        ? `0 20px 48px -24px ${plan.accent}66`
+                        : `0 22px 48px -20px ${plan.accent}44`
+                      : isLight
+                        ? "0 12px 32px -24px rgba(15,23,42,0.2)"
+                        : "none",
+                  }}
+                >
+                  {isFeatured ? (
+                    <div
+                      className="py-2 text-center text-[11px] font-bold text-white"
+                      style={{
+                        background: `linear-gradient(90deg, ${BLUE}, ${ORANGE})`,
+                      }}
+                    >
+                      الأكثر طلباً
+                    </div>
+                  ) : (
+                    <div className="h-1" style={{ background: plan.accent }} />
+                  )}
+
+                  <div className="flex flex-1 flex-col p-5 sm:p-6">
+                    <div className="mb-4 flex items-start justify-between gap-2">
+                      <div
+                        className="flex h-11 w-11 items-center justify-center rounded-xl text-white"
+                        style={{
+                          background: plan.accent,
+                          boxShadow: `0 10px 22px -10px ${plan.accent}99`,
+                        }}
+                      >
+                        <Icon className="text-lg" />
+                      </div>
+                      <span
+                        className="rounded-full px-2.5 py-1 text-[11px] font-bold"
+                        style={{ background: chipBg, color: muted }}
+                      >
+                        {isCenter ? "سنتر" : "فرد"}
+                      </span>
+                    </div>
+
+                    <h3
+                      className="text-lg font-extrabold sm:text-xl"
+                      style={{ color: titleColor }}
+                    >
+                      {plan.name}
+                    </h3>
+                    <p className="mt-1 text-sm" style={{ color: muted }}>
+                      {plan.tagline}
+                    </p>
+
+                    <div
+                      className="my-4 flex flex-wrap gap-2"
+                      style={{ color: muted }}
+                    >
+                      <span
+                        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold"
+                        style={{ background: softBg, color: titleColor }}
+                      >
+                        <FaUserGraduate
+                          className="text-[10px]"
+                          style={{ color: plan.accent }}
+                        />
+                        {pricing.students}
+                      </span>
+                      {isCenter ? (
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold"
+                          style={{ background: softBg, color: titleColor }}
+                        >
+                          <FaChalkboardTeacher
+                            className="text-[10px]"
+                            style={{ color: plan.accent }}
+                          />
+                          {pricing.teachers}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <div
+                      className="mb-5 border-t pt-5"
+                      style={{ borderColor: cardBorder }}
+                    >
+                      <div className="flex items-end gap-1">
+                        <span
+                          className="text-3xl font-extrabold sm:text-4xl"
+                          style={{ color: titleColor }}
+                        >
+                          {pricing.price}
+                        </span>
+                        <span className="mb-1 text-sm" style={{ color: muted }}>
+                          جنيه/شهر
+                        </span>
+                      </div>
+                    </div>
+
+                    <div
+                      className="flex-1 rounded-xl border p-3"
+                      style={{
+                        borderColor: cardBorder,
+                        background: softBg,
+                      }}
+                    >
+                      <p
+                        className="mb-2 text-[11px] font-bold"
+                        style={{ color: muted }}
+                      >
+                        يشمل اشتراكك
+                      </p>
+                      <PlanFeatures
+                        plan={plan}
+                        isLight={isLight}
+                        muted={muted}
+                        titleColor={titleColor}
+                      />
+                    </div>
+
+                    <Link to="/signup" className="mt-5 block">
+                      <motion.button
+                        type="button"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white"
+                        style={{
+                          background: isFeatured
+                            ? `linear-gradient(90deg, ${BLUE}, ${ORANGE})`
+                            : plan.accent,
+                          boxShadow: `0 12px 28px -12px ${plan.accent}88`,
+                        }}
+                      >
+                        {isFeatured ? "ابدأ بالاحتراف" : "اختر الباقة"}
+                        <FaArrowLeft className="text-xs" />
+                      </motion.button>
+                    </Link>
                   </div>
-                  <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-bold text-slate-300">
-                    {plan.students}
-                  </span>
-                </div>
+                </motion.article>
+              );
+            })}
+          </motion.div>
+        </AnimatePresence>
 
-                <h3 className="text-xl font-extrabold text-white">{plan.name}</h3>
-                <p className="mt-1 text-sm text-slate-400">{plan.tagline}</p>
-
-                <div className="my-5 border-t border-white/10 pt-5">
-                  <div className="flex items-end gap-1">
-                    <span className="text-4xl font-extrabold text-white">{plan.price}</span>
-                    <span className="mb-1 text-sm text-slate-400">جنيه/شهر</span>
-                  </div>
-                </div>
-
-                <div className="flex-1 rounded-xl border border-white/10 bg-white/[0.03] p-3">
-                  <p className="mb-2 text-xs font-bold text-slate-500">يشمل اشتراكك</p>
-                  <PlanFeatures plan={plan} />
-                </div>
-
-                <Link to="/signup" className="mt-5 block">
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-l ${plan.btnClass} px-4 py-3 text-sm font-bold text-white shadow-lg transition-shadow hover:shadow-xl`}
-                  >
-                    {isFeatured ? "ابدأ بالاحتراف" : "اختر الباقة"}
-                    <FaArrowLeft className="text-xs" />
-                  </motion.button>
-                </Link>
-              </div>
-            </motion.article>
-          );
-        })}
+        <motion.p
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          className="mt-10 text-center text-sm"
+          style={{ color: muted }}
+        >
+          ترقية في أي وقت · بدون فقدان بيانات · دعم فني مستمر
+        </motion.p>
       </div>
-
-      <motion.p
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true }}
-        className="mt-12 text-center text-sm text-slate-500"
-      >
-        ترقية في أي وقت · بدون فقدان بيانات · دعم فني مستمر
-      </motion.p>
-    </div>
-  </section>
-);
+    </section>
+  );
+};
 
 export default SectionThree;

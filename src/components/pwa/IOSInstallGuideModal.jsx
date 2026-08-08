@@ -1,6 +1,5 @@
 /**
- * IOSInstallGuideModal — elegant steps for Safari Add to Home Screen.
- * beforeinstallprompt is not available on iOS; we guide the user instead.
+ * دليل آيفون مختصر — خطوتان فقط.
  */
 
 import {
@@ -18,51 +17,42 @@ import {
   Box,
   useColorModeValue,
 } from "@chakra-ui/react";
-import { FaShareAlt, FaPlusSquare, FaCheckCircle } from "react-icons/fa";
+import { FaShareAlt, FaPlusSquare } from "react-icons/fa";
 
 const STEPS = [
   {
     icon: FaShareAlt,
-    title: "اضغط على زر المشاركة",
-    desc: "من شريط Safari بالأسفل، اضغط أيقونة Share (المربع مع السهم).",
+    title: "اضغط مشاركة",
+    desc: "من شريط Safari بالأسفل.",
   },
   {
     icon: FaPlusSquare,
-    title: "اختر Add to Home Screen",
-    desc: "مرّر قائمة المشاركة واختر «إضافة إلى الشاشة الرئيسية».",
-  },
-  {
-    icon: FaCheckCircle,
-    title: "اضغط Add",
-    desc: "أكّد الاسم ثم اضغط Add — وسيظهر التطبيق على شاشتك.",
+    title: "أضف للشاشة الرئيسية",
+    desc: "ثم اضغط إضافة.",
   },
 ];
 
-export default function IOSInstallGuideModal({ isOpen, onClose, appName = "التطبيق" }) {
+export default function IOSInstallGuideModal({ isOpen, onClose, appName = "المنصة" }) {
   const cardBg = useColorModeValue("blue.50", "whiteAlpha.100");
   const border = useColorModeValue("blue.100", "whiteAlpha.200");
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} isCentered size="md" motionPreset="slideInBottom">
-      <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
+    <Modal isOpen={isOpen} onClose={onClose} isCentered size="sm" motionPreset="slideInBottom">
+      <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(3px)" />
       <ModalContent dir="rtl" mx={4} borderRadius="2xl" overflow="hidden">
-        <Box h="4px" bgGradient="linear(to-l, blue.500, orange.500)" />
-        <ModalHeader pb={1} fontSize="lg" fontWeight="800">
-          تثبيت «{appName}» على الآيفون
+        <Box h="3px" bgGradient="linear(to-l, blue.500, orange.500)" />
+        <ModalHeader pb={1} fontSize="md" fontWeight="800">
+          تنزيل منصة {appName}
         </ModalHeader>
         <ModalCloseButton />
         <ModalBody pb={2}>
-          <Text fontSize="sm" color="gray.500" mb={4} lineHeight="1.8">
-            على Safari لا تظهر نافذة التثبيت تلقائياً. اتبع الخطوات التالية لإضافة
-            «{appName}» إلى الشاشة الرئيسية باسم ولوجو المنصة:
-          </Text>
-          <VStack align="stretch" spacing={3}>
+          <VStack align="stretch" spacing={2.5}>
             {STEPS.map((step, index) => {
               const Icon = step.icon;
               return (
                 <HStack
                   key={step.title}
-                  align="flex-start"
+                  align="center"
                   spacing={3}
                   p={3}
                   bg={cardBg}
@@ -72,10 +62,10 @@ export default function IOSInstallGuideModal({ isOpen, onClose, appName = "ال�
                 >
                   <Box
                     flexShrink={0}
-                    w="36px"
-                    h="36px"
+                    w="32px"
+                    h="32px"
                     borderRadius="lg"
-                    bg={index === 2 ? "orange.500" : "blue.500"}
+                    bg={index === 0 ? "blue.500" : "orange.500"}
                     color="white"
                     display="flex"
                     alignItems="center"
@@ -86,13 +76,13 @@ export default function IOSInstallGuideModal({ isOpen, onClose, appName = "ال�
                     {index + 1}
                   </Box>
                   <Box flex="1" minW={0}>
-                    <HStack spacing={2} mb={1}>
-                      <Icon className="text-blue-500" />
+                    <HStack spacing={2}>
+                      <Icon className="text-blue-500 text-sm" />
                       <Text fontWeight="700" fontSize="sm">
                         {step.title}
                       </Text>
                     </HStack>
-                    <Text fontSize="xs" color="gray.500" lineHeight="1.7">
+                    <Text fontSize="xs" color="gray.500" mt={0.5}>
                       {step.desc}
                     </Text>
                   </Box>
@@ -101,15 +91,9 @@ export default function IOSInstallGuideModal({ isOpen, onClose, appName = "ال�
             })}
           </VStack>
         </ModalBody>
-        <ModalFooter>
-          <Button
-            colorScheme="blue"
-            borderRadius="xl"
-            w="full"
-            onClick={onClose}
-            fontWeight="700"
-          >
-            فهمت
+        <ModalFooter pt={2}>
+          <Button colorScheme="blue" borderRadius="xl" w="full" onClick={onClose} fontWeight="700">
+            تم
           </Button>
         </ModalFooter>
       </ModalContent>
