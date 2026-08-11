@@ -331,15 +331,26 @@ export default function WhatsAppServicesPage() {
                         اختر أكثر من رقم لتوزيع الحمل. المحادثات النشطة تبقى على نفس الرقم (sticky).
                       </Text>
 
-                      {sessions.length === 0 ? (
-                        <Alert status="info" borderRadius="md">
-                          <AlertIcon />
-                          لا توجد جلسات — أنشئ جلسة من صفحة الجلسات أولاً.
-                        </Alert>
-                      ) : (
+                      {(() => {
+                        const isTeacherService =
+                          detail?.service?.config?.owner === "teacher";
+                        const poolSessions = sessions.filter((s) =>
+                          isTeacherService ? Boolean(s.teacher_id) : !s.teacher_id,
+                        );
+                        if (poolSessions.length === 0) {
+                          return (
+                            <Alert status="info" borderRadius="md">
+                              <AlertIcon />
+                              {isTeacherService
+                                ? "لا توجد جلسات مدرسين — يربط المدرسون أرقامهم من لوحة المدرس."
+                                : "لا توجد جلسات منصة — أنشئ جلسة من صفحة الجلسات أولاً (جلسات المدرسين مستبعدة)."}
+                            </Alert>
+                          );
+                        }
+                        return (
                         <CheckboxGroup value={selectedSlugs}>
                           <Stack spacing={3}>
-                            {sessions.map((s) => {
+                            {poolSessions.map((s) => {
                               const member = poolDraft.find((p) => p.session_slug === s.id);
                               const checked = Boolean(member);
                               return (
@@ -361,6 +372,11 @@ export default function WhatsAppServicesPage() {
                                       <Text fontSize="sm" color={muted} dir="ltr">
                                         {s.phone_number || "—"}
                                       </Text>
+                                      {s.teacher_id && (
+                                        <Badge colorScheme="purple" fontSize="xs">
+                                          {s.teacher_name || `مدرس #${s.teacher_id}`}
+                                        </Badge>
+                                      )}
                                       <Badge
                                         colorScheme={
                                           s.status === "ready" ? "green" : "orange"
@@ -409,7 +425,8 @@ export default function WhatsAppServicesPage() {
                             })}
                           </Stack>
                         </CheckboxGroup>
-                      )}
+                        );
+                      })()}
 
                       <Button
                         mt={4}

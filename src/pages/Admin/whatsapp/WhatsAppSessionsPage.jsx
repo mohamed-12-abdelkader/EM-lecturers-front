@@ -319,6 +319,15 @@ export default function WhatsAppSessionsPage() {
                         <Text fontSize="sm" color={muted} dir="ltr">
                           {s.phone_number || "—"}
                         </Text>
+                        {s.teacher_id ? (
+                          <Badge colorScheme="purple" mt={1} fontSize="xs">
+                            مدرس: {s.teacher_name || `#${s.teacher_id}`}
+                          </Badge>
+                        ) : (
+                          <Badge colorScheme="blue" mt={1} fontSize="xs">
+                            منصة
+                          </Badge>
+                        )}
                       </Box>
                       <StatusBadge status={s.status} />
                     </Flex>

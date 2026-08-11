@@ -83,6 +83,7 @@ const TeacherStudents = lazy(() => import("../pages/teacher/TeacherStudents"));
 const ManagedStudentsPage = lazy(() => import("../pages/teacher/managedStudents/ManagedStudentsPage"));
 const StudentReport = lazy(() => import("../pages/teacher/StudentReport"));
 const PlatformStudents = lazy(() => import("../pages/teacher/PlatformStudents"));
+const TeacherWhatsAppPage = lazy(() => import("../pages/teacher/TeacherWhatsAppPage"));
 
 // Center Management
 const CenterLayout = lazy(() => import("../pages/centerMgmt/components/CenterLayout"));
@@ -633,6 +634,7 @@ const AppRouter = () => {
           <Route path="teacher-free-lectures" element={<TeacherFreeLecturesPage />} />
           <Route path="teacher-daily-quizzes" element={<TeacherDailyQuizzesPage />} />
           <Route path="teacher-daily-quizzes/:id" element={<TeacherDailyQuizDetailPage />} />
+          <Route path="teacher/whatsapp" element={<TeacherWhatsAppPage />} />
         </Route>
         {/* Student Specific Routes */}
         <Route element={<ProtectedRoute auth={student} />}>
