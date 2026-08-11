@@ -507,6 +507,15 @@ const AppRouter = () => {
           <Route path="teachers" element={<AllTeacherLogin />} />
           <Route path="suggested-teachers" element={<SuggestedTeachers />} />
           <Route path="my-teachers" element={<MyTeacher />} />
+          {/* قبل teacher/:id حتى لا يُفسَّر whatsapp كمعرّف محاضر */}
+          <Route
+            path="teacher-whatsapp"
+            element={
+              <ProtectedRoute auth={isTeacher || isAdmin}>
+                <TeacherWhatsAppPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="teacher/:id" element={<TeacherDetails />} />
           <Route path="lectures_taple" element={<LecturesTaple />} />
           <Route
@@ -634,7 +643,6 @@ const AppRouter = () => {
           <Route path="teacher-free-lectures" element={<TeacherFreeLecturesPage />} />
           <Route path="teacher-daily-quizzes" element={<TeacherDailyQuizzesPage />} />
           <Route path="teacher-daily-quizzes/:id" element={<TeacherDailyQuizDetailPage />} />
-          <Route path="teacher/whatsapp" element={<TeacherWhatsAppPage />} />
         </Route>
         {/* Student Specific Routes */}
         <Route element={<ProtectedRoute auth={student} />}>

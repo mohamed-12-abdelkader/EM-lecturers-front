@@ -233,7 +233,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
         { to: "/teacher-daily-quizzes", Icon: MdWhatshot, label: "المسابقات اليومية" },
         { to: "/exam-builder-chat", Icon: MdQuiz, label: "مساعد الامتحانات" },
         { to: "/teacher-free-lectures", Icon: MdVideoLibrary, label: "المحاضرات المجانية" },
-        { to: "/teacher/whatsapp", Icon: FaWhatsapp, label: "واتساب المدرس" },
+        { to: "/teacher-whatsapp", Icon: FaWhatsapp, label: "واتساب المدرس" },
       ],
     },
     {
