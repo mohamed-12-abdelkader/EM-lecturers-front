@@ -5,7 +5,6 @@ const API = "/api/teacher/whatsapp";
 function authHeaders(contentType) {
   const headers = {
     Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-    "X-Tenant-Subdomain": "default",
   };
   if (contentType) headers["Content-Type"] = contentType;
   return headers;
