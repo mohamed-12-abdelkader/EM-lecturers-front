@@ -10,6 +10,7 @@ import {
 } from "../tenantLandingMotion";
 import { TL_CYAN, TL_LIME } from "../tenantLandingTheme";
 import { safeLocalGet, safeLocalSet } from "../../../utils/safeStorage";
+import { resolvePublicImageUrl } from "../../../utils/highQualityImageUrl";
 import TenantAppLink from "./TenantAppLink";
 
 const TENANT_FONT_LINK_ID = "tenant-public-arabic-fonts";
@@ -118,6 +119,7 @@ export function TenantPublicNavbar({
 }) {
   const handleToggleTheme = onToggleTheme || toggleTheme;
   const solidNav = alwaysSolid || navScrolled || isMobileMenuOpen;
+  const avatarSrc = resolvePublicImageUrl(tenantAvatar);
 
   return (
     <motion.header
@@ -150,9 +152,9 @@ export function TenantPublicNavbar({
             className="group flex min-w-0 flex-1 items-center gap-2.5 min-[920px]:flex-none min-[920px]:max-w-[280px]"
           >
             <span className="relative shrink-0">
-              {tenantAvatar ? (
+              {avatarSrc ? (
                 <img
-                  src={tenantAvatar}
+                  src={avatarSrc}
                   alt=""
                   className="h-10 w-10 rounded-xl object-cover ring-2 ring-white/25 transition-transform duration-300 group-hover:scale-[1.03]"
                 />

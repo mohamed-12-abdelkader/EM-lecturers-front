@@ -1,5 +1,6 @@
 import { Component } from "react";
-import { Box, Button, Heading, Text } from "@chakra-ui/react";
+import { Box, Button, Heading, Spinner, Text } from "@chakra-ui/react";
+import { isChunkLoadError, recoverFromChunkError } from "../utils/chunkLoadRecovery";
 
 /**
  * يمنع الشاشة البيضاء عند أي خطأ غير متوقع في شجرة React.
@@ -11,14 +12,18 @@ export default class AppErrorBoundary extends Component {
   }
 
   static getDerivedStateFromError(error) {
-    return {
-      hasError: true,
-      message: error?.message || "حدث خطأ غير متوقع",
-    };
+    const message = error?.message || "حدث خطأ غير متوقع";
+    if (isChunkLoadError(error)) {
+      return { hasError: true, message, chunkError: true };
+    }
+    return { hasError: true, message, chunkError: false };
   }
 
   componentDidCatch(error, info) {
     console.error("AppErrorBoundary:", error, info);
+    if (isChunkLoadError(error)) {
+      recoverFromChunkError(error);
+    }
   }
 
   handleReload = () => {
@@ -31,6 +36,27 @@ export default class AppErrorBoundary extends Component {
 
   render() {
     if (this.state.hasError) {
+      if (isChunkLoadError({ message: this.state.message })) {
+        return (
+          <Box
+            minH="100vh"
+            display="flex"
+            flexDirection="column"
+            alignItems="center"
+            justifyContent="center"
+            gap={4}
+            bg="#0A1628"
+            color="white"
+            dir="rtl"
+          >
+            <Spinner size="lg" color="blue.400" thickness="3px" />
+            <Text color="#7EB8D9" fontSize="sm">
+              جاري تحديث النسخة…
+            </Text>
+          </Box>
+        );
+      }
+
       return (
         <Box
           minH="100vh"

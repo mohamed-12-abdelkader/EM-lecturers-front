@@ -6,7 +6,7 @@
  * - Runtime caching للصور والخطوط الخارجية.
  * - صفحة offline.html عند انقطاع الإنترنت أثناء التنقل.
  * - Web Push + النقر على الإشعارات.
- * - التحديثات: skipWaiting تلقائي.
+ * - التحديثات: تنتظر موافقة المستخدم (SKIP_WAITING) قبل التفعيل.
  */
 
 import { clientsClaim } from "workbox-core";
@@ -179,7 +179,6 @@ registerRoute(
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
-self.skipWaiting();
 clientsClaim();
 
 self.addEventListener("message", (event) => {

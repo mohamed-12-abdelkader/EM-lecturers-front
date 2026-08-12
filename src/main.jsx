@@ -21,13 +21,16 @@ import AxiosProvider from "./providers/AxiosProvider.jsx";
 import OfflineScreen from "./components/network/OfflineScreen.jsx";
 import UpdatePrompt from "./components/pwa/UpdatePrompt.jsx";
 import InstallAppPrompt from "./components/pwa/InstallAppPrompt.jsx";
+import BrandLoadingOverlayHost from "./components/loading/BrandLoadingOverlayHost.jsx";
 import { initPWA } from "./pwa/registerPWA.js";
+import { registerChunkLoadRecovery } from "./utils/chunkLoadRecovery.js";
 
 // فرض العربية قبل أي رندر — مستقل عن لغة الجهاز
 forceArabicDocumentLocale();
 
 // PWA: تسجيل الـ Service Worker + كشف الإصدارات الجديدة (إنتاج فقط)
 initPWA();
+registerChunkLoadRecovery();
 
 // Sync Chakra color mode to data-theme + class "dark" for Tailwind dark: classes
 const SyncTheme = () => {
@@ -86,6 +89,7 @@ const RootContent = () => {
       <OfflineScreen />
       <UpdatePrompt />
       <InstallAppPrompt />
+      <BrandLoadingOverlayHost />
     </NotificationProvider>
   );
 };

@@ -188,7 +188,6 @@ const MyCourses = ({ embedded = false, onLoadingChange }) => {
   const subtextColor = useColorModeValue("slate.500", "gray.400");
   const sectionBg = useColorModeValue("white", "gray.800");
   const sectionBorder = useColorModeValue("gray.200", "gray.700");
-  const emptyBorder = useColorModeValue("gray.300", "gray.600");
   const modalBg = useColorModeValue("white", "gray.800");
   const modalBorder = useColorModeValue("gray.200", "gray.700");
   const modalText = useColorModeValue("gray.600", "gray.400");
@@ -452,32 +451,37 @@ const MyCourses = ({ embedded = false, onLoadingChange }) => {
           align="center"
           justify="center"
           minH={embedded ? "220px" : "280px"}
-          bg={cardBg}
-          borderRadius="2xl"
-          borderWidth="1px"
-          borderStyle="dashed"
-          borderColor={emptyBorder}
           textAlign="center"
-          p={8}
+          py={embedded ? 6 : 8}
+          px={4}
         >
           <Box
-            w="16"
-            h="16"
-            borderRadius="2xl"
-            bg="blue.50"
-            _dark={{ bg: "blue.900" }}
+            mx="auto"
             display="flex"
+            aspectRatio={1}
+            w={{ base: "16rem", sm: "20rem" }}
             alignItems="center"
             justifyContent="center"
-            mb={4}
+            overflow="hidden"
+            borderRadius="full"
+            bg="black"
           >
-            <Icon as={FaBookOpen} boxSize="8" color="blue.500" />
+            <Box
+              as="img"
+              src="/images/my-courses-empty-v2.jpg"
+              alt="لا توجد كورسات مسجلة بعد"
+              w="full"
+              h="full"
+              objectFit="contain"
+              loading="lazy"
+              decoding="async"
+            />
           </Box>
-          <Heading size="md" color={headingColor} mb={2}>
-            لا توجد كورسات مفعلة
+          <Heading size="md" color={headingColor} mt={4} mb={2}>
+            لست مشترك
           </Heading>
           <Text color={subtextColor} maxW="md" mb={6} fontSize="sm" lineHeight="1.7">
-            لم تشترك في أي كورسات بعد. فعّل كورساً بالكود أو QR للبدء.
+            لم تشترك في أي كورس بعد. فعّل كورساً من قسم «ابدأ من هنا» أو تصفّح كورسات المنصة.
           </Text>
           <Button
             bg="orange.500"

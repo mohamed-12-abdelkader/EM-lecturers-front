@@ -9,6 +9,8 @@ export const PWA_UPDATE_EVENT = "pwa:update-available";
 export const PWA_OFFLINE_READY_EVENT = "pwa:offline-ready";
 
 let updateServiceWorker = null;
+/** يُفعَّل فقط عند ضغط المستخدم على «تحديث» — يمنع إعادة التحميل التلقائية */
+let pendingUserReload = false;
 
 /** هل يوجد تحديث بانتظار الموافقة؟ */
 export function isUpdateAvailable() {
@@ -18,6 +20,7 @@ export function isUpdateAvailable() {
 /** تفعيل التحديث (يعيد تحميل الصفحة بالنسخة الجديدة) */
 export async function applyPWAUpdate() {
   if (typeof updateServiceWorker !== "function") return false;
+  pendingUserReload = true;
   try {
     await updateServiceWorker(true);
     return true;
@@ -33,16 +36,11 @@ export async function initPWA() {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
   if (!import.meta.env.PROD) return; // في التطوير لا يوجد SW مبني
 
-  // النسخة الجديدة تتفعّل تلقائياً (skipWaiting في sw.js). عند تغيّر الـ SW
-  // المسيطر نعيد تحميل التبويب مرة واحدة حتى لا تطلب الصفحة القديمة chunks
-  // بأسماء قديمة لم تعد موجودة. لا نعيد التحميل عند أول تسجيل (تبويب غير مُدار).
-  let hadController = Boolean(navigator.serviceWorker.controller);
+  // إعادة التحميل فقط بعد موافقة المستخدم (زر «تحديث» في UpdatePrompt).
+  // بدون ذلك، أي نشر جديد للموقع كان يفعّل SW تلقائياً ويعيد تحميل التبويب.
   let reloading = false;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (!hadController) {
-      hadController = true;
-      return;
-    }
+    if (!pendingUserReload) return;
     if (reloading) return;
     reloading = true;
     window.location.reload();

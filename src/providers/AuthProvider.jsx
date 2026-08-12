@@ -2,7 +2,7 @@
  * AuthProvider — قلب نظام المصادقة الجديد (HttpOnly Cookies + توكن في الذاكرة).
  *
  * عند الإقلاع:
- *   Splash → GET /auth/me → (401 → POST /auth/refresh → GET /auth/me) → دخول أو ضيف.
+ *   GET /auth/me → (401 → POST /auth/refresh → GET /auth/me) → دخول أو ضيف.
  * فشل الـ refresh لا يُظهر أي خطأ — المستخدم يُعامل كضيف وتتكفل الحراسات بالتحويل.
  *
  * متعدد التبويبات: مزامنة (login / logout / token / user) عبر BroadcastChannel.
@@ -12,7 +12,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 
 import { AuthContext } from "../contexts/AuthContext";
-import AppSplashScreen from "../components/auth/AppSplashScreen";
 import { bootstrapSession, fetchMe, logoutRequest } from "../services/authService";
 import { subscribeAuthMessages } from "../services/authChannel";
 import { clearAuthSession, markSessionExpired } from "../utils/authStorage";
@@ -76,8 +75,6 @@ function loginPathForUser(user) {
 
 export default function AuthProvider({ children }) {
   const initialUser = useMemo(() => readStoredUser(), []);
-  // وجود مستخدم محفوظ = غالباً جلسة سارية → نعرض Splash بدل وميض صفحات الضيف
-  const blockUiWhileChecking = Boolean(initialUser);
 
   const [status, setStatus] = useState("checking");
   const [user, setUser] = useState(initialUser);
@@ -241,10 +238,6 @@ export default function AuthProvider({ children }) {
     }),
     [status, user, refreshUser, logout],
   );
-
-  if (status === "checking" && blockUiWhileChecking) {
-    return <AppSplashScreen />;
-  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

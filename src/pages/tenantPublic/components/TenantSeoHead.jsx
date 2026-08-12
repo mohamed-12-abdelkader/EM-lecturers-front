@@ -6,6 +6,10 @@ import {
   buildTenantSeoMeta,
   isCompanyBrandingTitle,
 } from "../../../utils/tenantSeo";
+import {
+  isAbsoluteHttpUrl,
+  resolvePublicImageUrl,
+} from "../../../utils/highQualityImageUrl";
 
 function resolveTeacherLabel(tenant, teacher, subdomain) {
   const name =
@@ -81,25 +85,31 @@ export default function TenantSeoHead({ subdomain }) {
     document.title = meta.title;
 
     // Replace favicon nodes aggressively (browsers cache link[rel=icon])
-    const iconHref =
+    const iconHref = resolvePublicImageUrl(
       meta.favicon ||
-      meta.appleTouchIcon ||
-      tenant?.avatar_url ||
-      teacher?.avatar;
-    if (iconHref) {
+        meta.appleTouchIcon ||
+        tenant?.avatar_url ||
+        teacher?.avatar,
+    );
+    if (iconHref && isAbsoluteHttpUrl(iconHref)) {
       document
         .querySelectorAll('link[rel="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]')
         .forEach((node) => node.parentNode?.removeChild(node));
 
+      const isExternalCdn = /cloudinary\.com|unsplash\.com|googleusercontent\.com/i.test(iconHref);
+      const href = isExternalCdn
+        ? iconHref
+        : `${iconHref}${iconHref.includes("?") ? "&" : "?"}v=${encodeURIComponent(subdomain)}`;
+
       const icon = document.createElement("link");
       icon.rel = "icon";
       icon.type = "image/png";
-      icon.href = `${iconHref}${iconHref.includes("?") ? "&" : "?"}v=${encodeURIComponent(subdomain)}`;
+      icon.href = href;
       document.head.appendChild(icon);
 
       const apple = document.createElement("link");
       apple.rel = "apple-touch-icon";
-      apple.href = icon.href;
+      apple.href = href;
       document.head.appendChild(apple);
     }
 

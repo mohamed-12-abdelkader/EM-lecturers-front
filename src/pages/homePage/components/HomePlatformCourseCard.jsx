@@ -1,179 +1,132 @@
-import {
-  Box,
-  Text,
-  Badge,
-  Button,
-  HStack,
-  Icon,
-  useColorModeValue,
-} from "@chakra-ui/react";
-import { FaChevronLeft, FaUserGraduate, FaLock, FaCheckCircle } from "react-icons/fa";
-import { HP_BLUE, HP_BLUE_DARK, HP_ORANGE, HP_ORANGE_DARK } from "../homeTheme";
+import { FaCheckCircle, FaChevronLeft, FaLock, FaPlayCircle } from "react-icons/fa";
 
-/**
- * كارت كورس المنصة — براند أزرق / برتقالي موحّد
- */
+const DEFAULT_COURSE_COVER =
+  "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=800&q=80";
+
+function resolveCourseCover(url, fallback = DEFAULT_COURSE_COVER) {
+  if (!url || typeof url !== "string") return fallback;
+  const trimmed = url.trim();
+  if (!trimmed) return fallback;
+  return trimmed;
+}
+
+function handleCoverError(event, fallback = DEFAULT_COURSE_COVER) {
+  const img = event?.currentTarget;
+  if (!img || img.dataset.fallbackApplied === "1") return;
+  img.dataset.fallbackApplied = "1";
+  img.src = fallback;
+}
+
 export default function HomePlatformCourseCard({
   course,
   teacherName,
   isFree,
   isEnrolled,
+  isActivating = false,
   onEnter,
   onSubscribe,
+  onActivateFree,
 }) {
-  const cardBg = useColorModeValue("white", "gray.800");
-  const border = useColorModeValue("gray.200", "whiteAlpha.150");
-  const muted = useColorModeValue("gray.500", "gray.400");
-  const imageBg = useColorModeValue("gray.100", "gray.700");
-  const footerBg = useColorModeValue("gray.50", "whiteAlpha.50");
+  const cover = resolveCourseCover(course.avatar);
 
-  const cover =
-    course.avatar ||
-    "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200&q=80";
+  const gradeLabel = course?.grade?.name || course?.grade_name || course?.category_name || null;
+  const instructor = teacherName ? `أ. ${teacherName}` : "المدرس";
+  const lecturesCount = course?.lectures_count ?? course?.lectures?.length ?? null;
 
-  const statusLabel = isEnrolled ? "مشترك" : isFree ? "مجاني" : "مدفوع";
-  const statusBg = isEnrolled ? "#38A169" : isFree ? HP_BLUE : HP_ORANGE;
+  const priceLabel = isFree ? "مجاني" : course?.price != null ? `${course.price} ج.م` : "مدفوع";
+
+  const status = isEnrolled
+    ? { label: "مشترك", className: "bg-emerald-500 text-white" }
+    : isFree
+      ? { label: "مجاني", className: "bg-blue-600 text-white" }
+      : { label: "مدفوع", className: "bg-orange-500 text-white" };
+
+  const handlePrimary = () => {
+    if (isEnrolled || isFree) {
+      onEnter?.();
+      return;
+    }
+    onSubscribe?.();
+  };
+
+  const buttonLabel = isEnrolled || isFree ? "دخول للكورس" : "تفعيل الكورس";
+
+  const buttonClass =
+    isEnrolled || isFree
+      ? "bg-blue-600 text-white hover:bg-blue-700"
+      : "bg-orange-500 text-white hover:bg-orange-600";
 
   return (
-    <Box
-      as="article"
-      bg={cardBg}
-      borderWidth="1px"
-      borderColor={border}
-      borderRadius="2xl"
-      overflow="hidden"
-      h="full"
-      display="flex"
-      flexDirection="column"
-      transition="transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease"
-      boxShadow="0 8px 28px -14px rgba(26, 32, 44, 0.2)"
-      _hover={{
-        transform: "translateY(-4px)",
-        boxShadow: "0 18px 40px -16px rgba(49, 130, 206, 0.35)",
-        borderColor: "blue.200",
-      }}
-    >
-      <Box position="relative" bg={imageBg} flexShrink={0}>
-        <Box
-          as="img"
+    <article className="group flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-800">
+      <div className="relative h-40 shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-800">
+        <img
           src={cover}
           alt={course.title || "كورس"}
-          w="full"
-          h="auto"
-          display="block"
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+          loading="lazy"
+          onError={handleCoverError}
         />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
 
-        <HStack position="absolute" top={3} insetInline={3} justify="space-between" zIndex={1}>
-          <Badge
-            bg="white"
-            color="blue.700"
-            borderRadius="full"
-            px={3}
-            py={1}
-            fontSize="11px"
-            fontWeight="800"
-            boxShadow="sm"
+        <div className="absolute inset-x-3 top-3 flex items-start justify-between gap-2">
+          {gradeLabel ? (
+            <span className="rounded-lg bg-white/95 px-2.5 py-1 text-[11px] font-bold text-slate-700 shadow-sm dark:bg-slate-900/90 dark:text-slate-200">
+              {gradeLabel}
+            </span>
+          ) : (
+            <span />
+          )}
+          <span
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold shadow-sm ${status.className}`}
           >
-            {course?.grade?.name || "عام"}
-          </Badge>
-          <Badge
-            bg={statusBg}
-            color="white"
-            borderRadius="full"
-            px={3}
-            py={1}
-            fontSize="11px"
-            fontWeight="800"
-            display="inline-flex"
-            alignItems="center"
-            gap={1}
-          >
-            {isEnrolled ? <Icon as={FaCheckCircle} boxSize={2.5} /> : null}
-            {!isEnrolled && !isFree ? <Icon as={FaLock} boxSize={2.5} /> : null}
-            {statusLabel}
-          </Badge>
-        </HStack>
-      </Box>
+            {isEnrolled ? <FaCheckCircle className="text-[10px]" /> : null}
+            {!isEnrolled && !isFree ? <FaLock className="text-[10px]" /> : null}
+            {status.label}
+          </span>
+        </div>
+      </div>
 
-      <Box p={{ base: 4, md: 4 }} flex="1" display="flex" flexDirection="column" gap={3}>
-        <Text
-          fontSize={{ base: "md", md: "lg" }}
-          fontWeight="800"
-          noOfLines={2}
-          lineHeight="1.4"
-          letterSpacing="-0.01em"
-        >
+      <div className="flex flex-1 flex-col p-4">
+        <h3 className="line-clamp-2 font-heading text-base font-bold leading-snug text-slate-900 dark:text-white">
           {course.title}
-        </Text>
+        </h3>
 
-        <HStack justify="space-between" align="center" spacing={3}>
-          <HStack spacing={2} minW={0} color={muted}>
-            <Icon as={FaUserGraduate} boxSize={3.5} color="blue.500" flexShrink={0} />
-            <Text fontSize="sm" fontWeight="600" noOfLines={1}>
-              {teacherName || "مستر"}
-            </Text>
-          </HStack>
-          <Text
-            fontSize="md"
-            fontWeight="800"
-            color={isFree || isEnrolled ? "green.500" : "orange.500"}
-            whiteSpace="nowrap"
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm text-slate-500 dark:text-slate-400">{instructor}</p>
+          <span
+            className={`text-sm font-bold ${
+              isFree || isEnrolled ? "text-emerald-600 dark:text-emerald-400" : "text-orange-600 dark:text-orange-400"
+            }`}
           >
-            {isFree ? "مجاني" : `${course.price} ج.م`}
-          </Text>
-        </HStack>
+            {priceLabel}
+          </span>
+        </div>
 
         {course.description ? (
-          <Text fontSize="sm" color={muted} noOfLines={2} lineHeight="1.7">
+          <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
             {course.description}
-          </Text>
+          </p>
+        ) : null}
+
+        {lecturesCount != null ? (
+          <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
+            <FaPlayCircle className="text-blue-500" />
+            {lecturesCount} محاضرة
+          </p>
         ) : (
-          <Box flex="1" minH="4px" />
+          <div className="mt-3 flex-1" />
         )}
 
-        <Box
-          mt="auto"
-          pt={3}
-          borderTopWidth="1px"
-          borderColor={border}
-          bg={footerBg}
-          mx={{ base: -4, md: -4 }}
-          mb={{ base: -4, md: -4 }}
-          px={{ base: 4, md: 4 }}
-          pb={{ base: 4, md: 4 }}
+        <button
+          type="button"
+          onClick={handlePrimary}
+          disabled={isActivating}
+          className={`mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-bold transition-colors disabled:cursor-wait disabled:opacity-70 ${buttonClass}`}
         >
-          {isEnrolled || isFree ? (
-            <Button
-              w="full"
-              h="42px"
-              bg={HP_BLUE}
-              color="white"
-              _hover={{ bg: HP_BLUE_DARK }}
-              borderRadius="xl"
-              fontSize="sm"
-              fontWeight="800"
-              rightIcon={<Icon as={FaChevronLeft} boxSize={3} />}
-              onClick={onEnter}
-            >
-              دخول للكورس
-            </Button>
-          ) : (
-            <Button
-              w="full"
-              h="42px"
-              bg={HP_ORANGE}
-              color="white"
-              _hover={{ bg: HP_ORANGE_DARK }}
-              borderRadius="xl"
-              fontSize="sm"
-              fontWeight="800"
-              onClick={onSubscribe}
-            >
-              اشترك الآن
-            </Button>
-          )}
-        </Box>
-      </Box>
-    </Box>
+          {isActivating ? "جاري التفعيل…" : buttonLabel}
+          {!isActivating ? <FaChevronLeft className="text-[10px]" /> : null}
+        </button>
+      </div>
+    </article>
   );
 }

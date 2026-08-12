@@ -33,6 +33,10 @@ import {
   resolveTenantBrandLogo,
 } from "../../utils/tenantBrandLogo";
 import { SHELL_DESKTOP_BP } from "../../theme/chakraTheme";
+import {
+  TOUR_CLOSE_MOBILE_NAV,
+  TOUR_OPEN_MOBILE_NAV,
+} from "../../utils/studentHomeTour";
 
 const MARKETING_LINKS = [
   { label: "الرئيسية", href: "/", match: "home" },
@@ -43,10 +47,17 @@ const MARKETING_LINKS = [
 ];
 
 function BrandMark({ homeTo, tenantSubdomain, teacherLogo, brandName, logoRing }) {
+  const [logoFailed, setLogoFailed] = useState(false);
+  const showTenantLogo = Boolean(tenantSubdomain && teacherLogo && !logoFailed);
+
+  useEffect(() => {
+    setLogoFailed(false);
+  }, [teacherLogo]);
+
   return (
     <Link to={homeTo}>
       <Flex align="center" gap={2} _hover={{ opacity: 0.92 }}>
-        {tenantSubdomain && teacherLogo ? (
+        {showTenantLogo ? (
           <Image
             src={teacherLogo}
             alt={brandName}
@@ -57,6 +68,7 @@ function BrandMark({ homeTo, tenantSubdomain, teacherLogo, brandName, logoRing }
             border="1.5px solid"
             borderColor={logoRing}
             p={0.5}
+            onError={() => setLogoFailed(true)}
             fallback={<Avatar name={brandName} size="sm" bg="blue.500" color="white" />}
           />
         ) : tenantSubdomain ? (
@@ -179,6 +191,17 @@ export default function Nav() {
     return () => window.removeEventListener("hashchange", syncHash);
   }, [location.pathname]);
 
+  useEffect(() => {
+    const openForTour = () => onOpen();
+    const closeForTour = () => onClose();
+    window.addEventListener(TOUR_OPEN_MOBILE_NAV, openForTour);
+    window.addEventListener(TOUR_CLOSE_MOBILE_NAV, closeForTour);
+    return () => {
+      window.removeEventListener(TOUR_OPEN_MOBILE_NAV, openForTour);
+      window.removeEventListener(TOUR_CLOSE_MOBILE_NAV, closeForTour);
+    };
+  }, [onOpen, onClose]);
+
   const logoRing = useColorModeValue("blue.100", "blue.700");
   const pillBg = useColorModeValue(
     "rgba(248, 250, 252, 0.9)",
@@ -296,6 +319,7 @@ export default function Nav() {
                 <NotificationDropdown />
                 {showLoggedInMenu ? (
                   <Button
+                    data-tour-id="student-mobile-nav-trigger"
                     onClick={onOpen}
                     variant="outline"
                     colorScheme="blue"
@@ -321,7 +345,7 @@ export default function Nav() {
             ) : (
               <Button
                 as={Link}
-                to="/signup"
+                to="/create-platform"
                 colorScheme="blue"
                 size="sm"
                 borderRadius="full"
@@ -337,7 +361,7 @@ export default function Nav() {
 
         <Drawer isOpen={isOpen} placement="right" onClose={onClose}>
           <DrawerOverlay />
-          <DrawerContent dir="rtl">
+          <DrawerContent dir="rtl" data-tour-id="student-mobile-nav-drawer">
             <DrawerCloseButton />
             <DrawerHeader borderBottomWidth="1px" pt={10}>
               {user
@@ -369,7 +393,7 @@ export default function Nav() {
                   </Button>
                   <Button
                     as={Link}
-                    to="/signup"
+                    to="/create-platform"
                     colorScheme="blue"
                     borderRadius="full"
                     fontWeight="800"

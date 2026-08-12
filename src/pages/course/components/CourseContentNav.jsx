@@ -236,7 +236,7 @@ export default function CourseContentNav({ sections, activeId, onChange }) {
       {/* ديسكتوب — شريط أفقي أعلى المحتوى */}
       <SimpleGrid
         display={{ base: "none", md: "grid" }}
-        columns={3}
+        columns={{ md: 2, xl: 4 }}
         spacing={3}
       >
         {sections.map((section) => (

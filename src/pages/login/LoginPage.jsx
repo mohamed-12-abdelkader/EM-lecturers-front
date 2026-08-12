@@ -3,7 +3,9 @@ import {
   Button, 
   FormControl, 
   FormLabel, 
-  Input, 
+  Input,
+  InputGroup,
+  InputLeftElement,
   Spinner, 
   Modal,
   ModalOverlay,
@@ -16,7 +18,8 @@ import {
   HStack,
   Text,
   Icon,
-  Divider,
+  Flex,
+  Image,
   useColorModeValue,
   useColorMode,
   Checkbox
@@ -25,17 +28,29 @@ import { Link, useNavigate } from "react-router-dom";
 import ScrollToTop from "../../components/scollToTop/ScrollToTop";
 import { useEffect, useState } from "react";
 import { toast, ToastContainer } from "react-toastify";
-import { FiLock, FiPhone, FiMail, FiCheckCircle } from "react-icons/fi";
+import { FiLock, FiPhone, FiCheckCircle, FiUser } from "react-icons/fi";
 import { FaMoon, FaSun, FaBars, FaTimes } from "react-icons/fa";
 import baseUrl from "../../api/baseUrl";
 import {
   ensureTenantAuthContext,
+  resolveLoginTenantSubdomain,
   resolveTenantSubdomain,
   withTenantQuery,
 } from "../../utils/tenantHost";
 import { persistLoginSession } from "../../utils/authStorage";
+import { getPostLoginPath } from "../../utils/authRoles";
 import { TenantPublicNavbarShell } from "../tenantPublic/components/TenantPublicNavbar";
 import "react-toastify/dist/ReactToastify.css";
+
+const BLUE = "#3182CE";
+const ORANGE = "#DD6B20";
+const LOGIN_HERO = "/images/login-hero.png";
+
+const LOGIN_STATS = [
+  { value: "20K+", label: "طالب نشط" },
+  { value: "200+", label: "محاضر" },
+  { value: "500+", label: "مؤسسة" },
+];
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -59,19 +74,21 @@ const LoginPage = () => {
     if (resolved) setTenantSubdomain(resolved);
   }, []);
 
-  const pageBg = useColorModeValue("linear(to-br, blue.50, white)", "linear(to-br, gray.900, gray.800)");
-  const cardBg = useColorModeValue("white", "gray.800");
-  const cardBorder = useColorModeValue("gray.200", "gray.700");
-  const headingColor = useColorModeValue("gray.800", "white");
-  const subtextColor = useColorModeValue("gray.600", "gray.400");
-  const labelColor = useColorModeValue("gray.700", "gray.300");
-  const inputBorder = useColorModeValue("gray.200", "gray.600");
-  const inputBg = useColorModeValue("white", "gray.700");
-  const bottomTextColor = useColorModeValue("gray.500", "gray.500");
-  const cardShadow = useColorModeValue(
-    "0 0 0 1px rgba(0,0,0,0.04), 0 12px 24px -8px rgba(0,0,0,0.12), 0 24px 48px -16px rgba(0,0,0,0.08)",
-    "0 0 0 1px rgba(255,255,255,0.08), 0 0 40px rgba(255,255,255,0.2), 0 0 80px rgba(255,255,255,0.1), 0 24px 48px -16px rgba(0,0,0,0.45), 0 12px 24px -8px rgba(0,0,0,0.35)"
-  );
+  const pageBg = useColorModeValue("#f8fafc", "gray.950");
+  const illustrationBg = useColorModeValue("#f0f6ff", "gray.900");
+  const formPanelBg = useColorModeValue("white", "gray.950");
+  const headingColor = useColorModeValue("slate.900", "white");
+  const subtextColor = useColorModeValue("slate.500", "gray.400");
+  const labelColor = useColorModeValue("slate.700", "gray.300");
+  const inputBorder = useColorModeValue("slate.200", "gray.600");
+  const inputBg = useColorModeValue("white", "gray.900");
+  const bottomTextColor = useColorModeValue("slate.400", "gray.500");
+  const statBg = useColorModeValue("white", "whiteAlpha.50");
+  const statBorder = useColorModeValue("slate.200", "whiteAlpha.100");
+  const imageBlendMode = useColorModeValue("lighten", "normal");
+  const panelDivider = useColorModeValue("slate.200", "gray.800");
+  const blobColor = useColorModeValue("rgba(49,130,206,0.12)", "rgba(49,130,206,0.08)");
+  const outlineHoverBg = useColorModeValue("slate.50", "whiteAlpha.50");
 
   const playAuthSuccessSound = async () => {
     try {
@@ -159,7 +176,7 @@ const LoginPage = () => {
 
       // تحديد ما إذا كان المدخل بريدًا إلكترونيًا أو رقم هاتف
       const isEmail = identifier.includes("@");
-      const subdomain = resolveTenantSubdomain();
+      const subdomain = resolveLoginTenantSubdomain();
       const basePayload = isEmail
         ? {
             email: identifier.trim(),
@@ -172,7 +189,7 @@ const LoginPage = () => {
       const requestData =
         subdomain ? { subdomain, ...basePayload } : basePayload;
 
-      const response = await baseUrl.post(`api/login`, requestData);
+      const response = await baseUrl.post("/api/login", requestData);
 
       persistLoginSession(response.data);
 
@@ -182,12 +199,8 @@ const LoginPage = () => {
 
       const params = new URLSearchParams(window.location.search);
       const redirectTarget = params.get("redirect");
-      const destination =
-        redirectTarget &&
-        redirectTarget.startsWith("/") &&
-        !redirectTarget.startsWith("//")
-          ? redirectTarget
-          : "/home";
+      const user = response.data?.user ?? response.data?.data?.user;
+      const destination = getPostLoginPath(user, redirectTarget);
       // تنقّل SPA مرة واحدة — بدون reload (كان يسبب إعادة تحميل متكررة)
       setTimeout(() => {
         navigate(destination, { replace: true });
@@ -198,10 +211,14 @@ const LoginPage = () => {
       onOpen();
       
       if (error.response) {
-        if (error.response.data.msg === "You must login from the same device") {
+        const apiMsg =
+          error.response.data?.msg ||
+          error.response.data?.message ||
+          error.response.data?.error;
+        if (apiMsg === "You must login from the same device") {
           toast.error("لقد تجاوزت الحد المسموح لك من الاجهزة");
         } else {
-          toast.error(error.response.data.msg || "حدث خطأ أثناء تسجيل الدخول");
+          toast.error(apiMsg || "حدث خطأ أثناء تسجيل الدخول");
         }
       } else {
         toast.error("حدث خطأ في الاتصال بالخادم");
@@ -218,11 +235,7 @@ const LoginPage = () => {
   return (
     <Box
       minH="100vh"
-      bgGradient={pageBg}
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
-      p={4}
+      bg={pageBg}
       position="relative"
       overflow="hidden"
       dir="rtl"
@@ -309,87 +322,246 @@ const LoginPage = () => {
       </header>
       )}
 
-      <Box
-        position="absolute"
-        top="0"
-        left="0"
-        right="0"
-        bottom="0"
-        opacity={useColorModeValue(0.04, 0.06)}
-        bgImage="url('data:image/svg+xml,%3Csvg width=%2260%22 height=%2260%22 viewBox=%220 0 60 60%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cg fill=%22none%22 fill-rule=%22evenodd%22%3E%3Cg fill=%22%234299E1%22 fill-opacity=%22.4%22%3E%3Cpath d=%22M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30v4h-4v2h4v4h2v-4h4v-2h-4v-4h-2zM6 34v4h4v2h-4v4h-2v-4h-4v-2h4v-4h2zM6 4v4h-4v2h4v4h2v-4h4v-2h-4v-4H6z%22/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')"
-      />
-
-      <Box position="relative" zIndex="1" w="full" maxW="440px" mt="88px">
-        <Box
-          bg={cardBg}
-          borderRadius="2xl"
-          p={8}
-          boxShadow={cardShadow}
-          borderWidth="1px"
-          borderColor={cardBorder}
+      <Flex
+        minH="100vh"
+        direction={{ base: "column", lg: "row" }}
+        bg={pageBg}
+        pt={{ base: hasTenantNavbar ? "4.5rem" : "4.65rem", lg: 0 }}
+      >
+        {/* Illustration panel */}
+        <Flex
+          flex={1}
+          display={{ base: "none", lg: "flex" }}
+          position="relative"
+          align="center"
+          justify="center"
+          bg={illustrationBg}
+          px={{ lg: 12, xl: 16 }}
+          py={16}
           overflow="hidden"
         >
-          <VStack spacing={8} align="stretch">
-            <Box textAlign="center">
-              <Box
-                w="16"
-                h="16"
-                bg="blue.500"
-                borderRadius="xl"
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                mx="auto"
-                mb={4}
-                boxShadow="0 10px 25px rgba(66, 153, 225, 0.35)"
-              >
-                <Icon as={FiLock} w="8" h="8" color="white" />
-              </Box>
-              <Text fontSize="2xl" fontWeight="bold" color={headingColor} mb={2}>
-                مرحباً بعودتك
+          <Box
+            position="absolute"
+            top="50%"
+            left="50%"
+            transform="translate(-50%, -48%)"
+            w="480px"
+            h="480px"
+            borderRadius="full"
+            bg={blobColor}
+            filter="blur(90px)"
+            pointerEvents="none"
+          />
+
+          <Flex
+            position="relative"
+            zIndex={1}
+            direction="column"
+            align="flex-start"
+            maxW="520px"
+            w="full"
+            gap={0}
+          >
+            <Box
+              display="inline-flex"
+              alignItems="center"
+              gap={2}
+              px={3}
+              py={1.5}
+              mb={6}
+              borderRadius="full"
+              bg={statBg}
+              border="1px solid"
+              borderColor={statBorder}
+              boxShadow="0 1px 2px rgba(15,23,42,0.04)"
+            >
+              <Box w={2} h={2} borderRadius="full" bg={BLUE} />
+              <Text fontSize="xs" fontWeight="bold" color={subtextColor} letterSpacing="0.02em">
+                منصة Next Edu التعليمية
               </Text>
-              <Text color={subtextColor} fontSize="md">
-                سجل دخولك للاستمرار في رحلة التعلم مع Next Edu
+            </Box>
+
+            <Text
+              as="h1"
+              fontSize={{ lg: "4xl", xl: "4.5xl" }}
+              fontWeight="900"
+              color={headingColor}
+              lineHeight="1.2"
+              letterSpacing="-0.02em"
+              mb={4}
+            >
+              مرحباً
+              <Box as="span" display="block" color={BLUE}>
+                بعودتك مجدداً
+              </Box>
+            </Text>
+
+            <Text
+              fontSize="lg"
+              color={subtextColor}
+              lineHeight="1.85"
+              maxW="420px"
+              mb={2}
+            >
+              سجّل دخولك وتابع دروسك وامتحاناتك — تعلّم في أي وقت ومن أي مكان.
+            </Text>
+
+            <Box
+              position="relative"
+              w="full"
+              my={6}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              minH="380px"
+            >
+              <Image
+                src={LOGIN_HERO}
+                alt="طالب يتعلّم"
+                maxH="400px"
+                w="auto"
+                maxW="100%"
+                objectFit="contain"
+                mixBlendMode={imageBlendMode}
+                loading="eager"
+                draggable={false}
+                sx={{ background: "transparent" }}
+              />
+            </Box>
+
+            <HStack spacing={3} w="full" flexWrap="wrap">
+              {LOGIN_STATS.map(({ value, label }) => (
+                <Box
+                  key={label}
+                  flex="1"
+                  minW="120px"
+                  px={4}
+                  py={3}
+                  borderRadius="xl"
+                  bg={statBg}
+                  border="1px solid"
+                  borderColor={statBorder}
+                  boxShadow="0 1px 2px rgba(15,23,42,0.04)"
+                >
+                  <Text fontSize="xl" fontWeight="900" color={BLUE} lineHeight="1.2">
+                    {value}
+                  </Text>
+                  <Text fontSize="xs" fontWeight="semibold" color={subtextColor} mt={0.5}>
+                    {label}
+                  </Text>
+                </Box>
+              ))}
+            </HStack>
+          </Flex>
+        </Flex>
+
+        {/* Form panel */}
+        <Flex
+          flex={1}
+          bg={formPanelBg}
+          align="center"
+          justify="center"
+          px={{ base: 5, sm: 8, lg: 12, xl: 16 }}
+          py={{ base: 10, lg: 16 }}
+          borderRight={{ lg: "1px solid" }}
+          borderColor={panelDivider}
+        >
+          <Box w="full" maxW="400px">
+            <Box display={{ base: "flex", lg: "none" }} justifyContent="center" mb={8}>
+              <Image
+                src={LOGIN_HERO}
+                alt="طالب يتعلّم"
+                maxH="200px"
+                w="auto"
+                objectFit="contain"
+                mixBlendMode={imageBlendMode}
+                draggable={false}
+                sx={{ background: "transparent" }}
+              />
+            </Box>
+
+            <Box mb={8}>
+              <Text
+                fontSize={{ base: "2xl", sm: "3xl" }}
+                fontWeight="900"
+                color={headingColor}
+                letterSpacing="-0.02em"
+                mb={2}
+              >
+                تسجيل الدخول
+              </Text>
+              <Text fontSize="md" color={subtextColor} lineHeight="1.7">
+                أدخل بيانات حسابك للمتابعة إلى لوحة التعلم
               </Text>
             </Box>
 
             <Box as="form" onSubmit={handleLogin}>
-              <VStack spacing={5}>
+              <VStack spacing={5} align="stretch">
                 <FormControl>
-                  <FormLabel fontWeight="semibold" color={labelColor} mb={2}>
+                  <FormLabel fontWeight="semibold" color={labelColor} mb={2} fontSize="sm">
                     رقم الهاتف أو البريد الإلكتروني
                   </FormLabel>
-                  <Input
-                    placeholder="ادخل رقم الهاتف أو البريد الإلكتروني"
-                    size="lg"
-                    value={identifier}
-                    onChange={identifierChange}
-                    borderRadius="xl"
-                    borderColor={inputBorder}
-                    bg={inputBg}
-                    _hover={{ borderColor: "blue.300" }}
-                    _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 2px rgba(66, 153, 225, 0.25)" }}
-                    transition="all 0.2s"
-                  />
+                  <InputGroup size="lg">
+                    <InputLeftElement pointerEvents="none" h="full">
+                      <Icon as={FiUser} color="gray.400" />
+                    </InputLeftElement>
+                    <Input
+                      placeholder="01xxxxxxxxx أو name@email.com"
+                      value={identifier}
+                      onChange={identifierChange}
+                      pl={12}
+                      h="52px"
+                      borderRadius="xl"
+                      borderColor={inputBorder}
+                      bg={inputBg}
+                      fontSize="sm"
+                      _placeholder={{ color: "gray.400" }}
+                      _hover={{ borderColor: "blue.300" }}
+                      _focus={{
+                        borderColor: BLUE,
+                        boxShadow: `0 0 0 3px rgba(49,130,206,0.15)`,
+                      }}
+                      transition="all 0.15s"
+                    />
+                  </InputGroup>
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel fontWeight="semibold" color={labelColor} mb={2}>
-                    كلمة المرور
-                  </FormLabel>
-                  <Input
-                    type="password"
-                    placeholder="أدخل كلمة المرور"
-                    size="lg"
-                    value={pass}
-                    onChange={passChange}
-                    borderRadius="xl"
-                    borderColor={inputBorder}
-                    bg={inputBg}
-                    _hover={{ borderColor: "blue.300" }}
-                    _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 2px rgba(66, 153, 225, 0.25)" }}
-                    transition="all 0.2s"
-                  />
+                  <Flex justify="space-between" align="center" mb={2}>
+                    <FormLabel fontWeight="semibold" color={labelColor} mb={0} fontSize="sm">
+                      كلمة المرور
+                    </FormLabel>
+                    <Link
+                      to="/verify_code"
+                      style={{ fontSize: "0.8125rem", color: BLUE, fontWeight: 600 }}
+                    >
+                      نسيت كلمة المرور؟
+                    </Link>
+                  </Flex>
+                  <InputGroup size="lg">
+                    <InputLeftElement pointerEvents="none" h="full">
+                      <Icon as={FiLock} color="gray.400" />
+                    </InputLeftElement>
+                    <Input
+                      type="password"
+                      placeholder="••••••••"
+                      value={pass}
+                      onChange={passChange}
+                      pl={12}
+                      h="52px"
+                      borderRadius="xl"
+                      borderColor={inputBorder}
+                      bg={inputBg}
+                      fontSize="sm"
+                      _placeholder={{ color: "gray.400" }}
+                      _hover={{ borderColor: "blue.300" }}
+                      _focus={{
+                        borderColor: BLUE,
+                        boxShadow: `0 0 0 3px rgba(49,130,206,0.15)`,
+                      }}
+                      transition="all 0.15s"
+                    />
+                  </InputGroup>
                 </FormControl>
 
                 <Checkbox
@@ -398,9 +570,9 @@ const LoginPage = () => {
                     if (e.target.checked) navigate("/teacher-login");
                   }}
                   colorScheme="blue"
-                  size="lg"
-                  alignSelf="flex-start"
+                  size="md"
                   color={labelColor}
+                  mt={1}
                 >
                   تسجيل دخول كمدرس
                 </Checkbox>
@@ -409,14 +581,20 @@ const LoginPage = () => {
                   type="submit"
                   size="lg"
                   w="full"
-                  bg="orange.500"
+                  h="52px"
+                  mt={2}
+                  bg={BLUE}
                   color="white"
-                  _hover={{ bg: "orange.400", boxShadow: "0 10px 25px rgba(237, 137, 54, 0.35)" }}
-                  _active={{ bg: "orange.600" }}
+                  _hover={{
+                    bg: "#2b6cb0",
+                    transform: "translateY(-1px)",
+                    boxShadow: "0 8px 24px rgba(49,130,206,0.35)",
+                  }}
+                  _active={{ bg: "#2c5282", transform: "translateY(0)" }}
                   borderRadius="xl"
-                  fontSize="lg"
+                  fontSize="md"
                   fontWeight="bold"
-                  boxShadow="0 8px 20px rgba(237, 137, 54, 0.3)"
+                  boxShadow="0 4px 14px rgba(49,130,206,0.25)"
                   transition="all 0.2s"
                   rightIcon={loading ? <Spinner size="sm" color="white" /> : undefined}
                   isDisabled={loading}
@@ -426,55 +604,34 @@ const LoginPage = () => {
               </VStack>
             </Box>
 
-            <HStack>
-              <Divider borderColor={cardBorder} />
-              <Text fontSize="sm" color={bottomTextColor} px={3}>
-                أو
-              </Text>
-              <Divider borderColor={cardBorder} />
-            </HStack>
-
-            <Box textAlign="center">
-              <Text color={subtextColor} fontSize="md" mb={3}>
-                هل أنت جديد على منصتنا؟
+            <Box mt={8} pt={8} borderTop="1px solid" borderColor={panelDivider} textAlign="center">
+              <Text fontSize="sm" color={subtextColor} mb={4}>
+                ليس لديك حساب بعد؟
               </Text>
               <Button
                 variant="outline"
-                borderColor="blue.400"
-                color="blue.500"
-                _hover={{ bg: "blue.50", borderColor: "blue.500" }}
-                _dark={{ _hover: { bg: "blue.900", borderColor: "blue.400" } }}
+                borderColor={inputBorder}
+                color={headingColor}
+                _hover={{ bg: outlineHoverBg, borderColor: BLUE }}
                 size="lg"
                 w="full"
+                h="48px"
                 borderRadius="xl"
-                fontSize="md"
+                fontSize="sm"
                 fontWeight="semibold"
                 transition="all 0.2s"
-                onClick={() => navigate("/signup")}
+                onClick={() => navigate(withTenantQuery("/signup", tenantSubdomain))}
               >
                 إنشاء حساب جديد
               </Button>
             </Box>
 
-            <Box textAlign="center">
-              <Link
-                to="/verify_code"
-                color="blue.500"
-                fontSize="sm"
-                _hover={{ color: "blue.600", textDecoration: "underline" }}
-              >
-                هل نسيت كلمة المرور؟
-              </Link>
-            </Box>
-          </VStack>
-        </Box>
-
-        <Box mt={6} textAlign="center">
-          <Text fontSize="sm" color={bottomTextColor}>
-            انضم إلى آلاف الطلاب في رحلة التعلم مع Next Edu
-          </Text>
-        </Box>
-      </Box>
+            <Text mt={8} textAlign="center" fontSize="xs" color={bottomTextColor}>
+              محمي بتشفير آمن · Next Edu © {new Date().getFullYear()}
+            </Text>
+          </Box>
+        </Flex>
+      </Flex>
       <ScrollToTop />
       <ToastContainer position="top-center" />
 

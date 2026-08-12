@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import tenantSeoPlugin from "./vite-plugin-tenant-seo.mjs";
+import { drivePdfProxyPlugin } from "./vite-plugin-drive-pdf.mjs";
 
 /**
  * وضع التطوير فقط: SW "تنظيف ذاتي" على /sw.js.
@@ -77,6 +78,16 @@ export default defineConfig(({ mode }) => {
           ws: true,
           secure: false,
         },
+        "/uploads": {
+          target: proxyTarget,
+          changeOrigin: true,
+          secure: false,
+        },
+        "/storage": {
+          target: proxyTarget,
+          changeOrigin: true,
+          secure: false,
+        },
       },
     },
     build: {
@@ -91,6 +102,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       devServiceWorkerKillSwitch(),
+      drivePdfProxyPlugin(),
       tenantSeoPlugin({
         apiBase: proxyTarget,
         rootDomain: env.VITE_TENANT_ROOT_DOMAIN || "",

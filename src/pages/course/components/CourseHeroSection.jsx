@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { getHeroImageUrl, resolvePublicImageUrl } from "../../../utils/highQualityImageUrl";
 import {
   Icon,
   Button,
@@ -172,6 +173,9 @@ const CourseHeroSection = ({
 
   const gradeName = course?.grade_name || null;
   const courseTitle = course?.title || "الكورس";
+  const courseCoverUrl =
+    getHeroImageUrl(course?.avatar) ||
+    "https://via.placeholder.com/760x428/2B6CB0/FFFFFF?text=Course";
 
   const handleActivateStudent = async () => {
     if (!studentId.trim()) {
@@ -217,7 +221,7 @@ const CourseHeroSection = ({
 
   return (
     <>
-      <section className="relative bg-white dark:bg-slate-950" dir="rtl">
+      <section className="relative bg-white dark:bg-slate-950" dir="rtl" data-tour-id="course-hero">
         {/* شريط علوي */}
         <div className="bg-blue-500 pb-20 pt-5 md:pb-28 md:pt-6">
           <div className={crContainer}>
@@ -243,7 +247,7 @@ const CourseHeroSection = ({
             <div className="mx-auto w-full max-w-[400px] shrink-0 md:mx-0 md:w-[min(100%,380px)]">
               <div className="overflow-hidden rounded-xl border-[3px] border-white bg-slate-200 shadow-[0_12px_40px_rgba(15,23,42,0.18)] dark:border-slate-800">
                 <img
-                  src={course?.avatar || "https://via.placeholder.com/760x428/2B6CB0/FFFFFF?text=Course"}
+                  src={courseCoverUrl}
                   alt={courseTitle}
                   className="aspect-video w-full object-cover"
                   loading="eager"
@@ -443,7 +447,7 @@ const CourseHeroSection = ({
                       <Tr key={student.id}>
                         <Td>
                           <HStack spacing={3}>
-                            <Avatar size="sm" name={student.name} src={student.avatar} />
+                            <Avatar size="sm" name={student.name} src={resolvePublicImageUrl(student.avatar)} />
                             <Text fontWeight="semibold" fontSize="sm">
                               {student.name || "—"}
                             </Text>

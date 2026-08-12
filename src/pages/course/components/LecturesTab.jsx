@@ -12,12 +12,17 @@ import {
 } from "@chakra-ui/react";
 import { FaPlus, FaPlayCircle } from "react-icons/fa";
 import LectureCard from "./LectureCard";
+import CourseAccessSettingsPanel from "./CourseAccessSettingsPanel";
 import { crEyebrowOrange, crSubheading, lcLabel, lcRoot } from "../courseTheme";
 
 const LecturesTab = ({
   lectures,
   isTeacher,
   isAdmin,
+  lectureAccessMode = "always_open",
+  isCourseBasedAssignments = false,
+  courseId,
+  onRefreshCourse,
   handleAddLecture,
   handleEditLecture,
   handleDeleteLecture,
@@ -40,6 +45,9 @@ const LecturesTab = ({
   formatDate,
   onAddBulkQuestions,
   handleOpenVideo,
+  tourLectureId,
+  accessSettings,
+  accessSettingsLoading,
 }) => (
   <VStack spacing={{ base: 4, md: 5 }} align="stretch" dir="rtl" className={lcRoot}>
     <Flex
@@ -59,10 +67,18 @@ const LecturesTab = ({
           محاضرات الكورس
         </h2>
         <p className={`mt-2 max-w-md ${lcLabel}`}>
-          تابع الفيديوهات والملفات والواجبات لكل محاضرة
+          تابع الفيديوهات والملفات لكل محاضرة
         </p>
       </div>
-      <HStackWrap count={lectures?.length || 0} isTeacher={isTeacher} isAdmin={isAdmin} handleAddLecture={handleAddLecture} />
+      <HStackWrap
+        count={lectures?.length || 0}
+        isTeacher={isTeacher}
+        isAdmin={isAdmin}
+        handleAddLecture={handleAddLecture}
+        courseId={courseId}
+        accessSettings={accessSettings}
+        accessSettingsLoading={accessSettingsLoading}
+      />
     </Flex>
 
     {!lectures ? (
@@ -72,26 +88,24 @@ const LecturesTab = ({
         <Skeleton height="100px" borderRadius="2xl" />
       </VStack>
     ) : lectures.length === 0 ? (
-      <Center
-        py={14}
-        flexDir="column"
-        textAlign="center"
-        borderRadius="2xl"
-        border="2px dashed"
-        borderColor={borderColor}
-        bg={sectionBg}
-      >
-        <Center w={14} h={14} borderRadius="2xl" bg="blue.50" mb={4}>
-          <Icon as={FaPlayCircle} color="blue.500" boxSize={6} />
-        </Center>
-        <Text fontWeight="bold" color={textColor} mb={2}>
-          لا توجد محاضرات بعد
-        </Text>
-        <Text fontSize="sm" color={subTextColor} mb={5} maxW="320px">
-          ابدأ بإضافة أول محاضرة ليظهر المحتوى للطلاب.
-        </Text>
+      <Center py={8} flexDir="column" textAlign="center">
+        <div className="mx-auto flex aspect-square w-64 items-center justify-center overflow-hidden rounded-full bg-black sm:w-80">
+          <img
+            src="/images/course-lectures-empty.jpg"
+            alt="لا يوجد محاضرات الآن — سيتم إضافتها قريباً"
+            className="h-full w-full object-contain"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
         {(isTeacher || isAdmin) && (
-          <Button colorScheme="orange" leftIcon={<Icon as={FaPlus} />} borderRadius="xl" onClick={handleAddLecture}>
+          <Button
+            mt={6}
+            colorScheme="orange"
+            leftIcon={<Icon as={FaPlus} />}
+            borderRadius="xl"
+            onClick={handleAddLecture}
+          >
             إضافة محاضرة
           </Button>
         )}
@@ -103,6 +117,12 @@ const LecturesTab = ({
             key={lecture.id}
             lecture={lecture}
             lectureIndex={index}
+            lectureAccessMode={lectureAccessMode}
+            hideLectureAssignments={isCourseBasedAssignments}
+            onRefreshCourse={onRefreshCourse}
+            isTourTarget={
+              tourLectureId != null && String(lecture.id) === String(tourLectureId)
+            }
             isTeacher={isTeacher}
             isAdmin={isAdmin}
             handleEditLecture={handleEditLecture}
@@ -135,8 +155,16 @@ const LecturesTab = ({
 
 export default LecturesTab;
 
-const HStackWrap = ({ count, isTeacher, isAdmin, handleAddLecture }) => (
-  <HStack spacing={2} flexShrink={0} alignSelf={{ base: "flex-start", sm: "center" }}>
+const HStackWrap = ({
+  count,
+  isTeacher,
+  isAdmin,
+  handleAddLecture,
+  courseId,
+  accessSettings,
+  accessSettingsLoading,
+}) => (
+  <HStack spacing={2} flexShrink={0} alignSelf={{ base: "flex-start", sm: "center" }} flexWrap="wrap">
     <Badge
       colorScheme="blue"
       borderRadius="full"
@@ -149,15 +177,23 @@ const HStackWrap = ({ count, isTeacher, isAdmin, handleAddLecture }) => (
       {count} محاضرة
     </Badge>
     {(isTeacher || isAdmin) && (
-      <Button
-        size="sm"
-        colorScheme="orange"
-        leftIcon={<Icon as={FaPlus} />}
-        borderRadius="xl"
-        onClick={handleAddLecture}
-      >
-        إضافة محاضرة
-      </Button>
+      <>
+        <CourseAccessSettingsPanel
+          courseId={courseId}
+          settings={accessSettings}
+          loading={accessSettingsLoading}
+          canManage
+        />
+        <Button
+          size="sm"
+          colorScheme="orange"
+          leftIcon={<Icon as={FaPlus} />}
+          borderRadius="xl"
+          onClick={handleAddLecture}
+        >
+          إضافة محاضرة
+        </Button>
+      </>
     )}
   </HStack>
 );

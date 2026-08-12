@@ -13,7 +13,7 @@ import axios from "axios";
 import { markSessionExpired, readAuthToken } from "../utils/authStorage";
 import { isJwtExpired } from "../utils/jwt";
 import { getTenantSubdomain, resolveTenantSubdomain } from "../utils/tenantHost";
-import { getApiBaseURL } from "./apiConfig";
+import { getApiBaseURL, getResolvedApiTarget, useDevViteProxy } from "./apiConfig";
 import { getAccessToken, setAccessToken } from "../services/tokenStore";
 import { refreshSession } from "../services/refreshManager";
 import { isBrowserOnline, isNetworkError, waitForOnline } from "../utils/network";
@@ -59,13 +59,35 @@ function getHeader(headers, key) {
   return direct != null ? String(direct) : "";
 }
 
+function normalizeRequestUrl(url = "") {
+  const raw = String(url || "").trim();
+  if (!raw) return raw;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return raw.startsWith("/") ? raw : `/${raw}`;
+}
+
 const baseUrl = axios.create({
-  baseURL: getApiBaseURL(),
   withCredentials: true,
 });
 
 /* ------------------------- Request Interceptor ------------------------- */
 baseUrl.interceptors.request.use(async (config) => {
+  config.baseURL = getApiBaseURL();
+  config.url = normalizeRequestUrl(config.url);
+
+  if (import.meta.env.DEV && typeof console !== "undefined") {
+    const base = String(config.baseURL || "").replace(/\/$/, "");
+    const path = String(config.url || "");
+    const full = base ? `${base}${path}` : path;
+    const viaProxy = useDevViteProxy();
+    const target = getResolvedApiTarget();
+    console.info(
+      `[API →] ${String(config.method || "get").toUpperCase()} ${full}${
+        viaProxy ? `  ⟹ proxy to ${target}` : ""
+      }`,
+    );
+  }
+
   const headers = config.headers || {};
   let token = getAccessToken();
 

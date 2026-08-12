@@ -28,7 +28,12 @@ import {
 } from "./components/TenantPublicNavbar";
 import { motion, ScrollProgress } from "./tenantLandingMotion";
 import { useTenantPageMetadata } from "../../Hooks/tenantPublic/useTenantPageMetadata";
-import { getCardImageUrl, getPortraitImageUrl } from "../../utils/highQualityImageUrl";
+import {
+  getCardImageUrl,
+  getPortraitImageUrl,
+  isAbsoluteHttpUrl,
+  resolvePublicImageUrl,
+} from "../../utils/highQualityImageUrl";
 import TenantSeoHead from "./components/TenantSeoHead";
 import TenantLandingLoader from "./components/landing/TenantLandingLoader";
 
@@ -171,13 +176,15 @@ export default function TenantPublicLanding({ subdomain }) {
 
   const teacherPortraitUrl = useMemo(() => {
     const hero = landing?.hero || {};
-    const raw = hero.image_url || tenant?.avatar_url || null;
+    const raw = resolvePublicImageUrl(hero.image_url || tenant?.avatar_url || null);
     return raw ? getPortraitImageUrl(raw) : null;
   }, [landing, tenant]);
 
-  // Preload LCP portrait as early as possible
+  // Preload LCP portrait as early as possible (absolute URL only — relative paths break preload)
   useEffect(() => {
-    if (!teacherPortraitUrl || typeof document === "undefined") return undefined;
+    if (!teacherPortraitUrl || !isAbsoluteHttpUrl(teacherPortraitUrl) || typeof document === "undefined") {
+      return undefined;
+    }
     const id = "tenant-hero-image-preload";
     let link = document.getElementById(id);
     if (!link) {
@@ -191,22 +198,6 @@ export default function TenantPublicLanding({ subdomain }) {
     link.setAttribute("fetchpriority", "high");
     return undefined;
   }, [teacherPortraitUrl]);
-
-  // Warm cache for first visible course / lecture thumbs
-  useEffect(() => {
-    const urls = [
-      ...freeLectures.slice(0, 3).map((l) => l.image_url),
-      ...courses.slice(0, 4).map((c) => c.image_url || c.cover_url || c.thumbnail || c.avatar),
-    ]
-      .filter(Boolean)
-      .map((u) => getCardImageUrl(u));
-
-    urls.forEach((href) => {
-      const img = new Image();
-      img.decoding = "async";
-      img.src = href;
-    });
-  }, [freeLectures, courses]);
 
   const teacher = payload?.teacher;
   const seoFallback = useMemo(
@@ -433,7 +424,7 @@ export default function TenantPublicLanding({ subdomain }) {
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
       dir="rtl"
       data-theme={isDarkMode ? "dark" : "light"}
-      className={`tenant-public-page ${isDarkMode ? "tenant-dark" : "tenant-light"} min-h-screen overflow-x-hidden antialiased transition-colors duration-300`}
+      className={`tenant-public-page ${isDarkMode ? "tenant-dark" : "tenant-light"} relative min-h-screen overflow-x-hidden antialiased transition-colors duration-300`}
       style={{
         ...cssVars,
         ...themeCssVars,
@@ -498,7 +489,6 @@ export default function TenantPublicLanding({ subdomain }) {
           loginHref={loginHref}
           whatsappHref={whatsappHref}
           showFreeVideos={showFreeLectures}
-          heroStats={heroStats}
           teacherImageUrl={teacherPortraitUrl}
         />
 

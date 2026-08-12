@@ -32,6 +32,7 @@ const BottomNavItems = () => {
     <Box
       as="nav"
       aria-label="التنقل السفلي"
+      data-tour-id="student-bottom-nav"
       display={{ base: "block", [SHELL_DESKTOP_BP]: "none" }}
       position="fixed"
       bottom={0}

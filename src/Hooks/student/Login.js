@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import baseUrl from "../../api/baseUrl";
 import { toast } from "react-toastify";
 import { persistLoginSession } from "../../utils/authStorage";
+import { resolveLoginTenantSubdomain } from "../../utils/tenantHost";
 
 const studentLogin = () => {
   const navigate = useNavigate();
@@ -50,7 +51,10 @@ const studentLogin = () => {
         ? { email: identifier, password: pass, remember_me: true }
         : { phone: identifier.replace(/[^0-9]/g, ''), password: pass, remember_me: true };
 
-      const response = await baseUrl.post(`api/login`, requestData);
+      const subdomain = resolveLoginTenantSubdomain();
+      const payload = subdomain ? { subdomain, ...requestData } : requestData;
+
+      const response = await baseUrl.post("/api/login", payload);
 
       persistLoginSession(response.data);
 
@@ -68,12 +72,16 @@ const studentLogin = () => {
       }, 500);
     } catch (error) {
       if (error.response) {
-        if (error.response.data.msg == "You must login from the same device") {
+        const apiMsg =
+          error.response.data?.msg ||
+          error.response.data?.message ||
+          error.response.data?.error;
+        if (apiMsg == "You must login from the same device") {
           toast.error("لقد تجاوزت الحد المسموح لك من الاجهزة");
-        } else if (error.response.data.msg == "Invalid username or password") {
+        } else if (apiMsg == "Invalid username or password" || apiMsg == "Invalid credentials") {
           toast.error("بيانات المستخدم غير صحيحة");
         } else {
-          toast.error("حدث خطأ أثناء تسجيل الدخول");
+          toast.error(apiMsg || "حدث خطأ أثناء تسجيل الدخول");
         }
       } else {
         toast.error("حدث خطأ في الاتصال بالخادم");

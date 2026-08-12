@@ -42,13 +42,14 @@ const TENANT_HTML_ROUTES = new Set([
 function isHtmlDocumentRequest(url) {
   const pathname = (url || "/").split("?")[0];
 
-  // Never intercept Vite internals, source modules, API, or static assets.
+  // Never intercept Vite internals, source modules, API, static assets, or course PDFs.
   if (
     pathname.startsWith("/@") ||
     pathname.startsWith("/src/") ||
     pathname.startsWith("/node_modules/") ||
     pathname.startsWith("/api/") ||
     pathname.startsWith("/assets/") ||
+    pathname.startsWith("/course-files/") ||
     pathname.includes(".")
   ) {
     return false;

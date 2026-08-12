@@ -60,7 +60,12 @@ import { FaMoon, FaSun, FaBars, FaTimes } from "react-icons/fa";
 
 import "react-toastify/dist/ReactToastify.css";
 import baseUrl from "../../api/baseUrl";
+import {
+  fetchPublicCourseGroups,
+  fetchPublicRegistrationSettings,
+} from "../../api/courseGroupsApi";
 import { persistLoginSession } from "../../utils/authStorage";
+import { markStudentHomeTourPending } from "../../utils/studentHomeTour";
 import {
   ensureTenantAuthContext,
   resolveTenantSubdomain,
@@ -167,6 +172,10 @@ const SignUp = () => {
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [gradeId, setGradeId] = useState("");
+  const [courseGroupId, setCourseGroupId] = useState("");
+  const [requiresGroupSelection, setRequiresGroupSelection] = useState(false);
+  const [registrationGroups, setRegistrationGroups] = useState([]);
+  const [groupsLoading, setGroupsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [grades, setGrades] = useState([]); // الصفوف من API
@@ -236,6 +245,34 @@ const SignUp = () => {
     fetchGrades();
   }, []);
 
+  useEffect(() => {
+    const subdomain = resolveTenantSubdomain();
+    if (!subdomain) return;
+    fetchPublicRegistrationSettings(subdomain)
+      .then((settings) => {
+        setRequiresGroupSelection(
+          Boolean(settings.course_group_access_enabled) &&
+            Boolean(settings.requires_course_group_selection),
+        );
+      })
+      .catch(() => setRequiresGroupSelection(false));
+  }, []);
+
+  useEffect(() => {
+    setCourseGroupId("");
+    if (!requiresGroupSelection || !gradeId) {
+      setRegistrationGroups([]);
+      return;
+    }
+    const subdomain = resolveTenantSubdomain();
+    if (!subdomain) return;
+    setGroupsLoading(true);
+    fetchPublicCourseGroups(subdomain, gradeId)
+      .then((res) => setRegistrationGroups(res.groups || []))
+      .catch(() => setRegistrationGroups([]))
+      .finally(() => setGroupsLoading(false));
+  }, [gradeId, requiresGroupSelection]);
+
   // تصفية الصفوف حسب هل هو جامعي أم لا - تم إزالتها لأننا نستخدم الفئات الجديدة
   // let filteredGrades = grades;
   // if (grades.length > 0) {
@@ -268,6 +305,9 @@ const SignUp = () => {
       case 2:
         return password.length >= 6 && password === passwordConfirm;
       case 3:
+        if (requiresGroupSelection) {
+          return gradeId !== "" && courseGroupId !== "";
+        }
         return gradeId !== "";
       default:
         return false;
@@ -282,7 +322,8 @@ const SignUp = () => {
       !parentPhone ||
       !password ||
       !passwordConfirm ||
-      !gradeId
+      !gradeId ||
+      (requiresGroupSelection && !courseGroupId)
     ) {
       toast.error("يرجى ملء جميع الحقول");
       return;
@@ -329,18 +370,23 @@ const SignUp = () => {
         setLoading(false);
         return;
       }
-      const res = await baseUrl.post("/api/users/register", {
+      const registerPayload = {
         subdomain,
         phone: cleanPhone,
         password: password,
         name: nameCheck.normalized,
         parent_phone: cleanParentPhone,
-        grade_id: parseInt(gradeId),
+        grade_id: parseInt(gradeId, 10),
         remember_me: true,
-      });
+      };
+      if (requiresGroupSelection && courseGroupId) {
+        registerPayload.course_group_id = parseInt(courseGroupId, 10);
+      }
+      const res = await baseUrl.post("/api/users/register", registerPayload);
 
       // التوكن → الذاكرة فقط، والمستخدم → localStorage (بدون أسرار)
       persistLoginSession(res.data);
+      markStudentHomeTourPending();
 
       toast.success("تم إنشاء الحساب بنجاح!");
       void playAuthSuccessSound();
@@ -587,6 +633,41 @@ const SignUp = () => {
                 ))}
               </Select>
             </FormControl>
+
+            {requiresGroupSelection ? (
+              <FormControl isRequired mt={4}>
+                <FormLabel fontWeight="semibold" color={labelColor} mb={2} fontSize="md">
+                  مجموعة الكورس
+                </FormLabel>
+                {groupsLoading ? (
+                  <Spinner size="sm" color="blue.500" />
+                ) : (
+                  <Select
+                    dir="ltr"
+                    placeholder={
+                      gradeId
+                        ? registrationGroups.length
+                          ? "اختر مجموعتك"
+                          : "لا توجد مجموعات لهذا الصف"
+                        : "اختر الصف أولاً"
+                    }
+                    value={courseGroupId}
+                    onChange={(e) => setCourseGroupId(e.target.value)}
+                    isDisabled={!gradeId || registrationGroups.length === 0}
+                    {...inputStyles}
+                  >
+                    {registrationGroups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+                <Text fontSize="xs" color={subtextColor} mt={2}>
+                  المدرس يحدد المجموعة التي تتابع من خلالها المحاضرات
+                </Text>
+              </FormControl>
+            ) : null}
           </VStack>
         );
 

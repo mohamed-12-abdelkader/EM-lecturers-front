@@ -1,5 +1,6 @@
-import { lazy, Suspense } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Suspense } from "react";
+import { lazyWithRetry } from "../utils/lazyWithRetry";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 // Hooks & Utils (خفيفة — تبقى eager)
 import UserType from "../Hooks/auth/userType";
@@ -11,224 +12,218 @@ import {
   TenantPublicNotFoundRoute,
 } from "../pages/tenantPublic/TenantPublicRoutes";
 import TenantSeoHead from "../pages/tenantPublic/components/TenantSeoHead";
+import RouteChunkLoader from "../components/loading/RouteChunkLoader";
 
 /*
  * كل الصفحات lazy — تُحمَّل عند فتحها فقط.
- * قبل كده كانت 127 صفحة بتتحمّل كلها مقدمًا فتأخر أول عرض جدًا.
+ * lazyWithRetry: إعادة محاولة + reload تلقائي عند فشل chunk (PWA/كاش قديم).
  */
+const lazyPage = lazyWithRetry;
 
 // Auth & Login
-const SingUp = lazy(() => import("../pages/signup/SingUp"));
-const WelcomePage = lazy(() => import("../pages/signup/WelcomePage"));
-const LoginPage = lazy(() => import("../pages/login/LoginPage"));
-const TeacherLoginPage = lazy(() => import("../pages/login/TeacherLoginPage"));
-const VerifyCode = lazy(() => import("../pages/password/VerifyCode"));
-const ResetPassword = lazy(() => import("../pages/password/ResetPassword"));
+const SingUp = lazyPage(() => import("../pages/signup/SingUp"));
+const WelcomePage = lazyPage(() => import("../pages/signup/WelcomePage"));
+const LoginPage = lazyPage(() => import("../pages/login/LoginPage"));
+const TeacherLoginPage = lazyPage(() => import("../pages/login/TeacherLoginPage"));
+const VerifyCode = lazyPage(() => import("../pages/password/VerifyCode"));
+const ResetPassword = lazyPage(() => import("../pages/password/ResetPassword"));
 
 // Main Pages
-const Home = lazy(() => import("../pages/home/Home"));
-const HomePage = lazy(() => import("../pages/homePage/HomePage"));
-const HomeLogin = lazy(() => import("../pages/homeLogin/HomeLogin"));
-const LandingPage = lazy(() => import("../pages/landingPage/LandingPage"));
-const NotFound = lazy(() => import("../components/not found/NotFound"));
+const Home = lazyPage(() => import("../pages/home/Home"));
+const HomePage = lazyPage(() => import("../pages/homePage/HomePage"));
+const HomeLogin = lazyPage(() => import("../pages/homeLogin/HomeLogin"));
+const LandingPage = lazyPage(() => import("../pages/landingPage/LandingPage"));
+const NotFound = lazyPage(() => import("../components/not found/NotFound"));
 
 // Tenant root
-const TenantRootLayout = lazy(() =>
+const TenantRootLayout = lazyPage(() =>
   import("../pages/tenantPublic/TenantSubdomainRoot").then((m) => ({
     default: m.TenantRootLayout,
   }))
 );
-const TenantRootIndex = lazy(() =>
+const TenantRootIndex = lazyPage(() =>
   import("../pages/tenantPublic/TenantSubdomainRoot").then((m) => ({
     default: m.TenantRootIndex,
   }))
 );
 
 // Admin
-const Admin = lazy(() => import("../pages/Admin/Admin"));
-const AdminMange = lazy(() => import("../components/admin/AdminMange"));
-const AdminCreateCode = lazy(() => import("../components/admin/AdminCreateCode"));
-const AdminActivationCodes = lazy(() => import("../components/admin/AdminActivationCodes"));
-const AdminTeacherBalances = lazy(() => import("../components/admin/AdminTeacherBalances"));
-const AddTeacher = lazy(() => import("../components/admin/AddTeacher"));
-const AddEmployees = lazy(() => import("../components/admin/AddEmployees"));
-const MangeEmployees = lazy(() =>
+const Admin = lazyPage(() => import("../pages/Admin/Admin"));
+const AdminMange = lazyPage(() => import("../components/admin/AdminMange"));
+const AdminCreateCode = lazyPage(() => import("../components/admin/AdminCreateCode"));
+const AdminActivationCodes = lazyPage(() => import("../components/admin/AdminActivationCodes"));
+const AdminTeacherBalances = lazyPage(() => import("../components/admin/AdminTeacherBalances"));
+const AddTeacher = lazyPage(() => import("../components/admin/AddTeacher"));
+const AddEmployees = lazyPage(() => import("../components/admin/AddEmployees"));
+const MangeEmployees = lazyPage(() =>
   import("../components/admin/MangeEmployees").then((m) => ({
     default: m.MangeEmployees,
   }))
 );
-const OpenPhone = lazy(() => import("../components/admin/OpenPhone"));
-const CreateComp = lazy(() => import("../components/admin/CreateComp"));
-const AllComps = lazy(() => import("../components/admin/AllComps"));
-const PackagesManagement = lazy(() => import("../components/admin/PackagesManagement"));
-const PackageDetails = lazy(() => import("../pages/package/PackageDetails"));
-const SubjectDetails = lazy(() => import("../pages/package/SubjectDetails"));
-const GroupDetails = lazy(() => import("../pages/package/GroupDetails"));
-const AssignmentQuestions = lazy(() => import("../pages/package/AssignmentQuestions"));
-const AdminStreamsList = lazy(() => import("../components/stream/adminList"));
-const GeneralCourses = lazy(() => import("../components/admin/GeneralCourses"));
-const GeneralCourseDetailsPage = lazy(() => import("../pages/generalCourse/GeneralCourseDetailsPage"));
-const GeneralCourseGroupPage = lazy(() => import("../pages/generalCourse/GeneralCourseGroupPage"));
+const OpenPhone = lazyPage(() => import("../components/admin/OpenPhone"));
+const CreateComp = lazyPage(() => import("../components/admin/CreateComp"));
+const AllComps = lazyPage(() => import("../components/admin/AllComps"));
+const PackagesManagement = lazyPage(() => import("../components/admin/PackagesManagement"));
+const PackageDetails = lazyPage(() => import("../pages/package/PackageDetails"));
+const SubjectDetails = lazyPage(() => import("../pages/package/SubjectDetails"));
+const GroupDetails = lazyPage(() => import("../pages/package/GroupDetails"));
+const AssignmentQuestions = lazyPage(() => import("../pages/package/AssignmentQuestions"));
+const AdminStreamsList = lazyPage(() => import("../components/stream/adminList"));
+const GeneralCourses = lazyPage(() => import("../components/admin/GeneralCourses"));
+const GeneralCourseDetailsPage = lazyPage(() => import("../pages/generalCourse/GeneralCourseDetailsPage"));
+const GeneralCourseGroupPage = lazyPage(() => import("../pages/generalCourse/GeneralCourseGroupPage"));
 
 // Student
-const Profile = lazy(() => import("../pages/profile/Profile"));
-const Wallet = lazy(() => import("../pages/wallet/Wallet"));
-const TeacherWallet = lazy(() => import("../pages/wallet/TeacherWallet"));
-const TeacherDetails = lazy(() => import("../pages/teacher/TeacherDetails"));
-const Vedio = lazy(() => import("../pages/leacter/Vedio"));
-const AllTeacherLogin = lazy(() => import("../components/teacher/AllTeacherLogin"));
-const MyTeacher = lazy(() => import("../pages/myTeacher/MyTeacher"));
-const SuggestedTeachers = lazy(() => import("../pages/suggested-teachers/SuggestedTeachers"));
-const TeacherStudents = lazy(() => import("../pages/teacher/TeacherStudents"));
-const ManagedStudentsPage = lazy(() => import("../pages/teacher/managedStudents/ManagedStudentsPage"));
-const StudentReport = lazy(() => import("../pages/teacher/StudentReport"));
-const PlatformStudents = lazy(() => import("../pages/teacher/PlatformStudents"));
-const TeacherWhatsAppPage = lazy(() => import("../pages/teacher/TeacherWhatsAppPage"));
+const Profile = lazyPage(() => import("../pages/profile/Profile"));
+const Wallet = lazyPage(() => import("../pages/wallet/Wallet"));
+const TeacherWallet = lazyPage(() => import("../pages/wallet/TeacherWallet"));
+const TeacherDetails = lazyPage(() => import("../pages/teacher/TeacherDetails"));
+const Vedio = lazyPage(() => import("../pages/leacter/Vedio"));
+const AllTeacherLogin = lazyPage(() => import("../components/teacher/AllTeacherLogin"));
+const MyTeacher = lazyPage(() => import("../pages/myTeacher/MyTeacher"));
+const SuggestedTeachers = lazyPage(() => import("../pages/suggested-teachers/SuggestedTeachers"));
+const TeacherStudents = lazyPage(() => import("../pages/teacher/TeacherStudents"));
+const ManagedStudentsPage = lazyPage(() => import("../pages/teacher/managedStudents/ManagedStudentsPage"));
+const StudentReport = lazyPage(() => import("../pages/teacher/StudentReport"));
+const PlatformStudents = lazyPage(() => import("../pages/teacher/PlatformStudents"));
+const TeacherWhatsAppPage = lazyPage(() => import("../pages/teacher/TeacherWhatsAppPage"));
 
 // Center Management
-const CenterLayout = lazy(() => import("../pages/centerMgmt/components/CenterLayout"));
-const CenterDashboardPage = lazy(() => import("../pages/centerMgmt/CenterDashboardPage"));
-const GroupsPage = lazy(() => import("../pages/centerMgmt/GroupsPage"));
-const GroupDetailsPage = lazy(() => import("../pages/centerMgmt/GroupDetailsPage"));
-const StudentsPage = lazy(() => import("../pages/centerMgmt/StudentsPage"));
-const StudentDetailsPage = lazy(() => import("../pages/centerMgmt/StudentDetailsPage"));
-const AttendancePage = lazy(() => import("../pages/centerMgmt/AttendancePage"));
-const SubscriptionsPage = lazy(() => import("../pages/centerMgmt/SubscriptionsPage"));
-const PaymentsPage = lazy(() => import("../pages/centerMgmt/PaymentsPage"));
+const CenterLayout = lazyPage(() => import("../pages/centerMgmt/components/CenterLayout"));
+const CenterDashboardPage = lazyPage(() => import("../pages/centerMgmt/CenterDashboardPage"));
+const GroupsPage = lazyPage(() => import("../pages/centerMgmt/GroupsPage"));
+const GroupDetailsPage = lazyPage(() => import("../pages/centerMgmt/GroupDetailsPage"));
+const StudentsPage = lazyPage(() => import("../pages/centerMgmt/StudentsPage"));
+const StudentDetailsPage = lazyPage(() => import("../pages/centerMgmt/StudentDetailsPage"));
+const AttendancePage = lazyPage(() => import("../pages/centerMgmt/AttendancePage"));
+const SubscriptionsPage = lazyPage(() => import("../pages/centerMgmt/SubscriptionsPage"));
+const PaymentsPage = lazyPage(() => import("../pages/centerMgmt/PaymentsPage"));
 
 // Exams
-const Exam = lazy(() => import("../pages/exam/Exam"));
-const ExamTeacher = lazy(() => import("../pages/exam/ExamTeacher"));
-const ComprehensiveExam = lazy(() => import("../pages/exam/ComprehensiveExam"));
-const ExamGrades = lazy(() => import("../pages/exam/ExamGrades"));
-const TeacherAnalyticsIntelligence = lazy(() => import("../pages/analytics/TeacherAnalyticsIntelligence"));
-const TeacherMyFilesPage = lazy(() => import("../pages/myFiles/TeacherMyFilesPage"));
-const TeacherAssignmentsPage = lazy(() => import("../pages/assignments/TeacherAssignmentsPage"));
-const TeacherCourseExamsPage = lazy(() => import("../pages/exams/TeacherCourseExamsPage"));
-const TeacherFreeLecturesPage = lazy(() => import("../pages/freeLectures/TeacherFreeLecturesPage"));
-const TeacherDailyQuizzesPage = lazy(() => import("../pages/dailyQuiz/TeacherDailyQuizzesPage"));
-const TeacherDailyQuizDetailPage = lazy(() =>
+const Exam = lazyPage(() => import("../pages/exam/Exam"));
+const ExamTeacher = lazyPage(() => import("../pages/exam/ExamTeacher"));
+const ComprehensiveExam = lazyPage(() => import("../pages/exam/ComprehensiveExam"));
+const ExamReportPage = lazyPage(() => import("../pages/exam/ExamReportPage"));
+const ExamGrades = lazyPage(() => import("../pages/exam/ExamGrades"));
+const TeacherAnalyticsIntelligence = lazyPage(() => import("../pages/analytics/TeacherAnalyticsIntelligence"));
+const TeacherMyFilesPage = lazyPage(() => import("../pages/myFiles/TeacherMyFilesPage"));
+const TeacherCourseGroupsPage = lazyPage(() => import("../pages/teacher/CourseGroupsPage"));
+const TeacherAssignmentsPage = lazyPage(() => import("../pages/assignments/TeacherAssignmentsPage"));
+const TeacherCourseExamsPage = lazyPage(() => import("../pages/exams/TeacherCourseExamsPage"));
+const TeacherFreeLecturesPage = lazyPage(() => import("../pages/freeLectures/TeacherFreeLecturesPage"));
+const TeacherDailyQuizzesPage = lazyPage(() => import("../pages/dailyQuiz/TeacherDailyQuizzesPage"));
+const TeacherDailyQuizDetailPage = lazyPage(() =>
   import("../pages/dailyQuiz/TeacherDailyQuizDetailPage"),
 );
-const StudentDailyQuizzesHomePage = lazy(() =>
+const StudentDailyQuizzesHomePage = lazyPage(() =>
   import("../pages/dailyQuiz/StudentDailyQuizzesHomePage"),
 );
-const StudentDailyQuizPlayPage = lazy(() =>
+const StudentDailyQuizPlayPage = lazyPage(() =>
   import("../pages/dailyQuiz/StudentDailyQuizPlayPage"),
 );
-const StudentDailyQuizResultPage = lazy(() =>
+const StudentDailyQuizResultPage = lazyPage(() =>
   import("../pages/dailyQuiz/StudentDailyQuizResultPage"),
 );
-const StudentDailyQuizLeaderboardPage = lazy(() =>
+const StudentDailyQuizLeaderboardPage = lazyPage(() =>
   import("../pages/dailyQuiz/StudentDailyQuizLeaderboardPage"),
 );
-const StudentDailyQuizHubPage = lazy(() =>
+const StudentDailyQuizHubPage = lazyPage(() =>
   import("../pages/dailyQuiz/StudentDailyQuizHubPage"),
 );
-const ScientificChatPage = lazy(() => import("../pages/scientificChat/ScientificChatPage"));
-const ScientificTeacherFilesPage = lazy(() => import("../pages/scientificChat/ScientificTeacherFilesPage"));
-const ExamBuilderChatPage = lazy(() => import("../pages/examBuilder/ExamBuilderChatPage"));
-const PlatformExams = lazy(() => import("../pages/PlatformExams/PlatformExams"));
-const EssayExam = lazy(() => import("../pages/exam/EssayExam"));
+const ScientificChatPage = lazyPage(() => import("../pages/scientificChat/ScientificChatPage"));
+const ScientificTeacherFilesPage = lazyPage(() => import("../pages/scientificChat/ScientificTeacherFilesPage"));
+const ExamBuilderChatPage = lazyPage(() => import("../pages/examBuilder/ExamBuilderChatPage"));
+const PlatformExams = lazyPage(() => import("../pages/PlatformExams/PlatformExams"));
+const EssayExam = lazyPage(() => import("../pages/exam/EssayExam"));
 
 // Question Bank
-const QuestionBank = lazy(() => import("../pages/Question Bank/QuestionBank"));
-const ChapterQuestion = lazy(() => import("../pages/Question Bank/ChapterQuestion"));
-const SubjectPage = lazy(() => import("../pages/Question Bank/SubjectPage"));
-const QuestionsPage = lazy(() => import("../pages/Question Bank/QuestionsPage"));
-const QuestionBankDashboard = lazy(() => import("../pages/Question Bank/QuestionBankDashboard"));
-const QuestionLibraryPage = lazy(() => import("../pages/Question Bank/QuestionLibraryPage"));
-const QuestionLibraryLessonPage = lazy(() => import("../pages/Question Bank/QuestionLibraryLessonPage"));
-const Lesson = lazy(() => import("../pages/Question Bank/Lesson"));
-const TeacherSubject = lazy(() => import("../pages/Question Bank/TeacherSubject"));
+const QuestionBank = lazyPage(() => import("../pages/Question Bank/QuestionBank"));
+const ChapterQuestion = lazyPage(() => import("../pages/Question Bank/ChapterQuestion"));
+const SubjectPage = lazyPage(() => import("../pages/Question Bank/SubjectPage"));
+const QuestionsPage = lazyPage(() => import("../pages/Question Bank/QuestionsPage"));
+const QuestionBankDashboard = lazyPage(() => import("../pages/Question Bank/QuestionBankDashboard"));
+const QuestionLibraryPage = lazyPage(() => import("../pages/Question Bank/QuestionLibraryPage"));
+const QuestionLibraryLessonPage = lazyPage(() => import("../pages/Question Bank/QuestionLibraryLessonPage"));
+const Lesson = lazyPage(() => import("../pages/Question Bank/Lesson"));
+const TeacherSubject = lazyPage(() => import("../pages/Question Bank/TeacherSubject"));
 
 // Competitions
-const Competitions = lazy(() => import("../pages/competitions/Competitions"));
-const CompetitionDetails = lazy(() => import("../pages/competitions/CompetitionDetails"));
-const TheFirsts = lazy(() => import("../pages/theFirsts/TheFirsts"));
+const Competitions = lazyPage(() => import("../pages/competitions/Competitions"));
+const CompetitionDetails = lazyPage(() => import("../pages/competitions/CompetitionDetails"));
+const TheFirsts = lazyPage(() => import("../pages/theFirsts/TheFirsts"));
 
 // Courses
-const TeacherCourses = lazy(() => import("../pages/teacherCourses/TeacherCourses"));
-const AllCourses = lazy(() => import("../pages/teacherCourses/AllCourses"));
-const CourseDetailsPage = lazy(() => import("../pages/course/CourseDetailsPage"));
-const CourseStatisticsPage = lazy(() => import("../pages/course/CourseStatisticsPage"));
-const CourseStatistics = lazy(() => import("../pages/courseStatistics/CourseStatistics"));
-const CourseStudentsPage = lazy(() => import("../pages/course/CourseStudentsPage"));
+const TeacherCourses = lazyPage(() => import("../pages/teacherCourses/TeacherCourses"));
+const AllCourses = lazyPage(() => import("../pages/teacherCourses/AllCourses"));
+const CourseDetailsPage = lazyPage(() => import("../pages/course/CourseDetailsPage"));
+const CourseFileViewPage = lazyPage(() => import("../pages/course/CourseFileViewPage"));
+const CourseStatisticsPage = lazyPage(() => import("../pages/course/CourseStatisticsPage"));
+const CourseStatistics = lazyPage(() => import("../pages/courseStatistics/CourseStatistics"));
+const CourseStudentsPage = lazyPage(() => import("../pages/course/CourseStudentsPage"));
 
 // Chat & Support
-const ChatPage = lazy(() => import("../pages/chat/ChatPage"));
-const TeacherChat = lazy(() => import("../pages/chat/TeacherChatPage"));
-const ChatbotPage = lazy(() => import("../pages/chatbot/ChatbotPage"));
-const TeamChat = lazy(() => import("../pages/teamChatPage/TeamChat"));
-const SupportChatAdmin = lazy(() => import("../pages/support/SupportChatAdmin"));
-const SupportChatTeacher = lazy(() => import("../pages/support/SupportChatTeacher"));
-const SupportGuestPage = lazy(() => import("../pages/support/SupportGuestPage"));
-const SupportEntry = lazy(() => import("../pages/support/SupportEntry"));
+const ChatPage = lazyPage(() => import("../pages/chat/ChatPage"));
+const TeacherChat = lazyPage(() => import("../pages/chat/TeacherChatPage"));
+const ChatbotPage = lazyPage(() => import("../pages/chatbot/ChatbotPage"));
+const TeamChat = lazyPage(() => import("../pages/teamChatPage/TeamChat"));
+const SupportChatAdmin = lazyPage(() => import("../pages/support/SupportChatAdmin"));
+const SupportChatTeacher = lazyPage(() => import("../pages/support/SupportChatTeacher"));
+const SupportGuestPage = lazyPage(() => import("../pages/support/SupportGuestPage"));
+const SupportEntry = lazyPage(() => import("../pages/support/SupportEntry"));
 
 // Other Pages
-const Code = lazy(() => import("../pages/code/Code"));
-const TeacherCode = lazy(() => import("../pages/code/TeacherCode"));
-const StudentStats = lazy(() => import("../pages/myStatistics/MyStatistics"));
-const AllUsers = lazy(() => import("../pages/allUsers/AllUsers"));
-const TasksPage = lazy(() => import("../pages/tasks/TasksPage"));
-const AllStudents = lazy(() => import("../pages/allStudents/AllStudents"));
-const LecturCommints = lazy(() => import("../pages/lecturCommints/LecturCommints"));
-const Social = lazy(() => import("../pages/social/Social"));
-const PlatfourmLeagues = lazy(() => import("../pages/league/PlatfourmLeagues"));
-const League = lazy(() => import("../pages/league/League"));
-const Match = lazy(() => import("../pages/league/Match"));
-const LecturesSchedule = lazy(() => import("../pages/lecturesSchedule/LecturesSchedule"));
-const FinanceManagementPage = lazy(() => import("../pages/finance/FinanceManagementPage"));
-const AdminAllStudentsPage = lazy(() => import("../pages/Admin/AdminAllStudentsPage"));
-const WhatsAppSessionsPage = lazy(() => import("../pages/Admin/whatsapp/WhatsAppSessionsPage"));
-const WhatsAppServicesPage = lazy(() => import("../pages/Admin/whatsapp/WhatsAppServicesPage"));
-const WhatsAppMonitorPage = lazy(() => import("../pages/Admin/whatsapp/WhatsAppMonitorPage"));
-const WhatsAppInboxPage = lazy(() => import("../pages/Admin/whatsapp/WhatsAppInboxPage"));
-const TeacherInvoicesPage = lazy(() => import("../pages/teacher/TeacherInvoicesPage"));
-const AdminDashboardHome = lazy(() => import("../pages/home/AdminDashboardHome"));
-const TeacherDashboardHome = lazy(() => import("../pages/home/TeacherDashboardHome"));
-const GlobalSearchPage = lazy(() => import("../pages/search/GlobalSearchPage"));
-const ChallengeEMAcademy = lazy(() => import("../pages/challengeEMAcademy/ChallengeEMAcademy"));
-const LecturesTaple = lazy(() => import("../pages/lecturesTaple/LecturesTaple"));
-const MeetingRoom = lazy(() => import("../pages/meeting/MeetingRoom"));
-const MyEnrollmentsPage = lazy(() => import("../pages/myEnrollments/MyEnrollmentsPage"));
-const NotificationCenterPage = lazy(() => import("../pages/notifications/NotificationCenterPage"));
-
-/* مؤشر تحميل خفيف يظهر أثناء جلب كود الصفحة أول مرة فقط */
-const RouteFallback = () => (
-  <div
-    role="status"
-    aria-label="جاري التحميل"
-    style={{
-      minHeight: "60vh",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-    }}
-  >
-    <span
-      style={{
-        width: 40,
-        height: 40,
-        borderRadius: "50%",
-        border: "3px solid rgba(0,160,227,0.2)",
-        borderTopColor: "#00a0e3",
-        display: "inline-block",
-        animation: "em-route-spin 0.8s linear infinite",
-      }}
-    />
-    <style>{`@keyframes em-route-spin { to { transform: rotate(360deg); } }`}</style>
-  </div>
+const Code = lazyPage(() => import("../pages/code/Code"));
+const TeacherCode = lazyPage(() => import("../pages/code/TeacherCode"));
+const StudentStats = lazyPage(() => import("../pages/myStatistics/MyStatistics"));
+const AllUsers = lazyPage(() => import("../pages/allUsers/AllUsers"));
+const TasksPage = lazyPage(() => import("../pages/tasks/TasksPage"));
+const AllStudents = lazyPage(() => import("../pages/allStudents/AllStudents"));
+const LecturCommints = lazyPage(() => import("../pages/lecturCommints/LecturCommints"));
+const Social = lazyPage(() => import("../pages/social/Social"));
+const PlatfourmLeagues = lazyPage(() => import("../pages/league/PlatfourmLeagues"));
+const League = lazyPage(() => import("../pages/league/League"));
+const Match = lazyPage(() => import("../pages/league/Match"));
+const LecturesSchedule = lazyPage(() => import("../pages/lecturesSchedule/LecturesSchedule"));
+const FinanceManagementPage = lazyPage(() => import("../pages/finance/FinanceManagementPage"));
+const AdminAllStudentsPage = lazyPage(() => import("../pages/Admin/AdminAllStudentsPage"));
+const WhatsAppSessionsPage = lazyPage(() => import("../pages/Admin/whatsapp/WhatsAppSessionsPage"));
+const WhatsAppServicesPage = lazyPage(() => import("../pages/Admin/whatsapp/WhatsAppServicesPage"));
+const WhatsAppMonitorPage = lazyPage(() => import("../pages/Admin/whatsapp/WhatsAppMonitorPage"));
+const WhatsAppInboxPage = lazyPage(() => import("../pages/Admin/whatsapp/WhatsAppInboxPage"));
+const TeacherInvoicesPage = lazyPage(() => import("../pages/teacher/TeacherInvoicesPage"));
+const AdminDashboardHome = lazyPage(() => import("../pages/home/AdminDashboardHome"));
+const TeacherDashboardHome = lazyPage(() => import("../pages/home/TeacherDashboardHome"));
+const GlobalSearchPage = lazyPage(() => import("../pages/search/GlobalSearchPage"));
+const ChallengeEMAcademy = lazyPage(() => import("../pages/challengeEMAcademy/ChallengeEMAcademy"));
+const AcademyOverviewPage = lazyPage(() => import("../pages/academy/AcademyOverviewPage"));
+const AcademyTeachersPage = lazyPage(() => import("../pages/academy/AcademyTeachersPage"));
+const AcademyCoursesPage = lazyPage(() => import("../pages/academy/AcademyCoursesPage"));
+const AcademyTeacherHomePage = lazyPage(() => import("../pages/academy/AcademyTeacherHomePage"));
+const AcademyTeacherCoursesPage = lazyPage(() => import("../pages/academy/AcademyTeacherCoursesPage"));
+const AcademyOwnerShell = lazyPage(() =>
+  import("../pages/academy/components/AcademyShell").then((m) => ({
+    default: m.AcademyOwnerShell,
+  })),
 );
+const AcademyTeacherShell = lazyPage(() =>
+  import("../pages/academy/components/AcademyShell").then((m) => ({
+    default: m.AcademyTeacherShell,
+  })),
+);
+const LecturesTaple = lazyPage(() => import("../pages/lecturesTaple/LecturesTaple"));
+const MeetingRoom = lazyPage(() => import("../pages/meeting/MeetingRoom"));
+const MyEnrollmentsPage = lazyPage(() => import("../pages/myEnrollments/MyEnrollmentsPage"));
+const NotificationCenterPage = lazyPage(() => import("../pages/notifications/NotificationCenterPage"));
 
 const AppRouter = () => {
-  const [userData, isAdmin, isTeacher, student] = UserType();
+  const [userData, isAdmin, isTeacher, student, isAcademy, isAcademyTeacher] = UserType();
   const tenantSubdomain = getTenantSubdomain();
+  const isStaff = isAdmin || isTeacher || isAcademy || isAcademyTeacher;
 
   return (
     <div>
       {tenantSubdomain ? <TenantSeoHead subdomain={tenantSubdomain} /> : null}
-      <Suspense fallback={<RouteFallback />}>
+      <Suspense fallback={<RouteChunkLoader />}>
       <Routes>
         {/* Public Routes — على النطاق الفرعي للمستأجر: الرئيسية = لاندنج العميل؛ باقي المسارات (login, home, …) مشتركة لنفس الـ origin وللـ localStorage */}
         <Route
@@ -240,6 +235,9 @@ const AppRouter = () => {
           ) : null}
         </Route>
         <Route path="/landing" element={<LandingPage />} />
+        {!tenantSubdomain ? (
+          <Route path="/create-platform" element={<AddTeacher publicMode />} />
+        ) : null}
         <Route path="/support-guest" element={<SupportGuestPage />} />
         <Route path="/support" element={<SupportEntry />} />
         {!tenantSubdomain ? <Route path="/search" element={<GlobalSearchPage />} /> : null}
@@ -249,7 +247,7 @@ const AppRouter = () => {
         <Route
           path="/login"
           element={
-            <ProtectedLogin auth={isAdmin || student || isTeacher}>
+            <ProtectedLogin auth={isStaff || student}>
               <LoginPage />
             </ProtectedLogin>
           }
@@ -257,7 +255,7 @@ const AppRouter = () => {
         <Route
           path="/teacher-login"
           element={
-            <ProtectedLogin auth={isAdmin || student || isTeacher}>
+            <ProtectedLogin auth={isStaff || student}>
               <TeacherLoginPage />
             </ProtectedLogin>
           }
@@ -270,7 +268,7 @@ const AppRouter = () => {
         <Route
           path="/signup"
           element={
-            <ProtectedLogin auth={isAdmin || student || isTeacher}>
+            <ProtectedLogin auth={isStaff || student}>
               <SingUp />
             </ProtectedLogin>
           }
@@ -463,12 +461,48 @@ const AppRouter = () => {
           {/* Teacher Routes */}
 
         </Route>
+
+        {/* Academy Dashboard — مالك الأكاديمية */}
+        <Route
+          path="/academy"
+          element={
+            <ProtectedRoute auth={isAcademy}>
+              <AcademyOwnerShell />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<AcademyOverviewPage />} />
+          <Route path="teachers" element={<AcademyTeachersPage />} />
+          <Route path="courses" element={<AcademyCoursesPage />} />
+        </Route>
+
+        {/* Academy Teacher — مدرس تابع للأكاديمية */}
+        <Route
+          path="/academy/me"
+          element={
+            <ProtectedRoute auth={isAcademyTeacher}>
+              <AcademyTeacherShell />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<AcademyTeacherHomePage />} />
+          <Route path="courses" element={<AcademyTeacherCoursesPage />} />
+        </Route>
+
         <Route path="video/:videoId/:token?" element={<Vedio />} />
+        <Route
+          path="CourseDetailsPage/:courseId/file/:fileId"
+          element={
+            <ProtectedRoute auth={isAdmin || isTeacher || isAcademy || isAcademyTeacher || student}>
+              <CourseFileViewPage />
+            </ProtectedRoute>
+          }
+        />
         {/* Main App Routes */}
         <Route
           path="/*"
           element={
-            <ProtectedRoute auth={isAdmin || isTeacher || student}>
+            <ProtectedRoute auth={isAdmin || isTeacher || isAcademy || isAcademyTeacher || student}>
               <HomeLogin />
             </ProtectedRoute>
           }
@@ -479,6 +513,10 @@ const AppRouter = () => {
             element={
               isAdmin ? (
                 <AdminDashboardHome />
+              ) : isAcademy ? (
+                <Navigate to="/academy" replace />
+              ) : isAcademyTeacher ? (
+                <Navigate to="/academy/me" replace />
               ) : isTeacher ? (
                 <TeacherDashboardHome />
               ) : (
@@ -559,6 +597,7 @@ const AppRouter = () => {
           <Route path="exam/:examId" element={<Exam />} />
           <Route path="exam_grades" element={<ExamGrades />} />
           <Route path="teacher-analytics" element={<TeacherAnalyticsIntelligence />} />
+          <Route path="ComprehensiveExam/:id/report" element={<ExamReportPage />} />
           <Route path="ComprehensiveExam/:id" element={<ComprehensiveExam />} />
 
           {/* Leagues */}
@@ -614,7 +653,7 @@ const AppRouter = () => {
         </Route>
 
         {/* Teacher Specific Routes */}
-        <Route element={<ProtectedRoute auth={isTeacher || isAdmin} />}>
+        <Route element={<ProtectedRoute auth={isTeacher || isAcademyTeacher || isAdmin} />}>
           <Route path="teacher_wallet" element={<TeacherWallet />} />
           <Route path="teacher_code" element={<TeacherCode />} />
           <Route path="teacher_exam/:examId" element={<ExamTeacher />} />
@@ -637,6 +676,7 @@ const AppRouter = () => {
           <Route path="platform-students" element={<PlatformStudents />} />
           <Route path="support-teacher" element={<SupportChatTeacher />} />
           <Route path="teacher-my-files" element={<TeacherMyFilesPage />} />
+          <Route path="teacher-course-groups" element={<TeacherCourseGroupsPage />} />
           <Route path="teacher-assignments" element={<TeacherAssignmentsPage />} />
           <Route path="teacher-exams" element={<TeacherCourseExamsPage />} />
           <Route path="exam-builder-chat" element={<ExamBuilderChatPage />} />

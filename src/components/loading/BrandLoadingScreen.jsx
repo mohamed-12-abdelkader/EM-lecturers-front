@@ -1,90 +1,40 @@
-import React, { useEffect, useState } from "react";
-import { Box, Flex, Image, useColorModeValue } from "@chakra-ui/react";
+import React from "react";
+import { Box, Flex, Image, Text, useColorModeValue } from "@chakra-ui/react";
 import { motion } from "framer-motion";
-import { getTenantSubdomain } from "../../utils/tenantHost";
-import { fetchTenantPublic } from "../../api/tenantPublicApi";
-import {
-  readCachedTenantBrandLogo,
-  readDocumentTenantIcon,
-  resolveTenantBrandLogo,
-} from "../../utils/tenantBrandLogo";
+import useBrandLoading from "./useBrandLoading";
 
-const BRAND_LOGO = "/Picsart_25-08-26_23-28-39-014.png";
+const LOADING_HERO = "/images/brand-loading-hero.png";
 
 /**
- * شاشة تحميل بالبراند: لوجو في المنتصف + انيميشن انتظار + شريط تقدم تحت اللوجو.
- * على subdomain المدرس يعرض لوجو المدرس (favicon / avatar)، وإلا لوجو الشركة.
+ * شاشة تحميل بالبراند.
+ *
+ * - الاستخدام العادي (`return <BrandLoadingScreen />`): يفعّل الـ overlay الموحّد ولا يُرندر DOM محلي.
+ * - `overlay`: للـ host فقط — يُرندر واجهة التحميل فعلياً.
  *
  * @param {Object} props
- * @param {number} [props.progress] - اختياري: رقم 0–1 لشريط تحميل محدد؛ بدونه الشريط indeterminate (متحرك).
+ * @param {boolean} [props.overlay] - عرض الواجهة (Host).
+ * @param {number} [props.progress] - 0–1 لشريط تقدم محدد.
  */
-export default function BrandLoadingScreen({ progress }) {
+export default function BrandLoadingScreen({ overlay = false, progress }) {
+  useBrandLoading(!overlay);
+
+  if (!overlay) return null;
+  return <BrandLoadingScreenView progress={progress} />;
+}
+
+function BrandLoadingScreenView({ progress }) {
   const hasDeterminate = typeof progress === "number";
-  const trackBg = useColorModeValue("blue.50", "whiteAlpha.100");
   const screenBg = useColorModeValue("white", "gray.900");
-  const tenantSubdomain = getTenantSubdomain();
-
-  const [logoSrc, setLogoSrc] = useState(() => {
-    if (!tenantSubdomain) return BRAND_LOGO;
-    return (
-      readCachedTenantBrandLogo(tenantSubdomain) ||
-      readDocumentTenantIcon() ||
-      null
-    );
-  });
-  const [logoAlt, setLogoAlt] = useState(
-    tenantSubdomain ? tenantSubdomain : "EM Lectures",
-  );
-
-  useEffect(() => {
-    if (!tenantSubdomain) {
-      setLogoSrc(BRAND_LOGO);
-      setLogoAlt("EM Lectures");
-      return undefined;
-    }
-
-    // Instant from cache / current favicon while fetch runs
-    const instant =
-      readCachedTenantBrandLogo(tenantSubdomain) || readDocumentTenantIcon();
-    if (instant) setLogoSrc(instant);
-
-    let cancelled = false;
-    fetchTenantPublic(tenantSubdomain)
-      .then((res) => {
-        if (cancelled) return;
-        const tenant = res?.data?.tenant;
-        const teacher = res?.data?.teacher;
-        const icon = resolveTenantBrandLogo(tenant, teacher);
-        // Never fall back to company logo on a teacher platform
-        if (icon) setLogoSrc(icon);
-        setLogoAlt(
-          teacher?.name ||
-            tenant?.display_name ||
-            tenantSubdomain ||
-            "EM Lectures",
-        );
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setLogoAlt(tenantSubdomain || "EM Lectures");
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [tenantSubdomain]);
-
-  const NAVBAR_HEIGHT = 72;
+  const subText = useColorModeValue("gray.500", "gray.400");
+  const trackBg = useColorModeValue("blue.50", "whiteAlpha.200");
+  /** يُخفي الخلفية السوداء المدمجة في ملف PNG على الخلفية الفاتحة */
+  const heroBlend = useColorModeValue("screen", "normal");
 
   return (
     <Flex
       position="fixed"
-      top={`${NAVBAR_HEIGHT}px`}
-      left={0}
-      right={0}
-      bottom={0}
-      zIndex={900}
+      inset={0}
+      zIndex={9998}
       justify="center"
       align="center"
       direction="column"
@@ -100,38 +50,42 @@ export default function BrandLoadingScreen({ progress }) {
         right={0}
         bgGradient="linear(to-r, blue.500, orange.500)"
       />
+
       <motion.div
         style={{ display: "flex", flexDirection: "column", alignItems: "center" }}
-        initial={{ opacity: 0.9, scale: 1 }}
+        initial={{ opacity: 0.85, scale: 0.96 }}
         animate={{
-          opacity: [0.9, 1, 0.9],
-          scale: [1, 1.03, 1],
+          opacity: [0.88, 1, 0.88],
+          scale: [0.98, 1.02, 0.98],
         }}
         transition={{
-          duration: 1.6,
+          duration: 2,
           repeat: Infinity,
           ease: "easeInOut",
         }}
       >
-        {logoSrc ? (
+        <Box
+          boxSize={{ base: "220px", sm: "260px", md: "300px" }}
+          borderRadius="50%"
+          overflow="hidden"
+          mb={4}
+        >
           <Image
-            src={logoSrc}
-            alt={logoAlt}
-            maxH={{ base: "140px", md: "180px" }}
-            w="auto"
-            objectFit="contain"
-            mb={8}
+            src={LOADING_HERO}
+            alt="جاري التحميل"
+            w="full"
+            h="full"
+            objectFit="cover"
+            draggable={false}
+            userSelect="none"
+            bg="transparent"
+            mixBlendMode={heroBlend}
           />
-        ) : (
-          <Box
-            mb={8}
-            h={{ base: "100px", md: "120px" }}
-            w={{ base: "100px", md: "120px" }}
-            borderRadius="2xl"
-            bgGradient="linear(to-br, blue.400, orange.400)"
-            opacity={0.85}
-          />
-        )}
+        </Box>
+
+        <Text fontSize="sm" fontWeight="semibold" color={subText} mb={6}>
+          جاري التحميل…
+        </Text>
       </motion.div>
 
       <Box

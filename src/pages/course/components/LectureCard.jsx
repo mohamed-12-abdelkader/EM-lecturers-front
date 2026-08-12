@@ -6,6 +6,7 @@ import {
   Tooltip,
   useToast,
   Spinner,
+  useDisclosure,
 } from "@chakra-ui/react";
 import {
   FaLock,
@@ -23,6 +24,7 @@ import {
   FaRedo,
   FaChevronDown,
   FaClock,
+  FaKey,
 } from "react-icons/fa";
 import baseUrl from "../../../api/baseUrl";
 import { Link } from "react-router-dom";
@@ -41,6 +43,18 @@ import {
   lcTitle,
   lcTitleSm,
 } from "../courseTheme";
+import {
+  TOUR_COLLAPSE_LECTURE,
+  TOUR_EXPAND_LECTURE,
+} from "../../../utils/coursePageTour";
+import {
+  getAccessStatusMeta,
+  getLectureLockMessage,
+  LECTURE_ACCESS_MODE_LABELS,
+} from "../../../utils/lectureAccessUtils";
+import { LECTURE_ACCESS_MODES } from "../../../api/courseAccessApi";
+import LectureActivateCodeForm, { LectureActivationTimer } from "./LectureActivateCodeForm";
+import LectureActivationCodesModal from "./LectureActivationCodesModal";
 
 const EASE = [0.22, 1, 0.36, 1];
 
@@ -292,6 +306,10 @@ function AssignmentRow({
 const LectureCard = ({
   lecture,
   lectureIndex = 0,
+  lectureAccessMode = "always_open",
+  hideLectureAssignments = false,
+  onRefreshCourse,
+  isTourTarget = false,
   isTeacher,
   isAdmin,
   handleEditLecture,
@@ -304,6 +322,7 @@ const LectureCard = ({
   formatDate,
 }) => {
   const toast = useToast();
+  const codesModal = useDisclosure();
   const [expanded, setExpanded] = React.useState(false);
   const [visibilityLoading, setVisibilityLoading] = React.useState(false);
   const [isVisible, setIsVisible] = React.useState(lecture.is_visible ?? true);
@@ -364,6 +383,28 @@ const LectureCard = ({
     }
   }, [lecture.id, lecture.exam, lecture.assignments, lecture.exams, canManage]);
 
+  React.useEffect(() => {
+    if (!isTourTarget) return undefined;
+
+    const onExpand = (event) => {
+      const targetId = event?.detail?.lectureId;
+      if (targetId != null && String(lecture.id) === String(targetId)) {
+        setExpanded(true);
+      }
+    };
+
+    const onCollapse = () => {
+      setExpanded(false);
+    };
+
+    window.addEventListener(TOUR_EXPAND_LECTURE, onExpand);
+    window.addEventListener(TOUR_COLLAPSE_LECTURE, onCollapse);
+    return () => {
+      window.removeEventListener(TOUR_EXPAND_LECTURE, onExpand);
+      window.removeEventListener(TOUR_COLLAPSE_LECTURE, onCollapse);
+    };
+  }, [isTourTarget, lecture.id]);
+
   const progress = lecture.progress;
   const videosCount = progress?.total_videos ?? lecture.videos?.length ?? 0;
   const watchedVideos = progress?.watched_videos ?? lecture.videos?.filter((v) => v.is_watched).length ?? 0;
@@ -390,7 +431,19 @@ const LectureCard = ({
   const isLectureComplete =
     Boolean(progress?.all_videos_watched) && allAssignmentsPassed;
   const isLockedForViewer = Boolean(lecture.locked) && !canManage;
+  const accessStatus = lecture.access_status || (lecture.locked ? "locked" : "open");
+  const accessMeta = getAccessStatusMeta(accessStatus);
+  const needsActivationCode =
+    !canManage && accessStatus === "requires_activation_code";
+  const showActivationTimer =
+    !canManage && (accessStatus === "activated" || accessStatus === "open") && lecture.activation;
   const lectureDescription = lecture.description || lecture.objective || "";
+  const expiresLabel =
+    lecture.expires_at && lectureAccessMode === LECTURE_ACCESS_MODES.time_limited
+      ? formatDate
+        ? formatDate(lecture.expires_at)
+        : new Date(lecture.expires_at).toLocaleString("ar-EG")
+      : null;
 
   const openExamModal = (type, data = null) => {
     setExamModal({ isOpen: true, type, lectureId: lecture.id, data });
@@ -414,6 +467,7 @@ const LectureCard = ({
       transition={{ duration: 0.4, ease: EASE }}
       className={`${crCard} ${lcRoot} overflow-hidden`}
       dir="rtl"
+      data-tour-id={isTourTarget ? "course-lecture-card" : undefined}
     >
       {/* ── Header ── */}
       <div className="relative border-b border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900">
@@ -431,12 +485,25 @@ const LectureCard = ({
             <div className="min-w-0 flex-1 text-right">
               <div className="mb-1.5 flex flex-wrap items-center gap-1.5 sm:mb-2 sm:gap-2">
                 <span
-                  className={`rounded-full px-2 py-0.5 ${lcBadge} sm:px-2.5 ${
-                    lecture.locked ? "bg-slate-100 text-slate-600" : "bg-blue-50 text-blue-600"
-                  }`}
+                  className={`rounded-full px-2 py-0.5 ${lcBadge} sm:px-2.5 ${accessMeta.badgeClass}`}
                 >
-                  {lecture.locked ? "مغلق" : "مفتوح"}
+                  {canManage
+                    ? lecture.locked
+                      ? "مغلق للطلاب"
+                      : "مفتوح"
+                    : accessMeta.label}
                 </span>
+                {canManage && lectureAccessMode !== LECTURE_ACCESS_MODES.always_open ? (
+                  <span className={`rounded-full bg-violet-50 px-2 py-0.5 ${lcBadge} text-violet-600 sm:px-2.5 dark:bg-violet-950/40 dark:text-violet-400`}>
+                    {LECTURE_ACCESS_MODE_LABELS[lectureAccessMode]}
+                  </span>
+                ) : null}
+                {expiresLabel ? (
+                  <span className={`inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 ${lcBadge} text-amber-700 sm:px-2.5 dark:bg-amber-950/40 dark:text-amber-300`}>
+                    <FaClock className="text-[10px]" />
+                    ينتهي {expiresLabel}
+                  </span>
+                ) : null}
                 {canManage && (
                   <span className={`rounded-full px-2 py-0.5 ${lcBadge} sm:px-2.5 ${isVisible ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-500"}`}>
                     {isVisible ? "ظاهر" : "مخفي"}
@@ -460,7 +527,7 @@ const LectureCard = ({
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                   <FaTasks className="text-[10px] text-orange-500" />
-                  {assignmentsCount} واجب
+                  {hideLectureAssignments ? "واجبات الكورس" : `${assignmentsCount} واجب`}
                 </span>
               </div>
 
@@ -517,6 +584,19 @@ const LectureCard = ({
                     onClick={handleToggleVisibility}
                   />
                 </Tooltip>
+                {lectureAccessMode === LECTURE_ACCESS_MODES.activation_code ? (
+                  <Tooltip label="أكواد التفعيل">
+                    <IconButton
+                      aria-label="أكواد التفعيل"
+                      icon={<FaKey />}
+                      size="sm"
+                      colorScheme="purple"
+                      variant="ghost"
+                      borderRadius="xl"
+                      onClick={codesModal.onOpen}
+                    />
+                  </Tooltip>
+                ) : null}
               </div>
             )}
           </div>
@@ -537,20 +617,38 @@ const LectureCard = ({
             <div className="bg-slate-50 p-3.5 dark:bg-slate-950/50 sm:p-5">
               {isLockedForViewer ? (
                 <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center sm:flex-row sm:items-center sm:gap-4 sm:p-6 sm:text-right dark:border-slate-600 dark:bg-slate-900">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-500 text-white sm:h-14 sm:w-14">
-                    <FaLock className="text-lg sm:text-xl" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className={`${lcTitleSm} text-slate-800 dark:text-slate-200`}>هذه المحاضرة مغلقة</p>
-                    <p className={`mt-1 ${lcBodySm}`}>
-                      أكمل كل واجبات المحاضرات السابقة بنجاح لفتح هذا المحتوى.
-                    </p>
-                  </div>
+                  {needsActivationCode ? (
+                    <div className="w-full max-w-md space-y-3 text-right">
+                      <LectureActivateCodeForm
+                        onActivated={() => onRefreshCourse?.()}
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-500 text-white sm:h-14 sm:w-14">
+                        <FaLock className="text-lg sm:text-xl" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className={`${lcTitleSm} text-slate-800 dark:text-slate-200`}>
+                          {accessMeta.label}
+                        </p>
+                        <p className={`mt-1 ${lcBodySm}`}>
+                          {getLectureLockMessage(lecture)}
+                        </p>
+                        {showActivationTimer ? (
+                          <LectureActivationTimer activation={lecture.activation} />
+                        ) : null}
+                      </div>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-6">
                   {/* الفيديوهات */}
-                  <section className="space-y-3">
+                  <section
+                    className="space-y-3"
+                    data-tour-id={isTourTarget ? "course-lecture-videos" : undefined}
+                  >
                     <SectionHeading
                       icon={FaVideo}
                       label="الفيديوهات"
@@ -589,8 +687,11 @@ const LectureCard = ({
                   </section>
 
                   {/* الواجبات */}
-                  {(canManage || hasAssignments) && (
-                    <section className="space-y-3">
+                  {!hideLectureAssignments && (canManage || hasAssignments) && (
+                    <section
+                      className="space-y-3"
+                      data-tour-id={isTourTarget ? "course-lecture-assignments" : undefined}
+                    >
                       <SectionHeading
                         icon={FaTasks}
                         label="الواجبات"
@@ -664,6 +765,12 @@ const LectureCard = ({
           </motion.div>
         )}
       </AnimatePresence>
+
+      <LectureActivationCodesModal
+        isOpen={codesModal.isOpen}
+        onClose={codesModal.onClose}
+        lecture={lecture}
+      />
     </motion.article>
   );
 };

@@ -1,4 +1,5 @@
 import { buildTenantPublicUrl } from "./tenantHost";
+import { resolvePublicImageUrl } from "./highQualityImageUrl";
 
 const SEO_ATTR = "data-tenant-dynamic-seo";
 
@@ -32,6 +33,9 @@ function robotsContent(robots) {
 }
 
 function absoluteUrl(url, canonicalBase) {
+  const resolved = resolvePublicImageUrl(url);
+  if (resolved) return resolved;
+
   if (!url) return "";
   const raw = String(url).trim();
   if (!raw) return "";

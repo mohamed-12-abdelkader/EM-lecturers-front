@@ -53,7 +53,7 @@ import { motion } from "framer-motion";
 import UserType from "../../Hooks/auth/userType";
 import baseUrl from "../../api/baseUrl";
 import { getTenantSubdomain } from "../../utils/tenantHost";
-import { getSocketEndpoint } from "../../utils/socketEndpoint";
+import { getSocketEndpoint, getSocketClientOptions } from "../../utils/socketEndpoint";
 import {
   hasValidAuthSession,
   markSessionExpired,
@@ -63,14 +63,16 @@ import { safeLocalGet } from "../../utils/safeStorage";
 import { Html5Qrcode } from "html5-qrcode";
 import { io } from "socket.io-client";
 import { Howl } from "howler";
-import MyCourses from "../../components/courses/MyCourses";
 import MyTeacher from "../myTeacher/MyTeacher";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import ScientificChatPanel from "../../components/scientificChat/ScientificChatPanel";
 import HomeProHero from "./components/HomeProHero";
-import HomeProStats from "./components/HomeProStats";
 import HomeProQuickActions from "./components/HomeProQuickActions";
-import HomePlatformCourseCard from "./components/HomePlatformCourseCard";
+import HomeProMyCourses from "./components/HomeProMyCourses";
+import HomeProPlatformCourses from "./components/HomeProPlatformCourses";
+import StudentHomeTour from "../../components/onboarding/StudentHomeTour";
+import StudentCourseGroupGate from "../../components/courseGroups/StudentCourseGroupGate";
+import { shouldShowStudentHomeTour } from "../../utils/studentHomeTour";
 
 const MotionBox = motion(Box);
 const MotionCard = motion(Card);
@@ -107,7 +109,7 @@ const HomePage = () => {
   const { isOpen, onOpen, onClose } = useDisclosure(); // For course activation modal
   const invitationModal = useDisclosure(); // For game invite
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
-  const [userData] = UserType();
+  const [userData, isAdmin, isTeacher, student] = UserType();
   const navigate = useNavigate();
   const location = useLocation();
   const [sessionReady, setSessionReady] = useState(() => hasValidAuthSession());
@@ -143,6 +145,8 @@ const HomePage = () => {
   const [teacherDisplayName, setTeacherDisplayName] = useState("");
   const [teacherAvatar, setTeacherAvatar] = useState("");
   const [availableCourses, setAvailableCourses] = useState([]);
+  const [homeTourOpen, setHomeTourOpen] = useState(false);
+  const [coursesRefreshKey, setCoursesRefreshKey] = useState(0);
 
   const authHeader = useMemo(() => buildAuthHeader(), [token, sessionReady]);
   const toast = useToast();
@@ -162,6 +166,13 @@ const HomePage = () => {
     markSessionExpired();
   }, []);
 
+  // جولة تعريفية للطالب الجديد بعد إنشاء الحساب
+  useEffect(() => {
+    if (!sessionReady || !student) return undefined;
+    if (!shouldShowStudentHomeTour()) return undefined;
+    const timer = window.setTimeout(() => setHomeTourOpen(true), 700);
+    return () => window.clearTimeout(timer);
+  }, [sessionReady, student]);
 
   const formatDateTime = (dateStr) => {
     if (!dateStr) return "";
@@ -733,13 +744,9 @@ const HomePage = () => {
     let socket;
     try {
       const tokenOnly = readAuthToken();
-      socket = io(getSocketEndpoint(), {
-        path: "/socket.io",
-        withCredentials: true,
+      socket = io(getSocketEndpoint(), getSocketClientOptions({
         auth: tokenOnly ? { token: tokenOnly } : {},
-        transports: ["websocket", "polling"],
-        reconnection: true,
-      });
+      }));
       socketRef.current = socket;
     } catch (e) {
       console.warn("Socket init skipped:", e);
@@ -832,7 +839,7 @@ const HomePage = () => {
     return () => {
       mounted = false;
     };
-  }, [tenantSubdomain, sessionReady]);
+  }, [tenantSubdomain, sessionReady, coursesRefreshKey]);
 
   // --- UI Styling (براند: blue.500 & orange.500) ---
   const mainLinks = [
@@ -905,7 +912,7 @@ const HomePage = () => {
   const availableToJoin = availableCourses.filter((c) => !c?.is_enrolled).length;
   const studentId =
     user?.id ?? userData?.id ?? user?.student_id ?? userData?.student_id ?? null;
-  const pageBgColor = useColorModeValue("#F7FAFC", "gray.950");
+  const pageBgColor = useColorModeValue("#F8FAFC", "gray.950");
   const courseCardShadow = useColorModeValue(
     "0 8px 28px -14px rgba(26,32,44,0.18)",
     "0 12px 32px rgba(0,0,0,0.35)",
@@ -951,6 +958,7 @@ const HomePage = () => {
 
   return (
     <Box bg={pageBgColor} minH="calc(100vh - 80px)" pb={{ base: 28, "2xl": 10 }}>
+      <StudentCourseGroupGate student={student} />
       <VStack spacing={{ base: 4, md: 6 }} align="stretch">
         {liveBannerNotification ? (
           <Box px={{ base: 3, md: 4 }} pt={3}>
@@ -1028,178 +1036,35 @@ const HomePage = () => {
           </Box>
         ) : null}
 
-        <HomeProHero
-          studentName={user?.name}
-          studentId={studentId}
+        <Box data-tour-id="home-hero">
+          <HomeProHero
+            studentName={user?.name}
+            studentId={studentId}
+            enrolledCount={enrolledCount}
+            coursesCount={availableCourses.length}
+            availableToJoin={availableToJoin}
+            onCourseActivated={() => setCoursesRefreshKey((k) => k + 1)}
+          />
+        </Box>
+
+        <HomeProQuickActions onCourseActivated={() => setCoursesRefreshKey((k) => k + 1)} />
+
+        <HomeProMyCourses
           teacherName={teacherDisplayName}
-          teacherAvatar={teacherAvatar}
-          enrolledCount={enrolledCount}
-          onActivateWithQr={() => setIsQrScannerOpen(true)}
+          limit={2}
+          refreshKey={coursesRefreshKey}
         />
 
-        <HomeProStats
-          enrolledCount={enrolledCount}
-          coursesCount={availableCourses.length}
-          availableToJoin={availableToJoin}
+        <HomeProPlatformCourses
+          courses={availableCourses}
+          loading={coursesLoading}
+          teacherName={teacherDisplayName}
+          isCourseFree={isCourseFree}
+          activatingCourseId={activatingFreeCourseId}
+          onEnter={(course) => navigate(`/CourseDetailsPage/${course.id}`)}
+          onSubscribe={openCourseActivationModal}
+          onActivateFree={handleActivateFreeCourse}
         />
-
-        <HomeProQuickActions onActivateWithQr={() => setIsQrScannerOpen(true)} />
-
-        {/* My Courses */}
-        <Box px={{ base: 4, md: 6 }} maxW="7xl" w="full" mx="auto">
-          <Flex
-            align="center"
-            justify="space-between"
-            gap={3}
-            mb={3}
-            px={{ base: 0.5, md: 0 }}
-          >
-            <VStack align="flex-start" spacing={0}>
-              <Text fontWeight="bold" fontSize={{ base: "lg", md: "xl" }} color={headingColor} letterSpacing="-0.01em">
-                كورساتي
-              </Text>
-              <Text fontSize="sm" color={subtextColor}>
-                المحتوى الذي اشتركت به
-              </Text>
-            </VStack>
-            <Button
-              as={Link}
-              to="/my-courses"
-              size="sm"
-              variant="ghost"
-              color="blue.500"
-              borderRadius="xl"
-              rightIcon={<Icon as={FaChevronLeft} />}
-              _hover={{ bg: ghostHoverBg }}
-            >
-              عرض الكل
-            </Button>
-          </Flex>
-          <Box
-            bg={sectionSurfaceBg}
-            borderWidth="1px"
-            borderColor={sectionBorder}
-            borderRadius="2xl"
-            overflow="hidden"
-            boxShadow="0 8px 28px -14px rgba(26,32,44,0.14)"
-            px={{ base: 2, md: 3 }}
-            py={3}
-          >
-            <MyCourses embedded />
-          </Box>
-        </Box>
-
-        {/* Available courses */}
-        <Box
-          id="platform-courses"
-          px={{ base: 3, md: 6 }}
-          maxW="7xl"
-          w="full"
-          mx="auto"
-          pb={2}
-          scrollMarginTop="90px"
-        >
-          <Flex
-            align="center"
-            justify="space-between"
-            gap={3}
-            mb={3}
-            px={{ base: 0.5, md: 0 }}
-          >
-            <VStack align="flex-start" spacing={0}>
-              <Text fontWeight="bold" fontSize={{ base: "lg", md: "xl" }} color={headingColor} letterSpacing="-0.01em">
-                كورسات المنصة
-              </Text>
-              <Text fontSize="sm" color={subtextColor}>
-                اكتشف المحتوى المتاح للاشتراك
-              </Text>
-            </VStack>
-            {coursesLoading ? (
-              <HStack spacing={2} color={subtextColor}>
-                <Spinner size="sm" color="blue.500" thickness="3px" />
-                <Text fontSize="xs" fontWeight="medium">
-                  جاري التحميل...
-                </Text>
-              </HStack>
-            ) : (
-              <Badge
-                colorScheme="blue"
-                borderRadius="full"
-                px={3}
-                py={1}
-                fontWeight="800"
-              >
-                {availableCourses.length} كورس
-              </Badge>
-            )}
-          </Flex>
-
-          <Box>
-            {coursesLoading ? (
-              <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={{ base: 3, md: 4 }}>
-                {[0, 1, 2].map((i) => (
-                  <Box
-                    key={`course-skeleton-${i}`}
-                    bg={cardBg}
-                    borderWidth="1px"
-                    borderColor={courseCardBorder}
-                    borderRadius="2xl"
-                    overflow="hidden"
-                    boxShadow={courseCardShadow}
-                  >
-                    <Skeleton
-                      h={{ base: "200px", md: "168px" }}
-                      startColor="gray.100"
-                      endColor="gray.200"
-                    />
-                    <Box p={4}>
-                      <Skeleton height="16px" mb={3} borderRadius="md" />
-                      <Skeleton height="12px" width="60%" mb={4} borderRadius="md" />
-                      <Skeleton height="40px" borderRadius="xl" />
-                    </Box>
-                  </Box>
-                ))}
-              </SimpleGrid>
-            ) : (
-              <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={{ base: 3, md: 4 }}>
-                {availableCourses.map((course) => {
-                  const free = isCourseFree(course);
-                  const enrolled = !!course.is_enrolled;
-                  return (
-                    <HomePlatformCourseCard
-                      key={course.id}
-                      course={course}
-                      teacherName={teacherDisplayName}
-                      isFree={free}
-                      isEnrolled={enrolled}
-                      onEnter={() => navigate(`/CourseDetailsPage/${course.id}`)}
-                      onSubscribe={() => openCourseActivationModal(course)}
-                    />
-                  );
-                })}
-              </SimpleGrid>
-            )}
-            {!coursesLoading && availableCourses.length === 0 ? (
-              <Center
-                py={12}
-                borderRadius="2xl"
-                borderWidth="1px"
-                borderStyle="dashed"
-                borderColor={courseCardBorder}
-                bg={emptyCoursesBg}
-              >
-                <VStack spacing={2}>
-                  <Text fontWeight="black" color={headingColor}>
-                    لا توجد كورسات متاحة حالياً
-                  </Text>
-                  <Text fontSize="sm" color={subtextColor}>
-                    تابع المنصة لاحقاً لظهور محتوى جديد.
-                  </Text>
-                </VStack>
-              </Center>
-            ) : null}
-          </Box>
-        </Box>
       </VStack>
 
       {/* Floating scientific support chat — desktop only; mobile/tablet use bottom nav */}
@@ -1731,6 +1596,11 @@ const HomePage = () => {
           )}
         </ModalContent>
       </Modal>
+
+      <StudentHomeTour
+        isOpen={homeTourOpen}
+        onClose={() => setHomeTourOpen(false)}
+      />
     </Box>
   );
 };

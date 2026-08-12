@@ -463,7 +463,7 @@ const SectionOne = () => {
               transition={{ duration: 0.4, delay: 0.18 }}
               className="flex flex-col gap-2.5 sm:flex-row sm:items-center"
             >
-              <Link to="/signup" className="w-full sm:w-auto">
+              <Link to="/create-platform" className="w-full sm:w-auto">
                 <motion.button
                   type="button"
                   whileHover={{ y: -2, scale: 1.02 }}

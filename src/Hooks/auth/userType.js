@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { safeLocalGet } from "../../utils/safeStorage";
+import { resolveAuthRoles } from "../../utils/authRoles";
 
 function readStoredUser() {
   try {
@@ -13,36 +14,27 @@ function readStoredUser() {
   }
 }
 
-function rolesFromUser(user) {
-  if (user == null || typeof user !== "object") {
-    return { isAdmin: false, isTeacher: false, student: false };
-  }
-  if (user.role === "teacher") {
-    return { isAdmin: false, isTeacher: true, student: false };
-  }
-  if (user.role === "admin") {
-    return { isAdmin: true, isTeacher: false, student: false };
-  }
-  return { isAdmin: false, isTeacher: false, student: true };
-}
-
 const UserType = () => {
   const location = useLocation();
   const initialUser = readStoredUser();
-  const initialRoles = rolesFromUser(initialUser);
+  const initialRoles = resolveAuthRoles(initialUser);
 
   const [userData, setUserData] = useState(initialUser);
   const [isAdmin, setIsAdmin] = useState(initialRoles.isAdmin);
   const [isTeacher, setIsTeacher] = useState(initialRoles.isTeacher);
   const [student, setStudent] = useState(initialRoles.student);
+  const [isAcademy, setIsAcademy] = useState(initialRoles.isAcademy);
+  const [isAcademyTeacher, setIsAcademyTeacher] = useState(initialRoles.isAcademyTeacher);
 
   const syncFromStorage = useCallback(() => {
     const user = readStoredUser();
     setUserData(user);
-    const r = rolesFromUser(user);
+    const r = resolveAuthRoles(user);
     setIsAdmin(r.isAdmin);
     setIsTeacher(r.isTeacher);
     setStudent(r.student);
+    setIsAcademy(r.isAcademy);
+    setIsAcademyTeacher(r.isAcademyTeacher);
   }, []);
 
   useEffect(() => {
@@ -62,7 +54,7 @@ const UserType = () => {
     };
   }, [syncFromStorage]);
 
-  return [userData, isAdmin, isTeacher, student];
+  return [userData, isAdmin, isTeacher, student, isAcademy, isAcademyTeacher];
 };
 
 export default UserType;

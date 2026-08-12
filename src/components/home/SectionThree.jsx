@@ -417,7 +417,7 @@ const SectionThree = () => {
                       />
                     </div>
 
-                    <Link to="/signup" className="mt-5 block">
+                    <Link to="/create-platform" className="mt-5 block">
                       <motion.button
                         type="button"
                         whileHover={{ scale: 1.02 }}

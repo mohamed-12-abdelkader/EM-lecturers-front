@@ -19,6 +19,7 @@ import { FiLock } from "react-icons/fi";
 import { PiChalkboardTeacherBold } from "react-icons/pi";
 import baseUrl from "../../api/baseUrl";
 import { persistLoginSession } from "../../utils/authStorage";
+import { getPostLoginPath } from "../../utils/authRoles";
 import "react-toastify/dist/ReactToastify.css";
 
 const TeacherLoginPage = () => {
@@ -62,15 +63,15 @@ const TeacherLoginPage = () => {
         password,
       };
 
-      const response = await baseUrl.post("api/login", requestData);
+      const response = await baseUrl.post("/api/login", requestData);
       persistLoginSession(response.data);
 
       toast.success("تم تسجيل الدخول بنجاح");
 
       const params = new URLSearchParams(window.location.search);
       const redirectTarget = params.get("redirect");
-      const destination =
-        redirectTarget && redirectTarget.startsWith("/") ? redirectTarget : "/home";
+      const user = response.data?.user ?? response.data?.data?.user;
+      const destination = getPostLoginPath(user, redirectTarget);
 
       // تنقّل SPA مرة واحدة — بدون reload
       setTimeout(() => {

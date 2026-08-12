@@ -17,7 +17,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "../api/notificationsApi";
-import { getSocketEndpoint } from "../utils/socketEndpoint";
+import { getSocketEndpoint, getSocketClientOptions } from "../utils/socketEndpoint";
 import {
   getNotificationPermission,
   isPushSupported,
@@ -55,6 +55,11 @@ export function NotificationProvider({ children }) {
   const isFetchingRef = useRef(false);
   const hasInitializedRef = useRef(false);
   const syncTimeoutRef = useRef(null);
+  const prependRef = useRef(null);
+  const refreshRef = useRef(null);
+  const [socketToken, setSocketToken] = useState(
+    () => (typeof localStorage !== "undefined" ? localStorage.getItem("token") : "") || "",
+  );
 
   const applyNotificationList = useCallback((list) => {
     const safeList = Array.isArray(list) ? list : [];
@@ -142,6 +147,9 @@ export function NotificationProvider({ children }) {
       setUnreadCount((prev) => prev + 1);
     }
   }, []);
+
+  prependRef.current = prependNotification;
+  refreshRef.current = refreshNotifications;
 
   const enablePushNotifications = useCallback(async () => {
     if (!isPushSupported()) {
@@ -248,34 +256,45 @@ export function NotificationProvider({ children }) {
   }, [applyNotificationList, refreshNotifications]);
 
   useEffect(() => {
+    const syncToken = () => {
+      setSocketToken(localStorage.getItem("token") || "");
+    };
     syncAuth();
+    syncToken();
     window.addEventListener("auth-storage-update", syncAuth);
+    window.addEventListener("auth-storage-update", syncToken);
     window.addEventListener("storage", syncAuth);
+    window.addEventListener("storage", syncToken);
 
     return () => {
       if (syncTimeoutRef.current) {
         clearTimeout(syncTimeoutRef.current);
       }
       window.removeEventListener("auth-storage-update", syncAuth);
+      window.removeEventListener("auth-storage-update", syncToken);
       window.removeEventListener("storage", syncAuth);
+      window.removeEventListener("storage", syncToken);
     };
   }, [syncAuth]);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) return undefined;
+    if (!socketToken) {
+      if (socketRef.current) {
+        socketRef.current.removeAllListeners();
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+      setIsSocketConnected(false);
+      return undefined;
+    }
 
-    const socket = io(getSocketEndpoint(), {
-      path: "/socket.io",
-      withCredentials: true,
-      auth: { token },
-      transports: ["websocket", "polling"],
-      reconnection: true,
-      reconnectionAttempts: 8,
-      reconnectionDelay: 2000,
-      reconnectionDelayMax: 12000,
-      timeout: 12000,
-    });
+    const socket = io(
+      getSocketEndpoint(),
+      getSocketClientOptions({
+        auth: { token: socketToken },
+        forceNew: true,
+      }),
+    );
 
     socketRef.current = socket;
 
@@ -286,18 +305,21 @@ export function NotificationProvider({ children }) {
     socket.on("notification:new", (payload) => {
       const notification = payload?.notification || payload;
       if (notification?.id) {
-        prependNotification(notification);
+        prependRef.current?.(notification);
       } else {
-        refreshNotifications(true);
+        refreshRef.current?.(true);
       }
     });
 
     return () => {
+      socket.removeAllListeners();
       socket.disconnect();
-      socketRef.current = null;
+      if (socketRef.current === socket) {
+        socketRef.current = null;
+      }
       setIsSocketConnected(false);
     };
-  }, [prependNotification, refreshNotifications]);
+  }, [socketToken]);
 
   useEffect(() => {
     return onServiceWorkerMessage((data) => {

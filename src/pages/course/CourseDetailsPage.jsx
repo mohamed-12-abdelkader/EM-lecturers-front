@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Box,
   Heading,
@@ -107,17 +107,29 @@ import {
   FaFilm, // For no data component
   FaCog, // For settings
   FaBroadcastTower,
+  FaFolderOpen,
+  FaTasks,
 } from "react-icons/fa";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import baseUrl from "../../api/baseUrl";
 import UserType from "../../Hooks/auth/userType";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import CourseHeroSection from "./components/CourseHeroSection";
 import CourseContentNav, { SectionPanelHeader } from "./components/CourseContentNav";
 import { crContainer } from "./courseTheme";
 import LectureCard from "./components/LectureCard";
 import LecturesTab from "./components/LecturesTab";
 import CourseExamsTab from "./components/CourseExamsTab";
+import CourseFilesTab from "./components/CourseFilesTab";
+import { useCourseFiles } from "../../Hooks/course/useCourseFiles";
+import { useCourseAccessSettings } from "../../Hooks/course/useCourseAccessSettings";
+import { useCourseAssignments, courseAssignmentsQueryKey } from "../../Hooks/course/useCourseAssignments";
+import { createCourseExam as postCourseExam } from "../../api/courseAccessApi";
+import {
+  useCourseGroupSettings,
+  useTeacherCourseGroups,
+} from "../../Hooks/course/useCourseGroups";
+import CourseAssignmentsTab from "./components/CourseAssignmentsTab";
 import CourseFormModal, {
   CourseModalFieldCard,
   CourseModalFieldLabel,
@@ -129,6 +141,13 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import ScrollToTop from "../../components/scollToTop/ScrollToTop";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
+import CoursePageTour from "../../components/onboarding/CoursePageTour";
+import {
+  shouldShowCoursePageTour,
+  TOUR_SET_SECTION,
+  buildLectureTourMeta,
+  pickTourLecture,
+} from "../../utils/coursePageTour";
 import CourseStreams from "../../components/stream/courseStreams";
 import StudentStreamsList from "../../components/stream/studentStreamsList";
 import eduPlatformLogo from "../../img/2 (5).png";
@@ -153,12 +172,31 @@ async function fetchImageAsDataUrl(url) {
 }
 
 // Modal Components
-const LectureModal = ({ isOpen, onClose, type, data, onSubmit, loading }) => {
+const LectureModal = ({
+  isOpen,
+  onClose,
+  type,
+  data,
+  onSubmit,
+  loading,
+  lectureAccessMode = "always_open",
+  groupsEnabled = false,
+  availableGroups = [],
+}) => {
+  const toast = useToast();
   const inputProps = useCourseModalInputProps("blue");
+  const requiresExpiry = lectureAccessMode === "time_limited";
   const [formData, setFormData] = useState({
     title: data?.title || "",
     description: data?.description || "",
     position: data?.position || 1,
+    expires_at: "",
+    access_type: data?.access_type || "all",
+    group_ids: Array.isArray(data?.group_ids)
+      ? data.group_ids.map(Number)
+      : Array.isArray(data?.groups)
+        ? data.groups.map((g) => Number(g.id || g.group_id)).filter(Boolean)
+        : [],
   });
 
   useEffect(() => {
@@ -167,16 +205,62 @@ const LectureModal = ({ isOpen, onClose, type, data, onSubmit, loading }) => {
         title: data.title || "",
         description: data.description || "",
         position: data.position || 1,
+        expires_at: data.expires_at
+          ? (() => {
+              const date = new Date(data.expires_at);
+              if (Number.isNaN(date.getTime())) return "";
+              const offset = date.getTimezoneOffset();
+              const local = new Date(date.getTime() - offset * 60000);
+              return local.toISOString().slice(0, 16);
+            })()
+          : "",
+        access_type: data.access_type || "all",
+        group_ids: Array.isArray(data.group_ids)
+          ? data.group_ids.map(Number)
+          : Array.isArray(data.groups)
+            ? data.groups.map((g) => Number(g.id || g.group_id)).filter(Boolean)
+            : [],
       });
     } else if (isOpen) {
-      setFormData({ title: "", description: "", position: 1 });
+      setFormData({
+        title: "",
+        description: "",
+        position: 1,
+        expires_at: "",
+        access_type: "all",
+        group_ids: [],
+      });
     }
   }, [data, isOpen]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (
+      groupsEnabled &&
+      formData.access_type === "groups" &&
+      (!Array.isArray(formData.group_ids) || formData.group_ids.length === 0)
+    ) {
+      toast({
+        title: "يجب اختيار مجموعة واحدة على الأقل",
+        status: "warning",
+        duration: 3500,
+        isClosable: true,
+      });
+      return;
+    }
     if (type === "edit") onSubmit(data.id, formData);
     else onSubmit(formData);
+  };
+
+  const toggleGroupId = (groupId, checked) => {
+    const gid = Number(groupId);
+    if (!gid) return;
+    setFormData((prev) => ({
+      ...prev,
+      group_ids: checked
+        ? [...new Set([...prev.group_ids, gid])]
+        : prev.group_ids.filter((id) => id !== gid),
+    }));
   };
 
   return (
@@ -254,6 +338,82 @@ const LectureModal = ({ isOpen, onClose, type, data, onSubmit, loading }) => {
             />
           </FormControl>
         </CourseModalFieldCard>
+
+        {requiresExpiry ? (
+          <CourseModalFieldCard>
+            <FormControl isRequired={type === "add"}>
+              <CourseModalFieldLabel icon={FaClock} color="orange">
+                موعد انتهاء الوصول
+              </CourseModalFieldLabel>
+              <Input
+                type="datetime-local"
+                value={formData.expires_at}
+                onChange={(e) =>
+                  setFormData({ ...formData, expires_at: e.target.value })
+                }
+                isDisabled={loading}
+                {...inputProps}
+              />
+              <Text mt={2} fontSize="xs" color="gray.500">
+                بعد هذا الموعد لن يتمكن الطلاب من فتح المحاضرة
+              </Text>
+            </FormControl>
+          </CourseModalFieldCard>
+        ) : null}
+
+        {groupsEnabled && availableGroups.length > 0 ? (
+          <CourseModalFieldCard>
+            <FormControl>
+              <CourseModalFieldLabel icon={FaUsers} color="blue">
+                من يرى المحاضرة؟
+              </CourseModalFieldLabel>
+              <Select
+                value={formData.access_type}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    access_type: e.target.value,
+                    group_ids: e.target.value === "all" ? [] : formData.group_ids,
+                  })
+                }
+                isDisabled={loading}
+                {...inputProps}
+              >
+                <option value="all">كل المشتركين</option>
+                <option value="groups">مجموعات محددة فقط</option>
+              </Select>
+            </FormControl>
+            {formData.access_type === "groups" ? (
+              <FormControl mt={4}>
+                <FormLabel fontSize="sm">
+                  اختر المجموعات <Text as="span" color="red.500">*</Text>
+                </FormLabel>
+                <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={2} mt={2}>
+                  {availableGroups.map((group) => {
+                    const gid = Number(group.id);
+                    const checked = formData.group_ids.includes(gid);
+                    return (
+                      <Checkbox
+                        key={group.id}
+                        isChecked={checked}
+                        isDisabled={loading}
+                        onChange={(e) => toggleGroupId(group.id, e.target.checked)}
+                      >
+                        {group.name}
+                        {group.grade_name ? ` (${group.grade_name})` : ""}
+                      </Checkbox>
+                    );
+                  })}
+                </SimpleGrid>
+                {formData.group_ids.length === 0 ? (
+                  <Text mt={2} fontSize="xs" color="orange.500">
+                    اختر مجموعة واحدة على الأقل
+                  </Text>
+                ) : null}
+              </FormControl>
+            ) : null}
+          </CourseModalFieldCard>
+        ) : null}
       </VStack>
     </CourseFormModal>
   );
@@ -503,6 +663,7 @@ const MotionHStack = motion(HStack);
 
 const CourseDetailsPage = () => {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [userData, isAdmin, isTeacher, student] = UserType();
@@ -545,6 +706,7 @@ const CourseDetailsPage = () => {
     isOpen: false,
     type: "add",
     lectureId: null,
+    courseLevel: false,
     data: null,
   });
   const [deleteExamDialog, setDeleteExamDialog] = useState({
@@ -575,6 +737,14 @@ const CourseDetailsPage = () => {
   const [courseExamsError, setCourseExamsError] = useState(null);
   // القسم النشط في محتوى الكورس (محاضرات / بث مباشر / امتحانات / مساعد علمي)
   const [activeSection, setActiveSection] = useState("lectures");
+  const [courseTourOpen, setCourseTourOpen] = useState(false);
+
+  useEffect(() => {
+    const section = searchParams.get("section");
+    if (section && ["lectures", "assignments", "live", "exams", "files"].includes(section)) {
+      setActiveSection(section);
+    }
+  }, [searchParams]);
 
   // جلسات البث المباشر للكورس — لظهور أيقونة "بث شغال" على تاب المحاضرات المباشرة
   const { data: courseStreamsData } = useQuery({
@@ -600,6 +770,15 @@ const CourseDetailsPage = () => {
     }
   }, [hasActiveLiveStream]);
 
+  useEffect(() => {
+    const onTourSection = (event) => {
+      const section = event?.detail?.section;
+      if (section) setActiveSection(section);
+    };
+    window.addEventListener(TOUR_SET_SECTION, onTourSection);
+    return () => window.removeEventListener(TOUR_SET_SECTION, onTourSection);
+  }, []);
+
   // تفاصيل الكورس مع كاش — الرجوع لنفس الكورس لا يعيد التحميل من الصفر
   const {
     data: courseData,
@@ -621,6 +800,51 @@ const CourseDetailsPage = () => {
     retry: 1,
   });
 
+  const { data: courseFilesList = [] } = useCourseFiles(id, {
+    enabled: Boolean(id) && Boolean(token) && Boolean(courseData),
+  });
+  const courseFilesCount = courseFilesList.length;
+
+  const { data: accessSettings, isLoading: accessSettingsLoading } = useCourseAccessSettings(id, {
+    enabled: Boolean(id) && Boolean(token) && Boolean(courseData),
+  });
+  const lectureAccessMode = accessSettings?.lecture_access_mode || "always_open";
+  const assignmentMode = accessSettings?.assignment_mode || "lecture_based";
+  const isCourseBasedAssignments = assignmentMode === "course_based";
+
+  const canManageCourse = isTeacher || isAdmin;
+  const { data: courseGroupSettings } = useCourseGroupSettings({
+    enabled: canManageCourse,
+  });
+  const courseGroupsEnabled = Boolean(courseGroupSettings?.course_group_access_enabled);
+  const { data: teacherCourseGroups = [] } = useTeacherCourseGroups(undefined, {
+    enabled: canManageCourse && courseGroupsEnabled,
+  });
+  const activeTeacherGroups = useMemo(
+    () => teacherCourseGroups.filter((g) => g.status !== "inactive"),
+    [teacherCourseGroups],
+  );
+
+  const { data: courseAssignmentsData, isLoading: courseAssignmentsLoading } = useCourseAssignments(id, {
+    enabled: Boolean(id) && Boolean(token) && Boolean(courseData) && isCourseBasedAssignments,
+  });
+
+  const courseAssignmentsFromDetails =
+    courseData?.course_assignments ?? courseData?.assignments ?? [];
+
+  const courseAssignments =
+    courseAssignmentsFromDetails.length > 0
+      ? courseAssignmentsFromDetails
+      : (courseAssignmentsData?.assignments ?? []);
+
+  const courseAssignmentsCount = courseAssignments.length;
+
+  useEffect(() => {
+    if (!isCourseBasedAssignments && activeSection === "assignments") {
+      setActiveSection("lectures");
+    }
+  }, [isCourseBasedAssignments, activeSection]);
+
   useEffect(() => {
     if (courseQueryError) {
       console.log("Error fetching data:", courseQueryError);
@@ -629,6 +853,14 @@ const CourseDetailsPage = () => {
       setError(null);
     }
   }, [courseQueryError, courseData]);
+
+  useEffect(() => {
+    if (!student || isTeacher || isAdmin) return undefined;
+    if (!courseData?.course || courseLoading) return undefined;
+    if (!shouldShowCoursePageTour(id)) return undefined;
+    const timer = window.setTimeout(() => setCourseTourOpen(true), 850);
+    return () => window.clearTimeout(timer);
+  }, [student, isTeacher, isAdmin, courseData, courseLoading, id]);
 
   // State لمودال إنشاء الأكواد
   const [codeModalOpen, setCodeModalOpen] = useState(false);
@@ -654,7 +886,6 @@ const CourseDetailsPage = () => {
     isVisible: false,
     videoUrl: "",
     videoTitle: "",
-    isVisible: false,
   });
 
   // تحديث نطاق التصدير عند تغيير عدد الأكواد
@@ -726,7 +957,9 @@ const CourseDetailsPage = () => {
           setCourseExamsError(null);
         }
       } catch (error) {
-        console.error("Error fetching course exams:", error);
+        if (!(error.response?.status === 403 && !isAdmin && !isTeacher)) {
+          console.error("Error fetching course exams:", error);
+        }
         // التحقق من نوع الخطأ
         if (error.response) {
           const status = error.response.status;
@@ -815,7 +1048,9 @@ const CourseDetailsPage = () => {
         setCourseExamsError(null);
       }
     } catch (error) {
-      console.error("Error refreshing course exams:", error);
+      if (!(error.response?.status === 403 && !isAdmin && !isTeacher)) {
+        console.error("Error refreshing course exams:", error);
+      }
       // التحقق من نوع الخطأ
       if (error.response) {
         const status = error.response.status;
@@ -982,11 +1217,30 @@ const CourseDetailsPage = () => {
         return;
       }
       // التوكن يُرفَق تلقائياً من interceptor في baseUrl (Bearer + X-Tenant-Subdomain)
-      await baseUrl.post(`api/course/${id}/lectures`, {
+      const payload = {
         title: data.title,
         description: data.description || "",
         position: Number(data.position) || 1,
-      });
+      };
+      if (data.expires_at) {
+        payload.expires_at = new Date(data.expires_at).toISOString();
+      }
+      if (data.access_type === "groups") {
+        if (!Array.isArray(data.group_ids) || data.group_ids.length === 0) {
+          toast({
+            title: "يجب اختيار مجموعة واحدة على الأقل",
+            status: "warning",
+            duration: 4000,
+            isClosable: true,
+          });
+          return;
+        }
+        payload.access_type = "groups";
+        payload.group_ids = data.group_ids.map(Number).filter((id) => id > 0);
+      } else if (data.access_type) {
+        payload.access_type = data.access_type;
+      }
+      await baseUrl.post(`api/course/${id}/lectures`, payload);
       toast({
         title: "تم إضافة المحاضرة بنجاح",
         status: "success",
@@ -1020,13 +1274,35 @@ const CourseDetailsPage = () => {
   const updateLecture = async (lectureId, data) => {
     try {
       setActionLoading(true);
-      const response = await baseUrl.put(
-        `api/course-content/lectures/${lectureId}`,
-        data,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      const payload = {
+        title: data.title,
+        description: data.description || "",
+        position: Number(data.position) || 1,
+      };
+      if (data.expires_at !== undefined) {
+        payload.expires_at = data.expires_at
+          ? new Date(data.expires_at).toISOString()
+          : null;
+      }
+      if (data.access_type === "groups") {
+        if (!Array.isArray(data.group_ids) || data.group_ids.length === 0) {
+          toast({
+            title: "يجب اختيار مجموعة واحدة على الأقل",
+            status: "warning",
+            duration: 4000,
+            isClosable: true,
+          });
+          return;
+        }
+        payload.access_type = "groups";
+        payload.group_ids = data.group_ids.map(Number).filter((id) => id > 0);
+      } else if (data.access_type) {
+        payload.access_type = data.access_type;
+        if (data.access_type === "all") {
+          payload.group_ids = [];
+        }
+      }
+      await baseUrl.patch(`/api/course/lecture/${lectureId}`, payload);
       toast({
         title: "تم تعديل المحاضرة بنجاح",
         status: "success",
@@ -1343,7 +1619,14 @@ const CourseDetailsPage = () => {
       });
 
       await refreshCourseData();
-      setExamModal({ isOpen: false, type: "add", lectureId: null, data: null });
+      await queryClient.invalidateQueries({ queryKey: courseAssignmentsQueryKey(id) });
+      setExamModal({
+        isOpen: false,
+        type: "add",
+        lectureId: null,
+        courseLevel: false,
+        data: null,
+      });
     } catch (error) {
       console.error("Error creating exam:", error);
       toast({
@@ -1357,6 +1640,43 @@ const CourseDetailsPage = () => {
       setExamActionLoading(false);
     }
   };
+
+  const createCourseExam = async (data) => {
+    try {
+      setExamActionLoading(true);
+      await postCourseExam(id, data);
+
+      toast({
+        title: "تم إضافة واجب الكورس بنجاح",
+        description: `تم إنشاء "${data.title}"`,
+        status: "success",
+        duration: 4000,
+        isClosable: true,
+      });
+
+      await refreshCourseData();
+      await queryClient.invalidateQueries({ queryKey: courseAssignmentsQueryKey(id) });
+      setExamModal({
+        isOpen: false,
+        type: "add",
+        lectureId: null,
+        courseLevel: false,
+        data: null,
+      });
+    } catch (error) {
+      console.error("Error creating course exam:", error);
+      toast({
+        title: "خطأ في إضافة واجب الكورس",
+        description: error.response?.data?.message || "حدث خطأ غير متوقع",
+        status: "error",
+        duration: 4000,
+        isClosable: true,
+      });
+    } finally {
+      setExamActionLoading(false);
+    }
+  };
+
   const updateExam = async (examId, data) => {
     try {
       setExamActionLoading(true);
@@ -1394,8 +1714,14 @@ const CourseDetailsPage = () => {
 
       // تحديث البيانات بدون إعادة تحميل
       await refreshCourseData();
-      // إغلاق الموديل بعد النجاح
-      setExamModal({ isOpen: false, type: "edit", data: null });
+      await queryClient.invalidateQueries({ queryKey: courseAssignmentsQueryKey(id) });
+      setExamModal({
+        isOpen: false,
+        type: "edit",
+        lectureId: null,
+        courseLevel: false,
+        data: null,
+      });
     } catch (error) {
       console.error("Error updating exam:", error);
       toast({
@@ -1423,6 +1749,7 @@ const CourseDetailsPage = () => {
       });
       // تحديث البيانات بدون إعادة تحميل
       await refreshCourseData();
+      await queryClient.invalidateQueries({ queryKey: courseAssignmentsQueryKey(id) });
     } catch (error) {
       toast({
         title: "خطأ في حذف الواجب",
@@ -1503,7 +1830,7 @@ const CourseDetailsPage = () => {
   };
 
   // 3. مودال إضافة/تعديل امتحان — هوية بصرية (blue.500 / orange.500)
-  const ExamModal = ({ isOpen, onClose, type, data, onSubmit, loading }) => {
+  const ExamModal = ({ isOpen, onClose, type, data, onSubmit, loading, courseLevel = false }) => {
     const modalBg = useColorModeValue("gray.50", "gray.800");
     const cardBg = useColorModeValue("white", "gray.800");
     const cardBorder = useColorModeValue("gray.200", "gray.600");
@@ -1520,7 +1847,7 @@ const CourseDetailsPage = () => {
       is_visible: data?.is_visible ?? true,
       show_at: data?.show_at || "",
       hide_at: data?.hide_at || "",
-      lock_next_lectures: data?.lock_next_lectures ?? true,
+      lock_next_lectures: courseLevel ? false : (data?.lock_next_lectures ?? true),
       show_answers_immediately: data?.show_answers_immediately ?? false,
       show_answers_after_hours: data?.show_answers_after_hours || 24,
     });
@@ -1535,7 +1862,7 @@ const CourseDetailsPage = () => {
           is_visible: data.is_visible ?? true,
           show_at: data.show_at || "",
           hide_at: data.hide_at || "",
-          lock_next_lectures: data.lock_next_lectures ?? true,
+          lock_next_lectures: courseLevel ? false : (data.lock_next_lectures ?? true),
           show_answers_immediately: data.show_answers_immediately ?? false,
           show_answers_after_hours: data.show_answers_after_hours || 24,
         });
@@ -1548,12 +1875,12 @@ const CourseDetailsPage = () => {
           is_visible: true,
           show_at: "",
           hide_at: "",
-          lock_next_lectures: true,
+          lock_next_lectures: courseLevel ? false : true,
           show_answers_immediately: false,
           show_answers_after_hours: 24,
         });
       }
-    }, [data, isOpen]);
+    }, [data, isOpen, courseLevel]);
 
     const handleSubmit = (e) => {
       e.preventDefault();
@@ -1612,7 +1939,9 @@ const CourseDetailsPage = () => {
                 </Text>
                 <Text fontSize="sm" color="gray.500" fontWeight="normal">
                   {type === "add"
-                    ? "يمكنك إنشاء أكثر من واجب لنفس المحاضرة"
+                    ? courseLevel
+                      ? "واجب مستقل عن المحاضرات — نفس إعدادات واجب المحاضرة"
+                      : "يمكنك إنشاء أكثر من واجب لنفس المحاضرة"
                     : "حدّث إعدادات الواجب والدرجات والظهور"}
                 </Text>
               </VStack>
@@ -2087,6 +2416,7 @@ const CourseDetailsPage = () => {
                         />
                       </HStack>
                     </Box>
+                    {!courseLevel ? (
                     <Box
                       p={4}
                       bg={modalBg}
@@ -2125,6 +2455,7 @@ const CourseDetailsPage = () => {
                         />
                       </HStack>
                     </Box>
+                    ) : null}
                   </VStack>
                 </Box>
               </VStack>
@@ -2921,7 +3252,6 @@ display:block;
       isVisible: true,
       videoUrl,
       videoTitle,
-      isVisible: true,
     });
   };
 
@@ -2931,7 +3261,6 @@ display:block;
       isVisible: false,
       videoUrl: "",
       videoTitle: "",
-      isVisible: false,
     });
   };
 
@@ -2952,6 +3281,16 @@ display:block;
       console.log("Error refreshing course data:", error);
     }
   };
+
+  const lecturesForTour = courseData?.lectures;
+  const tourLecture = useMemo(
+    () => pickTourLecture(lecturesForTour, { isTeacher, isAdmin }),
+    [lecturesForTour, isTeacher, isAdmin],
+  );
+  const lectureTourMeta = useMemo(
+    () => buildLectureTourMeta(tourLecture, { isTeacher, isAdmin }),
+    [tourLecture, isTeacher, isAdmin],
+  );
 
   // شاشة التحميل فقط عند أول دخول بدون بيانات في الكاش
   if (courseLoading && !courseData) {
@@ -3118,11 +3457,25 @@ display:block;
     {
       id: "lectures",
       label: "المحاضرات",
-      desc: "الفيديوهات والملفات والواجبات",
+      desc: isCourseBasedAssignments
+        ? "الفيديوهات والملفات"
+        : "الفيديوهات والملفات والواجبات",
       icon: FaPlayCircle,
       colorKey: "blue",
       count: lectures?.length || 0,
     },
+    ...(isCourseBasedAssignments
+      ? [
+          {
+            id: "assignments",
+            label: "واجبات الكورس",
+            desc: "واجبات مستقلة عن المحاضرات",
+            icon: FaTasks,
+            colorKey: "orange",
+            count: courseAssignmentsCount,
+          },
+        ]
+      : []),
     {
       id: "live",
       label: "المحاضرات المباشرة",
@@ -3138,6 +3491,14 @@ display:block;
       icon: FaListOl,
       colorKey: "orange",
       count: courseExams?.length || 0,
+    },
+    {
+      id: "files",
+      label: "ملفات الكورس",
+      desc: "المرفقات والملفات التعليمية",
+      icon: FaFolderOpen,
+      colorKey: "purple",
+      count: courseFilesCount,
     },
   ];
   const activeSectionMeta = courseContentSections.find(
@@ -3862,14 +4223,17 @@ display:block;
         >
           <VStack spacing={{ base: 3, md: 5 }} align="stretch" w="full">
             {/* شريط أقسام المحتوى — أعلى الصفحة */}
-            <CourseContentNav
-              sections={courseContentSections}
-              activeId={activeSection}
-              onChange={setActiveSection}
-            />
+            <Box data-tour-id="course-content-nav">
+              <CourseContentNav
+                sections={courseContentSections}
+                activeId={activeSection}
+                onChange={setActiveSection}
+              />
+            </Box>
 
             {/* منطقة المحتوى */}
             <Box
+              data-tour-id="course-content-panel"
               w="full"
               minW={0}
               bg={sectionBg}
@@ -3899,30 +4263,83 @@ display:block;
                   lectures={lectures}
                   isTeacher={isTeacher}
                   isAdmin={isAdmin}
-                  expandedLecture={expandedLecture}
-                  setExpandedLecture={setExpandedLecture}
-                  handleAddLecture={handleAddLecture}
-                  handleEditLecture={handleEditLecture}
-                  handleDeleteLecture={handleDeleteLecture}
-                  handleAddVideo={handleAddVideo}
-                  handleEditVideo={handleEditVideo}
-                  handleDeleteVideo={handleDeleteVideo}
-                  handleAddFile={handleAddFile}
-                  handleEditFile={handleEditFile}
-                  handleDeleteFile={handleDeleteFile}
-                  setExamModal={setExamModal}
-                  setDeleteExamDialog={setDeleteExamDialog}
-                  examActionLoading={actionLoading}
-                  itemBg={itemBg}
-                  sectionBg={sectionBg}
-                  headingColor={headingColor}
-                  subTextColor={subTextColor}
+                  lectureAccessMode={lectureAccessMode}
+                  isCourseBasedAssignments={isCourseBasedAssignments}
+                  courseId={id}
+                  accessSettings={accessSettings}
+                  accessSettingsLoading={accessSettingsLoading}
+                  onRefreshCourse={refreshCourseData}
+                    expandedLecture={expandedLecture}
+                    setExpandedLecture={setExpandedLecture}
+                    handleAddLecture={handleAddLecture}
+                    handleEditLecture={handleEditLecture}
+                    handleDeleteLecture={handleDeleteLecture}
+                    handleAddVideo={handleAddVideo}
+                    handleEditVideo={handleEditVideo}
+                    handleDeleteVideo={handleDeleteVideo}
+                    handleAddFile={handleAddFile}
+                    handleEditFile={handleEditFile}
+                    handleDeleteFile={handleDeleteFile}
+                    setExamModal={setExamModal}
+                    setDeleteExamDialog={setDeleteExamDialog}
+                    examActionLoading={actionLoading}
+                    itemBg={itemBg}
+                    sectionBg={sectionBg}
+                    headingColor={headingColor}
+                    subTextColor={subTextColor}
+                    borderColor={borderColor}
+                    dividerColor={dividerColor}
+                    textColor={textColor}
+                    formatDate={formatDate}
+                    onAddBulkQuestions={handleOpenBulkQuestionsModal}
+                    handleOpenVideo={handleOpenVideo}
+                  tourLectureId={lectureTourMeta.lectureId}
+                />
+              )}
+
+              {activeSection === "assignments" && isCourseBasedAssignments && (
+                <CourseAssignmentsTab
+                  assignments={courseAssignments}
+                  loading={
+                    courseAssignmentsLoading &&
+                    !courseAssignmentsFromDetails.length
+                  }
+                  isTeacher={isTeacher}
+                  isAdmin={isAdmin}
+                  examActionLoading={examActionLoading}
+                  onAddAssignment={(data) =>
+                    setExamModal({
+                      isOpen: true,
+                      type: "add",
+                      lectureId: null,
+                      courseLevel: true,
+                      data,
+                    })
+                  }
+                  onEditAssignment={(exam) =>
+                    setExamModal({
+                      isOpen: true,
+                      type: "edit",
+                      lectureId: null,
+                      courseLevel: true,
+                      data: exam,
+                    })
+                  }
+                  onDeleteAssignment={(examId, title) =>
+                    setDeleteExamDialog({ isOpen: true, examId, title })
+                  }
+                />
+              )}
+
+              {activeSection === "files" && (
+                <CourseFilesTab
+                  courseId={id}
+                  isTeacher={isTeacher}
+                  isAdmin={isAdmin}
                   borderColor={borderColor}
-                  dividerColor={dividerColor}
+                  sectionBg={sectionBg}
                   textColor={textColor}
-                  formatDate={formatDate}
-                  onAddBulkQuestions={handleOpenBulkQuestionsModal}
-                  handleOpenVideo={handleOpenVideo}
+                  subTextColor={subTextColor}
                 />
               )}
 
@@ -3956,6 +4373,9 @@ display:block;
         }
         type={lectureModal.type}
         data={lectureModal.data}
+        lectureAccessMode={lectureAccessMode}
+        groupsEnabled={courseGroupsEnabled}
+        availableGroups={activeTeacherGroups}
         onSubmit={lectureModal.type === "add" ? createLecture : updateLecture}
         loading={actionLoading}
       />
@@ -4004,14 +4424,18 @@ display:block;
             isOpen: false,
             type: "add",
             lectureId: null,
+            courseLevel: false,
             data: null,
           })
         }
         type={examModal.type}
         data={examModal.data}
+        courseLevel={examModal.courseLevel}
         onSubmit={
           examModal.type === "add"
-            ? (formData) => createExam(examModal.lectureId, formData)
+            ? examModal.courseLevel
+              ? createCourseExam
+              : (formData) => createExam(examModal.lectureId, formData)
             : updateExam
         }
         loading={examActionLoading}
@@ -4141,6 +4565,13 @@ display:block;
       {console.log("BulkQuestionsModal isOpen:", bulkQuestionsModal.isOpen)}
 
       <ScrollToTop />
+
+      <CoursePageTour
+        isOpen={courseTourOpen}
+        courseId={id}
+        lectureTourMeta={lectureTourMeta}
+        onClose={() => setCourseTourOpen(false)}
+      />
     </Box>
   );
 };

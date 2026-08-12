@@ -20,6 +20,7 @@ import {
   MdCollectionsBookmark,
   MdDescription,
   MdBusiness,
+  MdGroups,
 } from "react-icons/md";
 import { FaAndroid, FaRobot, FaFolderOpen, FaWhatsapp } from "react-icons/fa";
 import { Link, useLocation } from "react-router-dom";
@@ -157,7 +158,7 @@ function NavSection({ title, children, isSidebarOpen }) {
 }
 
 const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
-  const [, isAdmin, isTeacher, isStudent] = UserType();
+  const [, isAdmin, isTeacher, isStudent, isAcademy, isAcademyTeacher] = UserType();
 
   const handleNavClick = () => {
     setIsSidebarOpen?.(true);
@@ -241,6 +242,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
       links: [
         { to: "/center-mgmt", Icon: MdBusiness, label: "إدارة السنتر" },
         { to: "/managed-students", Icon: MdManageAccounts, label: "إدارة الطلاب" },
+        { to: "/teacher-course-groups", Icon: MdGroups, label: "مجموعات الكورس" },
         { to: "/platform-students", Icon: MdPeople, label: "كل الطلاب" },
         { to: "/teacher-students", Icon: MdPeople, label: "طلاب الكورسات" },
         { to: "/teacher-invoices", Icon: MdDescription, label: "فواتير الاشتراك" },
@@ -268,16 +270,56 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
     },
   ];
 
+  const academySections = [
+    {
+      title: "الأكاديمية",
+      links: [
+        { to: "/academy", Icon: MdDashboard, label: "لوحة الأكاديمية" },
+        { to: "/academy/teachers", Icon: MdPeople, label: "مدرسو الأكاديمية" },
+        { to: "/academy/courses", Icon: MdLibraryBooks, label: "كورسات الأكاديمية" },
+      ],
+    },
+    {
+      title: "المحتوى",
+      links: [
+        { to: "/teacher_courses", Icon: MdCollectionsBookmark, label: "إنشاء وإدارة الكورسات" },
+        { to: "/platform-students", Icon: MdPeople, label: "طلاب المنصة" },
+      ],
+    },
+  ];
+
+  const academyTeacherSections = [
+    {
+      title: "أكاديميتي",
+      links: [
+        { to: "/academy/me", Icon: MdHome, label: "لوحتي" },
+        { to: "/academy/me/courses", Icon: MdLibraryBooks, label: "كورساتي المسندة" },
+      ],
+    },
+    {
+      title: "المحتوى",
+      links: [
+        { to: "/teacher-exams", Icon: MdQuiz, label: "الامتحانات" },
+        { to: "/teacher-assignments", Icon: MdAssignment, label: "الواجبات" },
+        { to: "/teacher-my-files", Icon: FaFolderOpen, label: "ملفاتي" },
+      ],
+    },
+  ];
+
   const sections = isAdmin
     ? adminSections
-    : isTeacher
-      ? teacherSections
-      : isStudent
-        ? studentSections
-        : [{ title: "عام", links: [{ to: "/home", Icon: MdHome, label: "الصفحة الرئيسية" }] }];
+    : isAcademy
+      ? academySections
+      : isAcademyTeacher
+        ? academyTeacherSections
+        : isTeacher
+          ? teacherSections
+          : isStudent
+            ? studentSections
+            : [{ title: "عام", links: [{ to: "/home", Icon: MdHome, label: "الصفحة الرئيسية" }] }];
 
   return (
-    <VStack spacing={1} align="stretch" w="full" pb={2}>
+    <VStack spacing={1} align="stretch" w="full" pb={2} data-tour-id="student-nav-links">
       {sections.map((section) => (
         <NavSection key={section.title} title={section.title} isSidebarOpen={isSidebarOpen}>
           {section.links.map((link) => (

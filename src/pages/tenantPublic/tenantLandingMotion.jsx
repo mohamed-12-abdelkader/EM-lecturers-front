@@ -564,14 +564,14 @@ export function ParallaxLayer({ children, className = "", speed = 0.2, as = "div
 
   if (reduceMotion) {
     return (
-      <div ref={ref} className={className}>
+      <div ref={ref} className={`relative ${className}`}>
         {children}
       </div>
     );
   }
 
   return (
-    <Component ref={ref} className={className} style={{ y, willChange: "transform" }}>
+    <Component ref={ref} className={`relative ${className}`} style={{ y, willChange: "transform" }}>
       {children}
     </Component>
   );

@@ -1,17 +1,15 @@
 /**
  * حارس المسارات المحمية — يعتمد على AuthProvider (كوكي HttpOnly + توكن بالذاكرة).
- * أثناء فحص الجلسة لا يُظهر شيئاً مزعجاً (الـ Splash يتكفل بالإقلاع).
  */
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import AppSplashScreen from "../components/auth/AppSplashScreen";
 
 export default function ProtectedRoute({ children, roles }) {
   const { status, user, isAuthenticated } = useAuth();
   const location = useLocation();
 
   if (status === "checking") {
-    return <AppSplashScreen />;
+    return children ?? <Outlet />;
   }
 
   if (!isAuthenticated) {

@@ -95,7 +95,7 @@ const Footer = () => {
               نبني معك براندك التعليمي من الصفر — منصة باسمك، هوية بصرية،
               ودعم سوشيال ميديا لتحوّل اسمك إلى علامة رائدة في التعليم.
             </p>
-            <Link to="/signup">
+            <Link to="/create-platform">
               <motion.span
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}

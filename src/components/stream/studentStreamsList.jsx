@@ -300,29 +300,17 @@ const StudentStreamsList = ({ courseId }) => {
           ))}
         </VStack>
       ) : (
-        <Flex
-          direction="column"
-          align="center"
-          justify="center"
-          py={12}
-          px={4}
-          bg={cardBg}
-          borderRadius="xl"
-          borderWidth="1px"
-          borderStyle="dashed"
-          borderColor={borderColor}
-          textAlign="center"
-        >
-          <Center p={3} bg={emptyIconBg} borderRadius="xl" mb={3}>
-            <Icon as={FaVideo} color="blue.500" boxSize={6} />
-          </Center>
-          <Text color={titleColor} fontWeight="700">
-            لا توجد جلسات مباشرة
-          </Text>
-          <Text color={subTextColor} fontSize="sm" mt={1}>
-            عند بدء المدرس بثاً جديداً سيظهر هنا
-          </Text>
-        </Flex>
+        <Center py={8} flexDir="column" textAlign="center">
+          <div className="mx-auto flex aspect-square w-64 items-center justify-center overflow-hidden rounded-full bg-black sm:w-80">
+            <img
+              src="/images/course-live-empty.jpg"
+              alt="لا يوجد محاضرات مباشرة — سيتم إضافتها قريباً"
+              className="h-full w-full object-contain"
+              loading="lazy"
+              decoding="async"
+            />
+          </div>
+        </Center>
       )}
     </Box>
   );

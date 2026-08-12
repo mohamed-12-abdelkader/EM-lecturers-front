@@ -9,3 +9,18 @@ export function getSocketEndpoint() {
   }
   return getResolvedApiTarget();
 }
+
+/** إعدادات مشتركة — polling أولاً لتفادي فشل WebSocket على *.localhost في التطوير */
+export function getSocketClientOptions(overrides = {}) {
+  return {
+    path: "/socket.io",
+    withCredentials: true,
+    transports: ["polling", "websocket"],
+    reconnection: true,
+    reconnectionAttempts: 8,
+    reconnectionDelay: 2000,
+    reconnectionDelayMax: 12000,
+    timeout: 12000,
+    ...overrides,
+  };
+}

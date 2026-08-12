@@ -1,10 +1,21 @@
 import { useRef } from "react";
 import { Navigate } from "react-router-dom";
+import { safeLocalGet } from "../../utils/safeStorage";
+import { getPostLoginPath } from "../../utils/authRoles";
+
+function readStoredUser() {
+  try {
+    const raw = safeLocalGet("user");
+    if (raw == null || raw === "") return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * يمنع عرض صفحات الدخول/التسجيل لمن لديه جلسة مسبقاً.
- * مهم: لا يعيد التوجيه إذا أصبح المستخدم مسجّلاً أثناء وجوده على الصفحة
- * (بعد login/signup) — الصفحة نفسها تتكفل بتنقّل واحد بدون reload متكرر.
  */
 const ProtectedLogin = ({ auth, children }) => {
   const wasAuthOnMount = useRef(Boolean(auth));
@@ -15,10 +26,7 @@ const ProtectedLogin = ({ auth, children }) => {
         ? new URLSearchParams(window.location.search)
         : null;
     const redirect = params?.get("redirect");
-    const to =
-      redirect && redirect.startsWith("/") && !redirect.startsWith("//")
-        ? redirect
-        : "/home";
+    const to = getPostLoginPath(readStoredUser(), redirect);
     return <Navigate to={to} replace />;
   }
 

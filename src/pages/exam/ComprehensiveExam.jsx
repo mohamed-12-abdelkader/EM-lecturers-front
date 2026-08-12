@@ -59,14 +59,15 @@ import {
   TeacherQuestionCard,
   StudentQuestionPanel,
 } from "./components/ExamQuestionDisplay";
+import ExamSubmissionsView from "./components/ExamSubmissionsView";
 import baseUrl from "../../api/baseUrl";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
-import { renderFormattedExamText } from "../../utils/renderFormattedExamText";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import UserType from "../../Hooks/auth/userType";
 
 const ComprehensiveExam = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [userData, isAdmin, isTeacher, student] = UserType();
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -130,11 +131,6 @@ const ComprehensiveExam = () => {
   const [passageLoading, setPassageLoading] = useState(false);
   // استخراج الأسئلة بالذكاء الاصطناعي
   const [aiExtractionModalOpen, setAiExtractionModalOpen] = useState(false);
-  // State لتقارير الامتحان
-  const [examReport, setExamReport] = useState(null);
-  const [reportLoading, setReportLoading] = useState(false);
-  const [reportError, setReportError] = useState(null);
-  const [showReportModal, setShowReportModal] = useState(false);
   const [attemptSummary, setAttemptSummary] = useState(null);
   const [imageZoomOpen, setImageZoomOpen] = useState(false);
   const [imageZoomSrc, setImageZoomSrc] = useState(null);
@@ -163,35 +159,6 @@ const ComprehensiveExam = () => {
       setGradesError("حدث خطأ أثناء تحميل الدرجات");
     } finally {
       setGradesLoading(false);
-    }
-  };
-
-  // جلب تقرير الامتحان
-  const fetchExamReport = async () => {
-    setReportLoading(true);
-    setReportError(null);
-    try {
-      const token = localStorage.getItem("token");
-      const res = await baseUrl.get(
-        `/api/exams/${id}/report`,
-        token ? { headers: { Authorization: `Bearer ${token}` } } : {}
-      );
-      setExamReport(res.data);
-      setShowReportModal(true);
-    } catch (err) {
-      console.error("Error fetching exam report:", err);
-      setReportError(
-        err.response?.data?.message || "حدث خطأ أثناء تحميل التقرير"
-      );
-      toast({
-        title: "خطأ في تحميل التقرير",
-        description: err.response?.data?.message || "حدث خطأ غير متوقع",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
-    } finally {
-      setReportLoading(false);
     }
   };
 
@@ -1594,97 +1561,48 @@ const ComprehensiveExam = () => {
   // عرض درجات الطلاب
   if (showGrades) {
     return (
-      <Box minH="100vh" bg={pageBg} pt="100px" pb={10} dir="rtl">
-        <Container maxW="container.lg">
-          <Box
-            p={8}
-            borderRadius="2xl"
-            bg={cardBg}
-            borderWidth="1px"
-            borderColor={cardBorder}
-            boxShadow="lg"
-          >
-            <Box
-              h="1"
-              w="100%"
-              bgGradient="linear(to-r, blue.500, orange.500)"
-              borderRadius="full"
-              mb={6}
-              maxW="240px"
-              mx="auto"
-            />
-            <Heading mb={8} textAlign="center" color={headingColor} size="lg">
-              درجات الطلاب في الامتحان
-            </Heading>
-            <Button
-              mb={6}
-              bg="blue.500"
-              color="white"
-              _hover={{ bg: "blue.400" }}
-              borderRadius="xl"
-              onClick={() => setShowGrades(false)}
-            >
-              عودة للأسئلة
-            </Button>
-            {gradesLoading ? (
-              <Center minH="40vh">
-                <Spinner size="xl" color="blue.500" />
-                <Text mt={4}>جاري تحميل الدرجات...</Text>
-              </Center>
-            ) : gradesError ? (
-              <Alert status="error" borderRadius="md">
-                <AlertIcon />
-                {gradesError}
-              </Alert>
-            ) : gradesData && gradesData.length > 0 ? (
-              <VStack spacing={5} align="stretch">
-                {gradesData.map((s, idx) => (
-                  <Box
-                    key={s.submission_id}
-                    p={5}
-                    borderRadius="xl"
-                    boxShadow="md"
-                    bgGradient={
-                      s.passed
-                        ? "linear(to-r, green.50, white)"
-                        : "linear(to-r, red.50, white)"
-                    }
-                    border="1px solid #e2e8f0"
-                  >
-                    <HStack justify="space-between">
-                      <Text fontWeight="bold" fontSize="lg" color="blue.700">
-                        {idx + 1}. {s.name}
-                      </Text>
-                      <Badge
-                        colorScheme={s.passed ? "green" : "red"}
-                        fontSize="md"
-                      >
-                        {s.passed ? "ناجح" : "راسب"}
-                      </Badge>
-                    </HStack>
-                    <HStack spacing={4} mt={2}>
-                      <Badge colorScheme="blue">الدرجة: {s.total_grade}</Badge>
-                      <Badge colorScheme="gray">ID: {s.student_id}</Badge>
-                      {s.phone && <Badge colorScheme="purple">{s.phone}</Badge>}
-                    </HStack>
-                    <Text color="gray.500" fontSize="sm" mt={2}>
-                      {s.submitted_at
-                        ? `تاريخ التسليم: ${new Date(
-                            s.submitted_at
-                          ).toLocaleString("ar-EG")}`
-                        : "لم يتم التسليم"}
-                    </Text>
-                  </Box>
-                ))}
-              </VStack>
-            ) : (
-              <Text color={subtextColor} textAlign="center">
-                لا يوجد نتائج بعد.
-              </Text>
-            )}
-          </Box>
-        </Container>
-      </Box>
+      <>
+        <ExamSubmissionsView
+          submissions={gradesData || []}
+          loading={gradesLoading}
+          error={gradesError}
+          onBack={() => setShowGrades(false)}
+          onRetry={fetchGrades}
+          onZoomImage={(src) => {
+            setImageZoomSrc(src);
+            setImageZoomOpen(true);
+          }}
+        />
+        <Modal
+          isOpen={imageZoomOpen}
+          onClose={() => {
+            setImageZoomOpen(false);
+            setImageZoomSrc(null);
+          }}
+          size="4xl"
+          isCentered
+        >
+          <ModalOverlay bg="blackAlpha.800" />
+          <ModalContent bg="transparent" boxShadow="none">
+            <ModalBody p={4} display="flex" justifyContent="center">
+              {imageZoomSrc && (
+                <Image
+                  src={imageZoomSrc}
+                  alt="تكبير صورة"
+                  maxH="85vh"
+                  objectFit="contain"
+                  borderRadius="lg"
+                  cursor="pointer"
+                  onClick={() => {
+                    setImageZoomOpen(false);
+                    setImageZoomSrc(null);
+                  }}
+                />
+              )}
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      </>
     );
   }
 
@@ -1695,8 +1613,7 @@ const ComprehensiveExam = () => {
           examTitle={examData?.title}
           questionsCount={questions.length}
           onGrades={fetchGrades}
-          onReport={fetchExamReport}
-          reportLoading={reportLoading}
+          onReport={() => navigate(`/ComprehensiveExam/${id}/report`)}
           onAddImages={openAddImageModal}
           onBulkText={() => setBulkTextModalOpen(true)}
           onPassage={() => setPassageModalOpen(true)}
@@ -2704,300 +2621,6 @@ const ComprehensiveExam = () => {
                     />
                   )}
                 </ModalBody>
-              </ModalContent>
-            </Modal>
-
-            {/* Exam Report Modal */}
-            <Modal
-              isOpen={showReportModal}
-              onClose={() => setShowReportModal(false)}
-              size="xl"
-              scrollBehavior="inside"
-            >
-              <ModalOverlay />
-              <ModalContent mx={{ base: 2, sm: 4 }} maxH="90vh">
-                <ModalHeader fontSize={{ base: "md", sm: "lg" }}>
-                  تقرير الامتحان
-                </ModalHeader>
-                <ModalCloseButton />
-                <ModalBody>
-                  {reportLoading ? (
-                    <Center minH="40vh">
-                      <VStack spacing={4}>
-                        <Spinner size="xl" color="blue.500" />
-                        <Text>جاري تحميل التقرير...</Text>
-                      </VStack>
-                    </Center>
-                  ) : reportError ? (
-                    <Alert status="error" borderRadius="md">
-                      <AlertIcon />
-                      <VStack spacing={2} align="start">
-                        <Text fontWeight="bold">خطأ في تحميل التقرير</Text>
-                        <Text>{reportError}</Text>
-                        <Button
-                          colorScheme="blue"
-                          size="sm"
-                          onClick={fetchExamReport}
-                          mt={2}
-                        >
-                          إعادة المحاولة
-                        </Button>
-                      </VStack>
-                    </Alert>
-                  ) : examReport ? (
-                    <VStack spacing={6} align="stretch">
-                      {/* معلومات عامة عن الامتحان */}
-                      {examReport.exam && (
-                        <Box
-                          p={4}
-                          bg="blue.50"
-                          borderRadius="lg"
-                          border="1px solid"
-                          borderColor="blue.200"
-                        >
-                          <Heading size="md" color="blue.700" mb={3}>
-                            معلومات الامتحان
-                          </Heading>
-                          <VStack spacing={2} align="stretch">
-                            <HStack justify="space-between">
-                              <Text fontWeight="bold">العنوان:</Text>
-                              <Text>{examReport.exam.title || "غير محدد"}</Text>
-                            </HStack>
-                            <HStack justify="space-between">
-                              <Text fontWeight="bold">الدرجة الكلية:</Text>
-                              <Text>{examReport.exam.totalGrade || 0}</Text>
-                            </HStack>
-                            {examReport.exam.duration && (
-                              <HStack justify="space-between">
-                                <Text fontWeight="bold">المدة:</Text>
-                                <Text>{examReport.exam.duration} دقيقة</Text>
-                              </HStack>
-                            )}
-                          </VStack>
-                        </Box>
-                      )}
-
-                      {/* إحصائيات المحاولات */}
-                      {examReport.attemptSummary && (
-                        <Box
-                          p={4}
-                          bg="green.50"
-                          borderRadius="lg"
-                          border="1px solid"
-                          borderColor="green.200"
-                        >
-                          <Heading size="md" color="green.700" mb={3}>
-                            إحصائيات المحاولات
-                          </Heading>
-                          <VStack spacing={3} align="stretch">
-                            <HStack justify="space-between">
-                              <Text fontWeight="bold">إجمالي المحاولات:</Text>
-                              <Badge
-                                colorScheme="blue"
-                                fontSize="md"
-                                px={3}
-                                py={1}
-                              >
-                                {examReport.attemptSummary.total_attempts || 0}
-                              </Badge>
-                            </HStack>
-                            <HStack justify="space-between">
-                              <Text fontWeight="bold">المحاولات المقدمة:</Text>
-                              <Badge
-                                colorScheme="green"
-                                fontSize="md"
-                                px={3}
-                                py={1}
-                              >
-                                {examReport.attemptSummary.submitted_attempts ||
-                                  0}
-                              </Badge>
-                            </HStack>
-                            <HStack justify="space-between">
-                              <Text fontWeight="bold">المحاولات المتأخرة:</Text>
-                              <Badge
-                                colorScheme="orange"
-                                fontSize="md"
-                                px={3}
-                                py={1}
-                              >
-                                {examReport.attemptSummary.late_attempts || 0}
-                              </Badge>
-                            </HStack>
-                            <HStack justify="space-between">
-                              <Text fontWeight="bold">المحاولات المنتهية:</Text>
-                              <Badge
-                                colorScheme="red"
-                                fontSize="md"
-                                px={3}
-                                py={1}
-                              >
-                                {examReport.attemptSummary.expired_attempts ||
-                                  0}
-                              </Badge>
-                            </HStack>
-                          </VStack>
-                        </Box>
-                      )}
-
-                      {/* إحصائيات الأسئلة */}
-                      {examReport.questionStats &&
-                        Array.isArray(examReport.questionStats) &&
-                        examReport.questionStats.length > 0 && (
-                          <Box
-                            p={4}
-                            bg="purple.50"
-                            borderRadius="lg"
-                            border="1px solid"
-                            borderColor="purple.200"
-                          >
-                            <Heading size="md" color="purple.700" mb={3}>
-                              إحصائيات الأسئلة
-                            </Heading>
-                            <VStack
-                              spacing={3}
-                              align="stretch"
-                              maxH="300px"
-                              overflowY="auto"
-                            >
-                              {examReport.questionStats.map((stat, idx) => (
-                                <Box
-                                  key={idx}
-                                  p={3}
-                                  bg="white"
-                                  borderRadius="md"
-                                  border="1px solid"
-                                  borderColor="purple.200"
-                                >
-                                  <HStack justify="space-between" mb={2}>
-                                    <Text fontWeight="bold">
-                                      السؤال {idx + 1}
-                                    </Text>
-                                    <Badge
-                                      colorScheme={
-                                        stat.correctRate >= 70
-                                          ? "green"
-                                          : stat.correctRate >= 50
-                                          ? "yellow"
-                                          : "red"
-                                      }
-                                    >
-                                      {stat.correctRate?.toFixed(1) || 0}%
-                                    </Badge>
-                                  </HStack>
-                                  <HStack
-                                    spacing={4}
-                                    fontSize="sm"
-                                    color="gray.600"
-                                  >
-                                    <Text>صحيح: {stat.correctCount || 0}</Text>
-                                    <Text>
-                                      خاطئ: {stat.incorrectCount || 0}
-                                    </Text>
-                                    <Text>
-                                      لم يُجاب: {stat.unansweredCount || 0}
-                                    </Text>
-                                  </HStack>
-                                </Box>
-                              ))}
-                            </VStack>
-                          </Box>
-                        )}
-
-                      {/* قائمة الطلاب */}
-                      {examReport.students &&
-                        Array.isArray(examReport.students) &&
-                        examReport.students.length > 0 && (
-                          <Box
-                            p={4}
-                            bg="gray.50"
-                            borderRadius="lg"
-                            border="1px solid"
-                            borderColor="gray.200"
-                          >
-                            <Heading size="md" color="gray.700" mb={3}>
-                              قائمة الطلاب
-                            </Heading>
-                            <VStack
-                              spacing={2}
-                              align="stretch"
-                              maxH="400px"
-                              overflowY="auto"
-                            >
-                              {examReport.students.map((student, idx) => (
-                                <Box
-                                  key={student.studentId || idx}
-                                  p={3}
-                                  bg="white"
-                                  borderRadius="md"
-                                  border="1px solid"
-                                  borderColor="gray.200"
-                                >
-                                  <HStack justify="space-between" mb={2}>
-                                    <Text fontWeight="bold">
-                                      {student.name || `طالب ${idx + 1}`}
-                                    </Text>
-                                    <Badge
-                                      colorScheme={
-                                        student.passed ? "green" : "red"
-                                      }
-                                      fontSize="md"
-                                    >
-                                      {student.passed ? "ناجح" : "راسب"}
-                                    </Badge>
-                                  </HStack>
-                                  <HStack
-                                    spacing={4}
-                                    fontSize="sm"
-                                    color="gray.600"
-                                  >
-                                    <Text>
-                                      الدرجة: {student.totalGrade || 0}
-                                    </Text>
-                                    {student.submittedAt && (
-                                      <Text>
-                                        التاريخ:{" "}
-                                        {new Date(
-                                          student.submittedAt
-                                        ).toLocaleString("ar-EG")}
-                                      </Text>
-                                    )}
-                                  </HStack>
-                                </Box>
-                              ))}
-                            </VStack>
-                          </Box>
-                        )}
-
-                      {/* إذا لم تكن هناك بيانات */}
-                      {!examReport.exam &&
-                        !examReport.attemptSummary &&
-                        (!examReport.questionStats ||
-                          examReport.questionStats.length === 0) &&
-                        (!examReport.students ||
-                          examReport.students.length === 0) && (
-                          <Alert status="info" borderRadius="md">
-                            <AlertIcon />
-                            <Text>لا توجد بيانات متاحة في التقرير</Text>
-                          </Alert>
-                        )}
-                    </VStack>
-                  ) : (
-                    <Alert status="info" borderRadius="md">
-                      <AlertIcon />
-                      <Text>لم يتم تحميل التقرير بعد</Text>
-                    </Alert>
-                  )}
-                </ModalBody>
-                <ModalFooter>
-                  <Button
-                    variant="ghost"
-                    onClick={() => setShowReportModal(false)}
-                    size={{ base: "sm", sm: "md" }}
-                  >
-                    إغلاق
-                  </Button>
-                </ModalFooter>
               </ModalContent>
             </Modal>
     </>

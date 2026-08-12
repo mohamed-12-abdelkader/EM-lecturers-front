@@ -132,6 +132,28 @@ export function resolveTenantSubdomain() {
 }
 
 /**
+ * سياق المنصة لتسجيل الدخول فقط.
+ * على localhost العادي بدون ?tenant= لا نرسل subdomain من session قديم
+ * (كان يسبب 400 رغم صحة البيانات).
+ */
+export function resolveLoginTenantSubdomain() {
+  if (typeof window === "undefined") return null;
+
+  const fromHost = getTenantSubdomain();
+  if (fromHost) return fromHost;
+
+  const fromQuery = readTenantFromSearchParams();
+  if (fromQuery) return fromQuery;
+
+  const host = window.location.hostname.toLowerCase();
+  if (host === "localhost" || host === "127.0.0.1") {
+    return null;
+  }
+
+  return readPersistedTenantSubdomain();
+}
+
+/**
  * على صفحات auth: لو في tenant بالـ query والنطاق الحالي مش subdomain،
  * حوّل لرابط المنصة الصحيح عشان المشاركة تفضل شغّالة.
  * @returns {string|null} subdomain بعد الحل (أو null)
@@ -145,7 +167,12 @@ export function ensureTenantAuthContext() {
     return fromHost;
   }
 
-  const slug = readTenantFromSearchParams() || readPersistedTenantSubdomain();
+  const fromQuery = readTenantFromSearchParams();
+  const host = window.location.hostname.toLowerCase();
+  const isBareLocalhost = host === "localhost" || host === "127.0.0.1";
+
+  const slug =
+    fromQuery || (!isBareLocalhost ? readPersistedTenantSubdomain() : null);
   if (!slug) return null;
 
   persistTenantSubdomain(slug);

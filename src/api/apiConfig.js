@@ -22,13 +22,22 @@ function isProductionBuild() {
   return import.meta.env.PROD === true;
 }
 
+/** نطاقات المدرس في التطوير: teacher.localhost — تحتاج proxy لتجنب CORS مع :8000 */
+function isTenantDevHost() {
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname.toLowerCase();
+  return host.endsWith(".localhost");
+}
+
 /**
  * في التطوير فقط: Vite proxy (/) → localhost:8000
- * يتجنب مشاكل CORS مع نطاقات مثل omar-mohamed.localhost:3000
+ * يتجنب مشاكل CORS مع نطاقات مثل mo-adbo.localhost:3000
  */
 export function useDevViteProxy() {
   if (isProductionBuild()) return false;
   if (!import.meta.env.DEV) return false;
+  // منصات المدرس على *.localhost:3000 — دائماً proxy (CORS لا يسمح بالاتصال المباشر لـ :8000)
+  if (isTenantDevHost()) return true;
   return import.meta.env.VITE_USE_VITE_PROXY !== "false";
 }
 

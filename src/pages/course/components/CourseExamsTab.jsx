@@ -1554,11 +1554,29 @@ const CourseExamsTab = ({
           </VStack>
         </Center>
       ) : !Array.isArray(courseExams) || courseExams.length === 0 ? (
-        <Center py={10}>
-          <VStack spacing={4}>
-            <Icon as={FaGraduationCap} boxSize={12} color="gray.400" />
-            <Text color="gray.500">لا يوجد امتحانات شاملة متاحة لهذا الكورس</Text>
-          </VStack>
+        <Center py={8} flexDir="column" textAlign="center">
+          <Box
+            mx="auto"
+            display="flex"
+            aspectRatio={1}
+            w={{ base: "16rem", sm: "20rem" }}
+            alignItems="center"
+            justifyContent="center"
+            overflow="hidden"
+            borderRadius="full"
+            bg="black"
+          >
+            <Box
+              as="img"
+              src="/images/course-exams-empty.jpg"
+              alt="لا توجد امتحانات شاملة — سيتم إضافتها قريباً"
+              w="full"
+              h="full"
+              objectFit="contain"
+              loading="lazy"
+              decoding="async"
+            />
+          </Box>
         </Center>
       ) : (
         <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={{ base: 3, md: 5 }}>

@@ -17,6 +17,7 @@ import {
 import { FaAndroid } from "react-icons/fa";
 import { MdVerified } from "react-icons/md";
 import Links from "../../components/links/Links";
+import { getRoleLabel } from "../../utils/authRoles";
 import UserType from "../../Hooks/auth/userType";
 import { SHELL_DESKTOP_BP } from "../../theme/chakraTheme";
 
@@ -27,18 +28,21 @@ function getUserDisplayName(user) {
   return full || "مستخدم";
 }
 
-function getRoleMeta(isAdmin, isTeacher) {
+function getRoleMeta(user, isAdmin, isTeacher, isAcademy, isAcademyTeacher) {
   if (isAdmin) return { label: "مشرف النظام", colorScheme: "purple" };
+  if (isAcademy) return { label: "مالك أكاديمية", colorScheme: "blue" };
+  if (isAcademyTeacher) return { label: "مدرس أكاديمية", colorScheme: "cyan" };
   if (isTeacher) return { label: "مدرس", colorScheme: "blue" };
-  return { label: "طالب", colorScheme: "green" };
+  return { label: getRoleLabel(user?.role) || "طالب", colorScheme: "green" };
 }
 
-function SidebarUserCard({ user, isAdmin, isTeacher, isExpanded }) {
+function SidebarUserCard({ user, isAdmin, isTeacher, isAcademy, isAcademyTeacher, isExpanded }) {
   const cardBg = useColorModeValue("gray.50", "whiteAlpha.50");
   const cardBorder = useColorModeValue("gray.100", "gray.700");
   const nameColor = useColorModeValue("gray.800", "white");
   const emailColor = useColorModeValue("gray.500", "gray.400");
-  const role = getRoleMeta(isAdmin, isTeacher);
+  const avatarBorder = useColorModeValue("white", "gray.700");
+  const role = getRoleMeta(user, isAdmin, isTeacher, isAcademy, isAcademyTeacher);
   const displayName = getUserDisplayName(user);
 
   if (!isExpanded) {
@@ -77,7 +81,7 @@ function SidebarUserCard({ user, isAdmin, isTeacher, isExpanded }) {
           color="white"
           fontWeight="bold"
           borderWidth="2px"
-          borderColor={useColorModeValue("white", "gray.700")}
+          borderColor={avatarBorder}
           boxShadow="sm"
         />
         <VStack align="start" spacing={1} flex={1} minW={0}>
@@ -117,7 +121,7 @@ const HomeLogin = () => {
       return null;
     }
   }, []);
-  const [, isAdmin, isTeacher, student] = UserType();
+  const [, isAdmin, isTeacher, student, isAcademy, isAcademyTeacher] = UserType();
   const location = useLocation();
 
   const sidebarBg = useColorModeValue("white", "gray.900");
@@ -159,6 +163,7 @@ const HomeLogin = () => {
     >
       {!shouldHideSidebar && (
         <Box
+          data-tour-id="student-sidebar"
           display={{ base: "none", [SHELL_DESKTOP_BP]: "flex" }}
           flexDirection="column"
           width={sidebarWidth}
@@ -180,6 +185,8 @@ const HomeLogin = () => {
             user={user}
             isAdmin={isAdmin}
             isTeacher={isTeacher}
+            isAcademy={isAcademy}
+            isAcademyTeacher={isAcademyTeacher}
             isExpanded
           />
 

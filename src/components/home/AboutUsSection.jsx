@@ -160,7 +160,7 @@ const AboutUsSection = () => {
                 ابدأ مجانًا وابنِ براندك التعليمي من أول يوم.
               </p>
             </div>
-            <Link to="/signup" className="relative z-10 shrink-0">
+            <Link to="/create-platform" className="relative z-10 shrink-0">
               <motion.span
                 whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.98 }}
