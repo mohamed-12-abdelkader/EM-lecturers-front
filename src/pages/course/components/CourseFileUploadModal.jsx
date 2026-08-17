@@ -136,7 +136,7 @@ export default function CourseFileUploadModal({ isOpen, onClose, onSubmit, loadi
                         isDisabled={loading}
                       />
                     </Box>
-                    <FormHelperText>يُرفع الملف إلى التخزين السحابي تلقائياً</FormHelperText>
+                    <FormHelperText>يُرفع الملف إلى Bunny CDN تلقائياً (أو التخزين المحلي كبديل)</FormHelperText>
                   </FormControl>
                 </TabPanel>
                 <TabPanel px={0}>

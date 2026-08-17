@@ -39,7 +39,18 @@ import {
 } from "../../utils/tenantHost";
 import { persistLoginSession } from "../../utils/authStorage";
 import { getPostLoginPath } from "../../utils/authRoles";
+import {
+  appendDeviceIp,
+  getAuthDeviceErrorMessage,
+  handleAuthIpRegistered,
+  isAccountIpMismatchError,
+  isSingleDeviceLimit,
+  SINGLE_DEVICE_NOTICE,
+} from "../../utils/deviceRestriction";
+import { fetchPublicDeviceRestrictionSettings } from "../../api/deviceRestrictionApi";
+import { fetchPublicRegistrationSettings } from "../../api/courseGroupsApi";
 import { TenantPublicNavbarShell } from "../tenantPublic/components/TenantPublicNavbar";
+import DeviceMismatchModal from "./components/DeviceMismatchModal";
 import "react-toastify/dist/ReactToastify.css";
 
 const BLUE = "#3182CE";
@@ -58,6 +69,11 @@ const LoginPage = () => {
   const hasTenantNavbar = Boolean(tenantSubdomain);
   const { colorMode, toggleColorMode } = useColorMode();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const {
+    isOpen: isDeviceMismatchOpen,
+    onOpen: onDeviceMismatchOpen,
+    onClose: onDeviceMismatchClose,
+  } = useDisclosure();
   const { 
     isOpen: isSupportOpen, 
     onOpen: onSupportOpen, 
@@ -68,11 +84,40 @@ const LoginPage = () => {
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [singleDeviceMode, setSingleDeviceMode] = useState(false);
+  const [loginErrorMessage, setLoginErrorMessage] = useState("");
+  const [deviceMismatchMessage, setDeviceMismatchMessage] = useState("");
 
   useEffect(() => {
     const resolved = ensureTenantAuthContext();
     if (resolved) setTenantSubdomain(resolved);
   }, []);
+
+  useEffect(() => {
+    if (!tenantSubdomain) {
+      setSingleDeviceMode(false);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const [deviceSettings, registrationSettings] = await Promise.all([
+          fetchPublicDeviceRestrictionSettings(tenantSubdomain).catch(() => null),
+          fetchPublicRegistrationSettings(tenantSubdomain).catch(() => null),
+        ]);
+        if (cancelled) return;
+        const settings = deviceSettings || registrationSettings;
+        setSingleDeviceMode(isSingleDeviceLimit(settings));
+      } catch {
+        if (!cancelled) setSingleDeviceMode(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [tenantSubdomain]);
 
   const pageBg = useColorModeValue("#f8fafc", "gray.950");
   const illustrationBg = useColorModeValue("#f0f6ff", "gray.900");
@@ -140,16 +185,6 @@ const LoginPage = () => {
     }
   };
 
-  function generateString() {
-    var chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    var string = "";
-    for (var i = 0; i < 30; i++) {
-      var randomIndex = Math.floor(Math.random() * chars.length);
-      string += chars[randomIndex];
-    }
-    return string;
-  }
-
   const identifierChange = (e) => {
     setIdentifier(e.target.value);
   };
@@ -168,13 +203,9 @@ const LoginPage = () => {
 
     try {
       setLoading(true);
+      setLoginErrorMessage("");
+      setDeviceMismatchMessage("");
 
-      if (!localStorage.getItem("ip")) {
-        var generatedString = generateString();
-        localStorage.setItem("ip", generatedString);
-      }
-
-      // تحديد ما إذا كان المدخل بريدًا إلكترونيًا أو رقم هاتف
       const isEmail = identifier.includes("@");
       const subdomain = resolveLoginTenantSubdomain();
       const basePayload = isEmail
@@ -186,49 +217,49 @@ const LoginPage = () => {
             phone: identifier.replace(/[^0-9]/g, ""),
             password: pass,
           };
-      const requestData =
-        subdomain ? { subdomain, ...basePayload } : basePayload;
+      const requestData = appendDeviceIp(
+        subdomain ? { subdomain, ...basePayload } : basePayload,
+      );
 
       const response = await baseUrl.post("/api/login", requestData);
 
       persistLoginSession(response.data);
+      handleAuthIpRegistered(response.data);
 
-      // Show success modal
       setShowSuccessModal(true);
       void playAuthSuccessSound();
+
+      if (response.data?.ip_registered) {
+        toast.info("تم ربط حسابك بهذا المتصفح");
+      }
 
       const params = new URLSearchParams(window.location.search);
       const redirectTarget = params.get("redirect");
       const user = response.data?.user ?? response.data?.data?.user;
       const destination = getPostLoginPath(user, redirectTarget);
-      // تنقّل SPA مرة واحدة — بدون reload (كان يسبب إعادة تحميل متكررة)
       setTimeout(() => {
         navigate(destination, { replace: true });
       }, 1400);
     } catch (error) {
-      console.error('Login error:', error);
-      // فتح مودال الخطأ تلقائياً
-      onOpen();
-      
-      if (error.response) {
-        const apiMsg =
-          error.response.data?.msg ||
-          error.response.data?.message ||
-          error.response.data?.error;
-        if (apiMsg === "You must login from the same device") {
-          toast.error("لقد تجاوزت الحد المسموح لك من الاجهزة");
-        } else {
-          toast.error(apiMsg || "حدث خطأ أثناء تسجيل الدخول");
-        }
+      console.error("Login error:", error);
+      const apiMsg = getAuthDeviceErrorMessage(error);
+      const legacyDeviceMsg =
+        error.response?.data?.msg === "You must login from the same device";
+      const mismatch = isAccountIpMismatchError(error) || legacyDeviceMsg;
+
+      if (mismatch) {
+        setDeviceMismatchMessage(
+          apiMsg ||
+            "هذا الحساب مسجّل على جهاز أو متصفح آخر من قبل. تواصل مع المدرس للسماح لك باستخدام جهاز آخر.",
+        );
+        onDeviceMismatchOpen();
       } else {
-        toast.error("حدث خطأ في الاتصال بالخادم");
+        setLoginErrorMessage(apiMsg);
+        onOpen();
+        toast.error(apiMsg);
       }
     } finally {
       setLoading(false);
-        setTimeout(() => {
-       
-  
-      }, 2000);
     }
   };
 
@@ -493,6 +524,21 @@ const LoginPage = () => {
               <Text fontSize="md" color={subtextColor} lineHeight="1.7">
                 أدخل بيانات حسابك للمتابعة إلى لوحة التعلم
               </Text>
+              {singleDeviceMode ? (
+                <Box
+                  mt={4}
+                  p={3}
+                  borderRadius="xl"
+                  bg="orange.50"
+                  border="1px solid"
+                  borderColor="orange.200"
+                  _dark={{ bg: "whiteAlpha.100", borderColor: "orange.700" }}
+                >
+                  <Text fontSize="xs" color="orange.800" _dark={{ color: "orange.200" }} lineHeight="tall">
+                    {SINGLE_DEVICE_NOTICE}
+                  </Text>
+                </Box>
+              ) : null}
             </Box>
 
             <Box as="form" onSubmit={handleLogin}>
@@ -635,6 +681,12 @@ const LoginPage = () => {
       <ScrollToTop />
       <ToastContainer position="top-center" />
 
+      <DeviceMismatchModal
+        isOpen={isDeviceMismatchOpen}
+        onClose={onDeviceMismatchClose}
+        message={deviceMismatchMessage}
+      />
+
       {/* Modal for login error */}
       <Modal isOpen={isOpen} onClose={onClose} isCentered>
         <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(10px)" />
@@ -664,9 +716,9 @@ const LoginPage = () => {
                 رقم الهاتف أو البريد الإلكتروني أو كلمة المرور غير صحيحة
               </Text>
               <Text fontSize="md" color="gray.500">
-                يبدو أن البيانات المدخلة غير صحيحة. تأكد من صحة البيانات المدخلة
+                {loginErrorMessage || "يبدو أن البيانات المدخلة غير صحيحة. تأكد من صحة البيانات المدخلة"}
               </Text>
-              
+
               <Box
                 bg="blue.50"
                 borderRadius="lg"

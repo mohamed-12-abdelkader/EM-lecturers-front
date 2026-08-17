@@ -1,22 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { safeLocalGet } from "../../utils/safeStorage";
-import { resolveAuthRoles } from "../../utils/authRoles";
+import { useAuth } from "../../contexts/AuthContext";
+import { AUTH_STORAGE_UPDATE_EVENT, readStoredUser } from "../../utils/authStorage";
+import { normalizeAuthUser, resolveAuthRoles } from "../../utils/authRoles";
 
-function readStoredUser() {
-  try {
-    const raw = safeLocalGet("user");
-    if (raw == null || raw === "") return null;
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : null;
-  } catch {
-    return null;
-  }
+function readStoredUserFromHook() {
+  return readStoredUser();
 }
 
 const UserType = () => {
   const location = useLocation();
-  const initialUser = readStoredUser();
+  const { user: authUser } = useAuth();
+  const initialUser = normalizeAuthUser(readStoredUserFromHook() ?? authUser, {
+    fallbackUser: readStoredUserFromHook() ?? authUser,
+  });
   const initialRoles = resolveAuthRoles(initialUser);
 
   const [userData, setUserData] = useState(initialUser);
@@ -27,7 +24,10 @@ const UserType = () => {
   const [isAcademyTeacher, setIsAcademyTeacher] = useState(initialRoles.isAcademyTeacher);
 
   const syncFromStorage = useCallback(() => {
-    const user = readStoredUser();
+    const stored = readStoredUserFromHook();
+    const user = normalizeAuthUser(authUser ?? stored, {
+      fallbackUser: stored ?? authUser,
+    });
     setUserData(user);
     const r = resolveAuthRoles(user);
     setIsAdmin(r.isAdmin);
@@ -35,22 +35,28 @@ const UserType = () => {
     setStudent(r.student);
     setIsAcademy(r.isAcademy);
     setIsAcademyTeacher(r.isAcademyTeacher);
-  }, []);
+  }, [authUser]);
 
   useEffect(() => {
     syncFromStorage();
-  }, [location.pathname, syncFromStorage]);
+  }, [location.pathname, authUser, syncFromStorage]);
 
   useEffect(() => {
     const onStorage = (e) => {
-      if (e.key === "user" || e.key === null) syncFromStorage();
+      if (
+        e.key === "user" ||
+        e.key === null ||
+        (typeof e.key === "string" && e.key.startsWith("em-auth:"))
+      ) {
+        syncFromStorage();
+      }
     };
     const onAuthUpdate = () => syncFromStorage();
     window.addEventListener("storage", onStorage);
-    window.addEventListener("auth-storage-update", onAuthUpdate);
+    window.addEventListener(AUTH_STORAGE_UPDATE_EVENT, onAuthUpdate);
     return () => {
       window.removeEventListener("storage", onStorage);
-      window.removeEventListener("auth-storage-update", onAuthUpdate);
+      window.removeEventListener(AUTH_STORAGE_UPDATE_EVENT, onAuthUpdate);
     };
   }, [syncFromStorage]);
 

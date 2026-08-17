@@ -7,16 +7,16 @@ import {
   Image,
   Badge,
   Flex,
-  Divider,
   Radio,
   RadioGroup,
-  Stack,
   IconButton,
   Spinner,
   Alert,
   AlertIcon,
   SimpleGrid,
   Grid,
+  Button,
+  Tooltip,
   useColorModeValue,
 } from "@chakra-ui/react";
 import {
@@ -316,6 +316,7 @@ function ExamChoicesSection({
   const correctBg = useColorModeValue("green.50", "green.900");
   const correctBorder = useColorModeValue("green.400", "green.500");
   const muted = useColorModeValue("gray.500", "gray.400");
+  const teacherChoicesBg = useColorModeValue("gray.50", "whiteAlpha.50");
 
   const normalized = (choices || []).map(mapChoice);
   const imageGrid = normalized.some((c) => c.isImageOnly || c.hasImage);
@@ -487,9 +488,17 @@ function ExamChoicesSection({
           </SimpleGrid>
         </RadioGroup>
       ) : (
-        <SimpleGrid columns={imageGrid ? 1 : { base: 1, md: 2 }} spacing={2}>
-          {normalized.map((choice, cidx) => renderTeacherChoice(choice, cidx))}
-        </SimpleGrid>
+        <Box
+          p={3}
+          borderRadius="xl"
+          bg={teacherChoicesBg}
+          borderWidth="1px"
+          borderColor={border}
+        >
+          <SimpleGrid columns={imageGrid ? 1 : { base: 1, md: 2 }} spacing={2}>
+            {normalized.map((choice, cidx) => renderTeacherChoice(choice, cidx))}
+          </SimpleGrid>
+        </Box>
       )}
     </Box>
   );
@@ -514,113 +523,167 @@ export function TeacherQuestionCard({
   const borderColor = useColorModeValue("gray.200", "gray.700");
   const textColor = useColorModeValue("gray.800", "white");
   const muted = useColorModeValue("gray.500", "gray.400");
+  const headerBg = useColorModeValue("gray.50", "whiteAlpha.50");
+  const accent = index % 2 === 0 ? "blue.500" : "orange.500";
+  const hasCorrect = (displayChoices || []).some((c) => c.is_correct);
 
   return (
     <Box
       bg={cardBg}
       borderWidth="1px"
       borderColor={borderColor}
-      borderRadius="xl"
-      p={{ base: 4, md: 5 }}
+      borderRadius="2xl"
+      overflow="hidden"
+      boxShadow="sm"
+      transition="box-shadow 0.2s ease"
+      _hover={{ boxShadow: "md" }}
     >
-      {/* رأس السؤال: رقم + أزرار */}
-      <Flex align="center" justify="space-between" gap={3} mb={3}>
-        <HStack spacing={2}>
+      <Box h="3px" bg={accent} />
+
+      <Flex
+        align={{ base: "stretch", sm: "center" }}
+        justify="space-between"
+        gap={3}
+        px={{ base: 4, md: 5 }}
+        py={3}
+        bg={headerBg}
+        borderBottomWidth="1px"
+        borderColor={borderColor}
+        direction={{ base: "column", sm: "row" }}
+      >
+        <HStack spacing={3} minW={0}>
           <Flex
-            minW="32px"
-            h="32px"
-            px={2}
-            borderRadius="md"
-            bg="blue.500"
+            minW="36px"
+            h="36px"
+            borderRadius="xl"
+            bg={accent}
             color="white"
             align="center"
             justify="center"
             fontSize="sm"
             fontWeight="black"
+            boxShadow="sm"
           >
             {index + 1}
           </Flex>
-          <Text fontSize="xs" color={muted}>
-            {displayChoices?.length || 0} اختيارات
-          </Text>
+          <VStack align="start" spacing={0.5} minW={0}>
+            <HStack spacing={2} flexWrap="wrap">
+              <Badge colorScheme="gray" variant="subtle" borderRadius="md" fontSize="10px">
+                {displayChoices?.length || 0} اختيارات
+              </Badge>
+              {passageContent ? (
+                <Badge colorScheme="blue" variant="subtle" borderRadius="md" fontSize="10px">
+                  قطعة قراءة
+                </Badge>
+              ) : null}
+              {displayImage && !displayText ? (
+                <Badge colorScheme="purple" variant="subtle" borderRadius="md" fontSize="10px">
+                  سؤال صورة
+                </Badge>
+              ) : null}
+              {hasCorrect ? (
+                <Badge colorScheme="green" variant="subtle" borderRadius="md" fontSize="10px">
+                  إجابة محددة
+                </Badge>
+              ) : (
+                <Badge colorScheme="orange" variant="subtle" borderRadius="md" fontSize="10px">
+                  بدون إجابة صحيحة
+                </Badge>
+              )}
+            </HStack>
+          </VStack>
         </HStack>
 
-        <HStack spacing={1}>
-          <IconButton
-            aria-label="إضافة صورة"
-            size="sm"
-            variant="outline"
-            borderColor={borderColor}
-            icon={<AiFillPicture />}
-            onClick={() => onAddImage(displayId)}
-          />
-          <IconButton
-            aria-label="تعديل"
-            size="sm"
-            variant="outline"
-            borderColor={borderColor}
-            icon={<AiFillEdit />}
-            onClick={() => onEdit(questionRef)}
-          />
-          <IconButton
-            aria-label="حذف"
-            size="sm"
-            variant="outline"
-            borderColor="red.200"
-            colorScheme="red"
-            icon={<AiFillDelete />}
-            onClick={() => onDelete(displayId)}
-          />
+        <HStack spacing={2} flexShrink={0} justify={{ base: "stretch", sm: "flex-end" }}>
+          <Tooltip label="إضافة صورة" hasArrow>
+            <Button
+              size="sm"
+              variant="outline"
+              borderRadius="lg"
+              leftIcon={<AiFillPicture />}
+              onClick={() => onAddImage(displayId)}
+              display={{ base: "flex", md: "inline-flex" }}
+              flex={{ base: 1, md: "none" }}
+            >
+              <Text display={{ base: "inline", md: "none" }}>صورة</Text>
+            </Button>
+          </Tooltip>
+          <Tooltip label="تعديل السؤال" hasArrow>
+            <Button
+              size="sm"
+              variant="outline"
+              colorScheme="blue"
+              borderRadius="lg"
+              leftIcon={<AiFillEdit />}
+              onClick={() => onEdit(questionRef)}
+              display={{ base: "flex", md: "inline-flex" }}
+              flex={{ base: 1, md: "none" }}
+            >
+              <Text display={{ base: "inline", md: "none" }}>تعديل</Text>
+            </Button>
+          </Tooltip>
+          <Tooltip label="حذف السؤال" hasArrow>
+            <IconButton
+              aria-label="حذف"
+              size="sm"
+              colorScheme="red"
+              variant="outline"
+              borderRadius="lg"
+              icon={<AiFillDelete />}
+              onClick={() => onDelete(displayId)}
+            />
+          </Tooltip>
         </HStack>
       </Flex>
 
-      {passageContent ? (
-        <Box mb={4}>
-          <ExamPassageBlock content={passageContent} variant="teacher" />
-        </Box>
-      ) : null}
+      <Box p={{ base: 4, md: 5 }}>
+        {passageContent ? (
+          <Box mb={4}>
+            <ExamPassageBlock content={passageContent} variant="teacher" />
+          </Box>
+        ) : null}
 
-      {/* نص السؤال */}
-      {displayText ? (
-        <Text
-          fontSize={{ base: "md", md: "md" }}
-          fontWeight="semibold"
-          color={textColor}
-          lineHeight="1.9"
-          dir="auto"
-          mb={displayImage || displayChoices?.length ? 4 : 0}
-          whiteSpace="pre-wrap"
-        >
-          {renderFormattedExamText(displayText)}
-        </Text>
-      ) : null}
+        {displayText ? (
+          <Text
+            fontSize={{ base: "md", md: "lg" }}
+            fontWeight="semibold"
+            color={textColor}
+            lineHeight="1.95"
+            dir="auto"
+            mb={displayImage || displayChoices?.length ? 4 : 0}
+            whiteSpace="pre-wrap"
+          >
+            {renderFormattedExamText(displayText)}
+          </Text>
+        ) : null}
 
-      {displayImage ? (
-        <Box mb={displayChoices?.length ? 4 : 0}>
-          <ExamQuestionImage
-            src={displayImage}
-            onZoom={onZoomImage}
-            maxH={{ base: "260px", md: "320px" }}
-            compact={!!displayText}
-          />
-        </Box>
-      ) : null}
+        {displayImage ? (
+          <Box mb={displayChoices?.length ? 4 : 0}>
+            <ExamQuestionImage
+              src={displayImage}
+              onZoom={onZoomImage}
+              maxH={{ base: "260px", md: "360px" }}
+              compact={!!displayText}
+            />
+          </Box>
+        ) : null}
 
-      {!displayText && !displayImage ? (
-        <Text fontSize="sm" color={muted} mb={4}>
-          سؤال بدون نص
-        </Text>
-      ) : null}
+        {!displayText && !displayImage ? (
+          <Text fontSize="sm" color={muted} mb={4}>
+            سؤال بدون نص — أضف صورة أو عدّل السؤال
+          </Text>
+        ) : null}
 
-      <ExamChoicesSection
-        choices={displayChoices}
-        mode="teacher"
-        displayId={displayId}
-        pendingCorrect={pendingCorrect}
-        onSetCorrect={onSetCorrect}
-        onZoomImage={onZoomImage}
-        headingColor={textColor}
-      />
+        <ExamChoicesSection
+          choices={displayChoices}
+          mode="teacher"
+          displayId={displayId}
+          pendingCorrect={pendingCorrect}
+          onSetCorrect={onSetCorrect}
+          onZoomImage={onZoomImage}
+          headingColor={textColor}
+        />
+      </Box>
     </Box>
   );
 }

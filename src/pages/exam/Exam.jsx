@@ -5,14 +5,13 @@ import {
   ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton, Button, Input, Divider, Badge, Tooltip, InputGroup, InputRightElement, Image, useColorModeValue, Flex, SimpleGrid, Grid, Textarea
 } from "@chakra-ui/react";
 import { AiFillEdit, AiFillDelete, AiFillCheckCircle, AiOutlineCheckCircle, AiOutlineCloseCircle, AiFillStar, AiOutlineRobot } from "react-icons/ai";
-import { CircularProgress, CircularProgressLabel } from "@chakra-ui/react";
 import baseUrl from "../../api/baseUrl";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import { useParams, useNavigate } from "react-router-dom";
 import UserType from "../../Hooks/auth/userType";
 import {
   FaBookOpen, FaCheckCircle, FaChevronLeft, FaChevronRight,
-  FaUser, FaTimesCircle, FaPhone, FaIdBadge, FaCalendarAlt, FaImage
+  FaUser, FaTimesCircle, FaImage, FaChartBar
 } from 'react-icons/fa';
 import { BiSearch } from "react-icons/bi";
 import {
@@ -22,6 +21,7 @@ import {
   isImageUrl,
 } from "./components/PlatformExamQuestionCard";
 import AiQuestionExtractionModal from "./components/AiQuestionExtractionModal";
+import { SubmissionCard } from "./components/ExamSubmissionsView";
 import FormattedQuestionText from "../../components/question/FormattedQuestionText";
 import { MdArrowBack } from "react-icons/md";
 const Exam = () => {
@@ -643,6 +643,17 @@ const Exam = () => {
                 >
                   {showGrades ? "عرض الأسئلة" : "عرض درجات الطلاب"}
                 </Button>
+                <Button
+                  variant="outline"
+                  colorScheme="blue"
+                  size={{ base: "sm", md: "md" }}
+                  leftIcon={<FaChartBar />}
+                  onClick={() => navigate(`/exam/${examId}/report`)}
+                  borderRadius="xl"
+                  fontWeight="600"
+                >
+                  تقرير الأسئلة
+                </Button>
               </HStack>
             )}
           </Flex>
@@ -651,9 +662,28 @@ const Exam = () => {
       {/* عرض درجات الطلاب للمدرس — يتوافق مع الـ API: submission_id, obtained_grade, total_grade, attempt_number */}
       {showGrades && isTeacher ? (
         <Box w="full" maxW="4xl" mx="auto" px={{ base: 2, sm: 4 }}>
-          <Heading mb={{ base: 4, md: 6 }} textAlign="center" color="blue.600" fontSize={{ base: "xl", sm: "2xl", md: "3xl" }}>
-            درجات الطلاب في الامتحان
-          </Heading>
+          <Flex
+            direction={{ base: "column", sm: "row" }}
+            align={{ base: "stretch", sm: "center" }}
+            justify="space-between"
+            gap={3}
+            mb={{ base: 4, md: 6 }}
+          >
+            <Heading textAlign={{ base: "center", sm: "start" }} color="blue.600" fontSize={{ base: "xl", sm: "2xl", md: "3xl" }}>
+              درجات الطلاب في الامتحان
+            </Heading>
+            <Button
+              colorScheme="blue"
+              size={{ base: "sm", md: "md" }}
+              leftIcon={<FaChartBar />}
+              onClick={() => navigate(`/exam/${examId}/report`)}
+              borderRadius="xl"
+              fontWeight="600"
+              alignSelf={{ base: "center", sm: "auto" }}
+            >
+              تقرير الأسئلة
+            </Button>
+          </Flex>
           <Box w="full" maxW={{ base: "100%", sm: "400px" }} mx="auto" mb={{ base: 4, md: 6 }}>
             <InputGroup size="lg">
               <Input
@@ -695,7 +725,6 @@ const Exam = () => {
                   (s.phone && s.phone.includes(term))
                 );
               });
-              const percentage = (s) => (s.total_grade > 0 ? Math.round((s.obtained_grade / s.total_grade) * 100) : 0);
               return (
                 <VStack spacing={{ base: 4, md: 5 }} align="stretch">
                   {filtered.length === 0 ? (
@@ -703,97 +732,12 @@ const Exam = () => {
                       <Text color="gray.500" fontSize="md">لا توجد نتائج مطابقة للبحث</Text>
                     </Center>
                   ) : (
-                    filtered.map((s) => (
-                      <Box
-                        key={s.submission_id}
-                        p={{ base: 4, sm: 5, md: 6 }}
-                        borderRadius="2xl"
-                        boxShadow="md"
-                        bg="white"
-                        borderWidth="2px"
-                        borderColor={s.passed ? "blue.200" : "orange.200"}
-                        bgGradient={s.passed ? "linear(to-br, blue.50, white)" : "linear(to-br, orange.50, white)"}
-                        transition="all 0.2s"
-                        _hover={{ boxShadow: "lg", borderColor: s.passed ? "blue.400" : "orange.400" }}
-                      >
-                        <HStack
-                          spacing={{ base: 3, sm: 4, md: 6 }}
-                          align={{ base: "flex-start", sm: "center" }}
-                          flexWrap="wrap"
-                          justify="space-between"
-                        >
-                          <HStack spacing={{ base: 3, md: 4 }} align="center" flex={1} minW="0">
-                            <Box
-                              bg={s.passed ? "blue.500" : "orange.500"}
-                              color="white"
-                              w={{ base: "48px", sm: "56px", md: "60px" }}
-                              h={{ base: "48px", sm: "56px", md: "60px" }}
-                              display="flex"
-                              alignItems="center"
-                              justifyContent="center"
-                              borderRadius="full"
-                              fontSize={{ base: "xl", md: "2xl" }}
-                              fontWeight="bold"
-                              flexShrink={0}
-                            >
-                              {s.name && s.name.trim().length > 0 ? s.name.trim()[0] : <FaUser />}
-                            </Box>
-                            <VStack align="stretch" spacing={1} flex={1} minW="0">
-                              <Text fontWeight="bold" fontSize={{ base: "md", sm: "lg", md: "xl" }} color="gray.800" noOfLines={1}>
-                                {s.name || "—"}
-                              </Text>
-                              <HStack spacing={2} flexWrap="wrap">
-                                <Badge colorScheme="gray" fontSize="xs" px={2} py={0.5} borderRadius="md">
-                                  <FaIdBadge style={{ marginLeft: 4, display: "inline" }} /> {s.student_id}
-                                </Badge>
-                                <Badge colorScheme="blue" fontSize="xs" px={2} py={0.5} borderRadius="md">
-                                  محاولة {s.attempt_number ?? "—"}
-                                </Badge>
-                                {s.phone && (
-                                  <Badge colorScheme="gray" variant="outline" fontSize="xs" px={2} py={0.5} borderRadius="md">
-                                    <FaPhone style={{ marginLeft: 4, display: "inline" }} /> {s.phone}
-                                  </Badge>
-                                )}
-                              </HStack>
-                              <Text fontSize="xs" color="gray.500">
-                                <FaCalendarAlt style={{ marginLeft: 4, display: "inline" }} />
-                                {s.submitted_at ? new Date(s.submitted_at).toLocaleString("ar-EG", { dateStyle: "short", timeStyle: "short" }) : "—"}
-                              </Text>
-                            </VStack>
-                          </HStack>
-                          <HStack spacing={{ base: 3, md: 5 }} align="center" flexShrink={0}>
-                            <Box textAlign="center">
-                              <CircularProgress
-                                value={Math.min(100, percentage(s))}
-                                size={{ base: "64px", sm: "72px", md: "80px" }}
-                                color={s.passed ? "blue.500" : "orange.500"}
-                                thickness="10px"
-                                trackColor="gray.100"
-                                capIsRound
-                              >
-                                <CircularProgressLabel fontWeight="bold" fontSize={{ base: "sm", md: "md" }} color="gray.800">
-                                  {s.obtained_grade != null ? s.obtained_grade : "—"} / {s.total_grade != null ? s.total_grade : "—"}
-                                </CircularProgressLabel>
-                              </CircularProgress>
-                              <Text fontSize="xs" color="gray.500" mt={1}>الدرجة</Text>
-                            </Box>
-                            <Badge
-                              bg={s.passed ? "blue.500" : "orange.500"}
-                              color="white"
-                              fontSize={{ base: "sm", md: "md" }}
-                              px={3}
-                              py={1.5}
-                              borderRadius="full"
-                              display="flex"
-                              alignItems="center"
-                              gap={2}
-                            >
-                              {s.passed ? <FaCheckCircle size={16} /> : <FaTimesCircle size={16} />}
-                              {s.passed ? "ناجح" : "راسب"}
-                            </Badge>
-                          </HStack>
-                        </HStack>
-                      </Box>
+                    filtered.map((s, idx) => (
+                      <SubmissionCard
+                        key={s.submission_id ?? idx}
+                        submission={s}
+                        index={idx}
+                      />
                     ))
                   )}
                 </VStack>

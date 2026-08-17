@@ -5,6 +5,7 @@ import {
   getGoogleDriveViewUrl,
   isGoogleDriveUrl,
 } from "./googleDriveEmbed";
+import { resolveCourseFileAbsoluteUrl } from "../api/courseFilesApi";
 
 /** ملفات PDF محلية مرتبطة بمعرف Drive — ضع الملف في public/course-files/ */
 export const LOCAL_DRIVE_PDF_MAP = {
@@ -48,7 +49,7 @@ export function isDriveFileView({ fileId, url }) {
 }
 
 export function resolveCourseFileOpenUrl({ fileId, url }) {
-  if (url) return url;
+  if (url) return resolveCourseFileAbsoluteUrl(url) || url;
   if (fileId && fileId !== "view" && !/^\d+$/.test(String(fileId))) {
     return getGoogleDriveViewUrl(fileId);
   }
@@ -65,14 +66,17 @@ export function getLocalPdfCandidates({ fileId, url }) {
   }
 
   if (url && !isGoogleDriveUrl(url)) {
-    if (url.startsWith("/")) {
-      candidates.push(url);
-    } else if (typeof window !== "undefined" && url.startsWith(window.location.origin)) {
+    const resolved = resolveCourseFileAbsoluteUrl(url) || url;
+    if (resolved.startsWith("/")) {
+      candidates.push(resolved);
+    } else if (typeof window !== "undefined" && resolved.startsWith(window.location.origin)) {
       try {
-        candidates.push(new URL(url).pathname);
+        candidates.push(new URL(resolved).pathname);
       } catch {
-        candidates.push(url);
+        candidates.push(resolved);
       }
+    } else if (/^https?:\/\//i.test(resolved)) {
+      candidates.push(resolved);
     }
   }
 

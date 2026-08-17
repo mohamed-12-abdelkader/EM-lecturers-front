@@ -83,6 +83,13 @@ export function formatDate(value) {
   }
 }
 
+export function formatPercent(score, total) {
+  const s = Number(score);
+  const t = Number(total);
+  if (Number.isNaN(s) || Number.isNaN(t) || t <= 0) return "—";
+  return `${Math.round((s / t) * 100)}%`;
+}
+
 export function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }

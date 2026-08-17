@@ -67,6 +67,13 @@ import {
 import { persistLoginSession } from "../../utils/authStorage";
 import { markStudentHomeTourPending } from "../../utils/studentHomeTour";
 import {
+  appendDeviceIp,
+  getAuthDeviceErrorMessage,
+  handleAuthIpRegistered,
+  isSingleDeviceLimit,
+  SINGLE_DEVICE_NOTICE,
+} from "../../utils/deviceRestriction";
+import {
   ensureTenantAuthContext,
   resolveTenantSubdomain,
   withTenantQuery,
@@ -174,6 +181,7 @@ const SignUp = () => {
   const [gradeId, setGradeId] = useState("");
   const [courseGroupId, setCourseGroupId] = useState("");
   const [requiresGroupSelection, setRequiresGroupSelection] = useState(false);
+  const [singleDeviceMode, setSingleDeviceMode] = useState(false);
   const [registrationGroups, setRegistrationGroups] = useState([]);
   const [groupsLoading, setGroupsLoading] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -254,8 +262,12 @@ const SignUp = () => {
           Boolean(settings.course_group_access_enabled) &&
             Boolean(settings.requires_course_group_selection),
         );
+        setSingleDeviceMode(isSingleDeviceLimit(settings));
       })
-      .catch(() => setRequiresGroupSelection(false));
+      .catch(() => {
+        setRequiresGroupSelection(false);
+        setSingleDeviceMode(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -370,7 +382,7 @@ const SignUp = () => {
         setLoading(false);
         return;
       }
-      const registerPayload = {
+      const registerPayload = appendDeviceIp({
         subdomain,
         phone: cleanPhone,
         password: password,
@@ -378,17 +390,21 @@ const SignUp = () => {
         parent_phone: cleanParentPhone,
         grade_id: parseInt(gradeId, 10),
         remember_me: true,
-      };
+      });
       if (requiresGroupSelection && courseGroupId) {
         registerPayload.course_group_id = parseInt(courseGroupId, 10);
       }
       const res = await baseUrl.post("/api/users/register", registerPayload);
 
-      // التوكن → الذاكرة فقط، والمستخدم → localStorage (بدون أسرار)
       persistLoginSession(res.data);
+      handleAuthIpRegistered(res.data);
       markStudentHomeTourPending();
 
-      toast.success("تم إنشاء الحساب بنجاح!");
+      toast.success(
+        res.data?.ip_registered
+          ? "تم إنشاء الحساب وربطه بهذا المتصفح بنجاح!"
+          : "تم إنشاء الحساب بنجاح!",
+      );
       void playAuthSuccessSound();
       setShowSuccessModal(true);
       // تنقّل SPA مرة واحدة — بدون full reload
@@ -401,7 +417,7 @@ const SignUp = () => {
         onOpen(); // فتح المودال
       } else {
         toast.error(
-          err.response?.data?.message || "حدث خطأ أثناء إنشاء الحساب"
+          getAuthDeviceErrorMessage(err, err.response?.data?.message || "حدث خطأ أثناء إنشاء الحساب"),
         );
       }
     } finally {
@@ -817,6 +833,21 @@ const SignUp = () => {
                 {currentStep + 1} من {steps.length}
               </Box>
             </HStack>
+            {singleDeviceMode ? (
+              <Box
+                mb={4}
+                p={3}
+                borderRadius="lg"
+                bg="orange.50"
+                borderWidth="1px"
+                borderColor="orange.200"
+                _dark={{ bg: "whiteAlpha.100", borderColor: "orange.700" }}
+              >
+                <Text fontSize="xs" color="orange.800" _dark={{ color: "orange.200" }} lineHeight="tall">
+                  {SINGLE_DEVICE_NOTICE}
+                </Text>
+              </Box>
+            ) : null}
             <Progress
               value={(currentStep / (steps.length - 1)) * 100}
               colorScheme="blue"

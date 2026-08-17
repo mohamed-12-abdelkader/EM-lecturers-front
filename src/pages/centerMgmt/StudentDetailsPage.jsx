@@ -22,11 +22,12 @@ import {
   useToast,
   VStack,
 } from "@chakra-ui/react";
-import { FaArrowRight, FaPrint } from "react-icons/fa";
+import { FaArrowRight, FaClipboardList, FaPrint } from "react-icons/fa";
 import {
   useGroups,
   useStudent,
   useStudentAttendanceReport,
+  useStudentExams,
   useStudentMutations,
   useStudentQr,
 } from "../../Hooks/centerMgmt/useCenterMgmtQueries";
@@ -36,6 +37,7 @@ import {
   currentMonthYear,
   field,
   formatDate,
+  formatPercent,
   monthFirstLast,
   studentCode,
   studentName,
@@ -74,6 +76,7 @@ export default function StudentDetailsPage() {
   const { data: student, isLoading } = useStudent(studentId);
   const { data: qr } = useStudentQr(studentId);
   const { data: report } = useStudentAttendanceReport(studentId, reportParams);
+  const { data: studentExamsApi = [] } = useStudentExams(studentId);
   const { data: groupsData } = useGroups({ limit: 100 });
   const groups = groupsData?.items || [];
   const { enrollStudent, unenrollStudent } = useStudentMutations();
@@ -98,6 +101,11 @@ export default function StudentDetailsPage() {
   const enrolledGroups = field(student, "groups") || [];
   const totals = report?.totals || {};
   const records = report?.records || [];
+  const profileExams = field(student, "exams") || [];
+  const exams =
+    (Array.isArray(studentExamsApi) && studentExamsApi.length
+      ? studentExamsApi
+      : profileExams) || [];
 
   const handlePrintQr = () => {
     const w = window.open("", "_blank");
@@ -248,6 +256,122 @@ export default function StudentDetailsPage() {
           </Button>
         </Surface>
       </SimpleGrid>
+
+      <Surface mb={5}>
+        <Flex align="center" gap={2} mb={4}>
+          <FaClipboardList />
+          <Text fontWeight="bold">درجات الامتحانات</Text>
+          <StatusBadge scheme="blue">{exams.length}</StatusBadge>
+        </Flex>
+
+        {exams.length === 0 ? (
+          <Text fontSize="sm" color="gray.500">
+            لا توجد درجات مسجّلة بعد — تُضاف من صفحة المجموعة.
+          </Text>
+        ) : (
+          <>
+            <MobileOnly>
+              <VStack spacing={3} align="stretch">
+                {exams.map((exam, idx) => {
+                  const total = field(exam, "total_grade", "totalGrade");
+                  const score = field(exam, "score");
+                  const isAbsent = Boolean(field(exam, "is_absent", "isAbsent"));
+                  const pctRaw = field(exam, "percentage");
+                  const pct =
+                    pctRaw != null
+                      ? `${pctRaw}%`
+                      : score != null && total
+                        ? formatPercent(score, total)
+                        : null;
+                  return (
+                    <ListCard key={exam.id || idx}>
+                      <Flex justify="space-between" align="flex-start" gap={2} mb={2}>
+                        <Box minW={0}>
+                          <Text fontWeight="black" noOfLines={2}>
+                            {field(exam, "title")}
+                          </Text>
+                          <Text fontSize="xs" color="gray.500" mt={1}>
+                            {field(exam, "group_name", "groupName") || "—"}
+                          </Text>
+                        </Box>
+                        {isAbsent ? (
+                          <StatusBadge scheme="orange">غائب</StatusBadge>
+                        ) : score != null ? (
+                          <StatusBadge scheme="green">{pct}</StatusBadge>
+                        ) : (
+                          <StatusBadge scheme="gray">لم يُرصد</StatusBadge>
+                        )}
+                      </Flex>
+                      <HStack spacing={4} fontSize="sm" color="gray.600" flexWrap="wrap">
+                        <Text>{formatDate(field(exam, "exam_date", "examDate"))}</Text>
+                        {!isAbsent && score != null ? (
+                          <>
+                            <Text color="gray.400">·</Text>
+                            <Text fontWeight="bold">
+                              {score} / {total ?? "—"}
+                            </Text>
+                          </>
+                        ) : null}
+                      </HStack>
+                    </ListCard>
+                  );
+                })}
+              </VStack>
+            </MobileOnly>
+
+            <DesktopOnly>
+              <TableContainer>
+                <Table size="sm">
+                  <Thead>
+                    <Tr>
+                      <Th>الامتحان</Th>
+                      <Th>المجموعة</Th>
+                      <Th>التاريخ</Th>
+                      <Th isNumeric>الدرجة</Th>
+                      <Th isNumeric>النسبة</Th>
+                      <Th>الحالة</Th>
+                    </Tr>
+                  </Thead>
+                  <Tbody>
+                    {exams.map((exam, idx) => {
+                      const total = field(exam, "total_grade", "totalGrade");
+                      const score = field(exam, "score");
+                      const isAbsent = Boolean(field(exam, "is_absent", "isAbsent"));
+                      const pctRaw = field(exam, "percentage");
+                      const pct =
+                        pctRaw != null
+                          ? `${pctRaw}%`
+                          : score != null && total
+                            ? formatPercent(score, total)
+                            : null;
+                      return (
+                        <Tr key={exam.id || idx}>
+                          <Td fontWeight="semibold">{field(exam, "title")}</Td>
+                          <Td>{field(exam, "group_name", "groupName") || "—"}</Td>
+                          <Td>{formatDate(field(exam, "exam_date", "examDate"))}</Td>
+                          <Td isNumeric>
+                            {isAbsent ? "—" : score != null ? `${score}/${total ?? "—"}` : "—"}
+                          </Td>
+                          <Td isNumeric fontWeight="bold">
+                            {isAbsent ? "غائب" : pct ?? "—"}
+                          </Td>
+                          <Td>
+                            <StatusBadge
+                              scheme={isAbsent ? "orange" : score != null ? "green" : "gray"}
+                            >
+                              {isAbsent ? "غائب" : score != null ? "مُرصد" : "معلق"}
+                            </StatusBadge>
+                          </Td>
+                        </Tr>
+                      );
+                    })}
+                  </Tbody>
+                </Table>
+              </TableContainer>
+            </DesktopOnly>
+          </>
+        )}
+      </Surface>
 
       <Surface>
         <Text fontWeight="bold" mb={3}>تقرير الحضور</Text>

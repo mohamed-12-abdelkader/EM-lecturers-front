@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo, useCallback } from "react";
 import {
   Box,
   Flex,
@@ -35,10 +35,10 @@ function difficultyMeta(level) {
   return { label: "متوسط", scheme: "orange", color: "orange.500" };
 }
 
-export default function LibraryQuestionCard({
+function LibraryQuestionCard({
   question,
   index,
-  selectedIds = [],
+  isSelected = false,
   onToggleSelect,
   onEdit,
   onDelete,
@@ -70,15 +70,17 @@ export default function LibraryQuestionCard({
       : choices.findIndex((c) => c === question.answer);
   const hasCorrect = isChoice && correctIdx >= 0;
   const imageUrl = question.image_url || question.imageUrl;
-  const isSelected = selectedIds.includes(question.id);
   const difficulty = difficultyMeta(question.difficulty_level);
   const canSelect = showSelect && typeof onToggleSelect === "function";
 
-  const toggleSelect = (e) => {
-    e?.stopPropagation?.();
-    if (!canSelect) return;
-    onToggleSelect(question.id, !isSelected);
-  };
+  const toggleSelect = useCallback(
+    (e) => {
+      e?.stopPropagation?.();
+      if (!canSelect) return;
+      onToggleSelect(question.id, !isSelected);
+    },
+    [canSelect, isSelected, onToggleSelect, question.id],
+  );
 
   if (isStatement) {
     return (
@@ -92,7 +94,7 @@ export default function LibraryQuestionCard({
         bg={isSelected ? selectedBg : pageSoft}
         cursor={canSelect ? "pointer" : "default"}
         onClick={canSelect ? toggleSelect : undefined}
-        transition="0.15s ease"
+        transition="border-color 0.1s, background 0.1s"
       >
         {canSelect ? (
           <Checkbox
@@ -135,16 +137,19 @@ export default function LibraryQuestionCard({
       borderColor={isSelected ? "blue.400" : borderColor}
       borderRadius="2xl"
       boxShadow={isSelected ? "0 10px 30px rgba(49,130,206,0.18)" : "0 4px 16px rgba(0,0,0,0.06)"}
-      transition="all 0.18s ease"
+      transition="border-color 0.1s, background 0.1s, box-shadow 0.1s"
       cursor={canSelect ? "pointer" : "default"}
       onClick={canSelect ? toggleSelect : undefined}
-      _hover={{
-        transform: "translateY(-2px)",
-        boxShadow: isSelected
-          ? "0 14px 34px rgba(49,130,206,0.22)"
-          : "0 10px 28px rgba(0,0,0,0.1)",
-        borderColor: isSelected ? "blue.400" : "blue.200",
-      }}
+      _hover={
+        canSelect
+          ? {
+              borderColor: isSelected ? "blue.400" : "blue.200",
+              boxShadow: isSelected
+                ? "0 14px 34px rgba(49,130,206,0.22)"
+                : "0 10px 28px rgba(0,0,0,0.1)",
+            }
+          : undefined
+      }
     >
       {/* accent strip */}
       <Box
@@ -226,7 +231,7 @@ export default function LibraryQuestionCard({
                   borderRadius="full"
                   px={3}
                   py={0.5}
-                  colorScheme={question.question_type === "text" ? "purple" : "cyan"}
+                  colorScheme={question.question_type === "text" ? "orange" : "blue"}
                   fontSize="xs"
                 >
                   {question.question_type === "text" ? "مقالي" : "اختيار من متعدد"}
@@ -420,3 +425,21 @@ export default function LibraryQuestionCard({
     </Box>
   );
 }
+
+function questionCardPropsAreEqual(prev, next) {
+  return (
+    prev.question === next.question &&
+    prev.isSelected === next.isSelected &&
+    prev.pendingId === next.pendingId &&
+    prev.index === next.index &&
+    prev.inPassage === next.inPassage &&
+    prev.showSelect === next.showSelect &&
+    prev.onToggleSelect === next.onToggleSelect &&
+    prev.onEdit === next.onEdit &&
+    prev.onDelete === next.onDelete &&
+    prev.onSetCorrect === next.onSetCorrect &&
+    prev.onZoomImage === next.onZoomImage
+  );
+}
+
+export default memo(LibraryQuestionCard, questionCardPropsAreEqual);

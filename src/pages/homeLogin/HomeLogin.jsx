@@ -177,7 +177,7 @@ const HomeLogin = () => {
           borderColor={sidebarBorder}
           boxShadow={sidebarGlow}
           overflow="hidden"
-          className="sidebar-container mt-[72px]"
+          className="sidebar-container"
         >
           <Box h="3px" bgGradient={accentGradient} flexShrink={0} />
 

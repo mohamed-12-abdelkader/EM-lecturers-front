@@ -43,8 +43,10 @@ import {
   getCourseFileDisplayName,
   getCourseFileKind,
   getCourseFileUrl,
+  isCourseFileUploadPath,
   isCourseFileImage,
   isCourseFilePdf,
+  isRemoteCourseFileUrl,
 } from "../../../api/courseFilesApi";
 import { useCourseFileMutations, useCourseFiles } from "../../../Hooks/course/useCourseFiles";
 import { buildCourseFileViewPath } from "../../../utils/courseFileView";
@@ -129,7 +131,11 @@ function CourseFileCard({
   const viewPath = buildCourseFileViewPath(courseId, file);
   const canInAppView =
     viewPath &&
-    (isCourseFilePdf(file) || isGoogleDriveUrl(href) || isCourseFileImage(file));
+    (isCourseFilePdf(file) ||
+      isCourseFileImage(file) ||
+      isGoogleDriveUrl(href) ||
+      isRemoteCourseFileUrl(href) ||
+      isCourseFileUploadPath(file?.file_url || file?.url));
 
   return (
     <Box
@@ -253,15 +259,13 @@ function CourseFileCard({
 
 export default function CourseFilesTab({
   courseId,
-  isTeacher,
-  isAdmin,
+  canManage = false,
   borderColor,
   sectionBg,
   textColor,
   subTextColor,
 }) {
   const toast = useToast();
-  const canManage = isTeacher || isAdmin;
   const uploadModal = useDisclosure();
   const [deleteTarget, setDeleteTarget] = useState(null);
   const cancelRef = useRef(null);
@@ -383,8 +387,15 @@ export default function CourseFilesTab({
           <Spinner size="lg" color="purple.500" thickness="3px" />
         </Center>
       ) : isError ? (
-        <Center py={12} flexDir="column" gap={3} textAlign="center">
-          <Text color="red.500">{courseFilesApiError(error, "تعذّر تحميل الملفات")}</Text>
+        <Center py={12} flexDir="column" gap={3} textAlign="center" px={4}>
+          <Text color={error?.response?.status === 403 ? "orange.500" : "red.500"}>
+            {courseFilesApiError(error, "تعذّر تحميل الملفات")}
+          </Text>
+          {error?.response?.status === 403 && !canManage ? (
+            <Text fontSize="sm" color={subTextColor}>
+              اشترك في الكورس أو فعّله لعرض الملفات المرفقة
+            </Text>
+          ) : null}
           <Button size="sm" variant="outline" borderRadius="xl" onClick={() => refetch()}>
             إعادة المحاولة
           </Button>

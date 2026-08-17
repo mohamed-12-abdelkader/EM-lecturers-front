@@ -10,7 +10,13 @@ import {
   normalizePassagesResponse,
 } from "../../pages/Question Bank/utils/teacherLibraryQuestionUtils";
 
-const LIBRARY_API = "/api/teacher/questions";
+import {
+  fetchTeacherLibraryGrades,
+  fetchTeacherLibraryLessons as fetchLibraryLessonsApi,
+  TEACHER_LIBRARY_API,
+} from "../../api/teacherQuestionLibraryApi";
+
+const LIBRARY_API = TEACHER_LIBRARY_API;
 
 export const teacherQbKeys = {
   all: ["teacherQuestionBank"],
@@ -19,7 +25,9 @@ export const teacherQbKeys = {
   chapter: (id) => [...teacherQbKeys.all, "chapter", String(id)],
   lessonQuestions: (id) => [...teacherQbKeys.all, "lessonQuestions", String(id)],
   lessonPassages: (id) => [...teacherQbKeys.all, "lessonPassages", String(id)],
-  libraryLessons: () => [...teacherQbKeys.all, "libraryLessons"],
+  libraryGrades: () => [...teacherQbKeys.all, "libraryGrades"],
+  libraryLessons: (gradeId) =>
+    [...teacherQbKeys.all, "libraryLessons", gradeId != null ? String(gradeId) : "all"],
   libraryLesson: (id) => [...teacherQbKeys.all, "libraryLesson", String(id)],
   lectureExams: () => [...teacherQbKeys.all, "lectureExams"],
   comprehensiveExams: () => [...teacherQbKeys.all, "comprehensiveExams"],
@@ -82,12 +90,14 @@ export async function fetchLessonPassages(lessonId) {
   return [];
 }
 
-export async function fetchTeacherLibraryLessons() {
+export async function fetchTeacherLibraryGradesList() {
   requireToken();
-  const { data } = await baseUrl.get(`${LIBRARY_API}/lessons`, {
-    headers: authHeaders(),
-  });
-  return data.lessons || [];
+  return fetchTeacherLibraryGrades();
+}
+
+export async function fetchTeacherLibraryLessons(gradeId) {
+  requireToken();
+  return fetchLibraryLessonsApi(gradeId);
 }
 
 export async function fetchTeacherLibraryLessonContent(lessonId) {
@@ -187,11 +197,22 @@ export function useTeacherQbLessonPassages(lessonId, options = {}) {
   });
 }
 
-export function useTeacherLibraryLessons(options = {}) {
+export function useTeacherLibraryGrades(options = {}) {
   const token = localStorage.getItem("token");
   return useQuery({
-    queryKey: teacherQbKeys.libraryLessons(),
-    queryFn: fetchTeacherLibraryLessons,
+    queryKey: teacherQbKeys.libraryGrades(),
+    queryFn: fetchTeacherLibraryGradesList,
+    enabled: !!token && options.enabled !== false,
+    ...queryDefaults,
+    ...options,
+  });
+}
+
+export function useTeacherLibraryLessons(gradeId, options = {}) {
+  const token = localStorage.getItem("token");
+  return useQuery({
+    queryKey: teacherQbKeys.libraryLessons(gradeId),
+    queryFn: () => fetchTeacherLibraryLessons(gradeId),
     enabled: !!token && options.enabled !== false,
     ...queryDefaults,
     ...options,
@@ -258,8 +279,16 @@ export function useInvalidateTeacherQuestionBank() {
             queryKey: teacherQbKeys.lessonPassages(lessonId),
           }),
         ]),
-      invalidateLibraryLessons: () =>
-        queryClient.invalidateQueries({ queryKey: teacherQbKeys.libraryLessons() }),
+      invalidateLibraryGrades: () =>
+        queryClient.invalidateQueries({ queryKey: teacherQbKeys.libraryGrades() }),
+      invalidateLibraryLessons: (gradeId) =>
+        queryClient.invalidateQueries({
+          queryKey: teacherQbKeys.libraryLessons(gradeId),
+        }),
+      invalidateAllLibraryLessons: () =>
+        queryClient.invalidateQueries({
+          queryKey: [...teacherQbKeys.all, "libraryLessons"],
+        }),
       invalidateLibraryLesson: (lessonId) =>
         queryClient.invalidateQueries({
           queryKey: teacherQbKeys.libraryLesson(lessonId),

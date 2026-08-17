@@ -1,10 +1,8 @@
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { motion, useInView, useMotionValue, useSpring } from "framer-motion";
 import { Link } from "react-router-dom";
 import { useColorModeValue } from "@chakra-ui/react";
 import {
-  FaPlay,
-  FaVolumeUp,
   FaGraduationCap,
   FaBookOpen,
   FaChalkboardTeacher,
@@ -18,8 +16,7 @@ import { landingFont } from "./landingTheme.js";
 
 const BLUE = "#3182CE";
 const ORANGE = "#DD6B20";
-const YOUTUBE_ID = "VNVLLP8twnY";
-
+const HERO_IMAGE = "/images/section-one-hero.png";
 const BG_ICONS = [
   { Icon: FaGraduationCap, className: "right-[4%] top-[18%]", size: "text-3xl", tone: "blue", delay: 0 },
   { Icon: FaBookOpen, className: "left-[5%] top-[22%]", size: "text-2xl", tone: "orange", delay: 0.4 },
@@ -179,122 +176,7 @@ function StatsStrip({ isLight, titleColor, mutedText }) {
   );
 }
 
-function loadYoutubeApi() {
-  return new Promise((resolve) => {
-    if (window.YT?.Player) {
-      resolve(window.YT);
-      return;
-    }
-    const prev = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      try {
-        prev?.();
-      } catch {
-        /* ignore */
-      }
-      resolve(window.YT);
-    };
-    if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
-      const tag = document.createElement("script");
-      tag.src = "https://www.youtube.com/iframe_api";
-      tag.async = true;
-      document.body.appendChild(tag);
-    }
-  });
-}
-
-function YoutubeHeroFrame({ isLight }) {
-  const hostRef = useRef(null);
-  const playerRef = useRef(null);
-  const [soundOn, setSoundOn] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(true);
-
-  const enableSound = useCallback(() => {
-    const player = playerRef.current;
-    if (!player) return;
-    try {
-      player.unMute?.();
-      player.setVolume?.(100);
-      setSoundOn(true);
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const togglePlay = useCallback(() => {
-    const player = playerRef.current;
-    if (!player) return;
-    try {
-      const state = player.getPlayerState?.();
-      if (state === 1 || state === 3) {
-        player.pauseVideo?.();
-        setIsPlaying(false);
-      } else {
-        player.playVideo?.();
-        setIsPlaying(true);
-        player.unMute?.();
-        player.setVolume?.(100);
-        setSoundOn(true);
-      }
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    let player = null;
-
-    loadYoutubeApi().then((YT) => {
-      if (cancelled || !hostRef.current) return;
-
-      player = new YT.Player(hostRef.current, {
-        videoId: YOUTUBE_ID,
-        width: "100%",
-        height: "100%",
-        playerVars: {
-          autoplay: 1,
-          mute: 1,
-          rel: 0,
-          modestbranding: 1,
-          playsinline: 1,
-          controls: 1,
-          fs: 1,
-          enablejsapi: 1,
-          origin: window.location.origin,
-        },
-        events: {
-          onReady: (event) => {
-            try {
-              event.target.playVideo();
-              event.target.unMute();
-              event.target.setVolume(100);
-              if (!event.target.isMuted?.()) setSoundOn(true);
-            } catch {
-              /* muted until user enables sound */
-            }
-          },
-          onStateChange: (event) => {
-            const s = event.data;
-            if (s === 1 || s === 3) setIsPlaying(true);
-            else if (s === 2 || s === 0) setIsPlaying(false);
-          },
-        },
-      });
-      playerRef.current = player;
-    });
-
-    return () => {
-      cancelled = true;
-      try {
-        player?.destroy?.();
-      } catch {
-        /* ignore */
-      }
-      playerRef.current = null;
-    };
-  }, []);
-
+function HeroIllustrationFrame({ isLight }) {
   return (
     <div className="relative mx-auto w-full max-w-[560px] lg:max-w-none">
       <motion.div
@@ -310,54 +192,24 @@ function YoutubeHeroFrame({ isLight }) {
       <motion.div
         animate={{ y: [0, -6, 0] }}
         transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-        className="relative overflow-hidden rounded-xl border bg-[#0b1220] sm:rounded-2xl"
+        className="relative overflow-hidden rounded-xl border sm:rounded-2xl"
         style={{
           borderColor: isLight ? `${BLUE}33` : `${BLUE}44`,
+          background: isLight ? "#ffffff" : "#0b1220",
           boxShadow: isLight
             ? `0 22px 48px -22px ${BLUE}55`
             : `0 24px 52px -20px rgba(0,0,0,0.55)`,
         }}
       >
-        <div className="relative aspect-video w-full">
-          <div
-            ref={hostRef}
-            className="absolute inset-0 z-0 h-full w-full [&_iframe]:pointer-events-auto [&_iframe]:h-full [&_iframe]:w-full"
+        <div className="relative aspect-[4/3] w-full sm:aspect-[16/11]">
+          <img
+            src={HERO_IMAGE}
+            alt="معلّم يفكر في حلول تعليمية — منصة EM Lectures"
+            className="h-full w-full object-cover object-center"
+            loading="eager"
+            fetchPriority="high"
+            draggable={false}
           />
-
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-between gap-2 p-2.5 sm:p-3">
-            <button
-              type="button"
-              onClick={togglePlay}
-              className="pointer-events-auto inline-flex items-center gap-2 rounded-lg bg-black/70 px-3 py-1.5 text-[11px] font-bold text-white backdrop-blur-sm transition hover:bg-black/85 sm:text-xs"
-              aria-label={isPlaying ? "إيقاف الفيديو" : "تشغيل الفيديو"}
-            >
-              {isPlaying ? (
-                <>
-                  <span className="flex h-3 items-center gap-[3px]" aria-hidden>
-                    <span className="h-2.5 w-[2.5px] rounded-sm bg-white" />
-                    <span className="h-2.5 w-[2.5px] rounded-sm bg-white" />
-                  </span>
-                  إيقاف
-                </>
-              ) : (
-                <>
-                  <FaPlay className="text-[9px]" style={{ color: ORANGE }} />
-                  تشغيل
-                </>
-              )}
-            </button>
-
-            {!soundOn ? (
-              <button
-                type="button"
-                onClick={enableSound}
-                className="pointer-events-auto inline-flex items-center gap-2 rounded-lg bg-black/70 px-3 py-1.5 text-[11px] font-bold text-white backdrop-blur-sm transition hover:bg-black/85 sm:text-xs"
-              >
-                <FaVolumeUp className="text-[11px]" style={{ color: ORANGE }} />
-                تشغيل الصوت
-              </button>
-            ) : null}
-          </div>
         </div>
       </motion.div>
     </div>
@@ -479,7 +331,7 @@ const SectionOne = () => {
                 </motion.button>
               </Link>
 
-              <a href="#hero-video" className="w-full sm:w-auto">
+              <a href="#hero-visual" className="w-full sm:w-auto">
                 <motion.button
                   type="button"
                   whileHover={{ y: -2, scale: 1.02 }}
@@ -495,12 +347,11 @@ const SectionOne = () => {
                     className="flex h-6 w-6 items-center justify-center rounded-full"
                     style={{ background: `${ORANGE}22`, color: ORANGE }}
                   >
-                    <FaPlay className="ms-0.5 text-[9px]" />
+                    <FaLightbulb className="text-[10px]" />
                   </span>
-                  شاهد الفيديو
+                  اكتشف المنصة
                 </motion.button>
-              </a>
-            </motion.div>
+              </a>            </motion.div>
 
             <motion.p
               initial={{ opacity: 0 }}
@@ -520,15 +371,14 @@ const SectionOne = () => {
           </div>
 
           <motion.div
-            id="hero-video"
+            id="hero-visual"
             className="order-2 w-full scroll-mt-28 lg:justify-self-end"
             initial={{ opacity: 0, y: 18, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.55, delay: 0.12 }}
           >
-            <YoutubeHeroFrame isLight={isLight} />
-          </motion.div>
-        </div>
+            <HeroIllustrationFrame isLight={isLight} />
+          </motion.div>        </div>
       </div>
     </section>
   );

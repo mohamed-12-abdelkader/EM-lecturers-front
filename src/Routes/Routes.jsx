@@ -93,6 +93,7 @@ const CenterLayout = lazyPage(() => import("../pages/centerMgmt/components/Cente
 const CenterDashboardPage = lazyPage(() => import("../pages/centerMgmt/CenterDashboardPage"));
 const GroupsPage = lazyPage(() => import("../pages/centerMgmt/GroupsPage"));
 const GroupDetailsPage = lazyPage(() => import("../pages/centerMgmt/GroupDetailsPage"));
+const GroupExamGradesPage = lazyPage(() => import("../pages/centerMgmt/GroupExamGradesPage"));
 const StudentsPage = lazyPage(() => import("../pages/centerMgmt/StudentsPage"));
 const StudentDetailsPage = lazyPage(() => import("../pages/centerMgmt/StudentDetailsPage"));
 const AttendancePage = lazyPage(() => import("../pages/centerMgmt/AttendancePage"));
@@ -143,6 +144,7 @@ const SubjectPage = lazyPage(() => import("../pages/Question Bank/SubjectPage"))
 const QuestionsPage = lazyPage(() => import("../pages/Question Bank/QuestionsPage"));
 const QuestionBankDashboard = lazyPage(() => import("../pages/Question Bank/QuestionBankDashboard"));
 const QuestionLibraryPage = lazyPage(() => import("../pages/Question Bank/QuestionLibraryPage"));
+const QuestionLibraryGradePage = lazyPage(() => import("../pages/Question Bank/QuestionLibraryGradePage"));
 const QuestionLibraryLessonPage = lazyPage(() => import("../pages/Question Bank/QuestionLibraryLessonPage"));
 const Lesson = lazyPage(() => import("../pages/Question Bank/Lesson"));
 const TeacherSubject = lazyPage(() => import("../pages/Question Bank/TeacherSubject"));
@@ -193,6 +195,7 @@ const WhatsAppInboxPage = lazyPage(() => import("../pages/Admin/whatsapp/WhatsAp
 const TeacherInvoicesPage = lazyPage(() => import("../pages/teacher/TeacherInvoicesPage"));
 const AdminDashboardHome = lazyPage(() => import("../pages/home/AdminDashboardHome"));
 const TeacherDashboardHome = lazyPage(() => import("../pages/home/TeacherDashboardHome"));
+const RoleHomePage = lazyPage(() => import("../pages/home/RoleHomePage"));
 const GlobalSearchPage = lazyPage(() => import("../pages/search/GlobalSearchPage"));
 const ChallengeEMAcademy = lazyPage(() => import("../pages/challengeEMAcademy/ChallengeEMAcademy"));
 const AcademyOverviewPage = lazyPage(() => import("../pages/academy/AcademyOverviewPage"));
@@ -218,7 +221,6 @@ const NotificationCenterPage = lazyPage(() => import("../pages/notifications/Not
 const AppRouter = () => {
   const [userData, isAdmin, isTeacher, student, isAcademy, isAcademyTeacher] = UserType();
   const tenantSubdomain = getTenantSubdomain();
-  const isStaff = isAdmin || isTeacher || isAcademy || isAcademyTeacher;
 
   return (
     <div>
@@ -247,7 +249,7 @@ const AppRouter = () => {
         <Route
           path="/login"
           element={
-            <ProtectedLogin auth={isStaff || student}>
+            <ProtectedLogin>
               <LoginPage />
             </ProtectedLogin>
           }
@@ -255,7 +257,7 @@ const AppRouter = () => {
         <Route
           path="/teacher-login"
           element={
-            <ProtectedLogin auth={isStaff || student}>
+            <ProtectedLogin>
               <TeacherLoginPage />
             </ProtectedLogin>
           }
@@ -268,7 +270,7 @@ const AppRouter = () => {
         <Route
           path="/signup"
           element={
-            <ProtectedLogin auth={isStaff || student}>
+            <ProtectedLogin>
               <SingUp />
             </ProtectedLogin>
           }
@@ -493,16 +495,16 @@ const AppRouter = () => {
         <Route
           path="CourseDetailsPage/:courseId/file/:fileId"
           element={
-            <ProtectedRoute auth={isAdmin || isTeacher || isAcademy || isAcademyTeacher || student}>
+            <ProtectedRoute>
               <CourseFileViewPage />
             </ProtectedRoute>
           }
         />
-        {/* Main App Routes */}
+        {/* Main App Routes — بوابة الجلسة فقط؛ الأدوار في المسارات الفرعية */}
         <Route
           path="/*"
           element={
-            <ProtectedRoute auth={isAdmin || isTeacher || isAcademy || isAcademyTeacher || student}>
+            <ProtectedRoute>
               <HomeLogin />
             </ProtectedRoute>
           }
@@ -511,17 +513,11 @@ const AppRouter = () => {
           <Route
             path="home"
             element={
-              isAdmin ? (
-                <AdminDashboardHome />
-              ) : isAcademy ? (
-                <Navigate to="/academy" replace />
-              ) : isAcademyTeacher ? (
-                <Navigate to="/academy/me" replace />
-              ) : isTeacher ? (
-                <TeacherDashboardHome />
-              ) : (
-                <HomePage />
-              )
+              <RoleHomePage
+                AdminDashboardHome={AdminDashboardHome}
+                TeacherDashboardHome={TeacherDashboardHome}
+                HomePage={HomePage}
+              />
             }
           />
 
@@ -586,6 +582,11 @@ const AppRouter = () => {
           <Route path="question-bank-dashboard" element={<QuestionBankDashboard />} />
           <Route path="dashboard" element={<QuestionBankDashboard />} />
           <Route path="QuestionLibraryPage" element={<QuestionLibraryPage />} />
+          <Route path="QuestionLibraryPage/grade/:gradeId" element={<QuestionLibraryGradePage />} />
+          <Route
+            path="QuestionLibraryPage/grade/:gradeId/lesson/:lessonId"
+            element={<QuestionLibraryLessonPage />}
+          />
           <Route
             path="QuestionLibraryPage/lesson/:lessonId"
             element={<QuestionLibraryLessonPage />}
@@ -595,6 +596,8 @@ const AppRouter = () => {
           <Route path="Platform_exams" element={<PlatformExams />} />
           <Route path="essay-exam/:id" element={<EssayExam />} />
           <Route path="exam/:examId" element={<Exam />} />
+          <Route path="exam/:examId/report" element={<ExamReportPage />} />
+          <Route path="lecture-exam/:examId/report" element={<ExamReportPage />} />
           <Route path="exam_grades" element={<ExamGrades />} />
           <Route path="teacher-analytics" element={<TeacherAnalyticsIntelligence />} />
           <Route path="ComprehensiveExam/:id/report" element={<ExamReportPage />} />
@@ -666,6 +669,7 @@ const AppRouter = () => {
             <Route index element={<CenterDashboardPage />} />
             <Route path="groups" element={<GroupsPage />} />
             <Route path="groups/:groupId" element={<GroupDetailsPage />} />
+            <Route path="groups/:groupId/exams/:examId" element={<GroupExamGradesPage />} />
             <Route path="students" element={<StudentsPage />} />
             <Route path="students/:studentId" element={<StudentDetailsPage />} />
             <Route path="attendance" element={<AttendancePage />} />

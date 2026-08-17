@@ -1,13 +1,11 @@
 /**
  * واجهة الجلسة الموحّدة (Facade) — نفس الدوال القديمة لكن:
  * - الـ Access Token في الذاكرة فقط (services/tokenStore) — لا يُكتب على القرص أبداً.
- * - بيانات المستخدم (بروفايل بدون أسرار) تبقى في localStorage لتوافق الكود القديم.
+ * - بيانات المستخدم (بروفايل بدون أسرار) في localStorage **معزولة لكل subdomain**.
  * - الـ Refresh Token في كوكي HttpOnly يديره الخادم بالكامل.
  */
 import {
-  safeLocalGet,
   safeLocalRemove,
-  safeLocalSet,
   safeSessionGet,
   safeSessionRemove,
   safeSessionSet,
@@ -23,17 +21,64 @@ import {
   setAccessToken,
 } from "../services/tokenStore";
 import { postAuthMessage } from "../services/authChannel";
+import {
+  enrichUserWithTenant,
+  getAuthScopeSubdomain,
+  inferTenantMetaFromHost,
+  readScopedAuthItem,
+  readStoredTenantMeta,
+  removeScopedAuthItem,
+  sessionMatchesCurrentTenant,
+  writeScopedAuthItem,
+  writeStoredTenantMeta,
+} from "./tenantAuthStorage";
+import { normalizeAuthUser } from "./authRoles";
+
+export const AUTH_STORAGE_UPDATE_EVENT = "auth-storage-update";
+
+function dispatchAuthStorageUpdate(user) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(AUTH_STORAGE_UPDATE_EVENT, {
+      detail: user ? { user } : undefined,
+    }),
+  );
+}
+
+function extractUserFromLoginPayload(inner) {
+  if (!inner || typeof inner !== "object") return null;
+  if (inner.user && typeof inner.user === "object") return inner.user;
+  if (inner.Data && typeof inner.Data === "object") return inner.Data;
+  const data = inner.data;
+  if (data && typeof data === "object") {
+    if (data.user && typeof data.user === "object") return data.user;
+    if ("role" in data || "id" in data || "email" in data || "phone" in data) {
+      return data;
+    }
+  }
+  return null;
+}
 
 export function normalizeAuthToken(raw) {
   return normalizeJwt(raw);
 }
 
+function readStoredUserRaw() {
+  try {
+    const raw = readScopedAuthItem("user");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * حفظ نتيجة تسجيل الدخول: التوكن → الذاكرة، المستخدم → localStorage.
- * يدعم الشكل المسطّح { token, user, ... } أو الغلاف { data: { token, user } }.
+ * حفظ نتيجة تسجيل الدخول/التسجيل: التوكن + المستخدم → localStorage (معزول + legacy user).
  */
 export function persistLoginSession(payload, { broadcast = true } = {}) {
-  if (!payload || typeof payload !== "object") return;
+  if (!payload || typeof payload !== "object") return null;
 
   const inner =
     payload.data != null &&
@@ -43,51 +88,65 @@ export function persistLoginSession(payload, { broadcast = true } = {}) {
       : payload;
 
   const token = normalizeAuthToken(inner.token);
-  const user = inner.user ?? inner.Data ?? inner.data;
+  const tenantMeta = inferTenantMetaFromHost(inner.tenant ?? null);
+  const rawUser = extractUserFromLoginPayload(inner);
+  const user =
+    rawUser != null && typeof rawUser === "object"
+      ? normalizeAuthUser(enrichUserWithTenant(rawUser, tenantMeta), { token })
+      : null;
 
   if (token) {
     setAccessToken(token, { broadcast: false });
   }
 
-  if (user != null && typeof user === "object") {
-    safeLocalSet("user", JSON.stringify(user));
+  if (user) {
+    writeScopedAuthItem("user", JSON.stringify(user));
+  }
+
+  if (tenantMeta) {
+    writeStoredTenantMeta(tenantMeta);
   }
 
   if ("employee_data" in inner) {
-    safeLocalSet("employee_data", JSON.stringify(inner.employee_data));
+    writeScopedAuthItem("employee_data", JSON.stringify(inner.employee_data));
   } else {
-    safeLocalRemove("employee_data");
+    removeScopedAuthItem("employee_data");
   }
 
   if ("employee_permissions" in inner) {
-    safeLocalSet("employee_permissions", JSON.stringify(inner.employee_permissions));
+    writeScopedAuthItem("employee_permissions", JSON.stringify(inner.employee_permissions));
   } else {
-    safeLocalRemove("employee_permissions");
+    removeScopedAuthItem("employee_permissions");
   }
 
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("auth-storage-update"));
-  }
+  dispatchAuthStorageUpdate(user);
 
   if (broadcast) {
     postAuthMessage({
       type: "login",
       token: token || getAccessToken(),
-      user: user != null && typeof user === "object" ? user : null,
+      user,
+      tenant: getAuthScopeSubdomain(),
     });
   }
+
+  return user;
 }
 
 export function clearAuthSession({ broadcast = false } = {}) {
   clearAccessToken({ broadcast: false });
-  safeLocalRemove("user");
-  safeLocalRemove("employee_data");
-  safeLocalRemove("employee_permissions");
+  removeScopedAuthItem("user");
+  removeScopedAuthItem("employee_data");
+  removeScopedAuthItem("employee_permissions");
+  removeScopedAuthItem("tenant");
+  if (getAuthScopeSubdomain()) {
+    purgeLegacyGlobalAuthKeys();
+  }
   if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("auth-storage-update"));
+    dispatchAuthStorageUpdate(null);
   }
   if (broadcast) {
-    postAuthMessage({ type: "logout" });
+    postAuthMessage({ type: "logout", tenant: getAuthScopeSubdomain() });
   }
 }
 
@@ -118,45 +177,48 @@ export function isAuthTokenExpired(rawToken) {
   return isJwtExpired(rawToken ?? readAuthToken());
 }
 
+export function readStoredUser() {
+  const user = readStoredUserRaw();
+  if (!user) return null;
+  const tenantMeta = readStoredTenantMeta();
+  if (!sessionMatchesCurrentTenant(user, tenantMeta)) return null;
+  return normalizeAuthUser(enrichUserWithTenant(user, tenantMeta));
+}
+
+/** يحفظ/يحدّث بيانات المستخدم في localStorage */
+export function persistStoredUser(user, { broadcast = true } = {}) {
+  if (!user || typeof user !== "object") return null;
+  const tenantMeta = readStoredTenantMeta();
+  const normalized = normalizeAuthUser(enrichUserWithTenant(user, tenantMeta));
+  writeScopedAuthItem("user", JSON.stringify(normalized));
+  dispatchAuthStorageUpdate(normalized);
+  if (broadcast) {
+    postAuthMessage({
+      type: "user",
+      user: normalized,
+      tenant: getAuthScopeSubdomain(),
+    });
+  }
+  return normalized;
+}
+
 /**
- * جلسة صالحة للدخول للوحة التحكم.
- * ملاحظة: مع نظام الكوكي، انتهاء الـ Access Token لا يعني انتهاء الجلسة —
- * لذا نعتمد على وجود مستخدم محفوظ أو توكن حي في الذاكرة.
+ * جلسة صالحة للدخول للوحة التحكم على المنصة الحالية.
  */
 export function hasValidAuthSession() {
   const token = readAuthToken();
   if (token && !isJwtExpired(token)) return true;
-  // التوكن يعيش في الذاكرة فقط؛ وجود user محفوظ يعني أن AuthProvider
-  // إما استعاد الجلسة بالفعل أو سيستعيدها عبر كوكي الـ refresh.
-  try {
-    const raw = safeLocalGet("user");
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object") return true;
-    }
-  } catch {
-    // ignore
-  }
-  return false;
+  return Boolean(readStoredUser());
 }
 
-/**
- * (توافق قديم) — كان يمسح التوكن المنتهي على الصفحات العامة.
- * مع نظام الـ refresh بالكوكي، انتهاء الـ Access Token طبيعي ويُجدَّد تلقائياً،
- * لذا لم يعد هناك ما يُمسح هنا.
- */
 export function clearExpiredAuthQuietly() {
   return false;
 }
 
-/**
- * يعلّم انتهاء الجلسة نهائياً (فشل الـ refresh)، يمسح بيانات الدخول،
- * وينبّه الواجهة + بقية التبويبات.
- */
 export function markSessionExpired({ broadcast = true } = {}) {
   let redirect = "/login";
   try {
-    const user = JSON.parse(safeLocalGet("user", "null") || "null");
+    const user = readStoredUser();
     if (user?.role === "teacher") redirect = "/teacher-login";
   } catch {
     // ignore
@@ -167,14 +229,13 @@ export function markSessionExpired({ broadcast = true } = {}) {
   safeLocalRemove("examTimeLeft");
   clearAuthSession();
   if (broadcast) {
-    postAuthMessage({ type: "session-expired" });
+    postAuthMessage({ type: "session-expired", tenant: getAuthScopeSubdomain() });
   }
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
   }
 }
 
-/** تسجيل خروج إجباري بعد انتهاء الجلسة */
 export function forceLogoutToLogin(loginPath) {
   const redirect =
     loginPath || safeSessionGet("auth_logout_redirect") || "/login";
@@ -186,3 +247,5 @@ export function forceLogoutToLogin(loginPath) {
     window.location.href = redirect;
   }
 }
+
+export { sessionMatchesCurrentTenant, enrichUserWithTenant, readStoredTenantMeta };

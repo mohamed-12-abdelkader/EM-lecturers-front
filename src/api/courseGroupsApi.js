@@ -106,6 +106,9 @@ export async function fetchPublicRegistrationSettings(subdomain) {
   return {
     course_group_access_enabled: Boolean(payload?.course_group_access_enabled),
     requires_course_group_selection: Boolean(payload?.requires_course_group_selection),
+    student_device_limit: payload?.student_device_limit ?? "single_device",
+    single_device: payload?.single_device ?? payload?.student_device_limit === "single_device",
+    multiple_devices: payload?.multiple_devices ?? payload?.student_device_limit === "multiple_devices",
   };
 }
 

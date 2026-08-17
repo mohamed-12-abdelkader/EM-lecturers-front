@@ -3,7 +3,6 @@ import {
   Badge,
   Box,
   Button,
-  Collapse,
   Flex,
   FormControl,
   FormLabel,
@@ -12,30 +11,41 @@ import {
   Input,
   InputGroup,
   InputLeftElement,
+  Modal,
+  ModalBody,
+  ModalCloseButton,
+  ModalContent,
+  ModalHeader,
+  ModalOverlay,
   Select,
   SimpleGrid,
+  Table,
+  TableContainer,
+  Tbody,
+  Td,
   Text,
   Textarea,
+  Th,
+  Thead,
+  Tr,
   useColorModeValue,
+  useDisclosure,
   useToast,
   VStack,
   Wrap,
   WrapItem,
 } from "@chakra-ui/react";
 import {
-  FaCamera,
+  FaCalendarAlt,
   FaCheck,
   FaCheckDouble,
-  FaChevronDown,
-  FaChevronUp,
   FaClock,
+  FaLayerGroup,
   FaQrcode,
   FaSave,
   FaTimes,
   FaUserCheck,
-  FaUserClock,
   FaUserInjured,
-  FaUserTimes,
 } from "react-icons/fa";
 import { FiSearch } from "react-icons/fi";
 import { Html5Qrcode } from "html5-qrcode";
@@ -49,108 +59,131 @@ import { apiErrorMessage } from "../../api/centerMgmtApi";
 import {
   ACCENT,
   ATTENDANCE_LABELS,
+  BRAND_ORANGE,
   field,
+  formatDate,
   parseQrScan,
   studentCode,
   studentName,
   todayISO,
 } from "./centerMgmtUtils";
 import {
+  DesktopOnly,
   EmptyState,
-  FilterBar,
   KpiCard,
   ListCard,
   LoadingBlock,
+  MobileOnly,
   PageHeader,
   PrimaryButton,
   StatusBadge,
   Surface,
 } from "./components/UiBits";
 
-const STATUS_ACTIONS = [
-  {
-    key: "present",
-    label: "حاضر",
-    short: "حاضر",
-    icon: FaCheck,
-    activeBg: "green.500",
-    softBg: "green.50",
-    softBorder: "green.200",
-    color: "green.600",
-  },
-  {
-    key: "absent",
-    label: "غائب",
-    short: "غائب",
-    icon: FaTimes,
-    activeBg: "red.500",
-    softBg: "red.50",
-    softBorder: "red.200",
-    color: "red.600",
-  },
-  {
-    key: "late",
-    label: "متأخر",
-    short: "متأخر",
-    icon: FaClock,
-    activeBg: "orange.500",
-    softBg: "orange.50",
-    softBorder: "orange.200",
-    color: "orange.600",
-  },
-  {
-    key: "excused",
-    label: "بعذر",
-    short: "بعذر",
-    icon: FaUserInjured,
-    activeBg: "purple.500",
-    softBg: "purple.50",
-    softBorder: "purple.200",
-    color: "purple.600",
-  },
-];
+const STATUS_KEYS = ["present", "absent", "late", "excused"];
+const EMPTY_STUDENTS = [];
 
-function StatusToggle({ value, onChange, compact = false }) {
-  const inactiveBg = useColorModeValue("gray.50", "whiteAlpha.100");
-  const inactiveBorder = useColorModeValue("gray.200", "gray.600");
-  const inactiveColor = useColorModeValue("gray.600", "gray.300");
+function buildRosterMap(students, todayData) {
+  const existing = Array.isArray(todayData)
+    ? todayData
+    : todayData?.items || todayData?.records || todayData?.attendance || [];
+  const byStudent = {};
+  existing.forEach((r) => {
+    const sid = field(r, "student_id", "studentId");
+    if (sid != null) byStudent[String(sid)] = field(r, "status") || "absent";
+  });
+  const map = {};
+  students.forEach((s) => {
+    map[String(s.id)] = byStudent[String(s.id)] || "absent";
+  });
+  return map;
+}
+
+const STATUS_BTNS = {
+  present: { icon: FaCheck, label: "ح", title: "حاضر", active: "green.500", soft: "green.50" },
+  absent: { icon: FaTimes, label: "غ", title: "غائب", active: "red.500", soft: "red.50" },
+  late: { icon: FaClock, label: "ت", title: "متأخر", active: "orange.500", soft: "orange.50" },
+  excused: { icon: FaUserInjured, label: "ع", title: "بعذر", active: "purple.500", soft: "purple.50" },
+};
+
+function StatusPicker({ value, onChange, size = "md" }) {
+  const idleBg = useColorModeValue("gray.100", "whiteAlpha.100");
+  const idleColor = useColorModeValue("gray.600", "gray.300");
+  const btnSize = size === "sm" ? "32px" : "36px";
 
   return (
-    <SimpleGrid columns={4} spacing={1.5} w="full">
-      {STATUS_ACTIONS.map((action) => {
-        const active = value === action.key;
+    <HStack spacing={1.5} flexShrink={0}>
+      {STATUS_KEYS.map((key) => {
+        const cfg = STATUS_BTNS[key];
+        const active = value === key;
         return (
           <Button
-            key={action.key}
+            key={key}
             type="button"
-            onClick={() => onChange(action.key)}
-            h={compact ? "40px" : { base: "52px", md: "44px" }}
-            px={1}
-            borderRadius="xl"
+            title={cfg.title}
+            aria-label={cfg.title}
+            minW={btnSize}
+            h={btnSize}
+            px={0}
+            borderRadius="lg"
+            fontWeight="black"
+            fontSize="xs"
             borderWidth="1.5px"
-            borderColor={active ? action.activeBg : inactiveBorder}
-            bg={active ? action.activeBg : inactiveBg}
-            color={active ? "white" : inactiveColor}
-            _hover={{
-              bg: active ? action.activeBg : action.softBg,
-              borderColor: active ? action.activeBg : action.softBorder,
-              color: active ? "white" : action.color,
-            }}
-            _active={{ transform: "scale(0.97)" }}
-            transition="all 0.15s"
-            boxShadow={active ? "sm" : "none"}
-            fontWeight={active ? "black" : "semibold"}
+            borderColor={active ? cfg.active : "transparent"}
+            bg={active ? cfg.active : idleBg}
+            color={active ? "white" : idleColor}
+            _hover={{ bg: active ? cfg.active : cfg.soft, transform: "scale(1.05)" }}
+            onClick={() => onChange(key)}
           >
-            <VStack spacing={0.5}>
-              <Icon as={action.icon} boxSize={compact ? 3 : 3.5} />
-              <Text fontSize={{ base: "9px", sm: "10px" }} lineHeight="1.1">
-                {action.short}
-              </Text>
-            </VStack>
+            {cfg.label}
           </Button>
         );
       })}
-    </SimpleGrid>
+    </HStack>
+  );
+}
+
+function StudentRow({ student, index, status, isDirty, onChange }) {
+  const meta = ATTENDANCE_LABELS[status] || ATTENDANCE_LABELS.absent;
+  const muted = useColorModeValue("gray.500", "gray.400");
+  const accent = `${meta.scheme}.400`;
+
+  return (
+    <ListCard p={3}>
+      <Box h="2px" bg={accent} borderTopRadius="2xl" mx={-3} mt={-3} mb={2.5} />
+      <Flex align="center" gap={3}>
+        <Flex
+          w={8}
+          h={8}
+          borderRadius="lg"
+          bg={`${meta.scheme}.50`}
+          color={`${meta.scheme}.600`}
+          align="center"
+          justify="center"
+          fontWeight="black"
+          fontSize="xs"
+          flexShrink={0}
+        >
+          {index + 1}
+        </Flex>
+        <Box flex={1} minW={0}>
+          <Text fontWeight="bold" fontSize="sm" noOfLines={1}>
+            {studentName(student)}
+          </Text>
+          <Text fontSize="10px" fontFamily="mono" color={muted}>
+            {studentCode(student)}
+          </Text>
+        </Box>
+        {isDirty ? (
+          <Badge colorScheme="orange" borderRadius="full" fontSize="9px" flexShrink={0}>
+            جديد
+          </Badge>
+        ) : (
+          <StatusBadge scheme={meta.scheme}>{meta.label}</StatusBadge>
+        )}
+        <StatusPicker value={status} onChange={(v) => onChange(student.id, v)} size="sm" />
+      </Flex>
+    </ListCard>
   );
 }
 
@@ -159,60 +192,58 @@ export default function AttendancePage() {
   const { data: groupsData } = useGroups({ limit: 100, status: "active" });
   const groups = groupsData?.items || [];
 
+  const { isOpen: isQrOpen, onOpen: onQrOpen, onClose: onQrClose } = useDisclosure();
+
   const [groupId, setGroupId] = useState("");
   const [date, setDate] = useState(todayISO());
-  const [mode, setMode] = useState("roster"); // roster | qr
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [manualToken, setManualToken] = useState("");
   const [scanStatus, setScanStatus] = useState("present");
   const [scanning, setScanning] = useState(false);
   const [bulkMap, setBulkMap] = useState({});
   const [baselineMap, setBaselineMap] = useState({});
-  const [showTips, setShowTips] = useState(false);
   const scannerRef = useRef(null);
   const lastScanRef = useRef("");
 
-  const pageBg = useColorModeValue("#F4F7FB", "gray.950");
   const stickyBg = useColorModeValue("white", "gray.900");
   const stickyBorder = useColorModeValue("gray.200", "gray.700");
-  const modeInactive = useColorModeValue("gray.100", "whiteAlpha.100");
-  const tipBg = useColorModeValue("blue.50", "whiteAlpha.100");
+  const muted = useColorModeValue("gray.500", "gray.400");
+  const titleColor = useColorModeValue("gray.900", "white");
+  const tableHeadBg = useColorModeValue("gray.50", "whiteAlpha.50");
+  const searchBg = useColorModeValue("gray.50", "whiteAlpha.50");
+  const chipIdle = useColorModeValue("gray.100", "whiteAlpha.100");
+
+  const selectedGroup = groups.find((g) => String(g.id) === String(groupId));
 
   const attendanceParams = useMemo(
-    () => ({
-      group_id: groupId || undefined,
-      date: date || undefined,
-    }),
-    [groupId, date]
+    () => ({ group_id: groupId || undefined, date: date || undefined }),
+    [groupId, date],
   );
 
   const { data: todayData, isLoading: loadingToday, refetch } = useAttendance(attendanceParams);
-  const { data: groupStudents = [], isLoading: loadingStudents } = useGroupStudents(groupId);
-  const { scan, record, bulk } = useAttendanceMutations();
+  const { data: studentsData, isLoading: loadingStudents } = useGroupStudents(groupId);
+  const groupStudents = studentsData ?? EMPTY_STUDENTS;
+  const { scan, bulk } = useAttendanceMutations();
+
+  const serverMap = useMemo(
+    () => buildRosterMap(groupStudents, todayData),
+    [groupStudents, todayData],
+  );
+
+  const rosterSyncKey = useMemo(
+    () => `${groupId}|${date}|${JSON.stringify(serverMap)}`,
+    [groupId, date, serverMap],
+  );
+
+  const lastRosterSyncRef = useRef("");
 
   useEffect(() => {
-    const existing = Array.isArray(todayData)
-      ? todayData
-      : todayData?.items || todayData?.records || todayData?.attendance || [];
-    const byStudent = {};
-    existing.forEach((r) => {
-      const sid = field(r, "student_id", "studentId");
-      if (sid != null) byStudent[String(sid)] = field(r, "status") || "absent";
-    });
-
-    const map = {};
-    groupStudents.forEach((s) => {
-      const id = String(s.id);
-      // موجود مسبقاً → حالته، غير مسجّل → غائب (أسهل: علّم الحاضرين فقط)
-      map[id] = byStudent[id] || "absent";
-    });
-    setBulkMap(map);
-    setBaselineMap(map);
-  }, [groupStudents, todayData]);
-
-  const todayList = Array.isArray(todayData)
-    ? todayData
-    : todayData?.items || todayData?.records || todayData?.attendance || [];
+    if (lastRosterSyncRef.current === rosterSyncKey) return;
+    lastRosterSyncRef.current = rosterSyncKey;
+    setBulkMap(serverMap);
+    setBaselineMap(serverMap);
+  }, [rosterSyncKey, serverMap]);
 
   useEffect(() => {
     return () => {
@@ -232,17 +263,6 @@ export default function AttendancePage() {
     return acc;
   }, [bulkMap]);
 
-  const savedCounts = useMemo(() => {
-    return todayList.reduce(
-      (acc, row) => {
-        const st = field(row, "status");
-        if (st && acc[st] != null) acc[st] += 1;
-        return acc;
-      },
-      { present: 0, absent: 0, late: 0, excused: 0 }
-    );
-  }, [todayList]);
-
   const isDirty = useMemo(() => {
     const ids = new Set([...Object.keys(bulkMap), ...Object.keys(baselineMap)]);
     for (const id of ids) {
@@ -252,15 +272,26 @@ export default function AttendancePage() {
   }, [bulkMap, baselineMap]);
 
   const filteredStudents = useMemo(() => {
+    let list = groupStudents;
     const q = search.trim().toLowerCase();
-    if (!q) return groupStudents;
-    return groupStudents.filter((s) => {
-      const name = String(studentName(s)).toLowerCase();
-      const code = String(studentCode(s)).toLowerCase();
-      const phone = String(field(s, "phone") || "").toLowerCase();
-      return name.includes(q) || code.includes(q) || phone.includes(q);
-    });
-  }, [groupStudents, search]);
+    if (q) {
+      list = list.filter((s) => {
+        const name = String(studentName(s)).toLowerCase();
+        const code = String(studentCode(s)).toLowerCase();
+        const phone = String(field(s, "phone") || "").toLowerCase();
+        return name.includes(q) || code.includes(q) || phone.includes(q);
+      });
+    }
+    if (statusFilter === "dirty") {
+      list = list.filter(
+        (s) =>
+          (bulkMap[String(s.id)] || "absent") !== (baselineMap[String(s.id)] || "absent"),
+      );
+    } else if (statusFilter !== "all") {
+      list = list.filter((s) => (bulkMap[String(s.id)] || "absent") === statusFilter);
+    }
+    return list;
+  }, [groupStudents, search, statusFilter, bulkMap, baselineMap]);
 
   const setStatus = (studentId, status) => {
     setBulkMap((m) => ({ ...m, [String(studentId)]: status }));
@@ -296,14 +327,12 @@ export default function AttendancePage() {
       const result = await scan.mutateAsync(payload);
       const name = studentName(result?.student) || "طالب";
       const sid = field(result?.student, "id") ?? field(result, "student_id", "studentId");
-      if (sid != null) {
-        setBulkMap((m) => ({ ...m, [String(sid)]: scanStatus }));
-      }
+      if (sid != null) setBulkMap((m) => ({ ...m, [String(sid)]: scanStatus }));
       toast({
-        title: `تم تسجيل: ${name}`,
-        description: ATTENDANCE_LABELS[scanStatus]?.label || scanStatus,
+        title: `تم: ${name}`,
+        description: ATTENDANCE_LABELS[scanStatus]?.label,
         status: "success",
-        duration: 2000,
+        duration: 1800,
       });
       setManualToken("");
       refetch();
@@ -313,10 +342,7 @@ export default function AttendancePage() {
   };
 
   const startScanner = async () => {
-    if (!groupId) {
-      toast({ title: "اختر المجموعة أولاً", status: "warning", duration: 2500 });
-      return;
-    }
+    if (!groupId || scannerRef.current) return;
     try {
       const scanner = new Html5Qrcode("teacher-center-qr-reader");
       scannerRef.current = scanner;
@@ -332,7 +358,7 @@ export default function AttendancePage() {
             lastScanRef.current = "";
           }, 2500);
         },
-        () => {}
+        () => {},
       );
     } catch (err) {
       setScanning(false);
@@ -358,19 +384,37 @@ export default function AttendancePage() {
     setScanning(false);
   };
 
-  const handleBulkSave = async () => {
+  const handleQrClose = () => {
+    stopScanner();
+    onQrClose();
+  };
+
+  const openQrModal = () => {
     if (!groupId) {
-      toast({ title: "اختر المجموعة", status: "warning", duration: 2500 });
+      toast({ title: "اختر المجموعة أولاً", status: "warning", duration: 2500 });
       return;
     }
+    onQrOpen();
+  };
+
+  useEffect(() => {
+    if (!isQrOpen || !groupId) return undefined;
+    const timer = window.setTimeout(() => {
+      startScanner();
+    }, 350);
+    return () => {
+      window.clearTimeout(timer);
+      stopScanner();
+    };
+  }, [isQrOpen, groupId]);
+
+  const handleBulkSave = async () => {
+    if (!groupId) return;
     const records = Object.entries(bulkMap).map(([student_id, status]) => ({
       student_id: Number(student_id),
       status,
     }));
-    if (!records.length) {
-      toast({ title: "لا يوجد طلاب", status: "warning", duration: 2000 });
-      return;
-    }
+    if (!records.length) return;
     try {
       await bulk.mutateAsync({
         group_id: Number(groupId),
@@ -390,459 +434,365 @@ export default function AttendancePage() {
     }
   };
 
-  const quickRecord = async (student, status) => {
-    if (!groupId) return;
-    setStatus(student.id, status);
-    try {
-      await record.mutateAsync({
-        group_id: Number(groupId),
-        student_id: Number(student.id),
-        attendance_date: date,
-        status,
-        notes: null,
-      });
-      setBaselineMap((m) => ({ ...m, [String(student.id)]: status }));
-      toast({
-        title: `${studentName(student)} — ${ATTENDANCE_LABELS[status]?.label || status}`,
-        status: "success",
-        duration: 1400,
-        isClosable: true,
-      });
-      refetch();
-    } catch (err) {
-      toast({ title: apiErrorMessage(err), status: "error", duration: 3000 });
-    }
-  };
+  const filterChips = [
+    { key: "all", label: "الكل" },
+    { key: "dirty", label: "غير محفوظ" },
+    ...STATUS_KEYS.map((k) => ({ key: k, label: ATTENDANCE_LABELS[k].label })),
+  ];
 
   return (
-    <Box pb={{ base: isDirty || mode === "roster" ? "96px" : 4, md: 4 }}>
+    <Box pb={{ base: groupId ? "100px" : 4, md: groupId && isDirty ? "88px" : 4 }}>
       <PageHeader
         title="تسجيل الحضور"
-        description="اضغط على حالة كل طالب، أو استخدم مسح QR."
+        description="اختر المجموعة والتاريخ، ثم علّم حالة كل طالب أو امسح QR"
       />
 
-      <FilterBar>
-        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
-          <FormControl isRequired>
-            <FormLabel fontSize="sm" fontWeight="semibold">
-              المجموعة
-            </FormLabel>
-            <Select
-              placeholder="اختر المجموعة أولاً"
-              value={groupId}
-              onChange={(e) => {
-                setGroupId(e.target.value);
-                setSearch("");
-              }}
-              borderRadius="xl"
-              size="md"
-              fontWeight="bold"
-            >
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {field(g, "name")}
-                </option>
-              ))}
-            </Select>
-          </FormControl>
-          <FormControl isRequired>
-            <FormLabel fontSize="sm" fontWeight="semibold">
-              تاريخ الحصة
-            </FormLabel>
-            <Input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              borderRadius="xl"
-              size="md"
-            />
-          </FormControl>
-        </SimpleGrid>
-      </FilterBar>
-
-      {/* Mode switcher */}
-      <SimpleGrid columns={2} spacing={2} mb={4}>
-        <Button
-          h="48px"
-          borderRadius="xl"
-          leftIcon={<FaUserCheck />}
-          bg={mode === "roster" ? ACCENT : modeInactive}
-          color={mode === "roster" ? "white" : "gray.700"}
-          _dark={{ color: mode === "roster" ? "white" : "gray.200" }}
-          _hover={{ bg: mode === "roster" ? "#2B6CB0" : modeInactive }}
-          onClick={() => {
-            if (scanning) stopScanner();
-            setMode("roster");
-          }}
-          fontWeight="bold"
-        >
-          كشف الطلاب
-        </Button>
-        <Button
-          h="48px"
-          borderRadius="xl"
-          leftIcon={<FaQrcode />}
-          bg={mode === "qr" ? "#DD6B20" : modeInactive}
-          color={mode === "qr" ? "white" : "gray.700"}
-          _dark={{ color: mode === "qr" ? "white" : "gray.200" }}
-          _hover={{ bg: mode === "qr" ? "#C05621" : modeInactive }}
-          onClick={() => setMode("qr")}
-          fontWeight="bold"
-          isDisabled={!groupId}
-        >
-          مسح QR
-        </Button>
-      </SimpleGrid>
-
-      <SimpleGrid columns={{ base: 2, md: 4 }} spacing={{ base: 2, md: 3 }} mb={4}>
-        <KpiCard
-          label="حاضر (المسودة)"
-          value={draftCounts.present}
-          icon={FaUserCheck}
-          color="green"
-          sub={groupId ? `محفوظ: ${savedCounts.present}` : undefined}
-        />
-        <KpiCard
-          label="غائب"
-          value={draftCounts.absent}
-          icon={FaUserTimes}
-          color="red"
-          sub={groupId ? `محفوظ: ${savedCounts.absent}` : undefined}
-        />
-        <KpiCard
-          label="متأخر"
-          value={draftCounts.late}
-          icon={FaUserClock}
-          color="orange"
-        />
-        <KpiCard
-          label="بعذر"
-          value={draftCounts.excused}
-          icon={FaUserInjured}
-          color="purple"
-        />
-      </SimpleGrid>
-
-      {mode === "roster" ? (
-        <Surface p={{ base: 3, md: 4 }}>
-          {!groupId ? (
-            <EmptyState
-              icon={FaUserCheck}
-              title="ابدأ باختيار المجموعة"
-              description="بعد الاختيار سيظهر كشف الطلاب لتسجيل الحضور بنقرة واحدة."
-            />
-          ) : loadingStudents ? (
-            <LoadingBlock label="جاري تحميل الطلاب..." />
-          ) : groupStudents.length === 0 ? (
-            <EmptyState title="لا يوجد طلاب في هذه المجموعة" />
-          ) : (
-            <VStack align="stretch" spacing={4}>
-              <Flex
-                direction={{ base: "column", md: "row" }}
-                gap={3}
-                justify="space-between"
-                align={{ base: "stretch", md: "center" }}
-              >
-                <Box>
-                  <HStack spacing={2} mb={1}>
-                    <Text fontWeight="black" fontSize="md">
-                      كشف الحضور
-                    </Text>
-                    <Badge colorScheme="blue" borderRadius="full">
-                      {filteredStudents.length} طالب
-                    </Badge>
-                    {isDirty ? (
-                      <Badge colorScheme="orange" borderRadius="full">
-                        غير محفوظ
-                      </Badge>
-                    ) : null}
-                  </HStack>
-                  <Text fontSize="xs" color="gray.500">
-                    اضغط الحالة المطلوبة لكل طالب ثم احفظ
-                  </Text>
-                </Box>
-
-                <Wrap spacing={2}>
-                  <WrapItem>
-                    <Button
-                      size="sm"
-                      leftIcon={<FaCheckDouble />}
-                      colorScheme="green"
-                      variant="outline"
-                      borderRadius="lg"
-                      onClick={() => markAll("present")}
-                    >
-                      الكل حاضر
-                    </Button>
-                  </WrapItem>
-                  <WrapItem>
-                    <Button
-                      size="sm"
-                      leftIcon={<FaTimes />}
-                      colorScheme="red"
-                      variant="outline"
-                      borderRadius="lg"
-                      onClick={() => markAll("absent")}
-                    >
-                      الكل غائب
-                    </Button>
-                  </WrapItem>
-                </Wrap>
-              </Flex>
-
-              <InputGroup>
-                <InputLeftElement pointerEvents="none">
-                  <FiSearch color="gray" />
-                </InputLeftElement>
-                <Input
-                  placeholder="ابحث باسم الطالب أو الكود..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  borderRadius="xl"
-                  bg={pageBg}
-                />
-              </InputGroup>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                alignSelf="flex-start"
-                rightIcon={<Icon as={showTips ? FaChevronUp : FaChevronDown} />}
-                onClick={() => setShowTips((v) => !v)}
-              >
-                طريقة سريعة
-              </Button>
-              <Collapse in={showTips}>
-                <Box p={3} borderRadius="xl" bg={tipBg} fontSize="sm" color="gray.600" mb={1}>
-                  اجعل الجميع غائبين ثم اضغط «حاضر» لمن حضر فقط — أو استخدم «الكل حاضر» وعدّل الغياب.
-                  الضغط المطوّل غير مطلوب: نقرة واحدة تكفي، ثم «حفظ الحضور».
-                </Box>
-              </Collapse>
-
-              <VStack spacing={3} align="stretch">
-                {filteredStudents.map((s, index) => {
-                  const st = bulkMap[String(s.id)] || "absent";
-                  const meta = ATTENDANCE_LABELS[st] || ATTENDANCE_LABELS.absent;
-                  const dirty =
-                    (bulkMap[String(s.id)] || "absent") !==
-                    (baselineMap[String(s.id)] || "absent");
-
-                  return (
-                    <ListCard key={s.id} p={{ base: 3, md: 3.5 }}>
-                      <Flex
-                        justify="space-between"
-                        align="flex-start"
-                        gap={3}
-                        mb={3}
-                      >
-                        <HStack spacing={3} minW={0} align="center">
-                          <Flex
-                            w={9}
-                            h={9}
-                            borderRadius="lg"
-                            bg={`${meta.scheme}.50`}
-                            color={`${meta.scheme}.600`}
-                            align="center"
-                            justify="center"
-                            fontWeight="black"
-                            fontSize="sm"
-                            flexShrink={0}
-                          >
-                            {index + 1}
-                          </Flex>
-                          <Box minW={0}>
-                            <Text fontWeight="black" noOfLines={1} fontSize={{ base: "sm", md: "md" }}>
-                              {studentName(s)}
-                            </Text>
-                            <Text fontSize="xs" color="gray.500" fontFamily="mono">
-                              {studentCode(s)}
-                            </Text>
-                          </Box>
-                        </HStack>
-                        <HStack spacing={1} flexShrink={0}>
-                          {dirty ? (
-                            <Badge colorScheme="orange" borderRadius="full" fontSize="9px">
-                              تعدّل
-                            </Badge>
-                          ) : null}
-                          <StatusBadge scheme={meta.scheme}>{meta.label}</StatusBadge>
-                        </HStack>
-                      </Flex>
-
-                      <StatusToggle
-                        value={st}
-                        onChange={(next) => setStatus(s.id, next)}
-                      />
-
-                      {/* Instant save one student — secondary on desktop */}
-                      <Flex
-                        display={{ base: "none", md: "flex" }}
-                        justify="flex-end"
-                        mt={2}
-                      >
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          colorScheme="blue"
-                          onClick={() => quickRecord(s, st)}
-                          isLoading={record.isPending}
-                        >
-                          حفظ هذا الطالب فوراً
-                        </Button>
-                      </Flex>
-                    </ListCard>
-                  );
-                })}
-              </VStack>
-
-              {filteredStudents.length === 0 ? (
-                <EmptyState title="لا نتائج للبحث" description="جرّب اسماً أو كوداً آخر." />
-              ) : null}
-            </VStack>
-          )}
-        </Surface>
-      ) : (
-        <Surface>
-          <Flex
-            justify="space-between"
-            align={{ base: "stretch", sm: "center" }}
-            direction={{ base: "column", sm: "row" }}
-            gap={3}
-            mb={4}
-          >
-            <Box>
-              <Text fontWeight="black" mb={1}>
-                مسح QR للطالب
-              </Text>
-              <Text fontSize="sm" color="gray.500">
-                وجّه الكاميرا لبطاقة الطالب — يُسجَّل فوراً
-              </Text>
-            </Box>
-            <FormControl maxW={{ sm: "180px" }}>
-              <FormLabel fontSize="xs">حالة المسح</FormLabel>
+      {/* Setup panel */}
+      <Surface p={0} overflow="hidden" mb={5}>
+        <Box h="3px" bgGradient="linear(to-l, blue.500, orange.500)" />
+        <Box p={{ base: 4, md: 5 }}>
+          <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={4}>
+            <FormControl isRequired>
+              <FormLabel fontSize="sm" fontWeight="semibold">
+                المجموعة
+              </FormLabel>
               <Select
-                value={scanStatus}
-                onChange={(e) => setScanStatus(e.target.value)}
+                placeholder="اختر المجموعة"
+                value={groupId}
+                onChange={(e) => {
+                  setGroupId(e.target.value);
+                  setSearch("");
+                  setStatusFilter("all");
+                  if (isQrOpen) handleQrClose();
+                }}
                 borderRadius="xl"
-                size="sm"
+                size="md"
               >
-                {Object.entries(ATTENDANCE_LABELS).map(([key, meta]) => (
-                  <option key={key} value={key}>
-                    {meta.label}
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {field(g, "name")}
                   </option>
                 ))}
               </Select>
             </FormControl>
-          </Flex>
-
-          <Box
-            id="teacher-center-qr-reader"
-            borderRadius="2xl"
-            overflow="hidden"
-            mb={4}
-            minH={scanning ? { base: "300px", md: "280px" } : "0"}
-            w="full"
-            bg="black"
-            display={scanning ? "block" : "none"}
-          />
-
-          <Flex gap={2} mb={5} flexWrap="wrap">
-            {!scanning ? (
-              <PrimaryButton
-                leftIcon={<FaCamera />}
-                onClick={startScanner}
-                isDisabled={!groupId}
-                w={{ base: "full", sm: "auto" }}
-                h="48px"
-              >
-                تشغيل الكاميرا
-              </PrimaryButton>
-            ) : (
-              <Button
-                colorScheme="red"
+            <FormControl isRequired>
+              <FormLabel fontSize="sm" fontWeight="semibold">
+                تاريخ الحصة
+              </FormLabel>
+              <Input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
                 borderRadius="xl"
-                onClick={stopScanner}
-                w={{ base: "full", sm: "auto" }}
-                h="48px"
-              >
-                إيقاف المسح
-              </Button>
-            )}
-          </Flex>
+                size="md"
+              />
+            </FormControl>
+          </SimpleGrid>
 
-          <FormControl mb={3}>
-            <FormLabel fontSize="sm">أو الصق رمز QR</FormLabel>
-            <Textarea
-              value={manualToken}
-              onChange={(e) => setManualToken(e.target.value)}
-              borderRadius="xl"
-              rows={2}
-              placeholder="qr_token أو JSON"
-            />
-          </FormControl>
+          {selectedGroup ? (
+            <HStack spacing={2} mb={4} flexWrap="wrap">
+              <Icon as={FaLayerGroup} color={ACCENT} />
+              <Text fontWeight="bold" color={titleColor}>
+                {field(selectedGroup, "name")}
+              </Text>
+              <Text fontSize="sm" color={muted}>
+                · {formatDate(date)}
+              </Text>
+            </HStack>
+          ) : null}
+
           <PrimaryButton
-            onClick={() => submitScan(manualToken)}
-            isLoading={scan.isPending}
-            isDisabled={!groupId || !manualToken.trim()}
-            w={{ base: "full", sm: "auto" }}
-            bg="teal.500"
-            _hover={{ bg: "teal.600" }}
+            leftIcon={<FaQrcode />}
+            onClick={openQrModal}
+            isDisabled={!groupId}
+            w="full"
+            h="48px"
+            bg={BRAND_ORANGE}
+            _hover={{ bg: "#C05621" }}
+            fontWeight="bold"
           >
-            تسجيل بالمسح النصي
+            مسح QR — فتح الكاميرا
           </PrimaryButton>
-        </Surface>
-      )}
+        </Box>
+      </Surface>
 
-      {/* Today's saved log — compact */}
       {groupId ? (
-        <Surface mt={4}>
-          <Flex justify="space-between" align="center" mb={3}>
-            <Text fontWeight="black">السجل المحفوظ لليوم</Text>
-            <Badge borderRadius="full">{todayList.length}</Badge>
-          </Flex>
-          {loadingToday ? (
-            <LoadingBlock label="جاري التحميل..." />
-          ) : todayList.length === 0 ? (
-            <Text fontSize="sm" color="gray.500">
-              لم يُحفظ أي حضور بعد لهذا التاريخ.
-            </Text>
-          ) : (
-            <VStack spacing={2} align="stretch" maxH="280px" overflowY="auto">
-              {todayList.map((row, idx) => {
-                const status = field(row, "status");
-                const meta = ATTENDANCE_LABELS[status] || {
-                  label: status || "—",
-                  scheme: "gray",
-                };
-                return (
-                  <Flex
-                    key={row.id || idx}
-                    justify="space-between"
-                    align="center"
-                    gap={2}
-                    p={2.5}
-                    borderRadius="xl"
-                    bg={pageBg}
-                  >
-                    <Text fontWeight="semibold" fontSize="sm" noOfLines={1}>
-                      {studentName(row) || field(row, "student_name", "full_name")}
-                    </Text>
-                    <HStack spacing={2}>
-                      <Text fontSize="xs" color="gray.400" display={{ base: "none", sm: "block" }}>
-                        {field(row, "method") || "—"}
-                      </Text>
-                      <StatusBadge scheme={meta.scheme}>{meta.label}</StatusBadge>
-                    </HStack>
-                  </Flex>
-                );
-              })}
-            </VStack>
-          )}
-        </Surface>
+        <SimpleGrid columns={{ base: 2, md: 4 }} spacing={{ base: 2, md: 3 }} mb={5}>
+          <KpiCard label="حاضر" value={draftCounts.present} icon={FaUserCheck} color="green" />
+          <KpiCard label="غائب" value={draftCounts.absent} icon={FaTimes} color="red" />
+          <KpiCard label="متأخر" value={draftCounts.late} icon={FaClock} color="orange" />
+          <KpiCard label="بعذر" value={draftCounts.excused} icon={FaUserInjured} color="purple" />
+        </SimpleGrid>
       ) : null}
 
-      {/* Sticky save bar */}
-      {groupId && mode === "roster" && groupStudents.length > 0 ? (
+      <Surface>
+        {!groupId ? (
+          <EmptyState
+            icon={FaUserCheck}
+            title="اختر مجموعة للبدء"
+            description="حدّد المجموعة والتاريخ من الأعلى"
+          />
+        ) : loadingStudents ? (
+          <LoadingBlock label="جاري تحميل الطلاب..." />
+        ) : groupStudents.length === 0 ? (
+          <EmptyState title="لا يوجد طلاب في هذه المجموعة" />
+        ) : (
+          <VStack align="stretch" spacing={4}>
+            {/* Toolbar */}
+            <Flex
+              direction={{ base: "column", lg: "row" }}
+              gap={3}
+              align={{ base: "stretch", lg: "center" }}
+              justify="space-between"
+            >
+              <InputGroup maxW={{ lg: "320px" }}>
+                <InputLeftElement pointerEvents="none">
+                  <FiSearch color="gray" />
+                </InputLeftElement>
+                <Input
+                  placeholder="بحث بالاسم أو الكود..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  borderRadius="xl"
+                  bg={searchBg}
+                  size="sm"
+                />
+              </InputGroup>
+              <HStack spacing={2} flexWrap="wrap">
+                <Button
+                  size="sm"
+                  leftIcon={<FaQrcode />}
+                  colorScheme="orange"
+                  borderRadius="xl"
+                  onClick={openQrModal}
+                >
+                  مسح QR
+                </Button>
+                <Button
+                  size="sm"
+                  leftIcon={<FaCheckDouble />}
+                  colorScheme="green"
+                  variant="outline"
+                  borderRadius="xl"
+                  onClick={() => markAll("present")}
+                >
+                  الكل حاضر
+                </Button>
+                <Button
+                  size="sm"
+                  leftIcon={<FaTimes />}
+                  colorScheme="red"
+                  variant="outline"
+                  borderRadius="xl"
+                  onClick={() => markAll("absent")}
+                >
+                  الكل غائب
+                </Button>
+              </HStack>
+            </Flex>
+
+              {/* Filter chips */}
+              <Wrap spacing={2}>
+                {filterChips.map((chip) => {
+                  const active = statusFilter === chip.key;
+                  return (
+                    <WrapItem key={chip.key}>
+                      <Button
+                        size="xs"
+                        borderRadius="full"
+                        px={3}
+                        h="28px"
+                        fontWeight="semibold"
+                        bg={active ? ACCENT : chipIdle}
+                        color={active ? "white" : muted}
+                        onClick={() => setStatusFilter(chip.key)}
+                      >
+                        {chip.label}
+                      </Button>
+                    </WrapItem>
+                  );
+                })}
+              </Wrap>
+
+              <Text fontSize="xs" color={muted}>
+                اضغط ح · غ · ت · ع لتغيير الحالة — ثم احفظ من الأسفل
+                {isDirty ? (
+                  <Text as="span" color="orange.500" fontWeight="bold">
+                    {" "}
+                    · لديك تعديلات غير محفوظة
+                  </Text>
+                ) : null}
+              </Text>
+
+              {filteredStudents.length === 0 ? (
+                <EmptyState title="لا نتائج" description="جرّب بحثاً أو فلتراً مختلفاً" />
+              ) : (
+                <>
+                  <MobileOnly>
+                    <VStack spacing={2} align="stretch">
+                      {filteredStudents.map((s, i) => {
+                        const st = bulkMap[String(s.id)] || "absent";
+                        const dirty =
+                          (bulkMap[String(s.id)] || "absent") !==
+                          (baselineMap[String(s.id)] || "absent");
+                        return (
+                          <StudentRow
+                            key={s.id}
+                            student={s}
+                            index={i}
+                            status={st}
+                            isDirty={dirty}
+                            onChange={setStatus}
+                          />
+                        );
+                      })}
+                    </VStack>
+                  </MobileOnly>
+
+                  <DesktopOnly>
+                    <TableContainer borderRadius="xl" borderWidth="1px" borderColor={stickyBorder}>
+                      <Table size="sm">
+                        <Thead bg={tableHeadBg}>
+                          <Tr>
+                            <Th w="48px">#</Th>
+                            <Th>الطالب</Th>
+                            <Th w="100px">الحالة</Th>
+                            <Th w="200px" textAlign="center">
+                              تسجيل سريع
+                            </Th>
+                          </Tr>
+                        </Thead>
+                        <Tbody>
+                          {filteredStudents.map((s, i) => {
+                            const st = bulkMap[String(s.id)] || "absent";
+                            const meta = ATTENDANCE_LABELS[st] || ATTENDANCE_LABELS.absent;
+                            const dirty =
+                              (bulkMap[String(s.id)] || "absent") !==
+                              (baselineMap[String(s.id)] || "absent");
+                            return (
+                              <Tr key={s.id}>
+                                <Td color={muted} fontWeight="bold">
+                                  {i + 1}
+                                </Td>
+                                <Td>
+                                  <Text fontWeight="semibold">{studentName(s)}</Text>
+                                  <Text fontSize="xs" fontFamily="mono" color={muted}>
+                                    {studentCode(s)}
+                                  </Text>
+                                </Td>
+                                <Td>
+                                  {dirty ? (
+                                    <Badge colorScheme="orange" borderRadius="full" fontSize="10px">
+                                      جديد
+                                    </Badge>
+                                  ) : (
+                                    <StatusBadge scheme={meta.scheme}>{meta.label}</StatusBadge>
+                                  )}
+                                </Td>
+                                <Td>
+                                  <Flex justify="center">
+                                    <StatusPicker
+                                      value={st}
+                                      onChange={(v) => setStatus(s.id, v)}
+                                    />
+                                  </Flex>
+                                </Td>
+                              </Tr>
+                            );
+                          })}
+                        </Tbody>
+                      </Table>
+                    </TableContainer>
+                  </DesktopOnly>
+                </>
+              )}
+            </VStack>
+          )}
+      </Surface>
+
+      <Modal
+        isOpen={isQrOpen}
+        onClose={handleQrClose}
+        size={{ base: "full", md: "md" }}
+        isCentered
+        closeOnOverlayClick
+      >
+        <ModalOverlay backdropFilter="blur(6px)" />
+        <ModalContent dir="rtl" borderRadius={{ base: "none", md: "2xl" }} m={0}>
+          <ModalHeader pb={2}>
+            <HStack spacing={2}>
+              <Icon as={FaQrcode} color={BRAND_ORANGE} />
+              <Text>مسح بطاقة الطالب</Text>
+            </HStack>
+          </ModalHeader>
+          <ModalCloseButton />
+          <ModalBody pb={6}>
+            <VStack align="stretch" spacing={4}>
+              <Text fontSize="sm" color={muted} textAlign="center">
+                وجّه الكاميرا لـ QR — يُسجَّل تلقائياً
+              </Text>
+
+              <FormControl>
+                <FormLabel fontSize="xs">حالة المسح</FormLabel>
+                <Select
+                  value={scanStatus}
+                  onChange={(e) => setScanStatus(e.target.value)}
+                  borderRadius="xl"
+                  size="sm"
+                >
+                  {Object.entries(ATTENDANCE_LABELS).map(([key, meta]) => (
+                    <option key={key} value={key}>
+                      {meta.label}
+                    </option>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <Box
+                id="teacher-center-qr-reader"
+                borderRadius="2xl"
+                overflow="hidden"
+                minH="280px"
+                w="full"
+                bg="black"
+              />
+
+              {!scanning ? (
+                <Text fontSize="xs" color={muted} textAlign="center">
+                  جاري تشغيل الكاميرا...
+                </Text>
+              ) : null}
+
+              <Box pt={2} borderTopWidth="1px" borderColor={stickyBorder}>
+                <FormLabel fontSize="sm" fontWeight="semibold">
+                  أو الصق رمز QR يدوياً
+                </FormLabel>
+                <Textarea
+                  value={manualToken}
+                  onChange={(e) => setManualToken(e.target.value)}
+                  borderRadius="xl"
+                  rows={2}
+                  placeholder="qr_token أو JSON"
+                  mb={3}
+                />
+                <PrimaryButton
+                  onClick={() => submitScan(manualToken)}
+                  isLoading={scan.isPending}
+                  isDisabled={!manualToken.trim()}
+                  w="full"
+                  bg="teal.500"
+                  _hover={{ bg: "teal.600" }}
+                >
+                  تسجيل
+                </PrimaryButton>
+              </Box>
+            </VStack>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
+
+      {/* Sticky save */}
+      {groupId && groupStudents.length > 0 ? (
         <Box
           position="fixed"
           bottom={{ base: "72px", md: 0 }}
@@ -852,7 +802,7 @@ export default function AttendancePage() {
           bg={stickyBg}
           borderTopWidth="1px"
           borderColor={stickyBorder}
-          boxShadow="0 -10px 30px rgba(15,23,42,0.1)"
+          boxShadow="0 -8px 24px rgba(15,23,42,0.08)"
           px={4}
           py={3}
         >
@@ -864,24 +814,18 @@ export default function AttendancePage() {
             justify="space-between"
             direction={{ base: "column", sm: "row" }}
           >
-            <HStack spacing={3} fontSize="sm" flexWrap="wrap" justify="center">
-              <Badge colorScheme="green" borderRadius="full" px={2}>
-                حاضر {draftCounts.present}
+            <HStack spacing={2} fontSize="sm" flexWrap="wrap" justify="center">
+              <Badge colorScheme="green" borderRadius="full">
+                {draftCounts.present} حاضر
               </Badge>
-              <Badge colorScheme="red" borderRadius="full" px={2}>
-                غائب {draftCounts.absent}
+              <Badge colorScheme="red" borderRadius="full">
+                {draftCounts.absent} غائب
               </Badge>
-              <Badge colorScheme="orange" borderRadius="full" px={2}>
-                متأخر {draftCounts.late}
-              </Badge>
-              {isDirty ? (
-                <Text fontSize="xs" color="orange.500" fontWeight="bold">
-                  لديك تعديلات غير محفوظة
-                </Text>
-              ) : (
-                <Text fontSize="xs" color="gray.500">
-                  كل شيء محفوظ
-                </Text>
+              {loadingToday ? null : (
+                <HStack spacing={1} color={muted} fontSize="xs">
+                  <Icon as={FaCalendarAlt} boxSize={3} />
+                  <Text>{formatDate(date)}</Text>
+                </HStack>
               )}
             </HStack>
             <PrimaryButton
@@ -890,7 +834,7 @@ export default function AttendancePage() {
               isLoading={bulk.isPending}
               isDisabled={!isDirty}
               w={{ base: "full", sm: "auto" }}
-              h="48px"
+              h="46px"
               px={8}
             >
               حفظ الحضور

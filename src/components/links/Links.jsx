@@ -30,13 +30,13 @@ import {
   Text,
   Icon,
   Box,
+  Button,
   Tooltip,
   useColorModeValue,
   Flex,
 } from "@chakra-ui/react";
 import UserType from "../../Hooks/auth/userType";
-import { logoutRequest } from "../../services/authService";
-import { clearAuthSession } from "../../utils/authStorage";
+import { performLogout } from "../../utils/performLogout";
 
 const NavLinkItem = ({ to, Icon: LinkIcon, label, onClick, isSidebarOpen }) => {
   const location = useLocation();
@@ -165,23 +165,15 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
     onClose?.();
   };
 
-  const handleLogout = async () => {
-    // يمسح كوكي الـ refresh على الخادم ثم ينظف الجلسة محلياً ويبلغ بقية التبويبات
-    try {
-      await logoutRequest();
-    } catch {
-      // الخروج محلياً يتم في كل الأحوال
-    }
-    ["examAnswers", "examTimeLeft"].forEach((item) =>
-      localStorage.removeItem(item),
-    );
-    clearAuthSession({ broadcast: true });
-    window.location.href = "/login";
+  const handleLogout = () => {
+    onClose?.();
+    void performLogout();
   };
 
   const logoutBorder = useColorModeValue("gray.100", "gray.700");
   const logoutHover = useColorModeValue("red.50", "whiteAlpha.50");
   const logoutColor = useColorModeValue("red.600", "red.300");
+  const logoutIconBg = useColorModeValue("red.50", "whiteAlpha.100");
 
   const adminSections = [
     {
@@ -340,42 +332,45 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
           hasArrow
           openDelay={300}
         >
-          <Flex
-            as="button"
-            type="button"
-            onClick={() => {
-              handleLogout();
-              onClose?.();
-            }}
-            align="center"
-            gap={3}
-            px={isSidebarOpen ? 2.5 : 2}
-            py={2}
-            borderRadius="xl"
-            color={logoutColor}
-            w="full"
-            minH="44px"
-            justify={isSidebarOpen ? "flex-start" : "center"}
-            _hover={{ bg: logoutHover }}
-            transition="all 0.2s ease"
-          >
-            <Flex
-              w={9}
-              h={9}
-              flexShrink={0}
-              align="center"
-              justify="center"
-              borderRadius="lg"
-              bg={useColorModeValue("red.50", "whiteAlpha.100")}
+          <Box as="span" display="block" w="full">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleLogout}
+              w="full"
+              h="auto"
+              minH="44px"
+              px={isSidebarOpen ? 2.5 : 2}
+              py={2}
+              borderRadius="xl"
+              color={logoutColor}
+              _hover={{ bg: logoutHover }}
             >
-              <Icon as={MdLogout} boxSize="18px" />
-            </Flex>
-            {isSidebarOpen ? (
-              <Text fontSize="sm" fontWeight="bold">
-                تسجيل الخروج
-              </Text>
-            ) : null}
-          </Flex>
+              <Flex
+                align="center"
+                gap={3}
+                w="full"
+                justify={isSidebarOpen ? "flex-start" : "center"}
+              >
+                <Flex
+                  w={9}
+                  h={9}
+                  flexShrink={0}
+                  align="center"
+                  justify="center"
+                  borderRadius="lg"
+                  bg={logoutIconBg}
+                >
+                  <Icon as={MdLogout} boxSize="18px" />
+                </Flex>
+                {isSidebarOpen ? (
+                  <Text fontSize="sm" fontWeight="bold">
+                    تسجيل الخروج
+                  </Text>
+                ) : null}
+              </Flex>
+            </Button>
+          </Box>
         </Tooltip>
       </Box>
     </VStack>

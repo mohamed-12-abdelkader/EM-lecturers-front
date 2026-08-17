@@ -217,14 +217,13 @@ export function FilterBar({ children }) {
   );
 }
 
-/** Mobile-first list row / card */
+/** Mobile-first list row / card — uses div (not button) so nested controls stay valid */
 export function ListCard({ children, onClick, ...props }) {
   const border = useColorModeValue("gray.200", "gray.700");
   const hoverBorder = useColorModeValue("blue.200", "blue.700");
   const bg = useColorModeValue("white", "gray.800");
   return (
     <Box
-      as={onClick ? "button" : "div"}
       w="full"
       textAlign="right"
       bg={bg}
@@ -233,11 +232,28 @@ export function ListCard({ children, onClick, ...props }) {
       borderRadius="2xl"
       p={{ base: 3.5, md: 4 }}
       transition="all 0.18s ease"
-      _hover={{
-        borderColor: hoverBorder,
-        shadow: "sm",
-        transform: "translateY(-1px)",
-      }}
+      cursor={onClick ? "pointer" : undefined}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick(e);
+              }
+            }
+          : undefined
+      }
+      _hover={
+        onClick
+          ? {
+              borderColor: hoverBorder,
+              shadow: "sm",
+              transform: "translateY(-1px)",
+            }
+          : undefined
+      }
       onClick={onClick}
       {...props}
     >

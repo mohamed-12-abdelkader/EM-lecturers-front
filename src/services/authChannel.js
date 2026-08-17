@@ -1,32 +1,45 @@
 /**
  * قناة مزامنة المصادقة بين التبويبات (BroadcastChannel).
- *
- * أنواع الرسائل:
- * - { type: "token",  token }            → توكن جديد (login / refresh)
- * - { type: "user",   user }             → تحديث بيانات المستخدم
- * - { type: "login",  user, token }      → تسجيل دخول من تبويب آخر
- * - { type: "logout" }                   → تسجيل خروج من تبويب آخر
- * - { type: "session-expired" }          → فشل الـ refresh نهائياً
- * - { type: "request-token" }            → تبويب جديد يطلب التوكن الحالي
+ * معزولة لكل subdomain — تبويبات منصات مختلفة لا تتشارك الجلسة.
  */
 
-const CHANNEL_NAME = "em-auth-v1";
+import { getAuthChannelName, getAuthScopeSubdomain } from "../utils/tenantAuthStorage";
 
 let channel = null;
+let channelScope = null;
 let channelFailed = false;
 const handlers = new Set();
 
+function authMessageFromOtherTenant(msg) {
+  const current = getAuthScopeSubdomain();
+  const msgTenant = msg?.tenant ?? null;
+  if (msgTenant == null && current == null) return false;
+  return String(msgTenant || "") !== String(current || "");
+}
+
 function ensureChannel() {
-  if (channel || channelFailed) return channel;
+  const scope = getAuthScopeSubdomain() || "__main__";
+  if (channel && channelScope === scope) return channel;
+  if (channel) {
+    try {
+      channel.close();
+    } catch {
+      // ignore
+    }
+    channel = null;
+  }
+  if (channelFailed) return null;
   if (typeof window === "undefined" || typeof BroadcastChannel === "undefined") {
     channelFailed = true;
     return null;
   }
   try {
-    channel = new BroadcastChannel(CHANNEL_NAME);
+    channelScope = scope;
+    channel = new BroadcastChannel(getAuthChannelName(scope === "__main__" ? null : scope));
     channel.onmessage = (event) => {
       const msg = event?.data;
       if (!msg || typeof msg !== "object" || !msg.type) return;
+      if (authMessageFromOtherTenant(msg)) return;
       handlers.forEach((handler) => {
         try {
           handler(msg);
@@ -47,7 +60,10 @@ export function postAuthMessage(message) {
   const ch = ensureChannel();
   if (!ch) return false;
   try {
-    ch.postMessage(message);
+    ch.postMessage({
+      ...message,
+      tenant: message?.tenant ?? getAuthScopeSubdomain(),
+    });
     return true;
   } catch {
     return false;

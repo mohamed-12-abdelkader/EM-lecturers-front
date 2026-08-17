@@ -1,38 +1,51 @@
 /**
  * RefreshManager — تجديد الجلسة عبر كوكي الـ HttpOnly.
- *
- * الضمانات:
- * - Refresh واحد فقط في نفس اللحظة داخل التبويب (single-flight promise).
- * - Refresh واحد فقط عبر كل التبويبات (Web Locks API + مشاركة التوكن عبر BroadcastChannel).
- * - كل الطلبات المعلّقة تنتظر نفس الـ promise ثم يُعاد إرسالها.
- *
- * العقد:
- * - ينجح  → يرجع التوكن الجديد (string).
- * - 401   → يرجع null (الجلسة انتهت نهائياً — على المستدعي تسجيل الخروج).
- * - شبكة  → يرمي خطأ (لا تُنهِ الجلسة بسبب انقطاع الإنترنت).
  */
 
 import authHttp from "../api/authHttp";
 import { isJwtExpired } from "../utils/jwt";
+import {
+  enrichUserWithTenant,
+  readStoredUser,
+  sessionMatchesCurrentTenant,
+  AUTH_STORAGE_UPDATE_EVENT,
+} from "../utils/authStorage";
+import { normalizeAuthUser } from "../utils/authRoles";
 import {
   getAccessToken,
   hasFreshAccessToken,
   setAccessToken,
 } from "./tokenStore";
 import { postAuthMessage } from "./authChannel";
-import { safeLocalSet } from "../utils/safeStorage";
+import {
+  getAuthScopeSubdomain,
+  readStoredTenantMeta,
+  writeScopedAuthItem,
+} from "../utils/tenantAuthStorage";
 
-const REFRESH_LOCK = "em-auth-refresh";
+const REFRESH_LOCK_PREFIX = "em-auth-refresh";
 
 let inflight = null;
 
+function refreshLockName() {
+  return `${REFRESH_LOCK_PREFIX}:${getAuthScopeSubdomain() || "main"}`;
+}
+
 function persistRefreshedUser(user) {
   if (user == null || typeof user !== "object") return;
-  safeLocalSet("user", JSON.stringify(user));
+  const tenantMeta = readStoredTenantMeta();
+  const stored = readStoredUser();
+  const enriched = normalizeAuthUser(enrichUserWithTenant(user, tenantMeta), {
+    fallbackUser: stored,
+  });
+  if (!sessionMatchesCurrentTenant(enriched, tenantMeta)) return;
+  writeScopedAuthItem("user", JSON.stringify(enriched));
   if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("auth-storage-update"));
+    window.dispatchEvent(
+      new CustomEvent(AUTH_STORAGE_UPDATE_EVENT, { detail: { user: enriched } }),
+    );
   }
-  postAuthMessage({ type: "user", user });
+  postAuthMessage({ type: "user", user: enriched, tenant: getAuthScopeSubdomain() });
 }
 
 async function performRefresh() {
@@ -40,22 +53,31 @@ async function performRefresh() {
     const response = await authHttp.post("api/auth/refresh");
     const token = response?.data?.token;
     if (!token) return null;
+
+    const tenantMeta = readStoredTenantMeta();
+    const user = response?.data?.user;
+    const enriched =
+      user != null && typeof user === "object"
+        ? enrichUserWithTenant(user, tenantMeta)
+        : null;
+
+    if (getAuthScopeSubdomain() && enriched && !sessionMatchesCurrentTenant(enriched, tenantMeta)) {
+      return null;
+    }
+
     setAccessToken(token);
-    persistRefreshedUser(response?.data?.user);
+    persistRefreshedUser(user);
     return getAccessToken();
   } catch (error) {
     const status = error?.response?.status;
     if (status === 401 || status === 403) return null;
-    // الباك اند لا يوفر /auth/refresh بعد (404) — لا يمكن التجديد
     if (status === 404 || status === 405) return null;
-    // خطأ شبكة أو خادم — لا نعتبر الجلسة منتهية
     throw error;
   }
 }
 
 async function refreshWithCrossTabLock(staleToken) {
   const run = async () => {
-    // تبويب آخر ربما جدّد التوكن أثناء انتظار الـ lock
     const current = getAccessToken();
     if (current && current !== staleToken && !isJwtExpired(current)) {
       return current;
@@ -63,16 +85,13 @@ async function refreshWithCrossTabLock(staleToken) {
     return performRefresh();
   };
 
+  const lockName = refreshLockName();
   if (typeof navigator !== "undefined" && navigator.locks?.request) {
-    return navigator.locks.request(REFRESH_LOCK, run);
+    return navigator.locks.request(lockName, run);
   }
   return run();
 }
 
-/**
- * يجدد الجلسة مرة واحدة مهما تعدد المستدعون.
- * كل من ينادي أثناء وجود refresh جارٍ ينتظر نفس النتيجة.
- */
 export function refreshSession() {
   if (inflight) return inflight;
   const staleToken = getAccessToken();
@@ -82,7 +101,6 @@ export function refreshSession() {
   return inflight;
 }
 
-/** هل يوجد refresh جارٍ الآن؟ */
 export function isRefreshing() {
   return inflight != null;
 }

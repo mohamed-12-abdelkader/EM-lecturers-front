@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   Box,
   VStack,
@@ -134,6 +134,7 @@ const ComprehensiveExam = () => {
   const [attemptSummary, setAttemptSummary] = useState(null);
   const [imageZoomOpen, setImageZoomOpen] = useState(false);
   const [imageZoomSrc, setImageZoomSrc] = useState(null);
+  const [questionSearch, setQuestionSearch] = useState("");
 
   // ألوان الصفحة
   const pageBg = useColorModeValue("#E8EEF5", "gray.950");
@@ -142,6 +143,18 @@ const ComprehensiveExam = () => {
   const headingColor = useColorModeValue("gray.900", "white");
   const subtextColor = useColorModeValue("gray.500", "gray.400");
   const isStaff = Boolean(isTeacher || isAdmin);
+
+  const filteredQuestions = useMemo(() => {
+    const term = questionSearch.trim().toLowerCase();
+    if (!term) return questions;
+    return questions.filter((q, idx) => {
+      const isPassageSub = q.type === "passage_sub";
+      const text = (isPassageSub ? q.sub_question?.text : q.text) || "";
+      const passage = q.passage?.content || "";
+      const haystack = `${idx + 1} ${text} ${passage}`.toLowerCase();
+      return haystack.includes(term);
+    });
+  }, [questions, questionSearch]);
 
   // جلب درجات الطلاب
   const fetchGrades = async () => {
@@ -1568,6 +1581,7 @@ const ComprehensiveExam = () => {
           error={gradesError}
           onBack={() => setShowGrades(false)}
           onRetry={fetchGrades}
+          onReport={() => navigate(`/lecture-exam/${id}/report`)}
           onZoomImage={(src) => {
             setImageZoomSrc(src);
             setImageZoomOpen(true);
@@ -1611,9 +1625,14 @@ const ComprehensiveExam = () => {
       {isStaff ? (
         <TeacherExamShell
           examTitle={examData?.title}
+          examData={examData}
+          examType="comprehensive"
           questionsCount={questions.length}
+          filteredCount={filteredQuestions.length}
+          searchQuery={questionSearch}
+          onSearchChange={setQuestionSearch}
           onGrades={fetchGrades}
-          onReport={() => navigate(`/ComprehensiveExam/${id}/report`)}
+          onReport={() => navigate(`/lecture-exam/${id}/report`)}
           onAddImages={openAddImageModal}
           onBulkText={() => setBulkTextModalOpen(true)}
           onPassage={() => setPassageModalOpen(true)}
@@ -1621,9 +1640,10 @@ const ComprehensiveExam = () => {
           onReload={fetchExamData}
           loading={loading}
         >
-          {questions.length > 0 ? (
+          {filteredQuestions.length > 0 ? (
             <VStack spacing={4} align="stretch" w="full">
-              {questions.map((q, idx) => {
+              {filteredQuestions.map((q) => {
+                const idx = questions.indexOf(q);
                 const isPassageSub = q.type === "passage_sub";
                 const displayId = isPassageSub ? q.sub_question.id : q.id;
                 const displayText = isPassageSub ? q.sub_question.text : q.text;
@@ -1637,7 +1657,7 @@ const ComprehensiveExam = () => {
                 return (
                   <TeacherQuestionCard
                     key={displayId}
-                    index={idx}
+                    index={idx >= 0 ? idx : 0}
                     displayId={displayId}
                     displayText={displayText}
                     displayImage={displayImage}
@@ -1657,6 +1677,10 @@ const ComprehensiveExam = () => {
                 );
               })}
             </VStack>
+          ) : questions.length > 0 ? (
+            <Box py={10} textAlign="center">
+              <Text color="gray.500">لا توجد أسئلة تطابق البحث</Text>
+            </Box>
           ) : (
             <TeacherExamEmptyState
               onAiExtract={() => setAiExtractionModalOpen(true)}

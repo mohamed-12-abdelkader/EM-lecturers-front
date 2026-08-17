@@ -4,5 +4,7 @@
  * قبل تحميل أي وحدة أخرى قد تقرأ التوكن.
  */
 import { initTokenStore } from "./services/tokenStore";
+import { initBrowserDeviceId } from "./utils/deviceRestriction";
 
 initTokenStore();
+initBrowserDeviceId();

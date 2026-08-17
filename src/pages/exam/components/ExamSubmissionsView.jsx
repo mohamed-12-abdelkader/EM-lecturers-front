@@ -22,9 +22,14 @@ import {
   AiOutlineCheckCircle,
   AiOutlineCloseCircle,
 } from "react-icons/ai";
-import { FiChevronDown } from "react-icons/fi";
+import { FiChevronDown, FiArrowRight } from "react-icons/fi";
+import { FaChartBar } from "react-icons/fa";
 import { ExamQuestionImage } from "./ExamQuestionDisplay";
 import { renderFormattedExamText } from "../../../utils/renderFormattedExamText";
+import {
+  getWrongQuestions,
+  getWrongQuestionsCount,
+} from "../utils/examSubmissionUtils";
 
 function SubmissionStat({ label, value, accent }) {
   const muted = useColorModeValue("gray.500", "gray.400");
@@ -56,9 +61,16 @@ function WrongQuestionCard({ question, index, onZoomImage }) {
       overflow="hidden"
     >
       <Box px={3} py={2} bg={softBg} borderBottomWidth="1px" borderColor={border}>
-        <Text fontSize="xs" fontWeight="semibold" color={muted}>
-          سؤال خاطئ {index + 1}
-        </Text>
+        <HStack spacing={2} flexWrap="wrap">
+          <Text fontSize="xs" fontWeight="semibold" color={muted}>
+            سؤال خاطئ {index + 1}
+          </Text>
+          {question.type ? (
+            <Badge colorScheme="purple" variant="subtle" fontSize="2xs">
+              {question.type === "mcq" ? "اختيار من متعدد" : question.type}
+            </Badge>
+          ) : null}
+        </HStack>
       </Box>
       <Box p={3}>
         {question.questionText && (
@@ -79,20 +91,12 @@ function WrongQuestionCard({ question, index, onZoomImage }) {
           <AnswerRow
             type="wrong"
             label="إجابة الطالب"
-            text={
-              question.yourChoice?.text
-                ? renderFormattedExamText(question.yourChoice.text)
-                : "لم يجب"
-            }
+            text={question.yourAnswerDisplay || "لم يجب"}
           />
           <AnswerRow
             type="correct"
             label="الإجابة الصحيحة"
-            text={
-              question.correctChoice?.text
-                ? renderFormattedExamText(question.correctChoice.text)
-                : "—"
-            }
+            text={question.correctAnswerDisplay || "—"}
           />
         </VStack>
       </Box>
@@ -105,6 +109,8 @@ function AnswerRow({ type, label, text }) {
   const bg = useColorModeValue("gray.50", "whiteAlpha.50");
   const textColor = useColorModeValue("gray.700", "gray.200");
   const IconComp = isWrong ? AiOutlineCloseCircle : AiOutlineCheckCircle;
+  const display =
+    typeof text === "string" ? text : renderFormattedExamText(String(text ?? ""));
 
   return (
     <Flex
@@ -123,13 +129,13 @@ function AnswerRow({ type, label, text }) {
         </Text>
       </HStack>
       <Box fontSize="sm" lineHeight="1.8" color={textColor}>
-        {text}
+        {display}
       </Box>
     </Flex>
   );
 }
 
-function SubmissionCard({ submission, index, onZoomImage }) {
+export function SubmissionCard({ submission, index, onZoomImage }) {
   const [wrongOpen, setWrongOpen] = useState(false);
   const cardBg = useColorModeValue("white", "gray.900");
   const border = useColorModeValue("gray.200", "gray.700");
@@ -141,9 +147,10 @@ function SubmissionCard({ submission, index, onZoomImage }) {
   const perfectBorder = useColorModeValue("green.200", "green.700");
   const perfectText = useColorModeValue("green.700", "green.200");
 
-  const wrongQuestions = submission.wrong_questions || [];
-  const wrongCount =
-    submission.wrong_questions_count ?? wrongQuestions.length ?? 0;
+  const wrongQuestions = getWrongQuestions(submission);
+  const wrongCount = getWrongQuestionsCount(submission);
+  const obtainedGrade = submission.obtained_grade ?? submission.obtainedGrade;
+  const totalGrade = submission.total_grade ?? submission.totalGrade;
 
   const statusLabel =
     submission.status === "submitted"
@@ -191,7 +198,11 @@ function SubmissionCard({ submission, index, onZoomImage }) {
 
           <VStack align={{ base: "start", sm: "end" }} spacing={1}>
             <Text fontSize="2xl" fontWeight="bold" color={heading}>
-              {submission.total_grade ?? 0}
+              {obtainedGrade != null ? obtainedGrade : "—"}
+              <Text as="span" fontSize="lg" color={muted} fontWeight="normal">
+                {" "}
+                / {totalGrade != null ? totalGrade : "—"}
+              </Text>
             </Text>
             <Text fontSize="xs" color={muted}>
               الدرجة
@@ -301,6 +312,7 @@ export default function ExamSubmissionsView({
   error = null,
   onBack,
   onRetry,
+  onReport,
   onZoomImage,
 }) {
   const pageBg = useColorModeValue("#F4F7FB", "gray.950");
@@ -339,9 +351,29 @@ export default function ExamSubmissionsView({
               <Text fontSize="xs" fontWeight="semibold" color={muted} mb={1}>
                 نتائج الطلاب
               </Text>
-              <Heading size="lg" color={heading} mb={4}>
-                درجات الطلاب في الامتحان
-              </Heading>
+              <Flex
+                justify="space-between"
+                align={{ base: "flex-start", sm: "center" }}
+                direction={{ base: "column", sm: "row" }}
+                gap={3}
+                mb={4}
+              >
+                <Heading size="lg" color={heading}>
+                  درجات الطلاب في الامتحان
+                </Heading>
+                {typeof onReport === "function" && (
+                  <Button
+                    size="sm"
+                    colorScheme="blue"
+                    leftIcon={<Icon as={FaChartBar} />}
+                    rightIcon={<Icon as={FiArrowRight} />}
+                    onClick={onReport}
+                    flexShrink={0}
+                  >
+                    تقرير الأسئلة
+                  </Button>
+                )}
+              </Flex>
 
               {submissions.length > 0 && (
                 <SimpleGrid columns={{ base: 3, md: 3 }} spacing={4} maxW="md">

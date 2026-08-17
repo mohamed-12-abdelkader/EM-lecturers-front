@@ -19,31 +19,25 @@ import {
   VStack,
   useColorModeValue,
 } from "@chakra-ui/react";
-import { FiArrowRight, FiCheckCircle, FiChevronDown, FiXCircle } from "react-icons/fi";
-import { Link, Navigate, useParams } from "react-router-dom";
-import baseUrl from "../../api/baseUrl";
+import { FiArrowRight, FiCheckCircle, FiChevronDown, FiXCircle, FiAlertCircle } from "react-icons/fi";
+import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import UserType from "../../Hooks/auth/userType";
+import {
+  fetchCourseLevelExamReport,
+  fetchLectureExamReport,
+} from "../../api/courseAssignmentReportsApi";
+import {
+  normalizeReportPayload,
+  resolveExamReportRoute,
+  buildExamManagePath,
+} from "./utils/examReportUtils";
 import { renderFormattedExamText } from "../../utils/renderFormattedExamText";
 
-function computeReportSummary(questions = []) {
-  const respondedStudentIds = new Set();
-  let totalCorrect = 0;
-  let totalIncorrect = 0;
-
-  questions.forEach((q) => {
-    totalCorrect += q.correctCount || 0;
-    totalIncorrect += q.incorrectCount || 0;
-    (q.correctStudents || []).forEach((s) => respondedStudentIds.add(s.studentId));
-    (q.incorrectStudents || []).forEach((s) => respondedStudentIds.add(s.studentId));
-  });
-
-  return {
-    questionCount: questions.length,
-    studentCount: respondedStudentIds.size,
-    totalCorrect,
-    totalIncorrect,
-  };
+function formatAnswerLabel(letter, text) {
+  if (!letter && !text) return "لم يُجِب";
+  if (letter && text) return `${letter} — ${text}`;
+  return letter || text || "—";
 }
 
 function StatCard({ label, value, accent }) {
@@ -70,7 +64,7 @@ function StatCard({ label, value, accent }) {
   );
 }
 
-function StudentList({ title, students, variant }) {
+function StudentList({ title, students, variant, showAnswer = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const cardBg = useColorModeValue("white", "gray.900");
   const muted = useColorModeValue("gray.500", "gray.400");
@@ -153,28 +147,45 @@ function StudentList({ title, students, variant }) {
         <Collapse in={isOpen} animateOpacity>
           <Box px={3} pb={3} pt={0}>
             <VStack spacing={2} align="stretch">
-              {students.map((student) => (
-                <Flex
-                  key={`${student.studentId}-${student.submissionId}`}
-                  justify="space-between"
-                  align="center"
-                  gap={2}
-                  bg={cardBg}
-                  borderRadius="md"
-                  px={3}
-                  py={2.5}
-                  fontSize="sm"
-                  borderWidth="1px"
-                  borderColor={rowBorder}
-                >
-                  <Text fontWeight="medium" noOfLines={1}>
-                    {student.studentName}
-                  </Text>
-                  <Badge colorScheme={isCorrect ? "green" : "red"} variant="subtle">
-                    محاولة {student.attemptNumber}
-                  </Badge>
-                </Flex>
-              ))}
+              {students.map((student) => {
+                const unanswered =
+                  !student.selectedAnswer && !student.selectedAnswerText;
+                return (
+                  <Flex
+                    key={`${student.studentId}-${student.selectedAnswer || "none"}`}
+                    justify="space-between"
+                    align={{ base: "flex-start", sm: "center" }}
+                    direction={{ base: "column", sm: "row" }}
+                    gap={2}
+                    bg={cardBg}
+                    borderRadius="md"
+                    px={3}
+                    py={2.5}
+                    fontSize="sm"
+                    borderWidth="1px"
+                    borderColor={rowBorder}
+                  >
+                    <Text fontWeight="medium" noOfLines={1}>
+                      {student.studentName || `طالب #${student.studentId}`}
+                    </Text>
+                    {showAnswer && (
+                      <Badge
+                        colorScheme={unanswered ? "gray" : "red"}
+                        variant="subtle"
+                        whiteSpace="normal"
+                        textAlign="center"
+                      >
+                        {unanswered
+                          ? "لم يُجِب"
+                          : formatAnswerLabel(
+                              student.selectedAnswer,
+                              student.selectedAnswerText,
+                            )}
+                      </Badge>
+                    )}
+                  </Flex>
+                );
+              })}
             </VStack>
           </Box>
         </Collapse>
@@ -188,13 +199,18 @@ function QuestionReportCard({ question, index, onZoomImage }) {
   const border = useColorModeValue("gray.200", "gray.700");
   const muted = useColorModeValue("gray.500", "gray.400");
   const textColor = useColorModeValue("gray.800", "white");
+  const correctBg = useColorModeValue("green.50", "whiteAlpha.100");
+  const correctBorder = useColorModeValue("green.200", "green.700");
 
   const correctStudents = question.correctStudents || [];
-  const incorrectStudents = question.incorrectStudents || [];
-  const responses = question.totalResponses || 0;
+  const wrongStudents = question.wrongStudents || [];
+  const unansweredStudents = question.unansweredStudents || [];
+  const totalStudents =
+    question.statistics?.totalStudents ??
+    (question.correctCount ?? 0) + (question.wrongCount ?? 0);
   const correctRate =
-    responses > 0
-      ? Math.round(((question.correctCount || 0) / responses) * 100)
+    totalStudents > 0
+      ? Math.round(((question.correctCount ?? 0) / totalStudents) * 100)
       : 0;
 
   return (
@@ -219,21 +235,28 @@ function QuestionReportCard({ question, index, onZoomImage }) {
           <Badge colorScheme="blue" borderRadius="md">
             سؤال {index + 1}
           </Badge>
-          <Text fontSize="sm" color={muted}>
-            {question.grade ?? 1} درجة
-          </Text>
+          {question.wrongCount > 0 && (
+            <Badge colorScheme="orange" variant="subtle">
+              {question.wrongCount} خطأ
+            </Badge>
+          )}
         </HStack>
-        <HStack spacing={3} fontSize="sm">
-          <Text color={muted}>إجابات: {responses}</Text>
+        <HStack spacing={3} fontSize="sm" flexWrap="wrap">
+          <Text color={muted}>طلاب: {totalStudents}</Text>
           <Text color="green.500">صحيح: {question.correctCount ?? 0}</Text>
-          <Text color="red.500">خاطئ: {question.incorrectCount ?? 0}</Text>
-          {responses > 0 && (
+          <Text color="red.500">خطأ: {question.wrongCount ?? 0}</Text>
+          {(question.unansweredCount ?? unansweredStudents.length) > 0 && (
+            <Text color="orange.500">
+              بدون إجابة: {question.unansweredCount ?? unansweredStudents.length}
+            </Text>
+          )}
+          {totalStudents > 0 && (
             <Badge
               colorScheme={
                 correctRate >= 70 ? "green" : correctRate >= 40 ? "yellow" : "red"
               }
             >
-              {correctRate}%
+              {correctRate}% صح
             </Badge>
           )}
         </HStack>
@@ -245,11 +268,7 @@ function QuestionReportCard({ question, index, onZoomImage }) {
         </Box>
 
         {question.questionImage && (
-          <Box
-            mb={4}
-            cursor="pointer"
-            onClick={() => onZoomImage(question.questionImage)}
-          >
+          <Box mb={4} cursor="pointer" onClick={() => onZoomImage(question.questionImage)}>
             <Image
               src={question.questionImage}
               alt={`صورة السؤال ${index + 1}`}
@@ -260,6 +279,25 @@ function QuestionReportCard({ question, index, onZoomImage }) {
           </Box>
         )}
 
+        {(question.correctAnswer || question.correctAnswerText) && (
+          <Box
+            mb={4}
+            px={3}
+            py={2.5}
+            borderRadius="lg"
+            bg={correctBg}
+            borderWidth="1px"
+            borderColor={correctBorder}
+          >
+            <Text fontSize="xs" color={muted} mb={1}>
+              الإجابة الصحيحة
+            </Text>
+            <Text fontSize="sm" fontWeight="semibold" color={textColor}>
+              {formatAnswerLabel(question.correctAnswer, question.correctAnswerText)}
+            </Text>
+          </Box>
+        )}
+
         <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
           <StudentList
             title="إجابات صحيحة"
@@ -267,14 +305,16 @@ function QuestionReportCard({ question, index, onZoomImage }) {
             variant="correct"
           />
           <StudentList
-            title="إجابات خاطئة"
-            students={incorrectStudents}
+            title="إجابات خاطئة / بدون إجابة"
+            students={wrongStudents}
             variant="incorrect"
+            showAnswer
           />
         </SimpleGrid>
-        {(correctStudents.length > 0 || incorrectStudents.length > 0) && (
+
+        {wrongStudents.length > 0 && (
           <Text fontSize="xs" color={muted} mt={2} textAlign="center">
-            اضغط على القسم لعرض أو إخفاء أسماء الطلاب
+            اضغط على القسم لعرض من أخطأ وماذا اختار (آخر محاولة لكل طالب)
           </Text>
         )}
       </Box>
@@ -283,7 +323,13 @@ function QuestionReportCard({ question, index, onZoomImage }) {
 }
 
 export default function ExamReportPage() {
-  const { id } = useParams();
+  const { id, examId: examIdParam } = useParams();
+  const location = useLocation();
+  const examId = id || examIdParam;
+  const { kind } = resolveExamReportRoute(location.pathname);
+  const examBasePath = buildExamManagePath(examId, {
+    from: kind === "course-level" ? "course-level" : "lecture",
+  });
   const [, isAdmin, isTeacher] = UserType();
   const isStaff = Boolean(isAdmin || isTeacher);
 
@@ -297,41 +343,50 @@ export default function ExamReportPage() {
   const border = useColorModeValue("gray.200", "gray.700");
   const muted = useColorModeValue("gray.500", "gray.400");
   const titleColor = useColorModeValue("gray.900", "white");
+  const warnBg = useColorModeValue("orange.50", "whiteAlpha.100");
+  const warnBorder = useColorModeValue("orange.200", "orange.700");
 
   const fetchReport = useCallback(async () => {
-    if (!id) return;
+    if (!examId) return;
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem("token");
-      const res = await baseUrl.get(
-        `/api/exams/${id}/report`,
-        token ? { headers: { Authorization: `Bearer ${token}` } } : {},
-      );
-      setReport(res.data);
+      const raw =
+        kind === "course-level"
+          ? await fetchCourseLevelExamReport(examId)
+          : await fetchLectureExamReport(examId);
+      setReport(normalizeReportPayload(raw));
     } catch (err) {
-      setError(err.response?.data?.message || "حدث خطأ أثناء تحميل التقرير");
+      setError(
+        err.response?.data?.message ||
+          err.response?.data?.msg ||
+          "حدث خطأ أثناء تحميل التقرير",
+      );
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [examId, kind]);
 
   useEffect(() => {
     if (isStaff) fetchReport();
   }, [fetchReport, isStaff]);
 
   const reportExam = report?.exam || {};
-  const reportQuestions = useMemo(
-    () => (Array.isArray(report?.questions) ? report.questions : []),
+  const overall = report?.overallStatistics || {};
+  const sortedQuestions = useMemo(
+    () => (Array.isArray(report?.sortedQuestions) ? report.sortedQuestions : []),
     [report],
   );
-  const summary = useMemo(
-    () => computeReportSummary(reportQuestions),
-    [reportQuestions],
+  const problematic = useMemo(
+    () =>
+      Array.isArray(report?.mostProblematicQuestions)
+        ? report.mostProblematicQuestions
+        : [],
+    [report],
   );
 
   if (!isStaff) {
-    return <Navigate to={`/ComprehensiveExam/${id}`} replace />;
+    return <Navigate to={examBasePath} replace />;
   }
 
   if (loading) {
@@ -350,7 +405,7 @@ export default function ExamReportPage() {
               <Button colorScheme="blue" onClick={fetchReport}>
                 إعادة المحاولة
               </Button>
-              <Button as={Link} to={`/ComprehensiveExam/${id}`} variant="outline">
+              <Button as={Link} to={examBasePath} variant="outline">
                 العودة للامتحان
               </Button>
             </HStack>
@@ -366,7 +421,7 @@ export default function ExamReportPage() {
         <VStack spacing={6} align="stretch">
           <Button
             as={Link}
-            to={`/ComprehensiveExam/${id}`}
+            to={examBasePath}
             variant="ghost"
             size="sm"
             alignSelf="flex-start"
@@ -387,44 +442,84 @@ export default function ExamReportPage() {
             <Box h="3px" bgGradient="linear(to-l, blue.500, orange.400)" />
             <Box p={{ base: 5, md: 6 }}>
               <Text fontSize="xs" fontWeight="semibold" color={muted} mb={1}>
-                تقرير الامتحان
+                {kind === "course-level" ? "تقرير الامتحان الشامل" : "تقرير الواجب / امتحان المحاضرة"}
               </Text>
               <Heading size="lg" color={titleColor} mb={2}>
                 {reportExam.title || "امتحان"}
               </Heading>
               <HStack spacing={4} flexWrap="wrap" fontSize="sm" color={muted}>
-                <Text>الدرجة الكلية: {reportExam.totalGrade ?? 0}</Text>
-                {reportExam.duration != null && (
-                  <Text>المدة: {reportExam.duration} دقيقة</Text>
+                {reportExam.courseTitle && <Text>الكورس: {reportExam.courseTitle}</Text>}
+                {reportExam.lectureTitle && <Text>المحاضرة: {reportExam.lectureTitle}</Text>}
+                {reportExam.scope && (
+                  <Badge colorScheme={reportExam.scope === "lecture" ? "purple" : "orange"} variant="subtle">
+                    {reportExam.scope === "lecture" ? "محاضرة" : "واجب كورس"}
+                  </Badge>
                 )}
-                {reportExam.createdAt && (
-                  <Text>
-                    تاريخ الإنشاء:{" "}
-                    {new Date(reportExam.createdAt).toLocaleDateString("ar-EG")}
-                  </Text>
+                {reportExam.type && (
+                  <Badge colorScheme="blue" variant="subtle">
+                    {reportExam.type === "exam" ? "امتحان" : "واجب"}
+                  </Badge>
                 )}
+                <Text>عدد الأسئلة: {reportExam.questionsCount ?? overall.totalQuestions ?? 0}</Text>
+                <Text color="blue.500">آخر محاولة لكل طالب</Text>
               </HStack>
             </Box>
           </Box>
 
-          {reportQuestions.length > 0 && (
+          {sortedQuestions.length > 0 && (
             <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
-              <StatCard label="عدد الأسئلة" value={summary.questionCount} />
-              <StatCard label="طلاب أجابوا" value={summary.studentCount} />
+              <StatCard label="عدد الطلاب" value={overall.totalStudents ?? 0} />
+              <StatCard label="عدد الأسئلة" value={overall.totalQuestions ?? sortedQuestions.length} />
               <StatCard
                 label="إجابات صحيحة"
-                value={summary.totalCorrect}
+                value={overall.totalCorrect ?? 0}
                 accent="green.500"
               />
               <StatCard
                 label="إجابات خاطئة"
-                value={summary.totalIncorrect}
+                value={overall.totalWrong ?? 0}
                 accent="red.500"
               />
             </SimpleGrid>
           )}
 
-          {reportQuestions.length === 0 ? (
+          {problematic.length > 0 && (
+            <Box
+              bg={warnBg}
+              borderWidth="1px"
+              borderColor={warnBorder}
+              borderRadius="xl"
+              p={4}
+            >
+              <HStack spacing={2} mb={3}>
+                <Icon as={FiAlertCircle} color="orange.500" />
+                <Heading size="sm" color={titleColor}>
+                  أكثر الأسئلة إثارة للمشاكل
+                </Heading>
+              </HStack>
+              <VStack align="stretch" spacing={2}>
+                {problematic.map((item) => (
+                  <Flex
+                    key={item.questionId}
+                    justify="space-between"
+                    align="center"
+                    gap={3}
+                    fontSize="sm"
+                    flexWrap="wrap"
+                  >
+                    <Text noOfLines={1} flex={1} minW={0}>
+                      {renderFormattedExamText(item.questionText || "")}
+                    </Text>
+                    <Badge colorScheme="red" variant="subtle">
+                      {item.wrongAnswers ?? item.wrongCount ?? 0} خطأ ({item.wrongPercentage ?? 0}%)
+                    </Badge>
+                  </Flex>
+                ))}
+              </VStack>
+            </Box>
+          )}
+
+          {sortedQuestions.length === 0 ? (
             <Box
               bg={cardBg}
               borderWidth="1px"
@@ -433,14 +528,14 @@ export default function ExamReportPage() {
               p={8}
               textAlign="center"
             >
-              <Text color={muted}>لا توجد بيانات في التقرير بعد.</Text>
+              <Text color={muted}>لا توجد بيانات في التقرير بعد — لم يُسلِّم أي طالب المحاولة.</Text>
             </Box>
           ) : (
             <VStack spacing={4} align="stretch">
               <Heading size="sm" color={titleColor}>
-                تفاصيل الأسئلة
+                تفاصيل الأسئلة (الأصعب أولًا)
               </Heading>
-              {reportQuestions.map((question, index) => (
+              {sortedQuestions.map((question, index) => (
                 <QuestionReportCard
                   key={question.questionId || index}
                   question={question}

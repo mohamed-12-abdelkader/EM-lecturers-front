@@ -8,6 +8,14 @@ export const centerMgmtKeys = {
   groups: (params) => [...centerMgmtKeys.all, "groups", params],
   group: (groupId) => [...centerMgmtKeys.all, "group", String(groupId)],
   groupStudents: (groupId) => [...centerMgmtKeys.all, "group-students", String(groupId)],
+  groupExams: (groupId) => [...centerMgmtKeys.all, "group-exams", String(groupId)],
+  groupExamSheet: (groupId, examId) => [
+    ...centerMgmtKeys.all,
+    "group-exam-sheet",
+    String(groupId),
+    String(examId),
+  ],
+  studentExams: (studentId) => [...centerMgmtKeys.all, "student-exams", String(studentId)],
   students: (params) => [...centerMgmtKeys.all, "students", params],
   student: (studentId) => [...centerMgmtKeys.all, "student", String(studentId)],
   studentQr: (studentId) => [...centerMgmtKeys.all, "student-qr", String(studentId)],
@@ -79,6 +87,30 @@ export function useGroupStudents(groupId) {
     queryKey: centerMgmtKeys.groupStudents(groupId),
     queryFn: () => api.fetchGroupStudents(groupId),
     enabled: Boolean(groupId),
+  });
+}
+
+export function useGroupExams(groupId) {
+  return useQuery({
+    queryKey: centerMgmtKeys.groupExams(groupId),
+    queryFn: () => api.fetchGroupExams(groupId),
+    enabled: Boolean(groupId),
+  });
+}
+
+export function useGroupExamSheet(groupId, examId) {
+  return useQuery({
+    queryKey: centerMgmtKeys.groupExamSheet(groupId, examId),
+    queryFn: () => api.fetchGroupExamSheet(groupId, examId),
+    enabled: Boolean(groupId && examId),
+  });
+}
+
+export function useStudentExams(studentId) {
+  return useQuery({
+    queryKey: centerMgmtKeys.studentExams(studentId),
+    queryFn: () => api.fetchStudentExams(studentId),
+    enabled: Boolean(studentId),
   });
 }
 
@@ -165,6 +197,40 @@ export function useGroupMutations() {
     deleteGroup: useMutation({
       mutationFn: (groupId) => api.deleteGroup(groupId),
       onSuccess: () => invalidateCore(qc),
+    }),
+  };
+}
+
+export function useGroupExamMutations() {
+  const qc = useQueryClient();
+  const invalidateExams = (groupId, examId, studentId) => {
+    qc.invalidateQueries({ queryKey: centerMgmtKeys.groupExams(groupId) });
+    if (examId) {
+      qc.invalidateQueries({ queryKey: centerMgmtKeys.groupExamSheet(groupId, examId) });
+    }
+    if (studentId) {
+      qc.invalidateQueries({ queryKey: centerMgmtKeys.student(studentId) });
+      qc.invalidateQueries({ queryKey: centerMgmtKeys.studentExams(studentId) });
+    }
+    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "student"] });
+    qc.invalidateQueries({ queryKey: [...centerMgmtKeys.all, "student-exams"] });
+  };
+
+  return {
+    createExam: useMutation({
+      mutationFn: ({ groupId, payload }) => api.createGroupExam(groupId, payload),
+      onSuccess: (_, { groupId }) => invalidateExams(groupId),
+    }),
+    bulkGrades: useMutation({
+      mutationFn: ({ groupId, examId, payload }) =>
+        api.updateGroupExamGrades(groupId, examId, payload),
+      onSuccess: (_, { groupId, examId }) => invalidateExams(groupId, examId),
+    }),
+    patchGrade: useMutation({
+      mutationFn: ({ groupId, examId, studentId, payload }) =>
+        api.updateGroupExamStudentGrade(groupId, examId, studentId, payload),
+      onSuccess: (_, { groupId, examId, studentId }) =>
+        invalidateExams(groupId, examId, studentId),
     }),
   };
 }

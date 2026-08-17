@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo, useMemo } from "react";
 import {
   Box,
   Flex,
@@ -26,12 +26,12 @@ function FormattedPassageText({ content }) {
   );
 }
 
-export default function LibraryPassagePanel({
+function LibraryPassagePanel({
   passage,
   passageIndex,
   isExpanded,
   onToggle,
-  selectedQuestionIds,
+  selectedQuestions,
   onToggleSelect,
   onEdit,
   onDelete,
@@ -45,14 +45,17 @@ export default function LibraryPassagePanel({
   const cardBg = useColorModeValue("white", "gray.800");
   const borderColor = useColorModeValue("gray.200", "gray.700");
   const headerBg = useColorModeValue(
-    "linear-gradient(135deg, #FFFAF0 0%, #FEEBC8 100%)",
-    "whiteAlpha.100",
+    "linear-gradient(135deg, #EBF8FF 0%, #FEEBC8 100%)",
+    "linear(to-br, blue.900, orange.900)",
   );
   const passageBg = useColorModeValue("orange.50", "gray.700");
   const textColor = useColorModeValue("gray.800", "gray.100");
   const muted = useColorModeValue("gray.600", "gray.400");
   const questions = passage.questions || [];
-  const selectedCount = questions.filter((q) => selectedQuestionIds?.includes(q.id)).length;
+  const selectedCount = useMemo(
+    () => questions.filter((q) => selectedQuestions?.has(q.id)).length,
+    [questions, selectedQuestions],
+  );
 
   return (
     <Box
@@ -61,9 +64,9 @@ export default function LibraryPassagePanel({
       borderColor={borderColor}
       borderRadius="2xl"
       overflow="hidden"
-      boxShadow="sm"
-      transition="box-shadow 0.15s"
-      _hover={{ boxShadow: "md" }}
+      boxShadow="0 1px 3px rgba(0,0,0,0.04)"
+      transition="all 0.22s ease"
+      _hover={{ boxShadow: "0 12px 32px rgba(234,88,12,0.08)", transform: "translateY(-2px)" }}
     >
       <Flex
         p={4}
@@ -92,7 +95,7 @@ export default function LibraryPassagePanel({
             w={10}
             h={10}
             borderRadius="xl"
-            bgGradient="linear(to-br, orange.400, orange.600)"
+              bgGradient="linear(to-br, orange.500, orange.600)"
             color="white"
             align="center"
             justify="center"
@@ -156,7 +159,7 @@ export default function LibraryPassagePanel({
                   key={q.id}
                   question={q}
                   index={i}
-                  selectedIds={selectedQuestionIds}
+                  isSelected={selectedQuestions?.has(q.id)}
                   onToggleSelect={onToggleSelect}
                   onEdit={onEdit}
                   onDelete={onDelete}
@@ -174,3 +177,24 @@ export default function LibraryPassagePanel({
     </Box>
   );
 }
+
+function passagePanelPropsAreEqual(prev, next) {
+  return (
+    prev.passage === next.passage &&
+    prev.passageIndex === next.passageIndex &&
+    prev.isExpanded === next.isExpanded &&
+    prev.selectedQuestions === next.selectedQuestions &&
+    prev.selectedPassageIds === next.selectedPassageIds &&
+    prev.showSelect === next.showSelect &&
+    prev.pendingId === next.pendingId &&
+    prev.onToggle === next.onToggle &&
+    prev.onToggleSelect === next.onToggleSelect &&
+    prev.onTogglePassageSelect === next.onTogglePassageSelect &&
+    prev.onEdit === next.onEdit &&
+    prev.onDelete === next.onDelete &&
+    prev.onSetCorrect === next.onSetCorrect &&
+    prev.onZoomImage === next.onZoomImage
+  );
+}
+
+export default memo(LibraryPassagePanel, passagePanelPropsAreEqual);

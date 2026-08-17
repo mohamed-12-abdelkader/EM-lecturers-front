@@ -12,7 +12,7 @@ import UserType from "./Hooks/auth/userType.js";
 import { getTenantSubdomain } from "./utils/tenantHost.js";
 import { NotificationProvider } from "./context/NotificationProvider.jsx";
 import { forceArabicDocumentLocale } from "./utils/forceArabicLocale.js";
-import theme, { SHELL_DESKTOP_BP } from "./theme/chakraTheme.js";
+import theme, { BOTTOM_NAV_MAX_BP } from "./theme/chakraTheme.js";
 import SessionExpiredModal from "./components/auth/SessionExpiredModal.jsx";
 import AppErrorBoundary from "./components/AppErrorBoundary.jsx";
 import AuthProvider from "./providers/AuthProvider.jsx";
@@ -81,7 +81,7 @@ const RootContent = () => {
       <ForceArabicLocale />
       <SyncTheme />
       {showSidebar && <SidebarWithHeader />}
-      <Box pb={showStudentBottomNav ? { base: "76px", [SHELL_DESKTOP_BP]: 0 } : 0} dir="rtl" lang="ar">
+      <Box pb={showStudentBottomNav ? { base: "76px", [BOTTOM_NAV_MAX_BP]: 0 } : 0} dir="rtl" lang="ar">
         <App />
       </Box>
       {showStudentBottomNav ? <BottomNavItems /> : null}

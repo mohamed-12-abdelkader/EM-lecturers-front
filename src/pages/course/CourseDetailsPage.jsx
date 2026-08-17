@@ -109,6 +109,7 @@ import {
   FaBroadcastTower,
   FaFolderOpen,
   FaTasks,
+  FaChartBar,
 } from "react-icons/fa";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import baseUrl from "../../api/baseUrl";
@@ -130,6 +131,7 @@ import {
   useTeacherCourseGroups,
 } from "../../Hooks/course/useCourseGroups";
 import CourseAssignmentsTab from "./components/CourseAssignmentsTab";
+import CourseAssignmentReportsPanel from "./components/CourseAssignmentReportsPanel";
 import CourseFormModal, {
   CourseModalFieldCard,
   CourseModalFieldLabel,
@@ -666,7 +668,7 @@ const CourseDetailsPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [userData, isAdmin, isTeacher, student] = UserType();
+  const [userData, isAdmin, isTeacher, student, isAcademy, isAcademyTeacher] = UserType();
   const [showFullDescription, setShowFullDescription] = React.useState(false);
   const [expandedLecture, setExpandedLecture] = React.useState(null);
   const token = localStorage.getItem("token");
@@ -741,7 +743,7 @@ const CourseDetailsPage = () => {
 
   useEffect(() => {
     const section = searchParams.get("section");
-    if (section && ["lectures", "assignments", "live", "exams", "files"].includes(section)) {
+    if (section && ["lectures", "assignments", "assignment-reports", "live", "exams", "files"].includes(section)) {
       setActiveSection(section);
     }
   }, [searchParams]);
@@ -813,6 +815,8 @@ const CourseDetailsPage = () => {
   const isCourseBasedAssignments = assignmentMode === "course_based";
 
   const canManageCourse = isTeacher || isAdmin;
+  const canManageCourseFiles =
+    isTeacher || isAdmin || isAcademy || isAcademyTeacher;
   const { data: courseGroupSettings } = useCourseGroupSettings({
     enabled: canManageCourse,
   });
@@ -3492,6 +3496,17 @@ display:block;
       colorKey: "orange",
       count: courseExams?.length || 0,
     },
+    ...(isTeacher || isAdmin
+      ? [
+          {
+            id: "assignment-reports",
+            label: "التقارير",
+            desc: "واجبات المحاضرة والكورس",
+            icon: FaChartBar,
+            colorKey: "blue",
+          },
+        ]
+      : []),
     {
       id: "files",
       label: "ملفات الكورس",
@@ -4334,8 +4349,7 @@ display:block;
               {activeSection === "files" && (
                 <CourseFilesTab
                   courseId={id}
-                  isTeacher={isTeacher}
-                  isAdmin={isAdmin}
+                  canManage={canManageCourseFiles}
                   borderColor={borderColor}
                   sectionBg={sectionBg}
                   textColor={textColor}
@@ -4358,6 +4372,10 @@ display:block;
                   refreshExams={refreshExams}
                   onAddBulkQuestions={handleOpenBulkQuestionsModal}
                 />
+              )}
+
+              {activeSection === "assignment-reports" && (isTeacher || isAdmin) && (
+                <CourseAssignmentReportsPanel courseId={id} />
               )}
 
             </Box>

@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef, startTransition } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Box,
-  Container,
   Flex,
-  Heading,
   Text,
   SimpleGrid,
   useColorModeValue,
@@ -34,7 +32,6 @@ import {
   useToast,
   Textarea,
   Checkbox,
-  Spinner,
   Center,
   Select,
   Image,
@@ -48,13 +45,14 @@ import {
   FaEdit,
   FaTrash,
   FaCheck,
-  FaSync,
   FaUpload,
   FaClipboardList,
   FaSearch,
   FaTimes,
+  FaListAlt,
+  FaParagraph,
+  FaQuestionCircle,
 } from "react-icons/fa";
-import { IoChevronBack } from "react-icons/io5";
 import baseUrl from "../../api/baseUrl";
 import TeacherLibraryExtractionModal from "./components/TeacherLibraryExtractionModal";
 import LibraryQuestionCard from "./components/LibraryQuestionCard";
@@ -72,6 +70,18 @@ import {
   useTeacherLibraryLessons,
 } from "../../Hooks/teacher/useTeacherQuestionBankQueries";
 import { normalizeTeacherQuestion } from "./utils/teacherLibraryQuestionUtils";
+import {
+  LibraryPageShell,
+  LibraryHero,
+  LibraryStatGrid,
+  LibraryStatCard,
+  LibraryToolbar,
+  LibraryFilterPanel,
+  LibraryContentSection,
+  LibraryLoadingState,
+  libraryModalProps,
+  libraryModalContentProps,
+} from "./components/QuestionLibraryShell";
 
 const API = "/api/teacher/questions";
 
@@ -83,18 +93,14 @@ function authHeaders() {
 const QuestionLibraryLessonPage = () => {
   const toast = useToast();
   const navigate = useNavigate();
-  const { lessonId } = useParams();
+  const { gradeId, lessonId } = useParams();
   const cancelRef = useRef(null);
   const invalidateQb = useInvalidateTeacherQuestionBank();
-  const pageBg = useColorModeValue("gray.100", "gray.900");
   const cardBg = useColorModeValue("white", "gray.800");
-  const borderColor = useColorModeValue("gray.200", "gray.700");
-  const textColor = useColorModeValue("gray.800", "gray.100");
-  const muted = useColorModeValue("gray.600", "gray.400");
-  const heroBg = useColorModeValue(
-    "linear(to-l, blue.600, blue.500)",
-    "linear(to-l, blue.700, blue.600)",
-  );
+  const borderColor = useColorModeValue("gray.100", "gray.800");
+  const textColor = useColorModeValue("gray.900", "gray.100");
+  const muted = useColorModeValue("gray.500", "gray.400");
+  const filterInputBg = useColorModeValue("gray.50", "gray.800");
   const [allQuestions, setAllQuestions] = useState([]);
   const [passages, setPassages] = useState([]);
 
@@ -102,13 +108,19 @@ const QuestionLibraryLessonPage = () => {
     data: lessons = [],
     isLoading: loading,
     refetch: refetchLessons,
-  } = useTeacherLibraryLessons();
+  } = useTeacherLibraryLessons(undefined);
 
   const selectedLesson = useMemo(
     () =>
       lessons.find((l) => String(l.id) === String(lessonId)) ||
-      (lessonId ? { id: Number(lessonId) || lessonId, title: "الدرس" } : null),
-    [lessons, lessonId],
+      (lessonId
+        ? {
+            id: Number(lessonId) || lessonId,
+            title: "الدرس",
+            grade_id: gradeId ? Number(gradeId) : null,
+          }
+        : null),
+    [lessons, lessonId, gradeId],
   );
 
   const activeLessonId = lessonId || null;
@@ -139,7 +151,8 @@ const QuestionLibraryLessonPage = () => {
   }, [lessonContent, activeLessonId]);
 
   const fetchLessons = useCallback(async () => {
-    await invalidateQb.invalidateLibraryLessons();
+    await invalidateQb.invalidateAllLibraryLessons();
+    await invalidateQb.invalidateLibraryGrades();
     return refetchLessons();
   }, [invalidateQb, refetchLessons]);
 
@@ -175,7 +188,7 @@ const QuestionLibraryLessonPage = () => {
   const [bulkText, setBulkText] = useState("");
   const [passageForm, setPassageForm] = useState({ title: "", content: "" });
   const [pendingAnswerId, setPendingAnswerId] = useState(null);
-  const [selectedQuestionIds, setSelectedQuestionIds] = useState([]);
+  const [selectedQuestions, setSelectedQuestions] = useState(() => new Set());
   const [selectedPassageIds, setSelectedPassageIds] = useState([]);
   const [expandedPassages, setExpandedPassages] = useState({});
   const [questionSearch, setQuestionSearch] = useState("");
@@ -186,7 +199,7 @@ const QuestionLibraryLessonPage = () => {
   const [examLoading, setExamLoading] = useState(false);
   const [lectureExams, setLectureExams] = useState([]);
   const [courseExams, setCourseExams] = useState([]);
-  const [selectedExamId, setSelectedExamId] = useState("");
+  const [selectedExamIds, setSelectedExamIds] = useState([]);
   const [examModalTab, setExamModalTab] = useState("lecture");
   const [examModalMode, setExamModalMode] = useState("questions");
   const { isOpen: isExamOpen, onOpen: onExamOpen, onClose: onExamClose } = useDisclosure();
@@ -258,12 +271,26 @@ const QuestionLibraryLessonPage = () => {
     return ids;
   }, [filteredStandaloneQuestions, filteredPassages]);
 
-  const selectVisibleQuestions = () => {
-    setSelectedQuestionIds(visibleQuestionIds);
-    setSelectedPassageIds([]);
-  };
+  const selectedQuestionCount = selectedQuestions.size;
+
+  const selectedQuestionIds = useMemo(
+    () => Array.from(selectedQuestions),
+    [selectedQuestions],
+  );
+
+  const selectVisibleQuestions = useCallback(() => {
+    startTransition(() => {
+      setSelectedQuestions(new Set(visibleQuestionIds));
+      setSelectedPassageIds([]);
+    });
+  }, [visibleQuestionIds]);
 
   const backToLessons = () => {
+    const resolvedGradeId = gradeId || selectedLesson?.grade_id;
+    if (resolvedGradeId) {
+      navigate(`/QuestionLibraryPage/grade/${resolvedGradeId}`);
+      return;
+    }
     navigate("/QuestionLibraryPage");
   };
 
@@ -290,9 +317,17 @@ const QuestionLibraryLessonPage = () => {
           { headers: authHeaders() },
         );
         toast({ title: "تم التحديث", description: "تم تعديل الدرس", status: "success", duration: 2000, isClosable: true });
-        await invalidateQb.invalidateLibraryLessons();
+        await invalidateQb.invalidateAllLibraryLessons();
       } else {
-        await baseUrl.post(`${API}/lesson`, { title: lessonTitle.trim() }, { headers: authHeaders() });
+        const resolvedGradeId = gradeId || selectedLesson?.grade_id;
+        if (!resolvedGradeId) {
+          throw new Error("grade_id مطلوب — افتح الدرس من صفه الدراسي");
+        }
+        await baseUrl.post(
+          `${API}/lesson`,
+          { grade_id: Number(resolvedGradeId), title: lessonTitle.trim() },
+          { headers: authHeaders() },
+        );
         toast({ title: "تم الإنشاء", description: "تم إنشاء الدرس", status: "success", duration: 2000, isClosable: true });
       }
       onLessonModalClose();
@@ -350,7 +385,7 @@ const QuestionLibraryLessonPage = () => {
     onQuestionModalOpen();
   };
 
-  const openEditQuestion = (question) => {
+  const openEditQuestion = useCallback((question) => {
     const q = normalizeTeacherQuestion(question);
     setQuestionEdit(q);
     setQuestionForm({
@@ -365,7 +400,7 @@ const QuestionLibraryLessonPage = () => {
       passage_id: q.passage_id ? String(q.passage_id) : "",
     });
     onQuestionModalOpen();
-  };
+  }, [onQuestionModalOpen]);
 
   const saveQuestion = async () => {
     if (!selectedLesson || !questionForm.question_text.trim()) return;
@@ -408,10 +443,10 @@ const QuestionLibraryLessonPage = () => {
     }
   };
 
-  const confirmDeleteQuestion = (question) => {
+  const confirmDeleteQuestion = useCallback((question) => {
     setDeletingQuestion(question);
     onDeleteQuestionOpen();
-  };
+  }, [onDeleteQuestionOpen]);
 
   const deleteQuestion = async () => {
     if (!deletingQuestion || !selectedLesson) return;
@@ -429,7 +464,7 @@ const QuestionLibraryLessonPage = () => {
     }
   };
 
-  const setCorrectAnswer = async (question, answerIndex) => {
+  const setCorrectAnswer = useCallback(async (question, answerIndex) => {
     const choices = question.choices || [];
     const answer = choices[answerIndex];
     if (answer == null) return;
@@ -465,11 +500,11 @@ const QuestionLibraryLessonPage = () => {
       );
     } catch {
       toast({ title: "خطأ", description: "فشل في تحديث الإجابة الصحيحة", status: "error", duration: 3000, isClosable: true });
-      fetchLessonContent(selectedLesson.id);
+      if (selectedLesson?.id) fetchLessonContent(selectedLesson.id);
     } finally {
       setPendingAnswerId(null);
     }
-  };
+  }, [fetchLessonContent, selectedLesson?.id, toast]);
 
   const addBulkQuestions = async () => {
     if (!selectedLesson || !bulkText.trim()) return;
@@ -529,26 +564,43 @@ const QuestionLibraryLessonPage = () => {
     }
   };
 
-  const toggleQuestionSelect = (id, checked) => {
-    setSelectedQuestionIds((prev) => (checked ? [...prev, id] : prev.filter((x) => x !== id)));
-  };
+  const toggleQuestionSelect = useCallback((id, checked) => {
+    setSelectedQuestions((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
 
-  const togglePassageSelect = (passageId, checked) => {
+  const togglePassageSelect = useCallback((passageId, checked) => {
     setSelectedPassageIds((prev) =>
       checked ? [...prev, passageId] : prev.filter((id) => id !== passageId),
     );
-  };
+  }, []);
 
+  const selectAllQuestions = useCallback(() => {
+    startTransition(() => {
+      setSelectedQuestions(new Set(allLessonQuestionIds));
+      setSelectedPassageIds([]);
+    });
+  }, [allLessonQuestionIds]);
 
-  const selectAllQuestions = () => {
-    setSelectedQuestionIds(allLessonQuestionIds);
+  const clearQuestionSelection = useCallback(() => {
+    setSelectedQuestions(new Set());
     setSelectedPassageIds([]);
-  };
+  }, []);
 
-  const clearQuestionSelection = () => {
-    setSelectedQuestionIds([]);
-    setSelectedPassageIds([]);
-  };
+  const toggleStandaloneSectionSelection = useCallback(() => {
+    const ids = filteredStandaloneQuestions.map((q) => q.id);
+    setSelectedQuestions((prev) => {
+      const next = new Set(prev);
+      const allSelected = ids.length > 0 && ids.every((id) => next.has(id));
+      if (allSelected) ids.forEach((id) => next.delete(id));
+      else ids.forEach((id) => next.add(id));
+      return next;
+    });
+  }, [filteredStandaloneQuestions]);
 
   const fetchExams = async () => {
     setExamLoading(true);
@@ -576,7 +628,7 @@ const QuestionLibraryLessonPage = () => {
   };
 
   const openExamModal = (mode) => {
-    if (mode === "questions" && selectedQuestionIds.length === 0) {
+    if (mode === "questions" && selectedQuestionCount === 0) {
       toast({ title: "تنبيه", description: "اختر أسئلة أولاً", status: "info", duration: 2500 });
       return;
     }
@@ -585,10 +637,17 @@ const QuestionLibraryLessonPage = () => {
       return;
     }
     setExamModalMode(mode);
-    setSelectedExamId("");
+    setSelectedExamIds([]);
     setExamModalTab("lecture");
     fetchExams();
     onExamOpen();
+  };
+
+  const toggleSelectedExamId = (examId) => {
+    const id = String(examId);
+    setSelectedExamIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
   };
 
   const buildExamPayload = () => {
@@ -602,8 +661,8 @@ const QuestionLibraryLessonPage = () => {
   };
 
   const handleConfirmAddToExam = async () => {
-    if (!selectedExamId) {
-      toast({ title: "تنبيه", description: "اختر امتحاناً", status: "warning", duration: 2500 });
+    if (selectedExamIds.length === 0) {
+      toast({ title: "تنبيه", description: "اختر واجباً أو امتحاناً واحداً على الأقل", status: "warning", duration: 2500 });
       return;
     }
 
@@ -613,53 +672,65 @@ const QuestionLibraryLessonPage = () => {
       const basePayload =
         examModalTab === "course" ? { type: "course-exam" } : {};
 
-      if (examModalMode === "passages") {
-        let totalAdded = 0;
-        const skipped = [];
-        for (const passageId of selectedPassageIds) {
-          const data = await addTeacherLibraryToExam(
-            selectedExamId,
-            { ...basePayload, passageId: Number(passageId) },
-            token,
-          );
-          totalAdded += data?.addedCount ?? 0;
-          if (data?.skippedTeacherQuestionIds?.length) {
-            skipped.push(...data.skippedTeacherQuestionIds);
-          }
-        }
-        toast({
-          title: "تمت الإضافة",
-          description:
-            totalAdded > 0
-              ? `تمت إضافة ${totalAdded} سؤال من ${selectedPassageIds.length} قطعة`
-              : "الأسئلة مضافة مسبقاً أو لا توجد أسئلة اختيارية في القطع",
-          status: totalAdded > 0 ? "success" : "warning",
-          duration: 4000,
-          isClosable: true,
-        });
-        setSelectedPassageIds([]);
-      } else {
-        const payload = { ...buildExamPayload(), ...basePayload };
-        const data = await addTeacherLibraryToExam(selectedExamId, payload, token);
-        const count = data?.addedCount ?? 0;
-        const skipped = data?.skippedTeacherQuestionIds?.length ?? 0;
-        let description = data?.message || `تمت إضافة ${count} سؤال للامتحان`;
-        if (skipped > 0) description += ` (${skipped} مُتخطى — مضاف مسبقاً)`;
+      let totalAdded = 0;
+      let successExams = 0;
+      const errors = [];
 
-        toast({
-          title: count > 0 ? "تمت الإضافة" : "تنبيه",
-          description,
-          status: count > 0 ? "success" : "warning",
-          duration: 4000,
-          isClosable: true,
-        });
-        if (examModalMode === "questions") {
-          setSelectedQuestionIds([]);
+      for (const examId of selectedExamIds) {
+        try {
+          if (examModalMode === "passages") {
+            for (const passageId of selectedPassageIds) {
+              const data = await addTeacherLibraryToExam(
+                examId,
+                { ...basePayload, passageId: Number(passageId) },
+                token,
+              );
+              totalAdded += data?.addedCount ?? 0;
+            }
+          } else {
+            const payload = { ...buildExamPayload(), ...basePayload };
+            const data = await addTeacherLibraryToExam(examId, payload, token);
+            totalAdded += data?.addedCount ?? 0;
+          }
+          successExams += 1;
+        } catch (err) {
+          errors.push(teacherLibraryExamErrorMessage(err));
         }
       }
 
-      onExamClose();
-      setExamModalMode("questions");
+      if (examModalMode === "passages") {
+        toast({
+          title: successExams > 0 ? "تمت الإضافة" : "تنبيه",
+          description:
+            successExams > 0
+              ? `تمت إضافة ${totalAdded} سؤال إلى ${successExams} من ${selectedExamIds.length} امتحان`
+              : errors[0] || "فشلت الإضافة",
+          status: successExams > 0 ? (errors.length ? "warning" : "success") : "error",
+          duration: 4500,
+          isClosable: true,
+        });
+        if (successExams > 0) setSelectedPassageIds([]);
+      } else {
+        toast({
+          title: successExams > 0 ? "تمت الإضافة" : "تنبيه",
+          description:
+            successExams > 0
+              ? `تمت إضافة ${totalAdded} سؤال إلى ${successExams} من ${selectedExamIds.length} امتحان`
+              : errors[0] || "فشلت الإضافة",
+          status: successExams > 0 ? (errors.length ? "warning" : "success") : "error",
+          duration: 4500,
+          isClosable: true,
+        });
+        if (successExams > 0 && examModalMode === "questions") {
+          setSelectedQuestions(new Set());
+        }
+      }
+
+      if (successExams > 0) {
+        onExamClose();
+        setExamModalMode("questions");
+        setSelectedExamIds([]);
+      }
     } catch (err) {
       toast({
         title: "خطأ",
@@ -682,202 +753,174 @@ const QuestionLibraryLessonPage = () => {
 
   const examModalConfirmLabel =
     examModalMode === "lesson"
-      ? "إضافة كل أسئلة الدرس"
+      ? selectedExamIds.length > 1
+        ? `إضافة الدرس إلى ${selectedExamIds.length} امتحانات`
+        : "إضافة كل أسئلة الدرس"
       : examModalMode === "passages"
-        ? `إضافة ${selectedPassageIds.length} قطعة`
-        : `إضافة ${selectedQuestionIds.length} سؤال`;
+        ? selectedExamIds.length > 1
+          ? `إضافة ${selectedPassageIds.length} قطعة إلى ${selectedExamIds.length} امتحانات`
+          : `إضافة ${selectedPassageIds.length} قطعة`
+        : selectedExamIds.length > 1
+          ? `إضافة ${selectedQuestionCount} سؤال إلى ${selectedExamIds.length} امتحانات`
+          : `إضافة ${selectedQuestionCount} سؤال`;
 
   const togglePassage = (id) => {
     setExpandedPassages((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const handleZoomImage = (url) => {
+  const handleZoomImage = useCallback((url) => {
     setZoomImageUrl(url);
     onZoomOpen();
-  };
+  }, [onZoomOpen]);
 
   return (
-    <Box minH="100vh" bg={pageBg} pt={{ base: "72px", md: "88px" }} pb={10} dir="rtl">
-      <Container maxW="container.xl">
-        <VStack spacing={5} align="stretch">
-          {/* Hero */}
-          <Box borderRadius="xl" overflow="hidden" bgGradient={heroBg} color="white" boxShadow="sm">
-            <Flex
-              p={{ base: 4, md: 6 }}
-              align={{ base: "start", md: "center" }}
-              justify="space-between"
-              gap={4}
-              flexWrap="wrap"
-            >
-              <HStack spacing={3} align="start" flex={1} minW={0}>
-                <IconButton
-                    aria-label="رجوع"
-                    icon={<IoChevronBack />}
-                    size="sm"
-                    variant="outline"
-                    color="white"
-                    borderColor="whiteAlpha.400"
-                    onClick={backToLessons}
-                    _hover={{ bg: "whiteAlpha.200" }}
-                  />
-                <Flex
-                  boxSize={11}
-                  borderRadius="lg"
-                  bg="whiteAlpha.200"
-                  align="center"
-                  justify="center"
-                  flexShrink={0}
-                >
-                  <Icon as={FaBookOpen} boxSize={5} />
-                </Flex>
-                <Box minW={0}>
-                  <Heading size={{ base: "md", md: "lg" }} fontWeight="semibold" lineHeight="1.3">
-                    {selectedLesson?.title || "الدرس"}
-                  </Heading>
-                  <Text color="whiteAlpha.900" fontSize="sm" mt={1} lineHeight="1.6">
-                    أسئلة مستقلة وقطع قراءة داخل الدرس
-                  </Text>
-                </Box>
-              </HStack>
-              <Button
-                leftIcon={<FaSync />}
-                size="sm"
-                bg="whiteAlpha.200"
-                color="white"
-                borderRadius="lg"
-                _hover={{ bg: "whiteAlpha.300" }}
-                onClick={() => selectedLesson && fetchLessonContent(selectedLesson.id)}
-              >
-                تحديث
-              </Button>
-            </Flex>
-          </Box>
+    <>
+    <LibraryPageShell>
+      <LibraryHero
+        title={selectedLesson?.title || "الدرس"}
+        subtitle={
+          selectedLesson?.grade_title
+            ? `${selectedLesson.grade_title} — أسئلة مستقلة وقطع قراءة`
+            : "أسئلة مستقلة وقطع قراءة داخل الدرس"
+        }
+        icon={FaBookOpen}
+        accent="blend"
+        onBack={backToLessons}
+        onRefresh={() => selectedLesson && fetchLessonContent(selectedLesson.id)}
+        isRefreshing={_lessonFetching}
+        breadcrumbs={[
+          { label: "مكتبة الأسئلة", onClick: () => navigate("/QuestionLibraryPage") },
+          ...(selectedLesson?.grade_title || gradeId
+            ? [{ label: selectedLesson?.grade_title || "الصف", onClick: backToLessons }]
+            : []),
+          { label: selectedLesson?.title || "الدرس" },
+        ]}
+      />
 
-          {!lessonId ? (
-            <Center py={16}>
-              <Text>معرّف الدرس غير موجود</Text>
-            </Center>
+      {!lessonId ? (
+        <Center py={16}>
+          <Text color={muted}>معرّف الدرس غير موجود</Text>
+        </Center>
+      ) : (
+        <>
+          <LibraryStatGrid columns={{ base: 2, md: 4 }}>
+            <LibraryStatCard label="إجمالي الأسئلة" value={allLessonQuestionIds.length} icon={FaListAlt} accent="blue" />
+            <LibraryStatCard label="أسئلة مستقلة" value={standaloneQuestions.length} icon={FaQuestionCircle} accent="orange" />
+            <LibraryStatCard label="قطع القراءة" value={passages.length} icon={FaParagraph} accent="blue" />
+            <LibraryStatCard label="المحدد" value={selectedQuestionCount} icon={FaClipboardList} accent="orange" />
+          </LibraryStatGrid>
+
+          <LibraryToolbar>
+            <Button size="sm" colorScheme="blue" leftIcon={<FaPlus />} borderRadius="xl" onClick={openAddQuestion}>
+              سؤال جديد
+            </Button>
+            <Button size="sm" colorScheme="orange" variant="outline" leftIcon={<FaUpload />} borderRadius="xl" onClick={onExtractOpen}>
+              استخراج من ملف
+            </Button>
+            {selectedQuestionCount > 0 ? (
+              <Button
+                size="sm"
+                colorScheme="blue"
+                variant="outline"
+                leftIcon={<FaClipboardList />}
+                borderRadius="xl"
+                onClick={() => openExamModal("questions")}
+                isLoading={addToExamLoading}
+              >
+                إضافة {selectedQuestionCount} سؤال
+              </Button>
+            ) : null}
+            {selectedPassageIds.length > 0 ? (
+              <Button
+                size="sm"
+                colorScheme="orange"
+                variant="outline"
+                leftIcon={<FaClipboardList />}
+                borderRadius="xl"
+                onClick={() => openExamModal("passages")}
+              >
+                إضافة {selectedPassageIds.length} قطعة
+              </Button>
+            ) : null}
+          </LibraryToolbar>
+
+          {lessonLoading ? (
+            <LibraryLoadingState />
           ) : (
             <>
-              <Flex gap={2} flexWrap="wrap" p={4} bg={cardBg} borderRadius="xl" borderWidth="1px" borderColor={borderColor}>
-                <Button size="sm" colorScheme="blue" leftIcon={<FaPlus />} borderRadius="lg" onClick={openAddQuestion}>
-                  سؤال جديد
-                </Button>
-                <Button size="sm" colorScheme="orange" variant="outline" leftIcon={<FaUpload />} borderRadius="lg" onClick={onExtractOpen}>
-                  استخراج من ملف
-                </Button>
-               
-               
-            
-              
-                {selectedQuestionIds.length > 0 ? (
-                  <Button
-                    size="sm"
-                    colorScheme="blue"
-                    leftIcon={<FaClipboardList />}
-                    borderRadius="lg"
-                    onClick={() => openExamModal("questions")}
-                    isLoading={addToExamLoading}
-                  >
-                    إضافة {selectedQuestionIds.length} سؤال للامتحان
-                  </Button>
-                ) : null}
-                {selectedPassageIds.length > 0 ? (
-                  <Button
-                    size="sm"
-                    colorScheme="orange"
-                    leftIcon={<FaClipboardList />}
-                    borderRadius="lg"
-                    onClick={() => openExamModal("passages")}
-                  >
-                    إضافة {selectedPassageIds.length} قطعة للامتحان
-                  </Button>
-                ) : null}
-              </Flex>
-
-              {lessonLoading ? (
-                <Center py={16}>
-                  <Spinner size="lg" color="blue.500" thickness="3px" />
-                </Center>
-              ) : (
-                <>
-                  <Box
-                    p={{ base: 3, md: 4 }}
-                    bg={cardBg}
-                    borderRadius="2xl"
-                    borderWidth="1px"
-                    borderColor={borderColor}
-                    shadow="sm"
-                  >
-                    <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3}>
-                      <InputGroup>
-                        <InputLeftElement pointerEvents="none">
-                          <Icon as={FaSearch} color="gray.400" />
-                        </InputLeftElement>
-                        <Input
-                          value={questionSearch}
-                          onChange={(e) => setQuestionSearch(e.target.value)}
-                          placeholder="ابحث في نص السؤال أو الاختيارات..."
-                          borderRadius="xl"
-                          dir="rtl"
+              <LibraryFilterPanel
+                hint={`${standaloneQuestions.length} سؤال مستقل · ${passages.length} قطعة · اضغط على البطاقة للتحديد`}
+              >
+                <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3}>
+                  <InputGroup>
+                    <InputLeftElement pointerEvents="none">
+                      <Icon as={FaSearch} color="gray.400" />
+                    </InputLeftElement>
+                    <Input
+                      value={questionSearch}
+                      onChange={(e) => setQuestionSearch(e.target.value)}
+                      placeholder="ابحث في نص السؤال أو الاختيارات..."
+                      borderRadius="xl"
+                      bg={filterInputBg}
+                      border="none"
+                      dir="rtl"
+                    />
+                    {questionSearch ? (
+                      <InputRightElement>
+                        <IconButton
+                          aria-label="مسح البحث"
+                          icon={<FaTimes />}
+                          size="xs"
+                          variant="ghost"
+                          onClick={() => setQuestionSearch("")}
                         />
-                        {questionSearch ? (
-                          <InputRightElement>
-                            <IconButton
-                              aria-label="مسح البحث"
-                              icon={<FaTimes />}
-                              size="xs"
-                              variant="ghost"
-                              onClick={() => setQuestionSearch("")}
-                            />
-                          </InputRightElement>
-                        ) : null}
-                      </InputGroup>
-                      <Select
-                        value={typeFilter}
-                        onChange={(e) => setTypeFilter(e.target.value)}
-                        borderRadius="xl"
-                      >
-                        <option value="all">كل الأنواع</option>
-                        <option value="choice">اختياري فقط</option>
-                        <option value="text">مقالي فقط</option>
-                      </Select>
-                      <HStack spacing={2}>
-                          <Button
-                            size="md"
-                            variant="outline"
-                            colorScheme="blue"
-                            borderRadius="xl"
-                            flex={1}
-                            onClick={selectVisibleQuestions}
-                            isDisabled={visibleQuestionIds.length === 0}
-                          >
-                            تحديد الظاهر ({visibleQuestionIds.length})
-                          </Button>
-                          <Button
-                            size="md"
-                            variant="ghost"
-                            colorScheme="blue"
-                            borderRadius="xl"
-                            onClick={clearQuestionSelection}
-                            isDisabled={selectedQuestionIds.length === 0}
-                          >
-                            مسح
-                          </Button>
-                        </HStack>
-                    </SimpleGrid>
-                    <Text fontSize="xs" color={muted} mt={2}>
-                      {`اضغط على البطاقة للتحديد · ${standaloneQuestions.length} سؤال مستقل · ${passages.length} قطعة`}
-                    </Text>
-                  </Box>
+                      </InputRightElement>
+                    ) : null}
+                  </InputGroup>
+                  <Select
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value)}
+                    borderRadius="xl"
+                    bg={filterInputBg}
+                    border="none"
+                  >
+                    <option value="all">كل الأنواع</option>
+                    <option value="choice">اختياري فقط</option>
+                    <option value="text">مقالي فقط</option>
+                  </Select>
+                  <HStack spacing={2}>
+                    <Button
+                      size="md"
+                      variant="outline"
+                      colorScheme="blue"
+                      borderRadius="xl"
+                      flex={1}
+                      onClick={selectVisibleQuestions}
+                      isDisabled={visibleQuestionIds.length === 0}
+                    >
+                      تحديد الظاهر ({visibleQuestionIds.length})
+                    </Button>
+                    <Button
+                      size="md"
+                      variant="ghost"
+                      colorScheme="blue"
+                      borderRadius="xl"
+                      onClick={clearQuestionSelection}
+                      isDisabled={selectedQuestionCount === 0}
+                    >
+                      مسح
+                    </Button>
+                  </HStack>
+                </SimpleGrid>
+              </LibraryFilterPanel>
 
-                  {selectedQuestionIds.length > 0 ? (
+                  {selectedQuestionCount > 0 ? (
                     <Flex
                       gap={3}
                       flexWrap="wrap"
                       align="center"
                       p={4}
-                      bgGradient="linear(to-l, blue.500, blue.600)"
+                      bgGradient="linear(to-l, blue.500, orange.500)"
                       color="white"
                       borderRadius="2xl"
                       shadow="md"
@@ -894,7 +937,7 @@ const QuestionLibraryLessonPage = () => {
                         py={1}
                         borderRadius="full"
                       >
-                        {selectedQuestionIds.length} محدد
+                        {selectedQuestionCount} محدد
                       </Badge>
                       <Button
                         size="sm"
@@ -930,12 +973,12 @@ const QuestionLibraryLessonPage = () => {
                       <Box flex={1} />
                       <Button
                         size="sm"
-                        bg="teal.400"
+                        bg="orange.500"
                         color="white"
                         leftIcon={<FaClipboardList />}
                         borderRadius="lg"
-                        _hover={{ bg: "teal.300" }}
-                        isDisabled={selectedQuestionIds.length === 0}
+                        _hover={{ bg: "orange.400" }}
+                        isDisabled={selectedQuestionCount === 0}
                         isLoading={addToExamLoading}
                         onClick={() => openExamModal("questions")}
                       >
@@ -944,43 +987,27 @@ const QuestionLibraryLessonPage = () => {
                     </Flex>
                   ) : null}
 
-                  <Box>
-                    <Flex justify="space-between" align="center" mb={4} gap={3} flexWrap="wrap">
-                      <HStack spacing={3}>
-                        <Heading size="sm" color={textColor} fontWeight="bold">
-                          أسئلة مستقلة
-                        </Heading>
-                        <Badge colorScheme="blue" borderRadius="full" px={2.5} py={0.5}>
-                          {filteredStandaloneQuestions.length}
-                          {filteredStandaloneQuestions.length !== standaloneQuestions.length
-                            ? ` / ${standaloneQuestions.length}`
-                            : ""}
-                        </Badge>
-                      </HStack>
-                      {filteredStandaloneQuestions.length > 0 ? (
+                  <LibraryContentSection
+                    title="أسئلة مستقلة"
+                    count={
+                      filteredStandaloneQuestions.length !== standaloneQuestions.length
+                        ? `${filteredStandaloneQuestions.length} / ${standaloneQuestions.length}`
+                        : filteredStandaloneQuestions.length
+                    }
+                  >
+                    {filteredStandaloneQuestions.length > 0 ? (
+                      <Flex justify="flex-end" mb={3}>
                         <Button
                           size="xs"
                           variant="outline"
                           colorScheme="blue"
                           borderRadius="lg"
-                          onClick={() => {
-                            const ids = filteredStandaloneQuestions.map((q) => q.id);
-                            setSelectedQuestionIds((prev) => {
-                              const set = new Set(prev);
-                              const allSelected = ids.every((id) => set.has(id));
-                              if (allSelected) {
-                                ids.forEach((id) => set.delete(id));
-                              } else {
-                                ids.forEach((id) => set.add(id));
-                              }
-                              return [...set];
-                            });
-                          }}
+                          onClick={toggleStandaloneSectionSelection}
                         >
                           تحديد / إلغاء هذا القسم
                         </Button>
-                      ) : null}
-                    </Flex>
+                      </Flex>
+                    ) : null}
                     {filteredStandaloneQuestions.length === 0 ? (
                       <Box
                         p={8}
@@ -1004,7 +1031,7 @@ const QuestionLibraryLessonPage = () => {
                             key={q.id}
                             question={q}
                             index={i}
-                            selectedIds={selectedQuestionIds}
+                            isSelected={selectedQuestions.has(q.id)}
                             onToggleSelect={toggleQuestionSelect}
                             onEdit={openEditQuestion}
                             onDelete={confirmDeleteQuestion}
@@ -1016,20 +1043,17 @@ const QuestionLibraryLessonPage = () => {
                         ))}
                       </VStack>
                     )}
-                  </Box>
+                  </LibraryContentSection>
 
-                  <Box>
-                    <Flex justify="space-between" align="center" mb={4}>
-                      <HStack spacing={3}>
-                        <Heading size="sm" color={textColor} fontWeight="bold">
-                          قطع القراءة
-                        </Heading>
-                        <Badge colorScheme="orange" borderRadius="full" px={2.5} py={0.5}>
-                          {filteredPassages.length}
-                          {filteredPassages.length !== passages.length ? ` / ${passages.length}` : ""}
-                        </Badge>
-                      </HStack>
-                    </Flex>
+                  <LibraryContentSection
+                    title="قطع القراءة"
+                    badgeColorScheme="orange"
+                    count={
+                      filteredPassages.length !== passages.length
+                        ? `${filteredPassages.length} / ${passages.length}`
+                        : filteredPassages.length
+                    }
+                  >
                     {filteredPassages.length === 0 ? (
                       <Box
                         p={8}
@@ -1059,7 +1083,7 @@ const QuestionLibraryLessonPage = () => {
                                 : true
                             }
                             onToggle={() => togglePassage(passage.id)}
-                            selectedQuestionIds={selectedQuestionIds}
+                            selectedQuestions={selectedQuestions}
                             onToggleSelect={toggleQuestionSelect}
                             onEdit={openEditQuestion}
                             onDelete={confirmDeleteQuestion}
@@ -1073,9 +1097,9 @@ const QuestionLibraryLessonPage = () => {
                         ))}
                       </VStack>
                     )}
-                  </Box>
+                  </LibraryContentSection>
 
-                  {selectedQuestionIds.length > 0 && (
+                  {selectedQuestionCount > 0 && (
                     <Box
                       position="sticky"
                       bottom={4}
@@ -1091,11 +1115,11 @@ const QuestionLibraryLessonPage = () => {
                         boxShadow="xl"
                         leftIcon={<FaClipboardList />}
                         isLoading={addToExamLoading}
-                        isDisabled={selectedQuestionIds.length === 0}
+                        isDisabled={selectedQuestionCount === 0}
                         onClick={() => openExamModal("questions")}
                       >
-                        {selectedQuestionIds.length > 0
-                          ? `إضافة ${selectedQuestionIds.length} سؤال للامتحان`
+                        {selectedQuestionCount > 0
+                          ? `إضافة ${selectedQuestionCount} سؤال للامتحان`
                           : "اختر أسئلة أولاً"}
                       </Button>
                     </Box>
@@ -1104,13 +1128,12 @@ const QuestionLibraryLessonPage = () => {
               )}
             </>
           )}
-        </VStack>
-      </Container>
+    </LibraryPageShell>
 
       {/* Lesson modal */}
-      <Modal isOpen={isLessonModalOpen} onClose={onLessonModalClose} isCentered>
-        <ModalOverlay />
-        <ModalContent borderRadius="xl">
+      <Modal isOpen={isLessonModalOpen} onClose={onLessonModalClose} {...libraryModalProps}>
+        <ModalOverlay backdropFilter="blur(4px)" />
+        <ModalContent {...libraryModalContentProps()}>
           <ModalHeader fontSize="md">{editingLesson ? "تعديل الدرس" : "درس جديد"}</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
@@ -1412,8 +1435,8 @@ const QuestionLibraryLessonPage = () => {
         courseExams={courseExams}
         examTab={examModalTab}
         onExamTabChange={setExamModalTab}
-        selectedExamId={selectedExamId}
-        onSelectExamId={setSelectedExamId}
+        selectedExamIds={selectedExamIds}
+        onToggleExamId={toggleSelectedExamId}
         onConfirm={handleConfirmAddToExam}
         isLoading={addToExamLoading}
         examsLoading={examLoading}
@@ -1439,7 +1462,7 @@ const QuestionLibraryLessonPage = () => {
           </ModalBody>
         </ModalContent>
       </Modal>
-    </Box>
+    </>
   );
 };
 

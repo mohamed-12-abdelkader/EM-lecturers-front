@@ -6,6 +6,8 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { getTenantSubdomain } from "../../utils/tenantHost";
+import { isTenantPwaInstallPromptDisabled } from "../../utils/tenantPwaManifest";
 
 const INSTALLED_KEY = "pwa_app_installed";
 
@@ -168,11 +170,19 @@ export default function usePWAInstall() {
     }
   }, [deferredPrompt]);
 
+  const installDisabledForTenant = isTenantPwaInstallPromptDisabled(
+    getTenantSubdomain(),
+  );
+
   /**
    * Always show the button in the browser tab when not already running as PWA.
    * Native prompt / guide modal is decided on click.
    */
-  const canShowInstallButton = isReady && !isInstalled && !isRunningStandalone();
+  const canShowInstallButton =
+    isReady &&
+    !isInstalled &&
+    !isRunningStandalone() &&
+    !installDisabledForTenant;
 
   return {
     canShowInstallButton,

@@ -166,6 +166,57 @@ export async function addStudentToGroup(groupId, payload) {
   return unwrap(data, "فشل إضافة الطالب");
 }
 
+// ---------- Group exams & grades ----------
+export async function fetchGroupExams(groupId) {
+  const { data } = await baseUrl.get(`${API}/groups/${groupId}/exams`, {
+    headers: authHeaders(),
+  });
+  const payload = unwrap(data, "فشل تحميل امتحانات المجموعة");
+  if (Array.isArray(payload)) return payload;
+  return payload?.exams ?? payload?.items ?? [];
+}
+
+export async function createGroupExam(groupId, payload) {
+  const { data } = await baseUrl.post(`${API}/groups/${groupId}/exams`, payload, {
+    headers: authHeaders("application/json"),
+  });
+  return unwrap(data, "فشل إنشاء الامتحان");
+}
+
+export async function fetchGroupExamSheet(groupId, examId) {
+  const { data } = await baseUrl.get(`${API}/groups/${groupId}/exams/${examId}`, {
+    headers: authHeaders(),
+  });
+  return unwrap(data, "فشل تحميل كشف الدرجات");
+}
+
+export async function updateGroupExamGrades(groupId, examId, payload) {
+  const { data } = await baseUrl.put(
+    `${API}/groups/${groupId}/exams/${examId}/grades`,
+    payload,
+    { headers: authHeaders("application/json") }
+  );
+  return unwrap(data, "فشل حفظ الدرجات");
+}
+
+export async function updateGroupExamStudentGrade(groupId, examId, studentId, payload) {
+  const { data } = await baseUrl.patch(
+    `${API}/groups/${groupId}/exams/${examId}/grades/${studentId}`,
+    payload,
+    { headers: authHeaders("application/json") }
+  );
+  return unwrap(data, "فشل تحديث درجة الطالب");
+}
+
+export async function fetchStudentExams(studentId) {
+  const { data } = await baseUrl.get(`${API}/students/${studentId}/exams`, {
+    headers: authHeaders(),
+  });
+  const payload = unwrap(data, "فشل تحميل درجات الطالب");
+  if (Array.isArray(payload)) return payload;
+  return payload?.exams ?? payload?.items ?? [];
+}
+
 // ---------- Students ----------
 export async function fetchStudents(params = {}) {
   const { data } = await baseUrl.get(`${API}/students${buildQuery(params)}`, {

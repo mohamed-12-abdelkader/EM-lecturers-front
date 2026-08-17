@@ -1,6 +1,6 @@
-import { FaCopy, FaBookOpen, FaGraduationCap, FaCalendarAlt, FaKey } from "react-icons/fa";
+import { FaCopy, FaBookOpen, FaGraduationCap, FaCalendarAlt, FaKey, FaChevronDown } from "react-icons/fa";
 import { motion, useReducedMotion } from "framer-motion";
-import { useToast } from "@chakra-ui/react";
+import { Collapse, useDisclosure, useBreakpointValue, useToast } from "@chakra-ui/react";
 import { hpContainer } from "../homeTheme";
 import HomeProActivateCourse from "./HomeProActivateCourse";
 
@@ -57,6 +57,8 @@ export default function HomeProHero({
 }) {
   const reduceMotion = useReducedMotion();
   const toast = useToast();
+  const isMobileStats = useBreakpointValue({ base: true, md: false });
+  const { isOpen: statsOpen, onToggle: toggleStats } = useDisclosure({ defaultIsOpen: false });
 
   const displayId =
     studentId != null && studentId !== "" ? String(studentId) : null;
@@ -145,11 +147,52 @@ export default function HomeProHero({
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, delay: 0.06, ease: EASE }}
           data-tour-id="home-stats"
-          className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4"
+          className="mt-4"
         >
-          {STAT_CONFIG.map((item) => (
-            <StatCard key={item.key} item={item} value={statValues[item.key]} />
-          ))}
+          {isMobileStats ? (
+            <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
+              <button
+                type="button"
+                onClick={toggleStats}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-right transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                aria-expanded={statsOpen}
+              >
+                <span className="flex items-center gap-2">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
+                    <FaGraduationCap className="text-sm" />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-bold text-slate-900 dark:text-white">
+                      الإحصائيات
+                    </span>
+                    <span className="block text-xs text-slate-500 dark:text-slate-400">
+                      {Number(statValues.enrolled || 0).toLocaleString("ar-EG")} كورس مشترك ·{" "}
+                      {Number(statValues.available || 0).toLocaleString("ar-EG")} متاح
+                    </span>
+                  </span>
+                </span>
+                <FaChevronDown
+                  className={`shrink-0 text-slate-400 transition-transform duration-200 ${
+                    statsOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              <Collapse in={statsOpen} animateOpacity>
+                <div className="grid grid-cols-1 gap-3 border-t border-slate-100 p-3 dark:border-slate-800">
+                  {STAT_CONFIG.map((item) => (
+                    <StatCard key={item.key} item={item} value={statValues[item.key]} />
+                  ))}
+                </div>
+              </Collapse>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+              {STAT_CONFIG.map((item) => (
+                <StatCard key={item.key} item={item} value={statValues[item.key]} />
+              ))}
+            </div>
+          )}
         </motion.div>
       </div>
     </section>

@@ -12,30 +12,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 
 import { AuthContext } from "../contexts/AuthContext";
-import { bootstrapSession, fetchMe, logoutRequest } from "../services/authService";
+import { bootstrapSession, fetchMe } from "../services/authService";
 import { subscribeAuthMessages } from "../services/authChannel";
-import { clearAuthSession, markSessionExpired } from "../utils/authStorage";
-import { safeLocalGet, safeLocalSet } from "../utils/safeStorage";
+import { clearAuthSession, markSessionExpired, readStoredUser, persistStoredUser, AUTH_STORAGE_UPDATE_EVENT } from "../utils/authStorage";
+import { performLogout } from "../utils/performLogout";
 import { isBrowserOnline } from "../utils/network";
 import { getTenantSubdomain } from "../utils/tenantHost";
 
-function readStoredUser() {
-  try {
-    const raw = safeLocalGet("user");
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
 function storeUser(user) {
   if (user != null && typeof user === "object") {
-    safeLocalSet("user", JSON.stringify(user));
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event("auth-storage-update"));
-    }
+    persistStoredUser(user, { broadcast: false });
   }
 }
 
@@ -79,6 +65,7 @@ export default function AuthProvider({ children }) {
   const [status, setStatus] = useState("checking");
   const [user, setUser] = useState(initialUser);
   const bootstrapStartedRef = useRef(false);
+  const bootstrapGenerationRef = useRef(0);
 
   const applyAuthenticated = useCallback((nextUser) => {
     if (nextUser) {
@@ -88,10 +75,7 @@ export default function AuthProvider({ children }) {
     setStatus("authenticated");
   }, []);
 
-  const applyGuest = useCallback(({ hadSession = false } = {}) => {
-    if (hadSession) {
-      clearAuthSession();
-    }
+  const applyGuest = useCallback(() => {
     setUser(null);
     setStatus("guest");
   }, []);
@@ -104,15 +88,21 @@ export default function AuthProvider({ children }) {
     bootstrapStartedRef.current = true;
 
     const runBootstrap = async () => {
+      const generation = ++bootstrapGenerationRef.current;
       try {
         const { user: sessionUser } = await bootstrapSession();
+        if (generation !== bootstrapGenerationRef.current) return;
+
+        const stored = readStoredUser();
         if (sessionUser) {
           applyAuthenticated(sessionUser);
+        } else if (stored) {
+          applyAuthenticated(stored);
         } else {
-          // لا جلسة — بدون أي رسالة خطأ للمستخدم
-          applyGuest({ hadSession: Boolean(readStoredUser()) });
+          applyGuest();
         }
       } catch {
+        if (generation !== bootstrapGenerationRef.current) return;
         // خطأ شبكة: أعد المحاولة تلقائياً فور عودة الاتصال
         if (!isBrowserOnline() && typeof window !== "undefined") {
           const onOnline = () => {
@@ -122,12 +112,11 @@ export default function AuthProvider({ children }) {
           window.addEventListener("online", onOnline);
           return;
         }
-        // خادم متعطل أو خطأ غير متوقع: لا تحبس المستخدم على الـ Splash
-        if (readStoredUser()) {
-          // اعتبره داخلاً مؤقتاً — الطلبات الفعلية ستتكفل بالتصحيح
-          setStatus("authenticated");
+        const stored = readStoredUser();
+        if (stored) {
+          applyAuthenticated(stored);
         } else {
-          setStatus("guest");
+          applyGuest();
         }
       }
     };
@@ -138,21 +127,28 @@ export default function AuthProvider({ children }) {
   /* -------------- مزامنة نفس التبويب (بعد login/signup) -------------- */
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
-    const onAuthUpdate = () => {
-      const next = readStoredUser();
+    const onAuthUpdate = (event) => {
+      bootstrapGenerationRef.current += 1;
+      const next =
+        event?.detail?.user ??
+        readStoredUser();
       if (next) {
         setUser(next);
         setStatus("authenticated");
+      } else {
+        setUser(null);
+        setStatus("guest");
       }
     };
-    window.addEventListener("auth-storage-update", onAuthUpdate);
-    return () => window.removeEventListener("auth-storage-update", onAuthUpdate);
+    window.addEventListener(AUTH_STORAGE_UPDATE_EVENT, onAuthUpdate);
+    return () => window.removeEventListener(AUTH_STORAGE_UPDATE_EVENT, onAuthUpdate);
   }, []);
 
   /* ----------------------- مزامنة بقية التبويبات ---------------------- */
   useEffect(() => {
     const unsubscribe = subscribeAuthMessages((msg) => {
       if (msg.type === "login") {
+        bootstrapGenerationRef.current += 1;
         if (msg.user) storeUser(msg.user);
         setUser(msg.user || readStoredUser());
         setStatus("authenticated");
@@ -207,26 +203,8 @@ export default function AuthProvider({ children }) {
   }, [applyAuthenticated]);
 
   const logout = useCallback(async () => {
-    const redirect = loginPathForUser(user || readStoredUser());
-    try {
-      await logoutRequest(); // يمسح كوكي الـ refresh على الخادم
-    } catch {
-      // الخروج محلياً يتم في كل الأحوال
-    }
-    ["examAnswers", "examTimeLeft"].forEach((key) => {
-      try {
-        window.localStorage.removeItem(key);
-      } catch {
-        // ignore
-      }
-    });
-    clearAuthSession({ broadcast: true });
-    setUser(null);
-    setStatus("guest");
-    if (typeof window !== "undefined") {
-      window.location.href = redirect;
-    }
-  }, [user]);
+    performLogout();
+  }, []);
 
   const value = useMemo(
     () => ({

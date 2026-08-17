@@ -51,6 +51,7 @@ import {
   FaSync,
   FaShareAlt,
   FaCopy,
+  FaMobileAlt,
 } from "react-icons/fa";
 import { FiSearch, FiUserCheck } from "react-icons/fi";
 import BrandLoadingScreen from "../../../components/loading/BrandLoadingScreen";
@@ -67,7 +68,9 @@ import {
   fetchTeacherStudyGroups,
   apiErrorMessage,
 } from "../../../api/teacherManagedStudentsApi";
+import { resetStudentDevice } from "../../../api/deviceRestrictionApi";
 import RegistrationSettingsCard from "./components/RegistrationSettingsCard";
+import DeviceRestrictionSettingsCard from "./components/DeviceRestrictionSettingsCard";
 import StudentFormModal from "./components/StudentFormModal";
 import CredentialsModal from "./components/CredentialsModal";
 import ImportCsvModal from "./components/ImportCsvModal";
@@ -303,6 +306,32 @@ const ManagedStudentsPage = () => {
     }
   };
 
+  const handleResetDevice = async (student) => {
+    const confirmed = window.confirm(
+      `إعادة تعيين جهاز الطالب «${student.name}»؟\nسيتمكن من تسجيل الدخول من الجهاز الجديد عند المحاولة التالية.`,
+    );
+    if (!confirmed) return;
+
+    try {
+      const result = await resetStudentDevice(student.id);
+      toast({
+        title: result.message || "تم إعادة تعيين جهاز الطالب",
+        status: "success",
+        duration: 4000,
+        isClosable: true,
+      });
+      await loadStudents();
+    } catch (err) {
+      toast({
+        title: "فشل إعادة تعيين الجهاز",
+        description: apiErrorMessage(err),
+        status: "error",
+        duration: 4000,
+        isClosable: true,
+      });
+    }
+  };
+
   const handleStatusChange = async (student, accountStatus) => {
     try {
       await updateManagedStudentStatus(student.id, accountStatus);
@@ -439,6 +468,7 @@ const ManagedStudentsPage = () => {
           </Box>
 
           <RegistrationSettingsCard onSettingsChange={(data) => setRegistrationMode(data.registration_mode)} />
+          <DeviceRestrictionSettingsCard />
 
           <SimpleGrid columns={{ base: 1, sm: 3 }} spacing={4}>
             <KpiCard label="إجمالي الطلاب" value={pagination.total || 0} sub="مسجّلون على المنصة" icon={FaUsers} />
@@ -570,6 +600,9 @@ const ManagedStudentsPage = () => {
                       <Th fontSize="xs" display={{ base: "none", lg: "table-cell" }}>
                         التواصل
                       </Th>
+                      <Th fontSize="xs" display={{ base: "none", xl: "table-cell" }}>
+                        المتصفح
+                      </Th>
                       <Th fontSize="xs">الحالة</Th>
                       <Th fontSize="xs" textAlign="center">
                         إجراءات
@@ -627,6 +660,23 @@ const ManagedStudentsPage = () => {
                               ولي الأمر: {student.parent_phone || "—"}
                             </Text>
                           </Td>
+                          <Td py={3} display={{ base: "none", xl: "table-cell" }}>
+                            {student.device_bound || student.registered_ip || student.device_ip ? (
+                              <VStack align="start" spacing={0.5}>
+                                <Badge colorScheme="blue" variant="subtle" fontSize="10px">
+                                  مربوط
+                                </Badge>
+                                <Text fontSize="10px" color={subTextColor} dir="ltr" noOfLines={1} maxW="140px">
+                                  {(student.registered_ip || student.device_ip || "").slice(0, 18)}
+                                  {(student.registered_ip || student.device_ip || "").length > 18 ? "…" : ""}
+                                </Text>
+                              </VStack>
+                            ) : (
+                              <Badge colorScheme="gray" variant="subtle" fontSize="10px">
+                                غير مربوط
+                              </Badge>
+                            )}
+                          </Td>
                           <Td py={3}>
                             <Badge colorScheme={st.scheme} variant="subtle" fontSize="xs">
                               {st.label}
@@ -654,6 +704,9 @@ const ManagedStudentsPage = () => {
                                     إعادة تعيين كلمة المرور
                                   </MenuItem>
                                 )}
+                                <MenuItem icon={<FaMobileAlt />} onClick={() => handleResetDevice(student)}>
+                                  إعادة تعيين الجهاز
+                                </MenuItem>
                                 {student.account_status !== "active" && (
                                   <MenuItem onClick={() => handleStatusChange(student, "active")}>
                                     تفعيل الحساب

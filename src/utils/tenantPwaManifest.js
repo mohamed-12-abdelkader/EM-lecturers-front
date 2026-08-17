@@ -13,6 +13,14 @@ export const TENANT_PWA_BRANDING_CACHE = "em-tenant-pwa-branding-v1";
 export const TENANT_PWA_BRANDING_URL = "/__em_tenant_pwa_branding__.json";
 export const TENANT_MANIFEST_PATH = "/manifest.webmanifest";
 
+/** منصات لا يُعرض فيها موديل/زر تثبيت PWA */
+const PWA_INSTALL_PROMPT_DISABLED_TENANTS = new Set(["mr-nofal"]);
+
+export function isTenantPwaInstallPromptDisabled(subdomain = getTenantSubdomain()) {
+  if (!subdomain) return false;
+  return PWA_INSTALL_PROMPT_DISABLED_TENANTS.has(String(subdomain).toLowerCase());
+}
+
 const DEFAULT_ICONS = [
   { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
   { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },

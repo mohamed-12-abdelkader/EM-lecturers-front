@@ -1,4 +1,5 @@
 import baseUrl from "./baseUrl";
+import { getApiOrigin, useDevViteProxy } from "./apiConfig";
 
 const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 
@@ -15,8 +16,49 @@ export function getCourseFileDisplayName(file) {
   return file?.name || file?.filename || file?.title || "ملف بدون اسم";
 }
 
+export function isAbsoluteHttpUrl(url) {
+  return /^https?:\/\//i.test(String(url || "").trim());
+}
+
+/** مسار محلي على الـ API مثل /uploads/course-files/... */
+export function isCourseFileUploadPath(url) {
+  const s = String(url || "").trim();
+  return s.startsWith("/uploads/") || s.startsWith("uploads/");
+}
+
+/** يحوّل file_url النسبي إلى رابط كامل (Bunny HTTPS أو مسار API) */
+export function resolveCourseFileAbsoluteUrl(url) {
+  if (!url || typeof url !== "string") return null;
+  const raw = url.trim();
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw) || raw.startsWith("data:")) return raw;
+  if (raw.startsWith("//")) return `https:${raw}`;
+
+  const path = raw.startsWith("/") ? raw : `/${raw}`;
+  if (typeof window !== "undefined" && useDevViteProxy()) {
+    return `${window.location.origin}${path}`;
+  }
+  const origin = getApiOrigin();
+  if (origin) return `${origin}${path}`;
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}${path}`;
+  }
+  return path;
+}
+
 export function getCourseFileUrl(file) {
-  return file?.file_url || file?.url || file?.link || null;
+  const raw = file?.file_url || file?.url || file?.link || null;
+  if (!raw) return null;
+  if (isAbsoluteHttpUrl(raw)) return raw;
+  if (isCourseFileUploadPath(raw) || raw.startsWith("/")) {
+    return resolveCourseFileAbsoluteUrl(raw);
+  }
+  return raw;
+}
+
+/** رابط HTTPS خارجي (Bunny CDN وغيره) — ليس Google Drive */
+export function isRemoteCourseFileUrl(url) {
+  return isAbsoluteHttpUrl(url) && !/drive\.google\.com/i.test(String(url || ""));
 }
 
 export function isCourseFilePdf(file) {
@@ -45,23 +87,47 @@ export function getCourseFileKind(file) {
 }
 
 export function courseFilesApiError(err, fallback = "حدث خطأ غير متوقع") {
-  return err?.response?.data?.message || err?.response?.data?.msg || err?.message || fallback;
+  const status = err?.response?.status;
+  const data = err?.response?.data;
+  const message = data?.message || data?.msg;
+
+  if (status === 403) {
+    return message || "ليس لديك صلاحية للوصول إلى ملفات هذا الكورس";
+  }
+  if (status === 413) {
+    return message || "حجم الملف يتجاوز 50MB";
+  }
+  if (status === 502) {
+    return message || "فشل رفع الملف على التخزين السحابي والمحلي، حاول مرة أخرى";
+  }
+  if (status === 404) {
+    return message || "الكورس أو الملف غير موجود";
+  }
+  if (status === 400) {
+    return message || "بيانات الرفع غير مكتملة";
+  }
+
+  return message || err?.message || fallback;
 }
 
 export async function fetchCourseFiles(courseId) {
   const { data } = await baseUrl.get(`/api/course/${courseId}/files`);
-  return Array.isArray(data?.files) ? data.files : [];
+  const files = Array.isArray(data?.files) ? data.files : [];
+  return [...files].sort((a, b) => {
+    const ta = new Date(a.created_at || 0).getTime();
+    const tb = new Date(b.created_at || 0).getTime();
+    return tb - ta;
+  });
 }
 
-export async function uploadCourseFile(courseId, { file, name, file_url }) {
+export async function uploadCourseFile(courseId, { file, name, filename, file_url }) {
   const form = new FormData();
   if (file) form.append("file", file);
-  if (name) form.append("name", name);
-  if (file_url) form.append("file_url", file_url);
+  const displayName = String(name || filename || "").trim();
+  if (displayName) form.append("name", displayName);
+  if (file_url) form.append("file_url", String(file_url).trim());
 
-  const { data } = await baseUrl.post(`/api/course/${courseId}/files`, form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  const { data } = await baseUrl.post(`/api/course/${courseId}/files`, form);
   return data?.file ?? data;
 }
 
@@ -70,8 +136,8 @@ export async function deleteCourseFile(courseId, fileId) {
   return data?.file ?? data;
 }
 
-export function validateCourseFileUpload({ file, name, file_url }) {
-  if (!String(name || "").trim()) return "اسم الملف مطلوب";
+export function validateCourseFileUpload({ file, name, filename, file_url }) {
+  if (!String(name || filename || "").trim()) return "اسم الملف مطلوب";
   if (!file && !String(file_url || "").trim()) return "اختر ملفاً أو أدخل رابطاً";
   if (file && file.size > MAX_UPLOAD_BYTES) return "حجم الملف يتجاوز 50MB";
   if (file_url && !/^https?:\/\//i.test(String(file_url).trim())) {

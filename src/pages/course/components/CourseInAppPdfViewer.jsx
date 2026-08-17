@@ -1,13 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Center, Flex, Image, Spinner, Text, useColorModeValue } from "@chakra-ui/react";
 import PdfJsScrollViewer from "./PdfJsScrollViewer";
-import { isCourseFileImage, isCourseFilePdf } from "../../../api/courseFilesApi";
+import {
+  isCourseFileImage,
+  isCourseFilePdf,
+  resolveCourseFileAbsoluteUrl,
+} from "../../../api/courseFilesApi";
 import {
   getDrivePdfProxyUrl,
   isDirectPdfUrl,
   resolveCourseFileEmbedSrc,
   resolveLocalPdfUrl,
 } from "../../../utils/courseFileView";
+import { isGoogleDriveUrl } from "../../../utils/googleDriveEmbed";
 
 function DriveIframeViewer({ src, fileName }) {
   const iframeRef = useRef(null);
@@ -43,7 +48,7 @@ function DriveIframeViewer({ src, fileName }) {
         _dark={{ bg: "gray.900" }}
       >
         <Text fontSize="xs" color="gray.500">
-          اضغط داخل العارض ثم مرّر — أو استخدم أسهم Google Drive أسفل الملف
+          اضغط داخل العارض ثم مرّر لقراءة الملف
         </Text>
       </Flex>
 
@@ -125,7 +130,12 @@ export default function CourseInAppPdfViewer({ fileId, fileUrl, fileName }) {
   const bg = useColorModeValue("gray.100", "gray.950");
   const muted = useColorModeValue("gray.500", "gray.400");
 
-  const fallbackEmbedSrc = resolveCourseFileEmbedSrc({ fileId, url: fileUrl });
+  const resolvedFileUrl = useMemo(() => {
+    if (!fileUrl) return null;
+    return resolveCourseFileAbsoluteUrl(fileUrl) || fileUrl;
+  }, [fileUrl]);
+
+  const fallbackEmbedSrc = resolveCourseFileEmbedSrc({ fileId, url: resolvedFileUrl });
 
   useEffect(() => {
     let cancelled = false;
@@ -134,18 +144,41 @@ export default function CourseInAppPdfViewer({ fileId, fileUrl, fileName }) {
       setLocalPdfUrl(null);
       setEmbedSrc(null);
 
-      if (fileUrl && isCourseFileImage({ file_url: fileUrl })) {
+      const url = resolvedFileUrl;
+
+      if (url && isCourseFileImage({ file_url: url })) {
         setMode("image");
         return;
       }
 
-      if (fileUrl && (isCourseFilePdf({ file_url: fileUrl }) || isDirectPdfUrl(fileUrl))) {
-        setLocalPdfUrl(fileUrl);
-        setMode("remote");
+      if (url && (isCourseFilePdf({ file_url: url }) || isDirectPdfUrl(url))) {
+        if (isGoogleDriveUrl(url)) {
+          const local = await resolveLocalPdfUrl({ fileId, url });
+          if (cancelled) return;
+
+          if (local) {
+            setLocalPdfUrl(local);
+            setMode("local");
+            return;
+          }
+
+          if (fileId && fileId !== "view" && !/^\d+$/.test(String(fileId))) {
+            setMode("proxy");
+            return;
+          }
+
+          setEmbedSrc(fallbackEmbedSrc);
+          setMode("iframe");
+          return;
+        }
+
+        // Bunny CDN أو /uploads/ على الـ API — iframe عبر file_url
+        setEmbedSrc(url);
+        setMode("iframe");
         return;
       }
 
-      const local = await resolveLocalPdfUrl({ fileId, url: fileUrl });
+      const local = await resolveLocalPdfUrl({ fileId, url });
       if (cancelled) return;
 
       if (local) {
@@ -166,7 +199,7 @@ export default function CourseInAppPdfViewer({ fileId, fileUrl, fileName }) {
     return () => {
       cancelled = true;
     };
-  }, [fileId, fileUrl, fallbackEmbedSrc]);
+  }, [fileId, resolvedFileUrl, fallbackEmbedSrc]);
 
   const handleProxyFallback = useCallback(() => {
     setEmbedSrc(fallbackEmbedSrc);
@@ -190,8 +223,8 @@ export default function CourseInAppPdfViewer({ fileId, fileUrl, fileName }) {
     );
   }
 
-  if (mode === "image" && fileUrl) {
-    return <ImageViewer src={fileUrl} fileName={fileName} />;
+  if (mode === "image" && resolvedFileUrl) {
+    return <ImageViewer src={resolvedFileUrl} fileName={fileName} />;
   }
 
   if ((mode === "local" || mode === "remote") && localPdfUrl) {

@@ -10,8 +10,21 @@
 
 import { normalizeAuthToken, isJwtExpired } from "../utils/jwt";
 import { postAuthMessage, subscribeAuthMessages } from "./authChannel";
+import {
+  getAuthScopeSubdomain,
+  readScopedAuthItem,
+  removeScopedAuthItem,
+  tenantAuthStorageKey,
+  writeScopedAuthItem,
+} from "../utils/tenantAuthStorage";
 
 const TOKEN_KEY = "token";
+const SCOPED_AUTH_KEYS = new Set([
+  TOKEN_KEY,
+  "user",
+  "employee_data",
+  "employee_permissions",
+]);
 
 /**
  * Fallback مؤقت: الباك اند لا يوفر بعد POST /auth/refresh بكوكي HttpOnly
@@ -55,7 +68,7 @@ export function setAccessToken(rawToken, { broadcast = true } = {}) {
   memoryToken = token;
   persistTokenToDisk(token);
   notifyListeners();
-  if (broadcast) postAuthMessage({ type: "token", token });
+  if (broadcast) postAuthMessage({ type: "token", token, tenant: getAuthScopeSubdomain() });
   return memoryToken;
 }
 
@@ -64,7 +77,7 @@ export function clearAccessToken({ broadcast = false } = {}) {
   if (!memoryToken) return;
   memoryToken = "";
   notifyListeners();
-  if (broadcast) postAuthMessage({ type: "logout" });
+  if (broadcast) postAuthMessage({ type: "logout", tenant: getAuthScopeSubdomain() });
 }
 
 /** الاستماع لتغيّر التوكن داخل نفس التبويب */
@@ -109,14 +122,29 @@ let nativeLocalGet = null;
 let nativeLocalSet = null;
 let nativeLocalRemove = null;
 
+function scopedTokenStorageKey() {
+  return tenantAuthStorageKey(TOKEN_KEY);
+}
+
 /** كتابة التوكن على القرص عبر الدوال الأصلية (بدون المرور بالجسر — لا recursion) */
 function persistTokenToDisk(token) {
   if (!PERSIST_TOKEN_FALLBACK || typeof window === "undefined") return;
   try {
     const write = nativeLocalSet || Storage.prototype.setItem;
-    write.call(window.localStorage, TOKEN_KEY, token);
+    write.call(window.localStorage, scopedTokenStorageKey(), token);
+    removeTokenFromDiskLegacy();
   } catch {
     // Safari Private Mode وغيره — تجاهل
+  }
+}
+
+function removeTokenFromDiskLegacy() {
+  if (typeof window === "undefined") return;
+  try {
+    const remove = nativeLocalRemove || Storage.prototype.removeItem;
+    remove.call(window.localStorage, TOKEN_KEY);
+  } catch {
+    // تجاهل
   }
 }
 
@@ -124,7 +152,8 @@ function removeTokenFromDisk() {
   if (typeof window === "undefined") return;
   try {
     const remove = nativeLocalRemove || Storage.prototype.removeItem;
-    remove.call(window.localStorage, TOKEN_KEY);
+    remove.call(window.localStorage, scopedTokenStorageKey());
+    removeTokenFromDiskLegacy();
   } catch {
     // تجاهل
   }
@@ -147,8 +176,9 @@ function installStorageBridge() {
     nativeLocalRemove = proto.removeItem;
 
     proto.getItem = function getItem(key) {
-      if (key === TOKEN_KEY && isWindowLocalStorage(this)) {
-        return memoryToken || null;
+      if (SCOPED_AUTH_KEYS.has(key) && isWindowLocalStorage(this)) {
+        if (key === TOKEN_KEY) return memoryToken || null;
+        return readScopedAuthItem(key);
       }
       return nativeLocalGet.call(this, key);
     };
@@ -157,11 +187,19 @@ function installStorageBridge() {
         setAccessToken(value);
         return undefined;
       }
+      if (SCOPED_AUTH_KEYS.has(key) && key !== TOKEN_KEY && isWindowLocalStorage(this)) {
+        writeScopedAuthItem(key, value);
+        return undefined;
+      }
       return nativeLocalSet.call(this, key, value);
     };
     proto.removeItem = function removeItem(key) {
       if (key === TOKEN_KEY && isWindowLocalStorage(this)) {
         clearAccessToken();
+        return undefined;
+      }
+      if (SCOPED_AUTH_KEYS.has(key) && key !== TOKEN_KEY && isWindowLocalStorage(this)) {
+        removeScopedAuthItem(key);
         return undefined;
       }
       return nativeLocalRemove.call(this, key);
@@ -181,13 +219,17 @@ function loadPersistedToken() {
   if (typeof window === "undefined") return;
   try {
     const read = nativeLocalGet || Storage.prototype.getItem;
-    const persisted = normalizeAuthToken(read.call(window.localStorage, TOKEN_KEY));
+    let persisted = normalizeAuthToken(
+      read.call(window.localStorage, scopedTokenStorageKey()),
+    );
+    if (!persisted) {
+      persisted = normalizeAuthToken(readScopedAuthItem(TOKEN_KEY));
+    }
     if (!persisted) return;
     if (isJwtExpired(persisted)) {
       removeTokenFromDisk();
       return;
     }
-    // بدون broadcast — كل تبويب يحمّل نسخته المحلية بنفسه
     memoryToken = persisted;
     if (!PERSIST_TOKEN_FALLBACK) removeTokenFromDisk();
   } catch {
@@ -198,6 +240,10 @@ function loadPersistedToken() {
 /** مزامنة التوكن الواصل من تبويبات أخرى */
 function listenToPeers() {
   subscribeAuthMessages((msg) => {
+    const currentTenant = getAuthScopeSubdomain();
+    const msgTenant = msg.tenant ?? null;
+    if (String(msgTenant || "") !== String(currentTenant || "")) return;
+
     if (msg.type === "token" && msg.token) {
       setAccessToken(msg.token, { broadcast: false });
     } else if (msg.type === "login" && msg.token) {
@@ -206,7 +252,11 @@ function listenToPeers() {
       clearAccessToken({ broadcast: false });
     } else if (msg.type === "request-token") {
       if (hasFreshAccessToken()) {
-        postAuthMessage({ type: "token", token: memoryToken });
+        postAuthMessage({
+          type: "token",
+          token: memoryToken,
+          tenant: currentTenant,
+        });
       }
     }
   });

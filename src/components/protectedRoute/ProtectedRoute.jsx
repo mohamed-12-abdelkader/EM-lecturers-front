@@ -1,29 +1,48 @@
-import { useEffect, useState } from "react";
+/**
+ * حارس المسارات المحمية — يعتمد على AuthProvider + التخزين المعزول لكل منصة.
+ *
+ * - auth (legacy): boolean من UserType — false = دور غير مسموح أو لم يُحمَّل بعد
+ * - بدون auth: يكفي وجود جلسة صالحة
+ */
 import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
+import { readStoredUser } from "../../utils/authStorage";
 
-const ProtectedRoute = ({ auth, children }) => {
-  const [redirected, setRedirected] = useState(false);
+export default function ProtectedRoute({ auth, children }) {
+  const { status, isAuthenticated } = useAuth();
   const location = useLocation();
+  const storedUser = readStoredUser();
+  const hasSession = isAuthenticated || Boolean(storedUser);
 
-  useEffect(() => {
-    let timer;
-    // لا نوجّه إلا عندما تكون الصلاحية معروفة وغير مسموحة (false). لو لا تزال undefined = جاري التحميل
-    if (auth === false && !redirected) {
-      timer = setTimeout(() => {
-        setRedirected(true);
-      }, 100);
-    }
-
-    return () => clearTimeout(timer);
-  }, [auth, redirected]);
-
-  return redirected ? (
-    <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname + location.search + location.hash)}`} replace />
-  ) : children ? (
-    children
-  ) : (
-    <Outlet />
+  const loginRedirect = (
+    <Navigate
+      to={`/login?redirect=${encodeURIComponent(
+        location.pathname + location.search + location.hash,
+      )}`}
+      replace
+    />
   );
-};
 
-export default ProtectedRoute;
+  // انتظر فحص الجلسة عند الإقلاع — بدون توجيه سريع
+  if (status === "checking" && !hasSession) {
+    return children ?? <Outlet />;
+  }
+
+  if (!hasSession) {
+    return loginRedirect;
+  }
+
+  // UserType يقول «لا دور» — لكن الجلسة موجودة (تأخر sync أو مسار فرعي بدور محدد)
+  if (auth === false) {
+    if (status === "checking") {
+      return children ?? <Outlet />;
+    }
+    // جلسة صالحة لكن الدور لا يطابق (مثلاً طالب على مسار admin) → الرئيسية
+    if (hasSession) {
+      return <Navigate to="/home" replace />;
+    }
+    return loginRedirect;
+  }
+
+  return children ?? <Outlet />;
+}

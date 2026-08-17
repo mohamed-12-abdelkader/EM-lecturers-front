@@ -1,37 +1,29 @@
 /**
  * AuthService — نداءات المصادقة + تدفق الإقلاع (Bootstrap).
  *
- * تدفق بدء التشغيل:
- *   1) لو يوجد توكن في الذاكرة (أو وصل من تبويب آخر) → GET /auth/me
- *   2) لو 401 أو لا يوجد توكن → POST /auth/refresh (كوكي HttpOnly)
- *   3) نجح الـ refresh → GET /auth/me مرة أخرى
- *   4) فشل → المستخدم غير مسجّل (بدون أي رسالة خطأ)
+ * عزل المنصات: جلسة منصة A لا تُقبل على منصة B — يُمسح الكوكي المشترك.
  */
 
 import authHttp from "../api/authHttp";
 import { isJwtExpired } from "../utils/jwt";
 import {
+  clearAuthSession,
+  enrichUserWithTenant,
+  persistStoredUser,
+  readStoredUser,
+  sessionMatchesCurrentTenant,
+} from "../utils/authStorage";
+import { normalizeAuthUser } from "../utils/authRoles";
+import {
   getAccessToken,
   requestTokenFromPeers,
 } from "./tokenStore";
 import { refreshSession } from "./refreshManager";
-import { safeLocalGet } from "../utils/safeStorage";
+import { writeStoredTenantMeta } from "../utils/tenantAuthStorage";
 
-/** الباك اند لم يطبّق الـ endpoint بعد (/auth/me أو /auth/refresh ترجع 404) */
 function isEndpointMissing(error) {
   const status = error?.response?.status;
   return status === 404 || status === 405;
-}
-
-function readStoredUser() {
-  try {
-    const raw = safeLocalGet("user");
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : null;
-  } catch {
-    return null;
-  }
 }
 
 function bearerConfig() {
@@ -39,10 +31,46 @@ function bearerConfig() {
   return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 }
 
-/** GET /auth/me — يرجع بيانات المستخدم أو يرمي الخطأ */
+async function rejectForeignTenantSession() {
+  try {
+    await logoutRequest();
+  } catch {
+    // ignore
+  }
+  clearAuthSession({ broadcast: false });
+}
+
+function normalizeMeResponse(response) {
+  const user = response?.data?.user ?? response?.data ?? null;
+  const tenant = response?.data?.tenant ?? null;
+  if (!user) return null;
+  const stored = readStoredUser();
+  const enriched = normalizeAuthUser(enrichUserWithTenant(user, tenant), {
+    fallbackUser: stored,
+  });
+  if (!sessionMatchesCurrentTenant(enriched, tenant)) {
+    return { mismatch: true };
+  }
+  return { user: enriched, tenant };
+}
+
+/** GET /auth/me — يرجع بيانات المستخدم أو null عند عدم التطابق */
 export async function fetchMe() {
   const response = await authHttp.get("api/auth/me", bearerConfig());
-  return response?.data?.user ?? response?.data ?? null;
+  const result = normalizeMeResponse(response);
+  if (result?.mismatch) {
+    const stored = readStoredUser();
+    if (stored) return stored;
+    await rejectForeignTenantSession();
+    return null;
+  }
+  if (result?.tenant) {
+    writeStoredTenantMeta(result.tenant);
+  }
+  if (result?.user) {
+    persistStoredUser(result.user, { broadcast: false });
+  }
+  return result?.user ?? null;
 }
 
 /** POST /auth/logout — يمسح كوكي الـ refresh ويلغي جلسة الجهاز الحالي */
@@ -51,7 +79,7 @@ export async function logoutRequest() {
     await authHttp.post("api/auth/logout", null, bearerConfig());
     return true;
   } catch {
-    return false; // الخروج محلياً يتم في كل الأحوال
+    return false;
   }
 }
 
@@ -66,15 +94,9 @@ function isAuthRejection(error) {
   return status === 401 || status === 403;
 }
 
-/**
- * فحص الجلسة عند الإقلاع.
- * يرجع { user } عند النجاح أو { user: null } عند عدم وجود جلسة.
- * يرمي الخطأ فقط عند مشاكل الشبكة (ليعاد المحاولة عند عودة الاتصال).
- */
 export async function bootstrapSession() {
   let token = getAccessToken();
 
-  // تبويب جديد: جرّب أخذ التوكن من التبويبات المفتوحة قبل عمل refresh
   if (!token || isJwtExpired(token)) {
     token = await requestTokenFromPeers(300);
   }
@@ -83,13 +105,14 @@ export async function bootstrapSession() {
     try {
       const user = await fetchMe();
       if (user) return { user };
+      const stored = readStoredUser();
+      if (stored) return { user: stored };
     } catch (error) {
-      // الباك اند بدون /auth/me بعد: توكن صالح + مستخدم محفوظ = جلسة سارية
       if (isEndpointMissing(error)) {
-        return { user: readStoredUser() };
+        const stored = readStoredUser();
+        return stored ? { user: stored } : { user: null };
       }
       if (!isAuthRejection(error)) throw error;
-      // TOKEN_EXPIRED → نكمل للـ refresh
     }
   }
 
@@ -97,17 +120,24 @@ export async function bootstrapSession() {
   try {
     refreshed = await refreshSession();
   } catch (error) {
-    // خطأ شبكة — بلّغ الأعلى ليتعامل مع وضع الأوفلاين
     throw error;
   }
 
-  if (!refreshed) return { user: null };
+  if (!refreshed) {
+    const stored = readStoredUser();
+    return stored ? { user: stored } : { user: null };
+  }
 
   try {
     const user = await fetchMe();
-    return { user: user || null };
+    if (user) return { user };
+    const stored = readStoredUser();
+    return stored ? { user: stored } : { user: null };
   } catch (error) {
-    if (isEndpointMissing(error)) return { user: readStoredUser() };
+    if (isEndpointMissing(error)) {
+      const stored = readStoredUser();
+      return stored ? { user: stored } : { user: null };
+    }
     if (isAuthRejection(error)) return { user: null };
     throw error;
   }
