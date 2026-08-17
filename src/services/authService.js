@@ -7,7 +7,6 @@
 import authHttp from "../api/authHttp";
 import { isJwtExpired } from "../utils/jwt";
 import {
-  clearAuthSession,
   enrichUserWithTenant,
   persistStoredUser,
   readStoredUser,
@@ -20,6 +19,7 @@ import {
 } from "./tokenStore";
 import { refreshSession } from "./refreshManager";
 import { writeStoredTenantMeta } from "../utils/tenantAuthStorage";
+import { rejectForeignTenantSession } from "../utils/sessionGuard";
 
 function isEndpointMissing(error) {
   const status = error?.response?.status;
@@ -31,13 +31,9 @@ function bearerConfig() {
   return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 }
 
-async function rejectForeignTenantSession() {
-  try {
-    await logoutRequest();
-  } catch {
-    // ignore
-  }
-  clearAuthSession({ broadcast: false });
+async function rejectForeignTenantSessionAndReturnNull() {
+  await rejectForeignTenantSession();
+  return null;
 }
 
 function normalizeMeResponse(response) {
@@ -59,10 +55,7 @@ export async function fetchMe() {
   const response = await authHttp.get("api/auth/me", bearerConfig());
   const result = normalizeMeResponse(response);
   if (result?.mismatch) {
-    const stored = readStoredUser();
-    if (stored) return stored;
-    await rejectForeignTenantSession();
-    return null;
+    return rejectForeignTenantSessionAndReturnNull();
   }
   if (result?.tenant) {
     writeStoredTenantMeta(result.tenant);
@@ -105,8 +98,6 @@ export async function bootstrapSession() {
     try {
       const user = await fetchMe();
       if (user) return { user };
-      const stored = readStoredUser();
-      if (stored) return { user: stored };
     } catch (error) {
       if (isEndpointMissing(error)) {
         const stored = readStoredUser();
@@ -124,15 +115,13 @@ export async function bootstrapSession() {
   }
 
   if (!refreshed) {
-    const stored = readStoredUser();
-    return stored ? { user: stored } : { user: null };
+    return { user: readStoredUser() };
   }
 
   try {
     const user = await fetchMe();
     if (user) return { user };
-    const stored = readStoredUser();
-    return stored ? { user: stored } : { user: null };
+    return { user: null };
   } catch (error) {
     if (isEndpointMissing(error)) {
       const stored = readStoredUser();

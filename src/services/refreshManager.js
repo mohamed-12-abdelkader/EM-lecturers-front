@@ -19,9 +19,11 @@ import {
 import { postAuthMessage } from "./authChannel";
 import {
   getAuthScopeSubdomain,
+  inferTenantMetaFromHost,
   readStoredTenantMeta,
   writeScopedAuthItem,
 } from "../utils/tenantAuthStorage";
+import { rejectForeignTenantSession } from "../utils/sessionGuard";
 
 const REFRESH_LOCK_PREFIX = "em-auth-refresh";
 
@@ -31,14 +33,14 @@ function refreshLockName() {
   return `${REFRESH_LOCK_PREFIX}:${getAuthScopeSubdomain() || "main"}`;
 }
 
-function persistRefreshedUser(user) {
+function persistRefreshedUser(user, apiTenant = null) {
   if (user == null || typeof user !== "object") return;
-  const tenantMeta = readStoredTenantMeta();
+  const tenantMeta = apiTenant ?? readStoredTenantMeta() ?? inferTenantMetaFromHost(null);
   const stored = readStoredUser();
   const enriched = normalizeAuthUser(enrichUserWithTenant(user, tenantMeta), {
     fallbackUser: stored,
   });
-  if (!sessionMatchesCurrentTenant(enriched, tenantMeta)) return;
+  if (!sessionMatchesCurrentTenant(enriched, apiTenant ?? tenantMeta)) return;
   writeScopedAuthItem("user", JSON.stringify(enriched));
   if (typeof window !== "undefined") {
     window.dispatchEvent(
@@ -54,19 +56,22 @@ async function performRefresh() {
     const token = response?.data?.token;
     if (!token) return null;
 
-    const tenantMeta = readStoredTenantMeta();
+    const apiTenant = response?.data?.tenant ?? null;
     const user = response?.data?.user;
     const enriched =
       user != null && typeof user === "object"
-        ? enrichUserWithTenant(user, tenantMeta)
+        ? enrichUserWithTenant(user, apiTenant)
         : null;
 
-    if (getAuthScopeSubdomain() && enriched && !sessionMatchesCurrentTenant(enriched, tenantMeta)) {
-      return null;
+    if (getAuthScopeSubdomain()) {
+      if (enriched && !sessionMatchesCurrentTenant(enriched, apiTenant)) {
+        await rejectForeignTenantSession();
+        return null;
+      }
     }
 
     setAccessToken(token);
-    persistRefreshedUser(user);
+    persistRefreshedUser(user, apiTenant);
     return getAccessToken();
   } catch (error) {
     const status = error?.response?.status;

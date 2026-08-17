@@ -204,25 +204,39 @@ export function sessionMatchesCurrentTenant(user, tenantMeta = null) {
 
 
 
-  const effectiveTenant = inferTenantMetaFromHost(tenantMeta);
+  if (!user || typeof user !== "object") return false;
+
+
+
+  const effectiveTenant = tenantMeta != null && typeof tenantMeta === "object" ? tenantMeta : null;
 
   const sessionTenant = extractSessionTenantSubdomain(user, effectiveTenant);
 
-  if (sessionTenant && sessionTenant === current) return true;
+
+
+  if (sessionTenant) {
+
+    if (sessionTenant === "default") {
+
+      const hostTenant = normalizeTenantSlug(getTenantSubdomain());
+
+      return Boolean(hostTenant && hostTenant === current);
+
+    }
+
+    return sessionTenant === current;
+
+  }
 
 
 
-  // hostname هو مرجع المنصة — يقبل جلسة بدون tenant_subdomain بعد login مباشرة
+  const metaSubdomain = normalizeTenantSlug(effectiveTenant?.subdomain);
 
-  const hostTenant = normalizeTenantSlug(getTenantSubdomain());
+  if (metaSubdomain) {
 
-  if (user && hostTenant && hostTenant === current) return true;
+    return metaSubdomain === current;
 
-
-
-  // منصة default / admin على localhost — tenant subdomain "default"
-
-  if (sessionTenant === "default" && hostTenant && hostTenant === current) return true;
+  }
 
 
 
@@ -282,7 +296,7 @@ export function readScopedAuthItem(baseKey, subdomain = getAuthScopeSubdomain())
 
   if (baseKey === "token") {
 
-    return legacy;
+    return null;
 
   }
 
@@ -320,15 +334,15 @@ export function readStoredTenantMeta(subdomain = getAuthScopeSubdomain()) {
 
     const raw = readScopedAuthItem("tenant", subdomain);
 
-    if (!raw) return inferTenantMetaFromHost(null);
+    if (!raw) return null;
 
     const parsed = JSON.parse(raw);
 
-    return parsed && typeof parsed === "object" ? parsed : inferTenantMetaFromHost(null);
+    return parsed && typeof parsed === "object" ? parsed : null;
 
   } catch {
 
-    return inferTenantMetaFromHost(null);
+    return null;
 
   }
 

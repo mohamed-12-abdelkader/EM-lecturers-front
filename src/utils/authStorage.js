@@ -25,6 +25,7 @@ import {
   enrichUserWithTenant,
   getAuthScopeSubdomain,
   inferTenantMetaFromHost,
+  purgeLegacyGlobalAuthKeys,
   readScopedAuthItem,
   readStoredTenantMeta,
   removeScopedAuthItem,
@@ -88,7 +89,11 @@ export function persistLoginSession(payload, { broadcast = true } = {}) {
       : payload;
 
   const token = normalizeAuthToken(inner.token);
-  const tenantMeta = inferTenantMetaFromHost(inner.tenant ?? null);
+  const scope = getAuthScopeSubdomain();
+  let tenantMeta = inferTenantMetaFromHost(inner.tenant ?? null);
+  if (scope) {
+    tenantMeta = { ...(tenantMeta && typeof tenantMeta === "object" ? tenantMeta : {}), subdomain: scope };
+  }
   const rawUser = extractUserFromLoginPayload(inner);
   const user =
     rawUser != null && typeof rawUser === "object"
@@ -188,7 +193,7 @@ export function readStoredUser() {
 /** يحفظ/يحدّث بيانات المستخدم في localStorage */
 export function persistStoredUser(user, { broadcast = true } = {}) {
   if (!user || typeof user !== "object") return null;
-  const tenantMeta = readStoredTenantMeta();
+  const tenantMeta = readStoredTenantMeta() ?? inferTenantMetaFromHost(null);
   const normalized = normalizeAuthUser(enrichUserWithTenant(user, tenantMeta));
   writeScopedAuthItem("user", JSON.stringify(normalized));
   dispatchAuthStorageUpdate(normalized);
