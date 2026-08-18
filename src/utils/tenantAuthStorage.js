@@ -11,6 +11,29 @@ import { safeLocalGet, safeLocalRemove, safeLocalSet } from "./safeStorage";
 
 const AUTH_KEYS = ["user", "token", "tenant", "employee_data", "employee_permissions"];
 const LEGACY_PREFIX = "em-auth:";
+const MAIN_SCOPE = "__main__";
+
+function legacyPrefixedKey(baseKey, subdomain) {
+  const scope = subdomain || MAIN_SCOPE;
+  return `${LEGACY_PREFIX}${scope}:${baseKey}`;
+}
+
+function parseLegacyPrefixedKey(key) {
+  if (!key || !key.startsWith(LEGACY_PREFIX)) return null;
+  const rest = key.slice(LEGACY_PREFIX.length);
+  const colonIdx = rest.indexOf(":");
+  if (colonIdx <= 0) return null;
+  return {
+    scope: rest.slice(0, colonIdx),
+    baseKey: rest.slice(colonIdx + 1),
+  };
+}
+
+function scopeMatchesCurrentTenant(scope) {
+  const current = getAuthScopeSubdomain();
+  if (!current) return scope === MAIN_SCOPE;
+  return scope === current || scope === MAIN_SCOPE;
+}
 
 /** Subdomain الحالي (للتحقق من تطابق الجلسة فقط) */
 export function getAuthScopeSubdomain() {
@@ -85,7 +108,19 @@ export function sessionMatchesCurrentTenant(user, tenantMeta = null) {
 }
 
 export function readScopedAuthItem(baseKey) {
-  return safeLocalGet(baseKey);
+  const plain = safeLocalGet(baseKey);
+  if (plain != null && plain !== "") return plain;
+
+  const current = getAuthScopeSubdomain();
+  if (current) {
+    const scoped = safeLocalGet(legacyPrefixedKey(baseKey, current));
+    if (scoped != null && scoped !== "") return scoped;
+  }
+
+  const mainScoped = safeLocalGet(legacyPrefixedKey(baseKey, MAIN_SCOPE));
+  if (mainScoped != null && mainScoped !== "") return mainScoped;
+
+  return null;
 }
 
 export function writeScopedAuthItem(baseKey, value) {
@@ -162,7 +197,37 @@ export function getAuthChannelName() {
   return `em-auth-v1:${scope}`;
 }
 
-/** تنظيف النظام القديم عند الإقلاع */
+/** ينقل em-auth:scope:* → user/token ثم يمسح المفاتيح القديمة */
 export function migrateLegacyAuthSession() {
+  if (typeof window === "undefined") return;
+
+  const legacyValues = new Map();
+
+  try {
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const key = window.localStorage.key(i);
+      const parsed = parseLegacyPrefixedKey(key);
+      if (!parsed || !AUTH_KEYS.includes(parsed.baseKey)) continue;
+      if (!scopeMatchesCurrentTenant(parsed.scope)) continue;
+
+      const value = safeLocalGet(key);
+      if (value != null && value !== "" && !legacyValues.has(parsed.baseKey)) {
+        legacyValues.set(parsed.baseKey, value);
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  for (const baseKey of AUTH_KEYS) {
+    const existing = safeLocalGet(baseKey);
+    if (existing != null && existing !== "") continue;
+
+    const migrated = legacyValues.get(baseKey);
+    if (migrated != null && migrated !== "") {
+      safeLocalSet(baseKey, migrated);
+    }
+  }
+
   purgeLegacyPrefixedAuthKeys();
 }

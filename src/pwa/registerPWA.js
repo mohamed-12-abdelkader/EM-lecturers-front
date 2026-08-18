@@ -123,29 +123,24 @@ export async function initPWA() {
       },
 
       onRegisteredSW(_url, registration) {
-
         if (!registration) return;
 
+        updateServiceWorker = update;
 
+        if (registration.waiting) {
+          void applyPWAUpdate();
+        }
 
+        scheduleUpdateCheck(registration);
         setInterval(() => scheduleUpdateCheck(registration), 60 * 60 * 1000);
 
-
-
         document.addEventListener("visibilitychange", () => {
-
           if (document.visibilityState === "visible") {
-
             scheduleUpdateCheck(registration);
-
           }
-
         });
 
-
-
         window.addEventListener("focus", () => scheduleUpdateCheck(registration));
-
       },
 
     });
