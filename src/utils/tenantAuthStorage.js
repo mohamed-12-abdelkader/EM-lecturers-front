@@ -32,7 +32,7 @@ function parseLegacyPrefixedKey(key) {
 function scopeMatchesCurrentTenant(scope) {
   const current = getAuthScopeSubdomain();
   if (!current) return scope === MAIN_SCOPE;
-  return scope === current || scope === MAIN_SCOPE;
+  return scope === current;
 }
 
 /** Subdomain الحالي (للتحقق من تطابق الجلسة فقط) */
@@ -72,7 +72,9 @@ export function inferTenantMetaFromHost(tenantMeta) {
 
 export function enrichUserWithTenant(user, tenantMeta) {
   if (!user || typeof user !== "object") return user;
-  const effectiveTenant = inferTenantMetaFromHost(tenantMeta);
+
+  const effectiveTenant =
+    tenantMeta != null && typeof tenantMeta === "object" ? tenantMeta : null;
   const subdomain = extractSessionTenantSubdomain(user, effectiveTenant);
   const tenantId = effectiveTenant?.id ?? user.tenant_id ?? null;
   return {
@@ -82,11 +84,18 @@ export function enrichUserWithTenant(user, tenantMeta) {
   };
 }
 
+function isMainSiteOnlyRole(user) {
+  const role = String(user?.role || user?.user_role || "").toLowerCase();
+  return role === "admin" || role === "super_admin";
+}
+
 /** هل الجلسة تخص المنصة الحالية؟ */
 export function sessionMatchesCurrentTenant(user, tenantMeta = null) {
   const current = getAuthScopeSubdomain();
   if (!current) return true;
   if (!user || typeof user !== "object") return false;
+
+  if (isMainSiteOnlyRole(user)) return false;
 
   const effectiveTenant =
     tenantMeta != null && typeof tenantMeta === "object" ? tenantMeta : null;
@@ -103,8 +112,7 @@ export function sessionMatchesCurrentTenant(user, tenantMeta = null) {
   const metaSubdomain = normalizeTenantSlug(effectiveTenant?.subdomain);
   if (metaSubdomain) return metaSubdomain === current;
 
-  const hostTenant = normalizeTenantSlug(getTenantSubdomain());
-  return Boolean(hostTenant && hostTenant === current);
+  return false;
 }
 
 export function readScopedAuthItem(baseKey) {
@@ -117,8 +125,10 @@ export function readScopedAuthItem(baseKey) {
     if (scoped != null && scoped !== "") return scoped;
   }
 
-  const mainScoped = safeLocalGet(legacyPrefixedKey(baseKey, MAIN_SCOPE));
-  if (mainScoped != null && mainScoped !== "") return mainScoped;
+  if (!current) {
+    const mainScoped = safeLocalGet(legacyPrefixedKey(baseKey, MAIN_SCOPE));
+    if (mainScoped != null && mainScoped !== "") return mainScoped;
+  }
 
   return null;
 }

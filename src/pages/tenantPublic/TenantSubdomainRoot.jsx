@@ -29,7 +29,10 @@ export function TenantRootLayout() {
   const { isAuthLoading } = useAuth();
   const { hasSession, roles } = useEffectiveSessionUser();
   const [, , isTeacher, student] = UserType();
-  const loggedIn = hasSession && (isTeacher || student || roles.isTeacher || roles.student);
+  const loggedIn =
+    hasSession &&
+    !roles.isAdmin &&
+    (isTeacher || student || roles.isTeacher || roles.student);
 
   if (isAuthLoading) {
     return (
@@ -63,11 +66,8 @@ export function TenantRootIndex() {
     );
   }
 
-  if (hasSession && user) {
+  if (hasSession && user && !roles.isAdmin) {
     if (roles.isTeacher && !roles.isAcademyTeacher) {
-      return <TeacherDashboardHome />;
-    }
-    if (roles.isAdmin) {
       return <TeacherDashboardHome />;
     }
     if (roles.isAcademy) {

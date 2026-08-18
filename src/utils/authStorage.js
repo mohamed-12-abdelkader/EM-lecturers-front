@@ -183,7 +183,7 @@ export function isAuthTokenExpired(rawToken) {
 export function readStoredUser() {
   const user = readStoredUserRaw();
   if (!user) return null;
-  const tenantMeta = readStoredTenantMeta() ?? inferTenantMetaFromHost(null);
+  const tenantMeta = readStoredTenantMeta();
   if (!sessionMatchesCurrentTenant(user, tenantMeta)) return null;
   return normalizeAuthUser(enrichUserWithTenant(user, tenantMeta));
 }
@@ -191,7 +191,7 @@ export function readStoredUser() {
 /** يحفظ/يحدّث بيانات المستخدم في localStorage */
 export function persistStoredUser(user, { broadcast = true } = {}) {
   if (!user || typeof user !== "object") return null;
-  const tenantMeta = readStoredTenantMeta() ?? inferTenantMetaFromHost(null);
+  const tenantMeta = readStoredTenantMeta();
   const normalized = normalizeAuthUser(enrichUserWithTenant(user, tenantMeta));
   writeScopedAuthItem("user", JSON.stringify(normalized));
   dispatchAuthStorageUpdate(normalized);

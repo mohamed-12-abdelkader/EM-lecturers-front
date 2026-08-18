@@ -19,7 +19,6 @@ import {
 import { postAuthMessage } from "./authChannel";
 import {
   getAuthScopeSubdomain,
-  inferTenantMetaFromHost,
   readStoredTenantMeta,
   writeScopedAuthItem,
 } from "../utils/tenantAuthStorage";
@@ -35,12 +34,12 @@ function refreshLockName() {
 
 function persistRefreshedUser(user, apiTenant = null) {
   if (user == null || typeof user !== "object") return;
-  const tenantMeta = apiTenant ?? readStoredTenantMeta() ?? inferTenantMetaFromHost(null);
+  const tenantMeta = apiTenant ?? readStoredTenantMeta();
   const stored = readStoredUser();
   const enriched = normalizeAuthUser(enrichUserWithTenant(user, tenantMeta), {
     fallbackUser: stored,
   });
-  if (!sessionMatchesCurrentTenant(enriched, apiTenant ?? tenantMeta)) return;
+  if (!sessionMatchesCurrentTenant(enriched, tenantMeta)) return;
   writeScopedAuthItem("user", JSON.stringify(enriched));
   if (typeof window !== "undefined") {
     window.dispatchEvent(
@@ -64,7 +63,7 @@ async function performRefresh() {
         : null;
 
     if (getAuthScopeSubdomain()) {
-      if (enriched && !sessionMatchesCurrentTenant(enriched, apiTenant)) {
+      if (!enriched || !sessionMatchesCurrentTenant(enriched, apiTenant)) {
         await rejectForeignTenantSession();
         return null;
       }

@@ -18,7 +18,7 @@ import {
   requestTokenFromPeers,
 } from "./tokenStore";
 import { refreshSession } from "./refreshManager";
-import { writeStoredTenantMeta } from "../utils/tenantAuthStorage";
+import { writeStoredTenantMeta, getAuthScopeSubdomain } from "../utils/tenantAuthStorage";
 import { rejectForeignTenantSession } from "../utils/sessionGuard";
 
 function isEndpointMissing(error) {
@@ -94,7 +94,9 @@ function restoreLocalSession() {
 }
 
 export async function bootstrapSession() {
+  const tenantScope = getAuthScopeSubdomain();
   let token = getAccessToken();
+  const localUser = readStoredUser();
 
   if (!token || isJwtExpired(token)) {
     token = await requestTokenFromPeers(300);
@@ -112,6 +114,11 @@ export async function bootstrapSession() {
       if (!isAuthRejection(error)) throw error;
       return restoreLocalSession();
     }
+  }
+
+  // على subdomain المدرس: لا نستعيد جلسة من كوكي مشترك بدون جلسة محلية
+  if (tenantScope && !localUser) {
+    return { user: null };
   }
 
   let refreshed;
