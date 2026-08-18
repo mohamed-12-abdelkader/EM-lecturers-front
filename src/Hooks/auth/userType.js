@@ -43,11 +43,7 @@ const UserType = () => {
 
   useEffect(() => {
     const onStorage = (e) => {
-      if (
-        e.key === "user" ||
-        e.key === null ||
-        (typeof e.key === "string" && e.key.startsWith("em-auth:"))
-      ) {
+      if (e.key === "user" || e.key === "token" || e.key === null) {
         syncFromStorage();
       }
     };

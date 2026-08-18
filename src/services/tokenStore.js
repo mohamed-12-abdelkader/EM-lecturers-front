@@ -1,11 +1,7 @@
 /**
- * مخزن الـ Access Token — في الذاكرة فقط (لا LocalStorage ولا SessionStorage).
+ * مخزن الـ Access Token — الذاكرة + localStorage (مفتاح token لكل منصة).
  *
- * جسر التوافق (Compatibility Bridge):
- * مئات الملفات القديمة تقرأ التوكن عبر localStorage.getItem("token").
- * بدلاً من تعديلها كلها دفعة واحدة، نعترض مفتاح "token" في localStorage
- * ونحوّله إلى الذاكرة، فيعمل كل الكود القديم بدون أن يُكتب التوكن على القرص.
- * (إزالة تدريجية بدون كسر النظام — يمكن حذف الجسر بعد ترحيل كل الملفات.)
+ * جسر التوافق: الكود القديم يقرأ localStorage.getItem("token") — يُحوَّل للذاكرة.
  */
 
 import { normalizeAuthToken, isJwtExpired } from "../utils/jwt";
@@ -14,7 +10,6 @@ import {
   getAuthScopeSubdomain,
   readScopedAuthItem,
   removeScopedAuthItem,
-  tenantAuthStorageKey,
   writeScopedAuthItem,
 } from "../utils/tenantAuthStorage";
 
@@ -26,13 +21,6 @@ const SCOPED_AUTH_KEYS = new Set([
   "employee_permissions",
 ]);
 
-/**
- * Fallback مؤقت: الباك اند لا يوفر بعد POST /auth/refresh بكوكي HttpOnly
- * (يرجع 404 حالياً)، وبدونه التوكن في الذاكرة يضيع مع كل تحديث صفحة
- * ولا توجد وسيلة لاسترجاعه → كل خدمات المنصة تتوقف.
- * لذلك نحفظ التوكن على القرص أيضاً (write-through) حتى يجهز الباك اند.
- * عند تفعيل /auth/refresh في الباك اند: اجعلها false ليعمل النظام بالذاكرة فقط.
- */
 const PERSIST_TOKEN_FALLBACK = true;
 
 let memoryToken = "";
@@ -48,20 +36,14 @@ function notifyListeners() {
   });
 }
 
-/** التوكن الحالي من الذاكرة (بدون بادئة Bearer) */
 export function getAccessToken() {
   return memoryToken;
 }
 
-/** هل يوجد توكن غير منتهي في الذاكرة؟ */
 export function hasFreshAccessToken() {
   return Boolean(memoryToken) && !isJwtExpired(memoryToken);
 }
 
-/**
- * تخزين توكن جديد في الذاكرة.
- * broadcast=false عندما يصل التوكن من تبويب آخر (منع حلقة رسائل).
- */
 export function setAccessToken(rawToken, { broadcast = true } = {}) {
   const token = normalizeAuthToken(rawToken);
   if (!token || token === memoryToken) return memoryToken;
@@ -80,17 +62,12 @@ export function clearAccessToken({ broadcast = false } = {}) {
   if (broadcast) postAuthMessage({ type: "logout", tenant: getAuthScopeSubdomain() });
 }
 
-/** الاستماع لتغيّر التوكن داخل نفس التبويب */
 export function subscribeAccessToken(listener) {
   if (typeof listener !== "function") return () => {};
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
 
-/**
- * تبويب جديد بلا توكن: يطلب التوكن من التبويبات المفتوحة وينتظر الرد.
- * يرجع التوكن لو وصل خلال المهلة، وإلا "".
- */
 export function requestTokenFromPeers(timeoutMs = 300) {
   if (hasFreshAccessToken()) return Promise.resolve(memoryToken);
   return new Promise((resolve) => {
@@ -113,38 +90,18 @@ export function requestTokenFromPeers(timeoutMs = 300) {
   });
 }
 
-/* ------------------------------------------------------------------ */
-/* جسر التوافق مع localStorage                                          */
-/* ------------------------------------------------------------------ */
-
 let bridgeInstalled = false;
 let nativeLocalGet = null;
 let nativeLocalSet = null;
 let nativeLocalRemove = null;
 
-function scopedTokenStorageKey() {
-  return tenantAuthStorageKey(TOKEN_KEY);
-}
-
-/** كتابة التوكن على القرص عبر الدوال الأصلية (بدون المرور بالجسر — لا recursion) */
 function persistTokenToDisk(token) {
   if (!PERSIST_TOKEN_FALLBACK || typeof window === "undefined") return;
   try {
     const write = nativeLocalSet || Storage.prototype.setItem;
-    write.call(window.localStorage, scopedTokenStorageKey(), token);
-    removeTokenFromDiskLegacy();
+    write.call(window.localStorage, TOKEN_KEY, token);
   } catch {
-    // Safari Private Mode وغيره — تجاهل
-  }
-}
-
-function removeTokenFromDiskLegacy() {
-  if (typeof window === "undefined") return;
-  try {
-    const remove = nativeLocalRemove || Storage.prototype.removeItem;
-    remove.call(window.localStorage, TOKEN_KEY);
-  } catch {
-    // تجاهل
+    // Safari Private Mode وغيره
   }
 }
 
@@ -152,10 +109,9 @@ function removeTokenFromDisk() {
   if (typeof window === "undefined") return;
   try {
     const remove = nativeLocalRemove || Storage.prototype.removeItem;
-    remove.call(window.localStorage, scopedTokenStorageKey());
-    removeTokenFromDiskLegacy();
+    remove.call(window.localStorage, TOKEN_KEY);
   } catch {
-    // تجاهل
+    // ignore
   }
 }
 
@@ -210,23 +166,13 @@ function installStorageBridge() {
   }
 }
 
-/**
- * تحميل التوكن المحفوظ على القرص إلى الذاكرة عند الإقلاع.
- * - مع الـ fallback المفعّل: يبقى التوكن على القرص (الباك اند بلا refresh).
- * - عند تعطيل الـ fallback مستقبلاً: يُرحَّل للذاكرة ويُمسح من القرص نهائياً.
- */
 function loadPersistedToken() {
   if (typeof window === "undefined") return;
   try {
     const read = nativeLocalGet || Storage.prototype.getItem;
-    let persisted = normalizeAuthToken(
-      read.call(window.localStorage, scopedTokenStorageKey()),
-    );
+    let persisted = normalizeAuthToken(read.call(window.localStorage, TOKEN_KEY));
     if (!persisted) {
       persisted = normalizeAuthToken(readScopedAuthItem(TOKEN_KEY));
-    }
-    if (!persisted) {
-      persisted = normalizeAuthToken(read.call(window.localStorage, TOKEN_KEY));
     }
     if (!persisted) return;
     if (isJwtExpired(persisted)) {
@@ -236,11 +182,10 @@ function loadPersistedToken() {
     memoryToken = persisted;
     if (!PERSIST_TOKEN_FALLBACK) removeTokenFromDisk();
   } catch {
-    // تجاهل — Safari Private Mode وغيره
+    // ignore
   }
 }
 
-/** مزامنة التوكن الواصل من تبويبات أخرى */
 function listenToPeers() {
   subscribeAuthMessages((msg) => {
     const currentTenant = getAuthScopeSubdomain();
@@ -265,7 +210,6 @@ function listenToPeers() {
   });
 }
 
-/** يُستدعى مرة واحدة كأول شيء في main.jsx قبل تحميل بقية التطبيق */
 export function initTokenStore() {
   if (bridgeInstalled) return;
   bridgeInstalled = true;

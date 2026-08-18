@@ -1,8 +1,6 @@
 /**
- * واجهة الجلسة الموحّدة (Facade) — نفس الدوال القديمة لكن:
- * - الـ Access Token في الذاكرة فقط (services/tokenStore) — لا يُكتب على القرص أبداً.
- * - بيانات المستخدم (بروفايل بدون أسرار) في localStorage **معزولة لكل subdomain**.
- * - الـ Refresh Token في كوكي HttpOnly يديره الخادم بالكامل.
+ * واجهة الجلسة — user + token في localStorage لكل منصة (origin منفصل).
+ * التوكن يُحمَّل في الذاكرة عبر tokenStore + جسر localStorage للكود القديم.
  */
 import {
   safeLocalRemove,
@@ -25,7 +23,7 @@ import {
   enrichUserWithTenant,
   getAuthScopeSubdomain,
   inferTenantMetaFromHost,
-  purgeLegacyGlobalAuthKeys,
+  purgeLegacyPrefixedAuthKeys,
   readScopedAuthItem,
   readStoredTenantMeta,
   removeScopedAuthItem,
@@ -81,7 +79,7 @@ function readStoredUserRaw() {
 export function persistLoginSession(payload, { broadcast = true } = {}) {
   if (!payload || typeof payload !== "object") return null;
 
-  purgeLegacyGlobalAuthKeys();
+  purgeLegacyPrefixedAuthKeys();
 
   const inner =
     payload.data != null &&
@@ -147,7 +145,6 @@ export function clearAuthSession({ broadcast = false } = {}) {
   removeScopedAuthItem("employee_permissions");
   removeScopedAuthItem("tenant");
   removeScopedAuthItem("token");
-  purgeLegacyGlobalAuthKeys();
   if (typeof window !== "undefined") {
     dispatchAuthStorageUpdate(null);
   }

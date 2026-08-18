@@ -1,7 +1,6 @@
 /**
  * يجب أن يكون أول import في main.jsx:
- * يفعّل مخزن التوكن بالذاكرة + جسر التوافق مع localStorage
- * قبل تحميل أي وحدة أخرى قد تقرأ التوكن.
+ * يفعّل مخزن التوكن + يمسح مفاتيح النظام القديم em-auth:*
  */
 import { initTokenStore } from "./services/tokenStore";
 import { initBrowserDeviceId } from "./utils/deviceRestriction";
