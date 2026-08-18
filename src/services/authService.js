@@ -1,5 +1,5 @@
 /**
- * AuthService — localStorage فقط. لا cookies ولا refresh مشترك بين subdomains.
+ * API calls للمستخدم الحالي — Bearer من localStorage.token.
  */
 import authHttp from "../api/authHttp";
 import {
@@ -7,41 +7,29 @@ import {
   enrichUserWithTenant,
   persistStoredUser,
   readAuthToken,
-  readStoredUser,
   sessionMatchesCurrentTenant,
 } from "../utils/authStorage";
-import { safeLocalGet } from "../utils/safeStorage";
 import { normalizeAuthUser } from "../utils/authRoles";
-import { clearLocalAuthSession } from "../utils/sessionGuard";
 
 function bearerConfig() {
   const token = readAuthToken();
   return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 }
 
-function normalizeMeResponse(response) {
+export async function fetchMe() {
+  const response = await authHttp.get("api/auth/me", bearerConfig());
   const user = response?.data?.user ?? response?.data ?? null;
   const tenant = response?.data?.tenant ?? null;
   if (!user) return null;
 
   const enriched = normalizeAuthUser(enrichUserWithTenant(user, tenant));
   if (!sessionMatchesCurrentTenant(enriched, tenant)) {
-    return { mismatch: true };
-  }
-  return { user: enriched, tenant };
-}
-
-export async function fetchMe() {
-  const response = await authHttp.get("api/auth/me", bearerConfig());
-  const result = normalizeMeResponse(response);
-  if (result?.mismatch) {
-    clearLocalAuthSession();
+    clearAuthSession();
     return null;
   }
-  if (result?.user) {
-    persistStoredUser(result.user);
-  }
-  return result?.user ?? null;
+
+  persistStoredUser(enriched);
+  return enriched;
 }
 
 export async function logoutRequest() {
@@ -56,20 +44,4 @@ export async function logoutRequest() {
 export async function logoutAllRequest() {
   const response = await authHttp.post("api/auth/logout-all", null, bearerConfig());
   return response?.data;
-}
-
-/** إقلاع من localStorage — بدون cookie refresh */
-export function bootstrapSession() {
-  const token = readAuthToken();
-  const user = readStoredUser();
-
-  if (token && user) {
-    return { user };
-  }
-
-  if (token || safeLocalGet("user")) {
-    clearAuthSession();
-  }
-
-  return { user: null };
 }

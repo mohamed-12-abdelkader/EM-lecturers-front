@@ -37,7 +37,7 @@ import {
   resolveTenantSubdomain,
   withTenantQuery,
 } from "../../utils/tenantHost";
-import { persistLoginSession } from "../../utils/authStorage";
+import { saveAuthSession } from "../../utils/authStorage";
 import { getPostLoginPath } from "../../utils/authRoles";
 import {
   appendDeviceIp,
@@ -223,7 +223,7 @@ const LoginPage = () => {
 
       const response = await baseUrl.post("/api/login", requestData);
 
-      persistLoginSession(response.data);
+      saveAuthSession(response.data);
       handleAuthIpRegistered(response.data);
 
       setShowSuccessModal(true);

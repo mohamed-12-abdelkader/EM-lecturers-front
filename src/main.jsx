@@ -1,4 +1,4 @@
-import "./authBootstrap.js";
+import { purgeLegacyAuthKeys } from "./utils/tenantAuthStorage";
 import React, { useEffect } from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
@@ -26,6 +26,7 @@ import { registerChunkLoadRecovery } from "./utils/chunkLoadRecovery.js";
 
 // فرض العربية قبل أي رندر — مستقل عن لغة الجهاز
 forceArabicDocumentLocale();
+purgeLegacyAuthKeys();
 
 // PWA: تسجيل الـ Service Worker + كشف الإصدارات الجديدة (إنتاج فقط)
 initPWA();

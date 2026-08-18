@@ -18,7 +18,7 @@ import { toast, ToastContainer } from "react-toastify";
 import { FiLock } from "react-icons/fi";
 import { PiChalkboardTeacherBold } from "react-icons/pi";
 import baseUrl from "../../api/baseUrl";
-import { persistLoginSession } from "../../utils/authStorage";
+import { saveAuthSession } from "../../utils/authStorage";
 import { getPostLoginPath } from "../../utils/authRoles";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -64,7 +64,7 @@ const TeacherLoginPage = () => {
       };
 
       const response = await baseUrl.post("/api/login", requestData);
-      persistLoginSession(response.data);
+      saveAuthSession(response.data);
 
       toast.success("تم تسجيل الدخول بنجاح");
 

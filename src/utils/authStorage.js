@@ -82,8 +82,8 @@ export function hasValidAuthSession() {
   return Boolean(readStoredUser() && readAuthToken());
 }
 
-/** Login / Register — يستبدل user + token في origin الحالي فقط */
-export function persistLoginSession(payload) {
+/** Login / Register — localStorage.setItem("user") + localStorage.setItem("token") */
+export function saveAuthSession(payload) {
   if (!payload || typeof payload !== "object") return null;
 
   purgeLegacyAuthKeys();
@@ -173,6 +173,9 @@ export function markSessionExpired() {
     );
   }
 }
+
+/** @deprecated استخدم saveAuthSession */
+export const persistLoginSession = saveAuthSession;
 
 export function forceLogoutToLogin(loginPath) {
   safeLocalRemove("examAnswers");

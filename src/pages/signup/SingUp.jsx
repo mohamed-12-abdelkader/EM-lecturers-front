@@ -64,7 +64,7 @@ import {
   fetchPublicCourseGroups,
   fetchPublicRegistrationSettings,
 } from "../../api/courseGroupsApi";
-import { persistLoginSession } from "../../utils/authStorage";
+import { saveAuthSession } from "../../utils/authStorage";
 import { markStudentHomeTourPending } from "../../utils/studentHomeTour";
 import {
   appendDeviceIp,
@@ -396,7 +396,7 @@ const SignUp = () => {
       }
       const res = await baseUrl.post("/api/users/register", registerPayload);
 
-      persistLoginSession(res.data);
+      saveAuthSession(res.data);
       handleAuthIpRegistered(res.data);
       markStudentHomeTourPending();
 
