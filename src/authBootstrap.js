@@ -5,6 +5,8 @@
  */
 import { initTokenStore } from "./services/tokenStore";
 import { initBrowserDeviceId } from "./utils/deviceRestriction";
+import { migrateLegacyAuthSession } from "./utils/tenantAuthStorage";
 
 initTokenStore();
+migrateLegacyAuthSession();
 initBrowserDeviceId();

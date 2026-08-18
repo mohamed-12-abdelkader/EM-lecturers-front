@@ -44,24 +44,9 @@ const LEGACY_AUTH_KEYS = new Set([
 
 
 
-/** يكتب مفتاح legacy مباشرة — للتوافق مع localStorage.getItem("user") */
-
-function mirrorLegacyAuthKey(baseKey, value) {
-
-  if (!LEGACY_AUTH_KEYS.has(baseKey)) return;
-
-  try {
-
-    if (typeof window === "undefined") return;
-
-    Storage.prototype.setItem.call(window.localStorage, baseKey, String(value));
-
-  } catch {
-
-    // ignore
-
-  }
-
+/** يكتب مفتاح legacy — معطّل: لا ن mirrored keys عامة بين tenants على نفس origin */
+function mirrorLegacyAuthKey(_baseKey, _value) {
+  // intentionally no-op — localStorage bridge + scoped keys only
 }
 
 
@@ -240,13 +225,103 @@ export function sessionMatchesCurrentTenant(user, tenantMeta = null) {
 
 
 
+  // تنسيق قديم: user/token بدون tenant_subdomain — على subdomain المدرس نفس الـ origin
+
+  const hostTenant = normalizeTenantSlug(getTenantSubdomain());
+
+  if (hostTenant && hostTenant === current) {
+
+    return true;
+
+  }
+
+
+
   return false;
 
 }
 
 
 
+function parseStoredUserRaw(raw) {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function readTenantMetaRaw(subdomain = getAuthScopeSubdomain()) {
+  const scoped = safeLocalGet(tenantAuthStorageKey("tenant", subdomain));
+  if (scoped) {
+    try {
+      const parsed = JSON.parse(scoped);
+      if (parsed && typeof parsed === "object") return parsed;
+    } catch {
+      // ignore
+    }
+  }
+  const legacy = safeLocalGet("tenant");
+  if (!legacy) return null;
+  try {
+    const parsed = JSON.parse(legacy);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function getEffectiveTenantMeta(subdomain = getAuthScopeSubdomain()) {
+  return readTenantMetaRaw(subdomain) ?? inferTenantMetaFromHost(null);
+}
+
+function migrateLegacyUserToScoped(legacyRaw, subdomain = getAuthScopeSubdomain()) {
+  if (!legacyRaw || !subdomain) return;
+  const scopedKey = tenantAuthStorageKey("user", subdomain);
+  safeLocalSet(scopedKey, legacyRaw);
+}
+
+function resolveUserStorageRaw(subdomain = getAuthScopeSubdomain()) {
+  const scopedKey = tenantAuthStorageKey("user", subdomain);
+  const scopedRaw = safeLocalGet(scopedKey);
+  const legacyRaw = safeLocalGet("user");
+  const tenantMeta = getEffectiveTenantMeta(subdomain);
+
+  const scopedUser = parseStoredUserRaw(scopedRaw);
+  const legacyUser = parseStoredUserRaw(legacyRaw);
+  const scopedOk =
+    scopedUser && sessionMatchesCurrentTenant(scopedUser, tenantMeta);
+  const legacyOk =
+    legacyUser && sessionMatchesCurrentTenant(legacyUser, tenantMeta);
+
+  if (scopedOk && legacyOk && String(scopedUser.id) !== String(legacyUser.id)) {
+    const legacyRole = String(legacyUser.role || "").toLowerCase();
+    const scopedRole = String(scopedUser.role || "").toLowerCase();
+    if (legacyRole === "student" && scopedRole !== "student") {
+      migrateLegacyUserToScoped(legacyRaw, subdomain);
+      return legacyRaw;
+    }
+    migrateLegacyUserToScoped(legacyRaw, subdomain);
+    return legacyRaw;
+  }
+
+  if (scopedOk) return scopedRaw;
+  if (legacyOk) {
+    migrateLegacyUserToScoped(legacyRaw, subdomain);
+    return legacyRaw;
+  }
+
+  if (scopedRaw && !scopedOk) safeLocalRemove(scopedKey);
+  return null;
+}
+
 export function readScopedAuthItem(baseKey, subdomain = getAuthScopeSubdomain()) {
+
+  if (baseKey === "user") {
+    return resolveUserStorageRaw(subdomain);
+  }
 
   const scopedKey = tenantAuthStorageKey(baseKey, subdomain);
 
@@ -258,7 +333,11 @@ export function readScopedAuthItem(baseKey, subdomain = getAuthScopeSubdomain())
 
   if (!subdomain) {
 
-    return safeLocalGet(baseKey);
+    const legacy = safeLocalGet(baseKey);
+
+    if (!legacy) return null;
+
+    return null;
 
   }
 
@@ -270,33 +349,9 @@ export function readScopedAuthItem(baseKey, subdomain = getAuthScopeSubdomain())
 
 
 
-  if (baseKey === "user") {
+  if (baseKey === "token" || baseKey === "tenant") {
 
-    try {
-
-      const parsed = JSON.parse(legacy);
-
-      if (sessionMatchesCurrentTenant(parsed)) {
-
-        safeLocalSet(scopedKey, legacy);
-
-        return legacy;
-
-      }
-
-    } catch {
-
-      // ignore
-
-    }
-
-  }
-
-
-
-  if (baseKey === "token") {
-
-    return null;
+    return legacy;
 
   }
 
@@ -322,29 +377,13 @@ export function removeScopedAuthItem(baseKey, subdomain = getAuthScopeSubdomain(
 
   safeLocalRemove(tenantAuthStorageKey(baseKey, subdomain));
 
-  removeLegacyAuthKey(baseKey);
-
 }
 
 
 
 export function readStoredTenantMeta(subdomain = getAuthScopeSubdomain()) {
 
-  try {
-
-    const raw = readScopedAuthItem("tenant", subdomain);
-
-    if (!raw) return null;
-
-    const parsed = JSON.parse(raw);
-
-    return parsed && typeof parsed === "object" ? parsed : null;
-
-  } catch {
-
-    return null;
-
-  }
+  return getEffectiveTenantMeta(subdomain);
 
 }
 
@@ -394,9 +433,81 @@ export function clearScopedAuthSession(subdomain = getAuthScopeSubdomain()) {
 
 
 
+export function getTenantStorageKey(baseKey, subdomain = getAuthScopeSubdomain()) {
+
+  return tenantAuthStorageKey(baseKey, subdomain);
+
+}
+
+
+
+export function clearTenantAuth(subdomain = getAuthScopeSubdomain()) {
+
+  clearScopedAuthSession(subdomain);
+
+  purgeLegacyGlobalAuthKeys();
+
+}
+
+
+
 export function getAuthChannelName(subdomain = getAuthScopeSubdomain()) {
 
   return `em-auth-v1:${subdomain || MAIN_SCOPE}`;
+
+}
+
+
+
+/**
+
+ * ترحيل جلسات النظام القديم (user / token / tenant العامة) إلى المفاتيح المعزولة.
+
+ * يُستدعى مرة عند الإقلاع — لا يمسح المفاتيح القديمة.
+
+ */
+
+export function migrateLegacyAuthSession(subdomain = getAuthScopeSubdomain()) {
+
+  if (!subdomain || typeof window === "undefined") return;
+
+
+
+  const tenantMeta = getEffectiveTenantMeta(subdomain);
+
+  const legacyUserRaw = safeLocalGet("user");
+
+  const legacyUser = parseStoredUserRaw(legacyUserRaw);
+
+  if (legacyUserRaw && legacyUser && sessionMatchesCurrentTenant(legacyUser, tenantMeta)) {
+
+    migrateLegacyUserToScoped(legacyUserRaw, subdomain);
+
+  }
+
+
+
+  const legacyToken = safeLocalGet("token");
+
+  const scopedTokenKey = tenantAuthStorageKey("token", subdomain);
+
+  if (legacyToken && !safeLocalGet(scopedTokenKey)) {
+
+    safeLocalSet(scopedTokenKey, legacyToken);
+
+  }
+
+
+
+  const legacyTenant = safeLocalGet("tenant");
+
+  const scopedTenantKey = tenantAuthStorageKey("tenant", subdomain);
+
+  if (legacyTenant && !safeLocalGet(scopedTenantKey)) {
+
+    safeLocalSet(scopedTenantKey, legacyTenant);
+
+  }
 
 }
 

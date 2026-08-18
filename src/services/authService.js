@@ -87,6 +87,12 @@ function isAuthRejection(error) {
   return status === 401 || status === 403;
 }
 
+/** استعادة جلسة محلية للـ tenant الحالي من التخزين */
+function restoreLocalSession() {
+  const stored = readStoredUser();
+  return stored ? { user: stored } : { user: null };
+}
+
 export async function bootstrapSession() {
   let token = getAccessToken();
 
@@ -98,12 +104,13 @@ export async function bootstrapSession() {
     try {
       const user = await fetchMe();
       if (user) return { user };
+      return restoreLocalSession();
     } catch (error) {
       if (isEndpointMissing(error)) {
-        const stored = readStoredUser();
-        return stored ? { user: stored } : { user: null };
+        return restoreLocalSession();
       }
       if (!isAuthRejection(error)) throw error;
+      return restoreLocalSession();
     }
   }
 
@@ -115,19 +122,18 @@ export async function bootstrapSession() {
   }
 
   if (!refreshed) {
-    return { user: readStoredUser() };
+    return restoreLocalSession();
   }
 
   try {
     const user = await fetchMe();
     if (user) return { user };
-    return { user: null };
+    return restoreLocalSession();
   } catch (error) {
     if (isEndpointMissing(error)) {
-      const stored = readStoredUser();
-      return stored ? { user: stored } : { user: null };
+      return restoreLocalSession();
     }
-    if (isAuthRejection(error)) return { user: null };
+    if (isAuthRejection(error)) return restoreLocalSession();
     throw error;
   }
 }

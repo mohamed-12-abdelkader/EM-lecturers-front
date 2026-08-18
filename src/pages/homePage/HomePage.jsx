@@ -54,12 +54,8 @@ import UserType from "../../Hooks/auth/userType";
 import baseUrl from "../../api/baseUrl";
 import { getTenantSubdomain } from "../../utils/tenantHost";
 import { getSocketEndpoint, getSocketClientOptions } from "../../utils/socketEndpoint";
-import {
-  hasValidAuthSession,
-  markSessionExpired,
-  readAuthToken,
-} from "../../utils/authStorage";
-import { safeLocalGet } from "../../utils/safeStorage";
+import { readAuthToken, readStoredUser } from "../../utils/authStorage";
+import { useAuth } from "../../contexts/AuthContext";
 import { Html5Qrcode } from "html5-qrcode";
 import { io } from "socket.io-client";
 import { Howl } from "howler";
@@ -88,14 +84,7 @@ const isCourseFree = (course) => {
 };
 
 function readStoredUserSafe() {
-  try {
-    const raw = safeLocalGet("user");
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : null;
-  } catch {
-    return null;
-  }
+  return readStoredUser();
 }
 
 function buildAuthHeader() {
@@ -104,15 +93,15 @@ function buildAuthHeader() {
 }
 
 const HomePage = () => {
-  // --- Logic & State (Preserved) ---
-  const user = useMemo(() => readStoredUserSafe(), []);
+  const { isAuthenticated, isAuthLoading } = useAuth();
+  const user = useMemo(() => readStoredUserSafe(), [isAuthenticated]);
   const { isOpen, onOpen, onClose } = useDisclosure(); // For course activation modal
   const invitationModal = useDisclosure(); // For game invite
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
   const [userData, isAdmin, isTeacher, student] = UserType();
   const navigate = useNavigate();
   const location = useLocation();
-  const [sessionReady, setSessionReady] = useState(() => hasValidAuthSession());
+  const [sessionReady, setSessionReady] = useState(false);
 
   // Notifications & Feed
   const [competitionNotifications, setCompetitionNotifications] = useState([]);
@@ -156,15 +145,10 @@ const HomePage = () => {
   const [latestInvitation, setLatestInvitation] = useState(null);
   const socketRef = useRef(null);
 
-  // جلسة منتهية / توكن تالف → مودال الخروج بدل شاشة بيضاء
   useEffect(() => {
-    if (hasValidAuthSession()) {
-      setSessionReady(true);
-      return;
-    }
-    setSessionReady(false);
-    markSessionExpired();
-  }, []);
+    if (isAuthLoading) return;
+    setSessionReady(isAuthenticated);
+  }, [isAuthLoading, isAuthenticated]);
 
   // جولة تعريفية للطالب الجديد بعد إنشاء الحساب
   useEffect(() => {

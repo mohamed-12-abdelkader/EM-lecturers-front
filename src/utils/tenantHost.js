@@ -79,10 +79,18 @@ export function getTenantSubdomainFromHost(hostname = typeof window !== "undefin
   );
 }
 
-/** من الـ hostname فقط (بدون query/storage) */
+/** @deprecated استخدم getCurrentTenant — للتوافق فقط */
 export function getTenantSubdomain() {
   if (typeof window === "undefined") return null;
   return getTenantSubdomainFromHost(window.location.hostname);
+}
+
+/**
+ * Tenant الحالي من الـ hostname فقط (مرجع مركزي للعزل).
+ * mr-nofal.em-online.online → "mr-nofal"
+ */
+export function getCurrentTenant() {
+  return getTenantSubdomain();
 }
 
 export function persistTenantSubdomain(subdomain) {

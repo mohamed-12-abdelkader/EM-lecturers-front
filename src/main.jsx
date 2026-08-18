@@ -19,7 +19,6 @@ import AuthProvider from "./providers/AuthProvider.jsx";
 import SessionProvider from "./providers/SessionProvider.jsx";
 import AxiosProvider from "./providers/AxiosProvider.jsx";
 import OfflineScreen from "./components/network/OfflineScreen.jsx";
-import UpdatePrompt from "./components/pwa/UpdatePrompt.jsx";
 import InstallAppPrompt from "./components/pwa/InstallAppPrompt.jsx";
 import BrandLoadingOverlayHost from "./components/loading/BrandLoadingOverlayHost.jsx";
 import { initPWA } from "./pwa/registerPWA.js";
@@ -87,7 +86,6 @@ const RootContent = () => {
       {showStudentBottomNav ? <BottomNavItems /> : null}
       <SessionExpiredModal />
       <OfflineScreen />
-      <UpdatePrompt />
       <InstallAppPrompt />
       <BrandLoadingOverlayHost />
     </NotificationProvider>

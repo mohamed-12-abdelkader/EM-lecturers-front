@@ -1,18 +1,19 @@
+import { Center, Spinner } from "@chakra-ui/react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { readStoredUser } from "../../utils/authStorage";
 import { getPostLoginPath } from "../../utils/authRoles";
 
-/**
- * يمنع عرض صفحات الدخول/التسجيل لمن لديه جلسة مسبقاً.
- */
 const ProtectedLogin = ({ children }) => {
-  const { status, isAuthenticated } = useAuth();
-  const storedUser = readStoredUser();
-  const hasSession = isAuthenticated || Boolean(storedUser);
+  const { status, isAuthenticated, isAuthLoading } = useAuth();
+  const hasSession = isAuthenticated;
 
-  if (status === "checking" && !hasSession) {
-    return children;
+  if (isAuthLoading || status === "checking") {
+    return (
+      <Center minH="40vh">
+        <Spinner size="lg" color="blue.500" thickness="3px" />
+      </Center>
+    );
   }
 
   if (hasSession) {
@@ -21,6 +22,7 @@ const ProtectedLogin = ({ children }) => {
         ? new URLSearchParams(window.location.search)
         : null;
     const redirect = params?.get("redirect");
+    const storedUser = readStoredUser();
     const to = getPostLoginPath(storedUser, redirect);
     return <Navigate to={to} replace />;
   }

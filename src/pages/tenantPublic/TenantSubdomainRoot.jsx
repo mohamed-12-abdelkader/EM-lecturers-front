@@ -6,25 +6,42 @@ import TenantPublicLanding from "./TenantPublicLanding";
 import ProtectedRoute from "../../components/protectedRoute/ProtectedRoute";
 import UserType from "../../Hooks/auth/userType";
 import { getTenantSubdomain } from "../../utils/tenantHost";
-import {
-  clearExpiredAuthQuietly,
-  hasValidAuthSession,
-} from "../../utils/authStorage";
+import { useAuth } from "../../contexts/AuthContext";
+import { hasValidAuthSession, readStoredUser } from "../../utils/authStorage";
+import { normalizeAuthUser, resolveAuthRoles } from "../../utils/authRoles";
+import { Center, Spinner } from "@chakra-ui/react";
+
+function useEffectiveSessionUser() {
+  const { user: authUser, isAuthenticated } = useAuth();
+  const storedUser = readStoredUser();
+  const user = normalizeAuthUser(authUser ?? storedUser, {
+    fallbackUser: storedUser ?? authUser,
+  });
+  const hasSession = isAuthenticated || hasValidAuthSession();
+  const roles = resolveAuthRoles(user);
+  return { user, hasSession, roles };
+}
 
 /**
- * على نطاق المستأجر: غلاف `/` — للمدرّس/الطالب بجلسة صالحة فقط؛
- * وإلا اللاندنج العام (مهم: التوكن المنتهي ما يفتحش لوحة بيضا/معلّقة).
+ * على نطاق المستأجر: غلاف `/` — للمدرّس/الطالب بجلسة صالحة فقط.
  */
 export function TenantRootLayout() {
-  // امسح الجلسات المنتهية فورًا قبل قرار العرض
-  clearExpiredAuthQuietly();
-
+  const { isAuthLoading } = useAuth();
+  const { hasSession, roles } = useEffectiveSessionUser();
   const [, , isTeacher, student] = UserType();
-  const loggedIn = hasValidAuthSession() && (isTeacher || student);
+  const loggedIn = hasSession && (isTeacher || student || roles.isTeacher || roles.student);
+
+  if (isAuthLoading) {
+    return (
+      <Center minH="50vh">
+        <Spinner size="lg" color="blue.500" thickness="3px" />
+      </Center>
+    );
+  }
 
   if (loggedIn) {
     return (
-      <ProtectedRoute auth={isTeacher || student}>
+      <ProtectedRoute auth={isTeacher || student || roles.isTeacher || roles.student}>
         <HomeLogin />
       </ProtectedRoute>
     );
@@ -34,17 +51,33 @@ export function TenantRootLayout() {
 
 /** محتوى الفهرس لمسار `/` على نطاق المستأجر */
 export function TenantRootIndex() {
-  clearExpiredAuthQuietly();
-
-  const [, , isTeacher, student] = UserType();
+  const { isAuthLoading } = useAuth();
+  const { user, hasSession, roles } = useEffectiveSessionUser();
   const subdomain = getTenantSubdomain();
-  const loggedIn = hasValidAuthSession();
 
-  if (loggedIn && isTeacher) {
-    return <TeacherDashboardHome />;
+  if (isAuthLoading) {
+    return (
+      <Center minH="50vh">
+        <Spinner size="lg" color="blue.500" thickness="3px" />
+      </Center>
+    );
   }
-  if (loggedIn && student) {
+
+  if (hasSession && user) {
+    if (roles.isTeacher && !roles.isAcademyTeacher) {
+      return <TeacherDashboardHome />;
+    }
+    if (roles.isAdmin) {
+      return <TeacherDashboardHome />;
+    }
+    if (roles.isAcademy) {
+      return <HomePage />;
+    }
+    if (roles.isAcademyTeacher) {
+      return <TeacherDashboardHome />;
+    }
     return <HomePage />;
   }
+
   return <TenantPublicLanding subdomain={subdomain} />;
 }

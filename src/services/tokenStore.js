@@ -225,6 +225,9 @@ function loadPersistedToken() {
     if (!persisted) {
       persisted = normalizeAuthToken(readScopedAuthItem(TOKEN_KEY));
     }
+    if (!persisted) {
+      persisted = normalizeAuthToken(read.call(window.localStorage, TOKEN_KEY));
+    }
     if (!persisted) return;
     if (isJwtExpired(persisted)) {
       removeTokenFromDisk();

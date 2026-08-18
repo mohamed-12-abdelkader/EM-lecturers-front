@@ -10,14 +10,17 @@
  * - انقطاع الإنترنت: الطلب ينتظر عودة الاتصال ويعاد تلقائياً مرة واحدة.
  */
 import axios from "axios";
-import { markSessionExpired, readAuthToken } from "../utils/authStorage";
+import { markSessionExpired, readAuthToken, readStoredUser } from "../utils/authStorage";
 import { isJwtExpired } from "../utils/jwt";
-import { getTenantSubdomain, resolveTenantSubdomain } from "../utils/tenantHost";
+import {
+  getTenantSubdomain,
+  resolveLoginTenantSubdomain,
+} from "../utils/tenantHost";
 import { getApiBaseURL, getResolvedApiTarget, useDevViteProxy } from "./apiConfig";
 import { getAccessToken, setAccessToken } from "../services/tokenStore";
 import { refreshSession } from "../services/refreshManager";
 import { isBrowserOnline, isNetworkError, waitForOnline } from "../utils/network";
-import { safeLocalGet } from "../utils/safeStorage";
+import { getAuthScopeSubdomain } from "../utils/tenantAuthStorage";
 
 function isPublicAuthRequest(config) {
   const url = String(config?.url || "").toLowerCase();
@@ -37,7 +40,12 @@ function isRefreshRequest(config) {
 function isOnAuthPage() {
   if (typeof window === "undefined") return false;
   const path = window.location.pathname;
-  return path === "/login" || path === "/signup" || path === "/teacher-login";
+  return (
+    path === "/login" ||
+    path === "/signup" ||
+    path === "/teacher-login" ||
+    path === "/welcome"
+  );
 }
 
 function setHeader(headers, key, value) {
@@ -111,7 +119,10 @@ baseUrl.interceptors.request.use(async (config) => {
     setHeader(headers, "Authorization", `Bearer ${token}`);
   }
 
-  const tenant = resolveTenantSubdomain() || getTenantSubdomain();
+  const tenant =
+    getTenantSubdomain() ||
+    getAuthScopeSubdomain() ||
+    resolveLoginTenantSubdomain();
   if (tenant && !getHeader(headers, "X-Tenant-Subdomain")) {
     setHeader(headers, "X-Tenant-Subdomain", tenant);
   }
@@ -175,7 +186,7 @@ baseUrl.interceptors.response.use(
     }
 
     // الـ refresh فشل نهائياً أو الطلب المعاد رجع 401 مرة أخرى
-    const hadSession = Boolean(readAuthToken()) || Boolean(safeLocalGet("user"));
+    const hadSession = Boolean(readAuthToken()) || Boolean(readStoredUser());
     if (!isOnAuthPage() && hadSession) {
       markSessionExpired();
       error.sessionExpired = true;

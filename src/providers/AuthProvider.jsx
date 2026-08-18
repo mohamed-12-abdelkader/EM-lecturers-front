@@ -1,12 +1,5 @@
 /**
- * AuthProvider — قلب نظام المصادقة الجديد (HttpOnly Cookies + توكن في الذاكرة).
- *
- * عند الإقلاع:
- *   GET /auth/me → (401 → POST /auth/refresh → GET /auth/me) → دخول أو ضيف.
- * فشل الـ refresh لا يُظهر أي خطأ — المستخدم يُعامل كضيف وتتكفل الحراسات بالتحويل.
- *
- * متعدد التبويبات: مزامنة (login / logout / token / user) عبر BroadcastChannel.
- * أوفلاين عند الإقلاع: يُعاد الفحص تلقائياً فور عودة الاتصال.
+ * AuthProvider — HttpOnly Cookies + توken في الذاكرة + عزل لكل subdomain.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
@@ -14,7 +7,14 @@ import { toast } from "react-toastify";
 import { AuthContext } from "../contexts/AuthContext";
 import { bootstrapSession, fetchMe } from "../services/authService";
 import { subscribeAuthMessages } from "../services/authChannel";
-import { clearAuthSession, markSessionExpired, readStoredUser, persistStoredUser, AUTH_STORAGE_UPDATE_EVENT } from "../utils/authStorage";
+import {
+  clearAuthSession,
+  markSessionExpired,
+  readStoredUser,
+  persistStoredUser,
+  AUTH_STORAGE_UPDATE_EVENT,
+  hasValidAuthSession,
+} from "../utils/authStorage";
 import { performLogout } from "../utils/performLogout";
 import { isBrowserOnline } from "../utils/network";
 import { getTenantSubdomain } from "../utils/tenantHost";
@@ -25,7 +25,6 @@ function storeUser(user) {
   }
 }
 
-/** صفحات لا يُعاد توجيه الضيف منها عند خروجه من تبويب آخر */
 function isPublicPath(pathname = "") {
   const path = String(pathname).toLowerCase();
   if (
@@ -59,11 +58,14 @@ function loginPathForUser(user) {
   return user?.role === "teacher" ? "/teacher-login" : "/login";
 }
 
-export default function AuthProvider({ children }) {
-  const initialUser = useMemo(() => readStoredUser(), []);
+function tryRestoreFromStorage() {
+  return readStoredUser();
+}
 
-  const [status, setStatus] = useState("checking");
-  const [user, setUser] = useState(initialUser);
+export default function AuthProvider({ children }) {
+  const initialStored = useMemo(() => readStoredUser(), []);
+  const [status, setStatus] = useState(initialStored ? "authenticated" : "checking");
+  const [user, setUser] = useState(initialStored);
   const bootstrapStartedRef = useRef(false);
   const bootstrapGenerationRef = useRef(0);
 
@@ -80,9 +82,6 @@ export default function AuthProvider({ children }) {
     setStatus("guest");
   }, []);
 
-  /* ----------------------------- الإقلاع ----------------------------- */
-  // ملاحظة: بدون علم إلغاء في الـ cleanup — StrictMode يعيد تشغيل الـ effect
-  // والحارس bootstrapStartedRef يمنع فحصاً ثانياً، والمزوّد لا يُفكّ أبداً من الجذر.
   useEffect(() => {
     if (bootstrapStartedRef.current) return;
     bootstrapStartedRef.current = true;
@@ -93,17 +92,18 @@ export default function AuthProvider({ children }) {
         const { user: sessionUser } = await bootstrapSession();
         if (generation !== bootstrapGenerationRef.current) return;
 
-        const stored = readStoredUser();
         if (sessionUser) {
           applyAuthenticated(sessionUser);
-        } else if (stored) {
-          applyAuthenticated(stored);
         } else {
-          applyGuest();
+          const stored = tryRestoreFromStorage();
+          if (stored) {
+            applyAuthenticated(stored);
+          } else {
+            applyGuest();
+          }
         }
       } catch {
         if (generation !== bootstrapGenerationRef.current) return;
-        // خطأ شبكة: أعد المحاولة تلقائياً فور عودة الاتصال
         if (!isBrowserOnline() && typeof window !== "undefined") {
           const onOnline = () => {
             window.removeEventListener("online", onOnline);
@@ -112,27 +112,32 @@ export default function AuthProvider({ children }) {
           window.addEventListener("online", onOnline);
           return;
         }
-        const stored = readStoredUser();
-        if (stored) {
-          applyAuthenticated(stored);
-        } else {
-          applyGuest();
+        if (hasValidAuthSession()) {
+          const stored = readStoredUser();
+          if (stored) {
+            applyAuthenticated(stored);
+            return;
+          }
         }
+        applyGuest();
       }
     };
 
     runBootstrap();
   }, [applyAuthenticated, applyGuest]);
 
-  /* -------------- مزامنة نفس التبويب (بعد login/signup) -------------- */
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
     const onAuthUpdate = (event) => {
       bootstrapGenerationRef.current += 1;
-      const next =
-        event?.detail?.user ??
-        readStoredUser();
-      if (next) {
+      const fromEvent = event?.detail?.user;
+      if (fromEvent) {
+        setUser(fromEvent);
+        setStatus("authenticated");
+        return;
+      }
+      const next = readStoredUser();
+      if (next && hasValidAuthSession()) {
         setUser(next);
         setStatus("authenticated");
       } else {
@@ -144,7 +149,6 @@ export default function AuthProvider({ children }) {
     return () => window.removeEventListener(AUTH_STORAGE_UPDATE_EVENT, onAuthUpdate);
   }, []);
 
-  /* ----------------------- مزامنة بقية التبويبات ---------------------- */
   useEffect(() => {
     const unsubscribe = subscribeAuthMessages((msg) => {
       if (msg.type === "login") {
@@ -169,7 +173,6 @@ export default function AuthProvider({ children }) {
           window.location.replace(redirect);
         }
       } else if (msg.type === "session-expired") {
-        // التبويب الآخر فشل refresh عنده — أظهر نفس المعالجة هنا
         markSessionExpired({ broadcast: false });
         setUser(null);
         setStatus("guest");
@@ -178,7 +181,6 @@ export default function AuthProvider({ children }) {
     return unsubscribe;
   }, []);
 
-  /* --------------------- إشعار عودة/انقطاع الاتصال -------------------- */
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
     const onOnline = () => {
@@ -188,7 +190,12 @@ export default function AuthProvider({ children }) {
     return () => window.removeEventListener("online", onOnline);
   }, []);
 
-  /* ------------------------------ أفعال ------------------------------ */
+  const logout = useCallback(async () => {
+    performLogout();
+  }, []);
+
+  const isAuthLoading = status === "checking";
+
   const refreshUser = useCallback(async () => {
     try {
       const nextUser = await fetchMe();
@@ -196,25 +203,36 @@ export default function AuthProvider({ children }) {
         applyAuthenticated(nextUser);
         return nextUser;
       }
+      const stored = readStoredUser();
+      if (stored) {
+        applyAuthenticated(stored);
+        return stored;
+      }
+      applyGuest();
       return null;
     } catch {
+      const stored = readStoredUser();
+      if (stored) {
+        applyAuthenticated(stored);
+        return stored;
+      }
       return null;
     }
-  }, [applyAuthenticated]);
+  }, [applyAuthenticated, applyGuest]);
 
-  const logout = useCallback(async () => {
-    performLogout();
-  }, []);
+  const storedSessionUser = useMemo(() => readStoredUser(), [user, status]);
 
   const value = useMemo(
     () => ({
       status,
-      user,
-      isAuthenticated: status === "authenticated",
+      user: user ?? storedSessionUser,
+      isAuthenticated:
+        status === "authenticated" || Boolean(user ?? storedSessionUser),
+      isAuthLoading,
       refreshUser,
       logout,
     }),
-    [status, user, refreshUser, logout],
+    [status, user, storedSessionUser, isAuthLoading, refreshUser, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

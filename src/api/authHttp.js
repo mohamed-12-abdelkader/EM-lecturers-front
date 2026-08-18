@@ -4,7 +4,7 @@
  */
 import axios from "axios";
 import { getApiBaseURL } from "./apiConfig";
-import { getTenantSubdomain, resolveTenantSubdomain } from "../utils/tenantHost";
+import { getTenantSubdomain, resolveLoginTenantSubdomain } from "../utils/tenantHost";
 
 const authHttp = axios.create({
   withCredentials: true,
@@ -20,7 +20,9 @@ authHttp.interceptors.request.use((config) => {
     }
   }
   const headers = config.headers || {};
-  const tenant = resolveTenantSubdomain() || getTenantSubdomain();
+  const tenant =
+    getTenantSubdomain() ||
+    resolveLoginTenantSubdomain();
   if (tenant) {
     if (typeof headers.set === "function") headers.set("X-Tenant-Subdomain", tenant);
     else headers["X-Tenant-Subdomain"] = tenant;

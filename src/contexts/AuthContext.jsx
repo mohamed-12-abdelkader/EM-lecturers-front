@@ -9,6 +9,7 @@ export const AuthContext = createContext({
   status: "checking",
   user: null,
   isAuthenticated: false,
+  isAuthLoading: true,
   refreshUser: async () => null,
   logout: async () => {},
 });

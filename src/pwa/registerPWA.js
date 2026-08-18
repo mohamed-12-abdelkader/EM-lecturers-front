@@ -46,8 +46,6 @@ export async function applyPWAUpdate() {
 
   pendingUserReload = true;
 
-  window.dispatchEvent(new CustomEvent(PWA_UPDATE_EVENT));
-
   try {
 
     await updateServiceWorker(true);

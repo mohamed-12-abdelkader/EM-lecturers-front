@@ -81,6 +81,8 @@ function readStoredUserRaw() {
 export function persistLoginSession(payload, { broadcast = true } = {}) {
   if (!payload || typeof payload !== "object") return null;
 
+  purgeLegacyGlobalAuthKeys();
+
   const inner =
     payload.data != null &&
     typeof payload.data === "object" &&
@@ -144,9 +146,8 @@ export function clearAuthSession({ broadcast = false } = {}) {
   removeScopedAuthItem("employee_data");
   removeScopedAuthItem("employee_permissions");
   removeScopedAuthItem("tenant");
-  if (getAuthScopeSubdomain()) {
-    purgeLegacyGlobalAuthKeys();
-  }
+  removeScopedAuthItem("token");
+  purgeLegacyGlobalAuthKeys();
   if (typeof window !== "undefined") {
     dispatchAuthStorageUpdate(null);
   }
@@ -185,7 +186,7 @@ export function isAuthTokenExpired(rawToken) {
 export function readStoredUser() {
   const user = readStoredUserRaw();
   if (!user) return null;
-  const tenantMeta = readStoredTenantMeta();
+  const tenantMeta = readStoredTenantMeta() ?? inferTenantMetaFromHost(null);
   if (!sessionMatchesCurrentTenant(user, tenantMeta)) return null;
   return normalizeAuthUser(enrichUserWithTenant(user, tenantMeta));
 }
@@ -207,17 +208,17 @@ export function persistStoredUser(user, { broadcast = true } = {}) {
   return normalized;
 }
 
-/**
- * جلسة صالحة للدخول للوحة التحكم على المنصة الحالية.
- */
+/** جلسة محفوظة للـ tenant الحالي (التحقق من التوكن يتم في bootstrap/refresh). */
 export function hasValidAuthSession() {
-  const token = readAuthToken();
-  if (token && !isJwtExpired(token)) return true;
   return Boolean(readStoredUser());
 }
 
+/** يمسح التوكن المنتهي من الذاكرة/القرص دون logout كامل */
 export function clearExpiredAuthQuietly() {
-  return false;
+  const token = readAuthToken();
+  if (!token || !isJwtExpired(token)) return false;
+  clearAccessToken({ broadcast: false });
+  return true;
 }
 
 export function markSessionExpired({ broadcast = true } = {}) {
