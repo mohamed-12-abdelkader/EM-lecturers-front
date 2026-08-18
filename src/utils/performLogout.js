@@ -29,9 +29,7 @@ function navigateToLogin(redirect) {
   }
 }
 
-/**
- * تسجيل خروج فوري: يلغي الجلسة على الخادم أولاً ثم يمسحها محلياً وينقل لصفحة الدخول.
- */
+/** Logout — يحذف user + token من origin الحالي فقط */
 export async function performLogout({ redirectTo } = {}) {
   if (typeof window === "undefined") return;
 
@@ -49,15 +47,10 @@ export async function performLogout({ redirectTo } = {}) {
       }),
     ]);
   } catch {
-    // نكمل الخروج المحلي حتى لو فشل الخادم
-  }
-
-  try {
-    clearAuthSession({ broadcast: true });
-  } catch {
     // ignore
   }
 
+  clearAuthSession();
   navigateToLogin(redirect);
 }
 

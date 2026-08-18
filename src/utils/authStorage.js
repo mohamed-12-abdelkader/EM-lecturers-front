@@ -1,12 +1,10 @@
 /**
- * واجهة الجلسة — user + token في localStorage لكل منصة (origin منفصل).
- * التوكن يُحمَّل في الذاكرة عبر tokenStore + جسر localStorage للكود القديم.
+ * Authentication — localStorage فقط (user + token) لكل origin/subdomain.
  */
 import {
+  safeLocalGet,
   safeLocalRemove,
-  safeSessionGet,
-  safeSessionRemove,
-  safeSessionSet,
+  safeLocalSet,
 } from "./safeStorage";
 import {
   normalizeAuthToken as normalizeJwt,
@@ -14,26 +12,17 @@ import {
   isJwtExpired,
 } from "./jwt";
 import {
-  clearAccessToken,
-  getAccessToken,
-  setAccessToken,
-} from "../services/tokenStore";
-import { postAuthMessage } from "../services/authChannel";
-import {
   enrichUserWithTenant,
   getAuthScopeSubdomain,
-  inferTenantMetaFromHost,
-  purgeLegacyPrefixedAuthKeys,
-  readScopedAuthItem,
-  readStoredTenantMeta,
-  removeScopedAuthItem,
+  purgeLegacyAuthKeys,
   sessionMatchesCurrentTenant,
-  writeScopedAuthItem,
-  writeStoredTenantMeta,
 } from "./tenantAuthStorage";
 import { normalizeAuthUser } from "./authRoles";
 
+export const USER_KEY = "user";
+export const TOKEN_KEY = "token";
 export const AUTH_STORAGE_UPDATE_EVENT = "auth-storage-update";
+export const SESSION_EXPIRED_EVENT = "session-expired";
 
 function dispatchAuthStorageUpdate(user) {
   if (typeof window === "undefined") return;
@@ -64,7 +53,7 @@ export function normalizeAuthToken(raw) {
 
 function readStoredUserRaw() {
   try {
-    const raw = readScopedAuthItem("user");
+    const raw = safeLocalGet(USER_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     return parsed && typeof parsed === "object" ? parsed : null;
@@ -73,13 +62,31 @@ function readStoredUserRaw() {
   }
 }
 
-/**
- * حفظ نتيجة تسجيل الدخول/التسجيل: التوكن + المستخدم → localStorage (معزول + legacy user).
- */
-export function persistLoginSession(payload, { broadcast = true } = {}) {
+export function readAuthToken() {
+  return normalizeAuthToken(safeLocalGet(TOKEN_KEY));
+}
+
+export function readStoredUser() {
+  const token = readAuthToken();
+  const user = readStoredUserRaw();
+  if (!token || !user) return null;
+
+  const tenantMeta =
+    user.tenant && typeof user.tenant === "object" ? user.tenant : null;
+  if (!sessionMatchesCurrentTenant(user, tenantMeta)) return null;
+
+  return normalizeAuthUser(enrichUserWithTenant(user, tenantMeta), { token });
+}
+
+export function hasValidAuthSession() {
+  return Boolean(readStoredUser() && readAuthToken());
+}
+
+/** Login / Register — يستبدل user + token في origin الحالي فقط */
+export function persistLoginSession(payload) {
   if (!payload || typeof payload !== "object") return null;
 
-  purgeLegacyPrefixedAuthKeys();
+  purgeLegacyAuthKeys();
 
   const inner =
     payload.data != null &&
@@ -90,165 +97,90 @@ export function persistLoginSession(payload, { broadcast = true } = {}) {
 
   const token = normalizeAuthToken(inner.token);
   const scope = getAuthScopeSubdomain();
-  let tenantMeta = inferTenantMetaFromHost(inner.tenant ?? null);
+  let tenantMeta = inner.tenant ?? null;
   if (scope) {
-    tenantMeta = { ...(tenantMeta && typeof tenantMeta === "object" ? tenantMeta : {}), subdomain: scope };
+    tenantMeta = {
+      ...(tenantMeta && typeof tenantMeta === "object" ? tenantMeta : {}),
+      subdomain: scope,
+    };
   }
+
   const rawUser = extractUserFromLoginPayload(inner);
-  const user =
+  let user =
     rawUser != null && typeof rawUser === "object"
       ? normalizeAuthUser(enrichUserWithTenant(rawUser, tenantMeta), { token })
       : null;
 
-  if (token) {
-    setAccessToken(token, { broadcast: false });
+  if (user && inner.employee_data != null) {
+    user = { ...user, employee_data: inner.employee_data };
+  }
+  if (user && inner.employee_permissions != null) {
+    user = { ...user, employee_permissions: inner.employee_permissions };
   }
 
-  if (user) {
-    writeScopedAuthItem("user", JSON.stringify(user));
-  }
-
-  if (tenantMeta) {
-    writeStoredTenantMeta(tenantMeta);
-  }
-
-  if ("employee_data" in inner) {
-    writeScopedAuthItem("employee_data", JSON.stringify(inner.employee_data));
-  } else {
-    removeScopedAuthItem("employee_data");
-  }
-
-  if ("employee_permissions" in inner) {
-    writeScopedAuthItem("employee_permissions", JSON.stringify(inner.employee_permissions));
-  } else {
-    removeScopedAuthItem("employee_permissions");
-  }
+  if (token) safeLocalSet(TOKEN_KEY, token);
+  if (user) safeLocalSet(USER_KEY, JSON.stringify(user));
 
   dispatchAuthStorageUpdate(user);
-
-  if (broadcast) {
-    postAuthMessage({
-      type: "login",
-      token: token || getAccessToken(),
-      user,
-      tenant: getAuthScopeSubdomain(),
-    });
-  }
-
   return user;
 }
 
-export function clearAuthSession({ broadcast = false } = {}) {
-  clearAccessToken({ broadcast: false });
-  removeScopedAuthItem("user");
-  removeScopedAuthItem("employee_data");
-  removeScopedAuthItem("employee_permissions");
-  removeScopedAuthItem("tenant");
-  removeScopedAuthItem("token");
-  if (typeof window !== "undefined") {
-    dispatchAuthStorageUpdate(null);
-  }
-  if (broadcast) {
-    postAuthMessage({ type: "logout", tenant: getAuthScopeSubdomain() });
-  }
+export function persistStoredUser(user) {
+  if (!user || typeof user !== "object") return null;
+  const normalized = normalizeAuthUser(user);
+  safeLocalSet(USER_KEY, JSON.stringify(normalized));
+  dispatchAuthStorageUpdate(normalized);
+  return normalized;
 }
 
-/** يقرأ التوكن الحالي من الذاكرة (بدون بادئة Bearer). */
-export function readAuthToken() {
-  return getAccessToken();
+/** Logout — يحذف user + token من origin الحالي فقط */
+export function clearAuthSession() {
+  safeLocalRemove(USER_KEY);
+  safeLocalRemove(TOKEN_KEY);
+  dispatchAuthStorageUpdate(null);
 }
 
-export const SESSION_EXPIRED_FLAG = "auth_session_expired";
-export const SESSION_EXPIRED_EVENT = "session-expired";
-
-export function isSessionExpiredFlagSet() {
-  return safeSessionGet(SESSION_EXPIRED_FLAG) === "1";
-}
-
-export function clearSessionExpiredFlag() {
-  safeSessionRemove(SESSION_EXPIRED_FLAG);
-  safeSessionRemove("auth_logout_redirect");
-}
-
-/** يفك payload الـ JWT بدون مكتبات خارجية */
 export function getJwtPayload(rawToken) {
   return decodeJwtPayload(rawToken ?? readAuthToken());
 }
 
-/** true لو التوكن موجود وانتهت صلاحية exp */
 export function isAuthTokenExpired(rawToken) {
   return isJwtExpired(rawToken ?? readAuthToken());
 }
 
-export function readStoredUser() {
-  const user = readStoredUserRaw();
-  if (!user) return null;
-  const tenantMeta = readStoredTenantMeta();
-  if (!sessionMatchesCurrentTenant(user, tenantMeta)) return null;
-  return normalizeAuthUser(enrichUserWithTenant(user, tenantMeta));
-}
-
-/** يحفظ/يحدّث بيانات المستخدم في localStorage */
-export function persistStoredUser(user, { broadcast = true } = {}) {
-  if (!user || typeof user !== "object") return null;
-  const tenantMeta = readStoredTenantMeta();
-  const normalized = normalizeAuthUser(enrichUserWithTenant(user, tenantMeta));
-  writeScopedAuthItem("user", JSON.stringify(normalized));
-  dispatchAuthStorageUpdate(normalized);
-  if (broadcast) {
-    postAuthMessage({
-      type: "user",
-      user: normalized,
-      tenant: getAuthScopeSubdomain(),
-    });
-  }
-  return normalized;
-}
-
-/** جلسة محفوظة للـ tenant الحالي (التحقق من التوكن يتم في bootstrap/refresh). */
-export function hasValidAuthSession() {
-  return Boolean(readStoredUser());
-}
-
-/** يمسح التوكن المنتهي من الذاكرة/القرص دون logout كامل */
 export function clearExpiredAuthQuietly() {
   const token = readAuthToken();
   if (!token || !isJwtExpired(token)) return false;
-  clearAccessToken({ broadcast: false });
+  clearAuthSession();
   return true;
 }
 
-export function markSessionExpired({ broadcast = true } = {}) {
-  let redirect = "/login";
-  try {
-    const user = readStoredUser();
-    if (user?.role === "teacher") redirect = "/teacher-login";
-  } catch {
-    // ignore
-  }
-  safeSessionSet(SESSION_EXPIRED_FLAG, "1");
-  safeSessionSet("auth_logout_redirect", redirect);
+function resolveLoginRedirect(user) {
+  const role = String(user?.role || "").toLowerCase();
+  if (role === "teacher") return "/teacher-login";
+  return "/login";
+}
+
+/** 401 — ينظف جلسة origin الحالي فقط */
+export function markSessionExpired() {
+  const redirect = resolveLoginRedirect(readStoredUser());
   safeLocalRemove("examAnswers");
   safeLocalRemove("examTimeLeft");
   clearAuthSession();
-  if (broadcast) {
-    postAuthMessage({ type: "session-expired", tenant: getAuthScopeSubdomain() });
-  }
   if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+    window.dispatchEvent(
+      new CustomEvent(SESSION_EXPIRED_EVENT, { detail: { redirect } }),
+    );
   }
 }
 
 export function forceLogoutToLogin(loginPath) {
-  const redirect =
-    loginPath || safeSessionGet("auth_logout_redirect") || "/login";
-  clearSessionExpiredFlag();
-  clearAuthSession({ broadcast: true });
   safeLocalRemove("examAnswers");
   safeLocalRemove("examTimeLeft");
+  clearAuthSession();
   if (typeof window !== "undefined") {
-    window.location.href = redirect;
+    window.location.href = loginPath || "/login";
   }
 }
 
-export { sessionMatchesCurrentTenant, enrichUserWithTenant, readStoredTenantMeta };
+export { sessionMatchesCurrentTenant, enrichUserWithTenant };

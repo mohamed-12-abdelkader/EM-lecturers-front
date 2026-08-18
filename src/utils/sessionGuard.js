@@ -1,17 +1,13 @@
 /**
- * رفض جلسة منصة أخرى — يمسح الكوكي المشترك (.em-online.online) والتخزين المحلي.
+ * مسح جلسة origin الحالي فقط — بدون استدعاء API (لا كوكي مشتركة).
  */
-import authHttp from "../api/authHttp";
 import { clearAuthSession } from "./authStorage";
-import { getAccessToken } from "../services/tokenStore";
 
+export function clearLocalAuthSession() {
+  clearAuthSession();
+}
+
+/** @deprecated */
 export async function rejectForeignTenantSession() {
-  try {
-    const token = getAccessToken();
-    const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-    await authHttp.post("api/auth/logout", null, config);
-  } catch {
-    // ignore — نكمل مسح التخزين المحلي
-  }
-  clearAuthSession({ broadcast: false });
+  clearLocalAuthSession();
 }

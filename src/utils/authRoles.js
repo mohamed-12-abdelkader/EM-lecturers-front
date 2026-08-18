@@ -1,7 +1,7 @@
 /** أدوار المنصة والتوجيه بعد تسجيل الدخول */
 
 import { getJwtPayload } from "./jwt";
-import { getAccessToken } from "../services/tokenStore";
+import { readAuthToken } from "./authStorage";
 
 const STUDENT_ONLY_PATH_PREFIXES = [
   "/my-courses",
@@ -27,7 +27,7 @@ export function normalizeAuthUser(user, { fallbackUser = null, token = null } = 
   }
 
   if (!role) {
-    const jwt = getJwtPayload(token ?? getAccessToken());
+    const jwt = getJwtPayload(token ?? readAuthToken());
     const fromJwt = jwt?.role ?? jwt?.user_role ?? null;
     if (fromJwt) role = String(fromJwt).trim().toLowerCase();
   }

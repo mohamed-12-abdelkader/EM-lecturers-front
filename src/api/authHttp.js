@@ -1,13 +1,13 @@
 /**
- * عميل HTTP خاص بالمصادقة — بدون interceptors للتجديد (يمنع الحلقات).
- * يرسل الكوكيز دائماً (em_refresh HttpOnly) + هيدر المنصة.
+ * عميل HTTP للمصادقة — Bearer من localStorage.token، بدون cookies.
  */
 import axios from "axios";
 import { getApiBaseURL } from "./apiConfig";
+import { readAuthToken } from "../utils/authStorage";
 import { getTenantSubdomain, resolveLoginTenantSubdomain } from "../utils/tenantHost";
 
 const authHttp = axios.create({
-  withCredentials: true,
+  withCredentials: false,
   timeout: 20_000,
 });
 
@@ -20,9 +20,12 @@ authHttp.interceptors.request.use((config) => {
     }
   }
   const headers = config.headers || {};
-  const tenant =
-    getTenantSubdomain() ||
-    resolveLoginTenantSubdomain();
+  const token = readAuthToken();
+  if (token) {
+    if (typeof headers.set === "function") headers.set("Authorization", `Bearer ${token}`);
+    else headers.Authorization = `Bearer ${token}`;
+  }
+  const tenant = getTenantSubdomain() || resolveLoginTenantSubdomain();
   if (tenant) {
     if (typeof headers.set === "function") headers.set("X-Tenant-Subdomain", tenant);
     else headers["X-Tenant-Subdomain"] = tenant;

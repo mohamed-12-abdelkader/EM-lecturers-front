@@ -2,10 +2,10 @@
  * SessionService — إدارة جلسات الأجهزة (GET /auth/sessions).
  */
 import authHttp from "../api/authHttp";
-import { getAccessToken } from "./tokenStore";
+import { readAuthToken } from "../utils/authStorage";
 
 function bearerConfig() {
-  const token = getAccessToken();
+  const token = readAuthToken();
   return token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 }
 

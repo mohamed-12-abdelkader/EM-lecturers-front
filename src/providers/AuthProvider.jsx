@@ -1,80 +1,34 @@
 /**
- * AuthProvider — HttpOnly Cookies + توken في الذاكرة + عزل لكل subdomain.
+ * AuthProvider — localStorage (user + token) للـ origin الحالي فقط.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "react-toastify";
-
 import { AuthContext } from "../contexts/AuthContext";
-import { bootstrapSession, fetchMe } from "../services/authService";
-import { subscribeAuthMessages } from "../services/authChannel";
+import { fetchMe } from "../services/authService";
 import {
-  clearAuthSession,
-  markSessionExpired,
-  readStoredUser,
-  persistStoredUser,
   AUTH_STORAGE_UPDATE_EVENT,
   hasValidAuthSession,
+  readStoredUser,
+  persistStoredUser,
+  USER_KEY,
+  TOKEN_KEY,
 } from "../utils/authStorage";
 import { performLogout } from "../utils/performLogout";
-import { isBrowserOnline } from "../utils/network";
-import { getTenantSubdomain } from "../utils/tenantHost";
+import { bootstrapSession } from "../services/authService";
 
-function storeUser(user) {
-  if (user != null && typeof user === "object") {
-    persistStoredUser(user, { broadcast: false });
-  }
-}
-
-function isPublicPath(pathname = "") {
-  const path = String(pathname).toLowerCase();
-  if (
-    path === "/login" ||
-    path === "/signup" ||
-    path === "/teacher-login" ||
-    path === "/landing" ||
-    path.startsWith("/forgot") ||
-    path.startsWith("/reset") ||
-    path.startsWith("/welcome")
-  ) {
-    return true;
-  }
-  if (getTenantSubdomain()) {
-    if (
-      path === "/" ||
-      path === "/teacher" ||
-      path === "/courses" ||
-      path.startsWith("/course/") ||
-      path.startsWith("/free-lesson") ||
-      path === "/search" ||
-      path.startsWith("/subjects")
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function loginPathForUser(user) {
-  return user?.role === "teacher" ? "/teacher-login" : "/login";
-}
-
-function tryRestoreFromStorage() {
-  return readStoredUser();
+function readSessionFromStorage() {
+  const { user } = bootstrapSession();
+  return user;
 }
 
 export default function AuthProvider({ children }) {
-  const initialStored = useMemo(() => readStoredUser(), []);
-  const [status, setStatus] = useState(initialStored ? "authenticated" : "checking");
-  const [user, setUser] = useState(initialStored);
-  const bootstrapStartedRef = useRef(false);
-  const bootstrapGenerationRef = useRef(0);
+  const [status, setStatus] = useState("checking");
+  const [user, setUser] = useState(null);
 
   const applyAuthenticated = useCallback((nextUser) => {
-    if (nextUser) {
-      storeUser(nextUser);
-      setUser(nextUser);
-    }
-    setStatus("authenticated");
+    if (nextUser) persistStoredUser(nextUser);
+    setUser(nextUser ?? readStoredUser());
+    setStatus(nextUser || readStoredUser() ? "authenticated" : "guest");
   }, []);
 
   const applyGuest = useCallback(() => {
@@ -83,59 +37,26 @@ export default function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    if (bootstrapStartedRef.current) return;
-    bootstrapStartedRef.current = true;
-
-    const runBootstrap = async () => {
-      const generation = ++bootstrapGenerationRef.current;
-      try {
-        const { user: sessionUser } = await bootstrapSession();
-        if (generation !== bootstrapGenerationRef.current) return;
-
-        if (sessionUser) {
-          applyAuthenticated(sessionUser);
-        } else {
-          const stored = tryRestoreFromStorage();
-          if (stored) {
-            applyAuthenticated(stored);
-          } else {
-            applyGuest();
-          }
+    const stored = readSessionFromStorage();
+    if (stored) {
+      setUser(stored);
+      setStatus("authenticated");
+      fetchMe().then((fresh) => {
+        if (fresh) {
+          setUser(fresh);
         }
-      } catch {
-        if (generation !== bootstrapGenerationRef.current) return;
-        if (!isBrowserOnline() && typeof window !== "undefined") {
-          const onOnline = () => {
-            window.removeEventListener("online", onOnline);
-            runBootstrap();
-          };
-          window.addEventListener("online", onOnline);
-          return;
-        }
-        if (hasValidAuthSession()) {
-          const stored = readStoredUser();
-          if (stored) {
-            applyAuthenticated(stored);
-            return;
-          }
-        }
-        applyGuest();
-      }
-    };
-
-    runBootstrap();
-  }, [applyAuthenticated, applyGuest]);
+      }).catch(() => {
+        // offline أو API غير متاح — نبقى على localStorage
+      });
+    } else {
+      applyGuest();
+    }
+  }, [applyGuest]);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
-    const onAuthUpdate = (event) => {
-      bootstrapGenerationRef.current += 1;
-      const fromEvent = event?.detail?.user;
-      if (fromEvent) {
-        setUser(fromEvent);
-        setStatus("authenticated");
-        return;
-      }
+
+    const syncFromStorage = () => {
       const next = readStoredUser();
       if (next && hasValidAuthSession()) {
         setUser(next);
@@ -145,40 +66,20 @@ export default function AuthProvider({ children }) {
         setStatus("guest");
       }
     };
-    window.addEventListener(AUTH_STORAGE_UPDATE_EVENT, onAuthUpdate);
-    return () => window.removeEventListener(AUTH_STORAGE_UPDATE_EVENT, onAuthUpdate);
-  }, []);
 
-  useEffect(() => {
-    const unsubscribe = subscribeAuthMessages((msg) => {
-      if (msg.type === "login") {
-        bootstrapGenerationRef.current += 1;
-        if (msg.user) storeUser(msg.user);
-        setUser(msg.user || readStoredUser());
-        setStatus("authenticated");
-      } else if (msg.type === "user") {
-        if (msg.user) {
-          storeUser(msg.user);
-          setUser(msg.user);
-        }
-      } else if (msg.type === "logout") {
-        const redirect = loginPathForUser(readStoredUser());
-        clearAuthSession();
-        setUser(null);
-        setStatus("guest");
-        if (
-          typeof window !== "undefined" &&
-          !isPublicPath(window.location.pathname)
-        ) {
-          window.location.replace(redirect);
-        }
-      } else if (msg.type === "session-expired") {
-        markSessionExpired({ broadcast: false });
-        setUser(null);
-        setStatus("guest");
+    const onAuthUpdate = () => syncFromStorage();
+    const onStorage = (event) => {
+      if (event.key === USER_KEY || event.key === TOKEN_KEY || event.key === null) {
+        syncFromStorage();
       }
-    });
-    return unsubscribe;
+    };
+
+    window.addEventListener(AUTH_STORAGE_UPDATE_EVENT, onAuthUpdate);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(AUTH_STORAGE_UPDATE_EVENT, onAuthUpdate);
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
   useEffect(() => {
@@ -191,48 +92,41 @@ export default function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(async () => {
-    performLogout();
+    await performLogout();
   }, []);
 
-  const isAuthLoading = status === "checking";
-
   const refreshUser = useCallback(async () => {
-    try {
-      const nextUser = await fetchMe();
-      if (nextUser) {
-        applyAuthenticated(nextUser);
-        return nextUser;
-      }
-      const stored = readStoredUser();
-      if (stored) {
-        applyAuthenticated(stored);
-        return stored;
-      }
+    const stored = readStoredUser();
+    if (!stored) {
       applyGuest();
       return null;
-    } catch {
-      const stored = readStoredUser();
-      if (stored) {
-        applyAuthenticated(stored);
-        return stored;
+    }
+    try {
+      const fresh = await fetchMe();
+      if (fresh) {
+        applyAuthenticated(fresh);
+        return fresh;
       }
-      return null;
+      applyAuthenticated(stored);
+      return stored;
+    } catch {
+      applyAuthenticated(stored);
+      return stored;
     }
   }, [applyAuthenticated, applyGuest]);
 
-  const storedSessionUser = useMemo(() => readStoredUser(), [user, status]);
+  const isAuthLoading = status === "checking";
 
   const value = useMemo(
     () => ({
       status,
-      user: user ?? storedSessionUser,
-      isAuthenticated:
-        status === "authenticated" || Boolean(user ?? storedSessionUser),
+      user,
+      isAuthenticated: status === "authenticated" && Boolean(user),
       isAuthLoading,
       refreshUser,
       logout,
     }),
-    [status, user, storedSessionUser, isAuthLoading, refreshUser, logout],
+    [status, user, isAuthLoading, refreshUser, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -16,12 +16,9 @@ import { useLocation } from "react-router-dom";
 import { getTenantSubdomain } from "../../utils/tenantHost";
 import {
   SESSION_EXPIRED_EVENT,
-  clearSessionExpiredFlag,
   forceLogoutToLogin,
-  isSessionExpiredFlagSet,
 } from "../../utils/authStorage";
 
-/** صفحات عامة — لا نعرض مودال الجلسة عليها */
 function isPublicSurface(pathname = "") {
   const path = String(pathname).toLowerCase();
   const tenant = Boolean(getTenantSubdomain());
@@ -37,7 +34,6 @@ function isPublicSurface(pathname = "") {
     return true;
   }
 
-  // لاندنج المستأجر العام ومساراته العامة
   if (tenant) {
     if (
       path === "/" ||
@@ -55,40 +51,27 @@ function isPublicSurface(pathname = "") {
   return false;
 }
 
-/**
- * يظهر فقط عند فشل تجديد الجلسة نهائياً (كوكي الـ refresh انتهى أو أُلغي).
- * انتهاء الـ Access Token القصير أمر طبيعي ويُجدَّد تلقائياً بدون هذا المودال.
- */
 export default function SessionExpiredModal() {
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const [redirectPath, setRedirectPath] = useState("/login");
   const overlayBg = useColorModeValue("blackAlpha.600", "blackAlpha.800");
   const iconBg = useColorModeValue("orange.50", "whiteAlpha.100");
   const iconColor = useColorModeValue("orange.500", "orange.300");
 
   const evaluate = useCallback(() => {
-    try {
-      if (isPublicSurface(location.pathname)) {
-        clearSessionExpiredFlag();
-        setIsOpen(false);
-        return;
-      }
-      setIsOpen(isSessionExpiredFlagSet());
-    } catch (err) {
-      console.error("SessionExpiredModal evaluate failed", err);
-      setIsOpen(false);
-    }
-  }, [location.pathname]);
+    setIsOpen(false);
+  }, []);
 
   useEffect(() => {
     evaluate();
 
-    const onExpired = () => {
+    const onExpired = (event) => {
       if (isPublicSurface(window.location.pathname)) {
-        clearSessionExpiredFlag();
         setIsOpen(false);
         return;
       }
+      setRedirectPath(event?.detail?.redirect || "/login");
       setIsOpen(true);
     };
 
@@ -96,7 +79,7 @@ export default function SessionExpiredModal() {
     return () => {
       window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
     };
-  }, [evaluate]);
+  }, [evaluate, location.pathname]);
 
   if (isPublicSurface(location.pathname) || !isOpen) return null;
 
@@ -150,9 +133,9 @@ export default function SessionExpiredModal() {
             size="lg"
             borderRadius="xl"
             px={10}
-            onClick={() => forceLogoutToLogin()}
+            onClick={() => forceLogoutToLogin(redirectPath)}
           >
-            تسجيل الخروج
+            تسجيل الدخول
           </Button>
         </ModalFooter>
       </ModalContent>

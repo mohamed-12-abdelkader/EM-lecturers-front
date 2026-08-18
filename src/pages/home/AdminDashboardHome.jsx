@@ -73,9 +73,8 @@ function StatTile({ label, value, icon, color }) {
 }
 
 const AdminDashboardHome = () => {
-  const user = JSON.parse(localStorage.getItem("user")) || {};
-  const employeeData =
-    JSON.parse(localStorage.getItem("employee_data")) || null;
+  const user = JSON.parse(localStorage.getItem("user") || "null") || {};
+  const employeeData = user?.employee_data ?? null;
 
   const [summary, setSummary] = useState({
     total: 0,
