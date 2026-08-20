@@ -1,7 +1,8 @@
 import baseUrl from "./baseUrl";
-import { getApiOrigin, useDevViteProxy } from "./apiConfig";
 
-const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
+/** يطابق الحد الافتراضي في الـBackend (`COURSE_PDF_MAX_FILE_SIZE_MB`) */
+export const COURSE_PDF_MAX_FILE_SIZE_MB = 50;
+export const COURSE_PDF_MAX_UPLOAD_BYTES = COURSE_PDF_MAX_FILE_SIZE_MB * 1024 * 1024;
 
 export function formatCourseFileSize(bytes) {
   if (bytes == null || Number.isNaN(Number(bytes))) return null;
@@ -13,135 +14,224 @@ export function formatCourseFileSize(bytes) {
 }
 
 export function getCourseFileDisplayName(file) {
-  return file?.name || file?.filename || file?.title || "ملف بدون اسم";
+  return file?.title || file?.name || file?.originalName || file?.original_name || "ملف بدون اسم";
 }
 
-export function isAbsoluteHttpUrl(url) {
-  return /^https?:\/\//i.test(String(url || "").trim());
+export function isPdfFile(file) {
+  if (!file) return false;
+  const type = String(file.type || "").toLowerCase();
+  const name = String(file.name || "").toLowerCase();
+  return type === "application/pdf" || name.endsWith(".pdf");
 }
 
-/** مسار محلي على الـ API مثل /uploads/course-files/... */
-export function isCourseFileUploadPath(url) {
-  const s = String(url || "").trim();
-  return s.startsWith("/uploads/") || s.startsWith("uploads/");
+export function normalizeCourseFile(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const id = raw.id;
+  return {
+    id,
+    courseId: raw.courseId ?? raw.course_id ?? null,
+    teacherId: raw.teacherId ?? raw.teacher_id ?? null,
+    title: raw.title || raw.name || "",
+    description: raw.description || "",
+    originalName: raw.originalName ?? raw.original_name ?? "",
+    fileSize: raw.fileSize ?? raw.file_size ?? 0,
+    mimeType: raw.mimeType ?? raw.mime_type ?? "application/pdf",
+    createdAt: raw.createdAt ?? raw.created_at ?? null,
+    updatedAt: raw.updatedAt ?? raw.updated_at ?? null,
+  };
 }
 
-/** يحوّل file_url النسبي إلى رابط كامل (Bunny HTTPS أو مسار API) */
-export function resolveCourseFileAbsoluteUrl(url) {
-  if (!url || typeof url !== "string") return null;
-  const raw = url.trim();
-  if (!raw) return null;
-  if (/^https?:\/\//i.test(raw) || raw.startsWith("data:")) return raw;
-  if (raw.startsWith("//")) return `https:${raw}`;
+function extractFilesList(payload) {
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.files)) return payload.files;
+  if (Array.isArray(payload)) return payload;
+  return [];
+}
 
-  const path = raw.startsWith("/") ? raw : `/${raw}`;
-  if (typeof window !== "undefined" && useDevViteProxy()) {
-    return `${window.location.origin}${path}`;
+function extractFilePayload(payload) {
+  if (payload?.data && typeof payload.data === "object" && !Array.isArray(payload.data)) {
+    return payload.data;
   }
-  const origin = getApiOrigin();
-  if (origin) return `${origin}${path}`;
-  if (typeof window !== "undefined") {
-    return `${window.location.origin}${path}`;
+  if (payload?.file && typeof payload.file === "object") return payload.file;
+  if (payload && typeof payload === "object" && payload.id != null) return payload;
+  return null;
+}
+
+export async function hydrateBlobError(err) {
+  const data = err?.response?.data;
+  if (!(data instanceof Blob)) return err;
+  try {
+    const text = await data.text();
+    const json = JSON.parse(text);
+    if (err.response) err.response.data = json;
+  } catch {
+    // keep original blob error
   }
-  return path;
-}
-
-export function getCourseFileUrl(file) {
-  const raw = file?.file_url || file?.url || file?.link || null;
-  if (!raw) return null;
-  if (isAbsoluteHttpUrl(raw)) return raw;
-  if (isCourseFileUploadPath(raw) || raw.startsWith("/")) {
-    return resolveCourseFileAbsoluteUrl(raw);
-  }
-  return raw;
-}
-
-/** رابط HTTPS خارجي (Bunny CDN وغيره) — ليس Google Drive */
-export function isRemoteCourseFileUrl(url) {
-  return isAbsoluteHttpUrl(url) && !/drive\.google\.com/i.test(String(url || ""));
-}
-
-export function isCourseFilePdf(file) {
-  const type = String(file?.file_type || "").toLowerCase();
-  if (type.includes("pdf")) return true;
-  const url = getCourseFileUrl(file) || "";
-  return /\.pdf(\?|$)/i.test(url);
-}
-
-export function isCourseFileImage(file) {
-  const type = String(file?.file_type || "").toLowerCase();
-  if (type.startsWith("image/")) return true;
-  const url = getCourseFileUrl(file) || "";
-  return /\.(jpe?g|png|webp|gif)(\?|$)/i.test(url);
-}
-
-export function getCourseFileKind(file) {
-  if (isCourseFilePdf(file)) return "pdf";
-  if (isCourseFileImage(file)) return "image";
-  const type = String(file?.file_type || "").toLowerCase();
-  if (type.includes("word") || type.includes("document")) return "doc";
-  if (type.includes("sheet") || type.includes("excel")) return "sheet";
-  if (type.includes("presentation") || type.includes("powerpoint")) return "slides";
-  if (type.includes("zip") || type.includes("compressed")) return "archive";
-  return "other";
+  return err;
 }
 
 export function courseFilesApiError(err, fallback = "حدث خطأ غير متوقع") {
   const status = err?.response?.status;
   const data = err?.response?.data;
-  const message = data?.message || data?.msg;
+  const message = data?.message || data?.msg || data?.error;
 
+  if (status === 401) {
+    return message || "يجب تسجيل الدخول أولاً للوصول إلى هذا الملف";
+  }
   if (status === 403) {
-    return message || "ليس لديك صلاحية للوصول إلى ملفات هذا الكورس";
-  }
-  if (status === 413) {
-    return message || "حجم الملف يتجاوز 50MB";
-  }
-  if (status === 502) {
-    return message || "فشل رفع الملف على التخزين السحابي والمحلي، حاول مرة أخرى";
+    return message || "ليس لديك صلاحية الوصول إلى هذا الملف";
   }
   if (status === 404) {
-    return message || "الكورس أو الملف غير موجود";
+    return message || "الملف غير موجود أو تم حذفه";
+  }
+  if (status === 413) {
+    return message || `حجم الملف أكبر من الحد المسموح (${COURSE_PDF_MAX_FILE_SIZE_MB} ميجابايت)`;
+  }
+  if (status === 422) {
+    return message || "البيانات المدخلة غير صحيحة، راجع العنوان والملف ثم حاول مرة أخرى";
+  }
+  if (status === 429) {
+    return message || "تم تجاوز عدد المحاولات، انتظر قليلاً ثم حاول مرة أخرى";
   }
   if (status === 400) {
-    return message || "بيانات الرفع غير مكتملة";
+    return message || "تعذّر رفع الملف. تأكد أنه PDF وعنوانه غير فارغ";
+  }
+  if (status === 502) {
+    return message || "تعذّر رفع الملف إلى التخزين، حاول مرة أخرى";
+  }
+  if (status === 500 || status >= 500) {
+    return message || "حدث خطأ في الخادم، حاول مرة أخرى لاحقاً";
   }
 
   return message || err?.message || fallback;
 }
 
-export async function fetchCourseFiles(courseId) {
-  const { data } = await baseUrl.get(`/api/course/${courseId}/files`);
-  const files = Array.isArray(data?.files) ? data.files : [];
-  return [...files].sort((a, b) => {
-    const ta = new Date(a.created_at || 0).getTime();
-    const tb = new Date(b.created_at || 0).getTime();
-    return tb - ta;
-  });
+export async function getCourseFiles(courseId) {
+  const { data } = await baseUrl.get(`/api/courses/${courseId}/files`);
+  return extractFilesList(data)
+    .map(normalizeCourseFile)
+    .filter(Boolean)
+    .sort((a, b) => {
+      const ta = new Date(a.createdAt || 0).getTime();
+      const tb = new Date(b.createdAt || 0).getTime();
+      return tb - ta;
+    });
 }
 
-export async function uploadCourseFile(courseId, { file, name, filename, file_url }) {
+/** @deprecated استخدم getCourseFiles */
+export const fetchCourseFiles = getCourseFiles;
+
+export async function getCourseFile(fileId) {
+  const { data } = await baseUrl.get(`/api/course-files/${fileId}`);
+  return normalizeCourseFile(extractFilePayload(data));
+}
+
+export async function uploadCourseFile(courseId, { file, title, name, description }, onUploadProgress) {
   const form = new FormData();
-  if (file) form.append("file", file);
-  const displayName = String(name || filename || "").trim();
-  if (displayName) form.append("name", displayName);
-  if (file_url) form.append("file_url", String(file_url).trim());
+  form.append("file", file);
+  const displayTitle = String(title || name || "").trim();
+  if (displayTitle) form.append("title", displayTitle);
+  if (description) form.append("description", String(description).trim());
 
-  const { data } = await baseUrl.post(`/api/course/${courseId}/files`, form);
-  return data?.file ?? data;
+  const { data } = await baseUrl.post(`/api/courses/${courseId}/files`, form, {
+    onUploadProgress: onUploadProgress
+      ? (event) => {
+          if (event.total) {
+            onUploadProgress(Math.round((event.loaded / event.total) * 100), event);
+          }
+        }
+      : undefined,
+  });
+  return normalizeCourseFile(extractFilePayload(data));
 }
 
-export async function deleteCourseFile(courseId, fileId) {
-  const { data } = await baseUrl.delete(`/api/course/${courseId}/files/${fileId}`);
-  return data?.file ?? data;
+export async function updateCourseFile(fileId, { title, description }) {
+  const body = {};
+  if (title != null) body.title = String(title).trim();
+  if (description != null) body.description = String(description).trim();
+
+  const { data } = await baseUrl.patch(`/api/course-files/${fileId}`, body);
+  return normalizeCourseFile(extractFilePayload(data)) || { id: fileId, ...body };
 }
 
-export function validateCourseFileUpload({ file, name, filename, file_url }) {
-  if (!String(name || filename || "").trim()) return "اسم الملف مطلوب";
-  if (!file && !String(file_url || "").trim()) return "اختر ملفاً أو أدخل رابطاً";
-  if (file && file.size > MAX_UPLOAD_BYTES) return "حجم الملف يتجاوز 50MB";
-  if (file_url && !/^https?:\/\//i.test(String(file_url).trim())) {
-    return "أدخل رابطاً صالحاً يبدأ بـ https://";
+export async function deleteCourseFile(fileId) {
+  const { data } = await baseUrl.delete(`/api/course-files/${fileId}`);
+  return data;
+}
+
+/**
+ * يجلب محتوى PDF بعد التحقق من الصلاحيات.
+ * يُستخدم داخل العارض فقط — لا يُحفظ الرابط ولا الـBlob بشكل دائم.
+ */
+export async function getCourseFileView(fileId) {
+  try {
+    const response = await baseUrl.post(
+      `/api/course-files/${fileId}/view`,
+      {},
+      {
+        responseType: "arraybuffer",
+        maxRedirects: 0,
+        headers: {
+          Accept: "application/octet-stream",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        params: { client: "app" },
+      },
+    );
+
+    const buffer = response.data;
+    const bytes = buffer instanceof ArrayBuffer ? new Uint8Array(buffer) : new Uint8Array(buffer?.data || buffer || []);
+    const contentType = String(response.headers?.["content-type"] || "");
+
+    if (contentType.includes("application/json")) {
+      const json = JSON.parse(new TextDecoder().decode(bytes));
+      const error = new Error(json.message || "تعذّر تحميل الملف");
+      error.response = { status: response.status, data: json };
+      throw error;
+    }
+
+    return new Blob([bytes], { type: "application/pdf" });
+  } catch (err) {
+    const data = err?.response?.data;
+    if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
+      try {
+        const text = new TextDecoder().decode(data instanceof ArrayBuffer ? data : data.buffer);
+        const json = JSON.parse(text);
+        if (err.response) err.response.data = json;
+      } catch {
+        // keep original error
+      }
+    } else {
+      await hydrateBlobError(err);
+    }
+    throw err;
+  }
+}
+
+export function validateCourseFileUpload({ file, title, name, description }) {
+  const displayTitle = String(title || name || "").trim();
+  if (!displayTitle) return "عنوان الملف مطلوب";
+  if (displayTitle.length > 200) return "عنوان الملف طويل جداً";
+  if (description && String(description).length > 1000) return "الوصف طويل جداً";
+  if (!file) return "اختر ملف PDF";
+  if (!isPdfFile(file)) return "يُسمح بملفات PDF فقط";
+  if (file.size > COURSE_PDF_MAX_UPLOAD_BYTES) {
+    return `حجم الملف يتجاوز ${COURSE_PDF_MAX_FILE_SIZE_MB} ميجابايت`;
   }
   return null;
+}
+
+export function validateCourseFileUpdate({ title, description }) {
+  const displayTitle = String(title || "").trim();
+  if (!displayTitle) return "عنوان الملف مطلوب";
+  if (displayTitle.length > 200) return "عنوان الملف طويل جداً";
+  if (description && String(description).length > 1000) return "الوصف طويل جداً";
+  return null;
+}
+
+/** مسار العرض داخل المنصة — بدون روابط تخزين في الـURL */
+export function buildCourseFileViewPath(courseId, file) {
+  const fileId = file?.id;
+  if (!courseId || fileId == null || fileId === "") return null;
+  return `/CourseDetailsPage/${courseId}/file/${fileId}`;
 }

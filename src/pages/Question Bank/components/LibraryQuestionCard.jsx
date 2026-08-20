@@ -20,10 +20,18 @@ import { isPassageStatementQuestion } from "../utils/teacherLibraryQuestionUtils
 
 const CHOICE_LETTERS = ["أ", "ب", "ج", "د", "هـ", "و"];
 
-function FormattedText({ value, fontSize = "sm", fontWeight, color, lineHeight = "1.9", ...rest }) {
+function FormattedText({ value, fontSize = "sm", fontWeight, color, lineHeight = "2.05", ...rest }) {
   if (!value) return null;
   return (
-    <Text fontSize={fontSize} fontWeight={fontWeight} color={color} lineHeight={lineHeight} {...rest}>
+    <Text
+      fontFamily="'Noto Naskh Arabic', 'Noto Sans Arabic', Tahoma, serif"
+      fontSize={fontSize}
+      fontWeight={fontWeight}
+      color={color}
+      lineHeight={lineHeight}
+      letterSpacing="0.01em"
+      {...rest}
+    >
       {renderFormattedExamText(value)}
     </Text>
   );

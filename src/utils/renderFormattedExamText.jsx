@@ -390,26 +390,235 @@ const renderMathSegment = (value, keyPrefix, display = false) => (
   </Box>
 );
 
-/**
- * يعرض نص السؤال/الاختيار مع دعم LaTeX ($...$) والكسور والأرقام العشرية والرموز.
- * @param {string} value
- */
-export function renderFormattedExamText(value) {
-  const text = String(value ?? "");
-  if (!text) return null;
+const MARKUP_RE =
+  /<\/?(u|ins|b|strong|i|em|mark|sub|sup)(?:\s[^>]*)?>|<(?:br)\s*\/?>/gi;
 
-  return tokenizeFormattedText(text).map((segment, index) => {
+const VERSE_SPLIT_RE = /^(.{8,}?)\s+[.\u06D4،,]*\s*:\s+(.{8,})$/;
+
+function decodeBasicEntities(text) {
+  return String(text ?? "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+/** ينظّف بقايا OCR (JSON boxes وأسئلة مدمجة بعد السؤال الأصلي) */
+export function cleanQuestionStemForDisplay(value) {
+  let text = decodeBasicEntities(value);
+  text = text.replace(/\s*\[\{\s*"box_2d"[\s\S]*$/i, "");
+  text = text.replace(/<br\s*\/?>/gi, "\n");
+  const extra = text.search(/\n\s*[٠-٩0-9]{2,}\s+/);
+  if (extra > 40) {
+    const head = text.slice(0, extra).trim();
+    if (head.length >= 20) text = head;
+  }
+  return text.trim();
+}
+
+function renderLatexAwarePlain(value, keyPrefix) {
+  return tokenizeFormattedText(String(value ?? "")).map((segment, index) => {
     if (segment.type === "latex") {
-      return renderMathSegment(
-        segment.value,
-        `math-${index}`,
-        segment.display,
-      );
+      return renderMathSegment(segment.value, `${keyPrefix}-math-${index}`, segment.display);
     }
     return (
-      <React.Fragment key={`plain-${index}`}>
-        {renderPlainText(segment.value, `text-${index}`)}
+      <React.Fragment key={`${keyPrefix}-plain-${index}`}>
+        {renderPlainText(segment.value, `${keyPrefix}-text-${index}`)}
       </React.Fragment>
     );
   });
+}
+
+function VerseLine({ sadr, ajuz, keyPrefix }) {
+  return (
+    <Box
+      key={keyPrefix}
+      my={2}
+      px={3}
+      py={2.5}
+      borderRadius="xl"
+      bg="blackAlpha.50"
+      borderWidth="1px"
+      borderColor="blackAlpha.100"
+      fontFamily="'Noto Naskh Arabic', 'Noto Sans Arabic', Tahoma, serif"
+      _dark={{ bg: "whiteAlpha.100", borderColor: "whiteAlpha.200" }}
+    >
+      <Box
+        display="flex"
+        flexDirection={{ base: "column", md: "row" }}
+        alignItems={{ base: "stretch", md: "center" }}
+        gap={{ base: 1, md: 3 }}
+      >
+        <Box flex="1" textAlign="right" lineHeight="2">
+          {renderLatexAwarePlain(sadr, `${keyPrefix}-sadr`)}
+        </Box>
+        <Box
+          display={{ base: "none", md: "block" }}
+          w="8px"
+          h="8px"
+          borderRadius="full"
+          bg="orange.400"
+          flexShrink={0}
+        />
+        <Box flex="1" textAlign={{ base: "right", md: "left" }} lineHeight="2">
+          {renderLatexAwarePlain(ajuz, `${keyPrefix}-ajuz`)}
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
+function renderLiteraryPlain(value, keyPrefix) {
+  const text = String(value ?? "");
+  if (!text) return null;
+
+  const renderLine = (line, lineKey) => {
+    const trimmed = line.trim();
+    if (!trimmed) return null;
+    const verse = trimmed.match(VERSE_SPLIT_RE);
+    if (verse) {
+      return (
+        <VerseLine
+          key={lineKey}
+          keyPrefix={lineKey}
+          sadr={verse[1].trim()}
+          ajuz={verse[2].trim()}
+        />
+      );
+    }
+    return (
+      <React.Fragment key={lineKey}>
+        {renderLatexAwarePlain(line, lineKey)}
+      </React.Fragment>
+    );
+  };
+
+  if (!text.includes("\n")) {
+    return renderLine(text, keyPrefix);
+  }
+
+  return text.split("\n").map((line, lineIndex) => (
+    <React.Fragment key={`${keyPrefix}-ln-${lineIndex}`}>
+      {lineIndex > 0 ? <Box as="br" /> : null}
+      {line.trim() ? renderLine(line, `${keyPrefix}-ln-${lineIndex}`) : null}
+    </React.Fragment>
+  ));
+}
+
+function wrapMarkup(tag, children, key) {
+  switch (tag) {
+    case "u":
+    case "ins":
+      return (
+        <Box
+          as="u"
+          key={key}
+          textDecoration="underline"
+          textDecorationThickness="2px"
+          textUnderlineOffset="3px"
+        >
+          {children}
+        </Box>
+      );
+    case "b":
+    case "strong":
+      return (
+        <Box as="strong" key={key}>
+          {children}
+        </Box>
+      );
+    case "i":
+    case "em":
+      return (
+        <Box as="em" key={key}>
+          {children}
+        </Box>
+      );
+    case "mark":
+      return (
+        <Box as="mark" key={key} bg="yellow.200" px="0.5" borderRadius="sm">
+          {children}
+        </Box>
+      );
+    case "sub":
+      return (
+        <Box as="sub" key={key} fontSize="0.75em">
+          {children}
+        </Box>
+      );
+    case "sup":
+      return (
+        <Box as="sup" key={key} fontSize="0.75em">
+          {children}
+        </Box>
+      );
+    default:
+      return <React.Fragment key={key}>{children}</React.Fragment>;
+  }
+}
+
+function renderMarkupTree(text, keyPrefix = "mk") {
+  const source = String(text ?? "");
+  const nodes = [];
+  const stack = [{ tag: null, children: nodes }];
+  let lastIndex = 0;
+  MARKUP_RE.lastIndex = 0;
+  let match;
+
+  const flushText = (end) => {
+    if (end <= lastIndex) return;
+    const chunk = source.slice(lastIndex, end);
+    if (!chunk) return;
+    stack[stack.length - 1].children.push(
+      <React.Fragment key={`${keyPrefix}-t-${lastIndex}`}>
+        {renderLiteraryPlain(chunk, `${keyPrefix}-t-${lastIndex}`)}
+      </React.Fragment>,
+    );
+  };
+
+  while ((match = MARKUP_RE.exec(source))) {
+    flushText(match.index);
+    const raw = match[0];
+    if (/^<br/i.test(raw)) {
+      stack[stack.length - 1].children.push(<Box key={`${keyPrefix}-br-${match.index}`} as="br" />);
+      lastIndex = match.index + raw.length;
+      continue;
+    }
+    const isClose = raw.startsWith("</");
+    const tag = String(match[1] || "").toLowerCase();
+    if (isClose) {
+      if (stack.length > 1 && stack[stack.length - 1].tag === tag) {
+        const closed = stack.pop();
+        stack[stack.length - 1].children.push(
+          wrapMarkup(closed.tag, closed.children, `${keyPrefix}-${tag}-${match.index}`),
+        );
+      }
+    } else {
+      stack.push({ tag, children: [] });
+    }
+    lastIndex = match.index + raw.length;
+  }
+
+  flushText(source.length);
+
+  while (stack.length > 1) {
+    const closed = stack.pop();
+    stack[0].children.push(
+      wrapMarkup(closed.tag, closed.children, `${keyPrefix}-unclosed-${closed.tag}`),
+    );
+  }
+
+  return nodes;
+}
+
+/**
+ * يعرض نص السؤال/الاختيار مع دعم HTML الآمن (<u> للتسطير) والأبيات وLaTeX.
+ * @param {string} value
+ */
+export function renderFormattedExamText(value) {
+  const text = cleanQuestionStemForDisplay(value);
+  if (!text) return null;
+  return renderMarkupTree(text, "q");
 }

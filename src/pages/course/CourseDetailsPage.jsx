@@ -121,7 +121,7 @@ import { crContainer } from "./courseTheme";
 import LectureCard from "./components/LectureCard";
 import LecturesTab from "./components/LecturesTab";
 import CourseExamsTab from "./components/CourseExamsTab";
-import CourseFilesTab from "./components/CourseFilesTab";
+import CourseFiles from "./components/CourseFiles";
 import { useCourseFiles } from "../../Hooks/course/useCourseFiles";
 import { useCourseAccessSettings } from "../../Hooks/course/useCourseAccessSettings";
 import { useCourseAssignments, courseAssignmentsQueryKey } from "../../Hooks/course/useCourseAssignments";
@@ -3510,7 +3510,7 @@ display:block;
     {
       id: "files",
       label: "ملفات الكورس",
-      desc: "المرفقات والملفات التعليمية",
+      desc: "ملفات PDF الخاصة بالكورس",
       icon: FaFolderOpen,
       colorKey: "purple",
       count: courseFilesCount,
@@ -4347,7 +4347,7 @@ display:block;
               )}
 
               {activeSection === "files" && (
-                <CourseFilesTab
+                <CourseFiles
                   courseId={id}
                   canManage={canManageCourseFiles}
                   borderColor={borderColor}

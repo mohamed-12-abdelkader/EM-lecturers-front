@@ -8,5 +8,13 @@ import { renderFormattedExamText } from "../../utils/renderFormattedExamText";
 export default function FormattedQuestionText({ value, as = Text, ...props }) {
   if (value == null || value === "") return null;
   const Component = as;
-  return <Component {...props}>{renderFormattedExamText(value)}</Component>;
+  return (
+    <Component
+      fontFamily="'Noto Naskh Arabic', 'Noto Sans Arabic', Tahoma, serif"
+      lineHeight="2"
+      {...props}
+    >
+      {renderFormattedExamText(value)}
+    </Component>
+  );
 }

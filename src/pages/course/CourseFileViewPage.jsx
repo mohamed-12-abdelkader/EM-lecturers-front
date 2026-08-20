@@ -1,55 +1,37 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   Box,
+  Button,
   Flex,
-  HStack,
   Icon,
   IconButton,
   Text,
   useColorModeValue,
 } from "@chakra-ui/react";
-import { FiArrowRight, FiExternalLink } from "react-icons/fi";
-import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import CourseInAppPdfViewer from "./components/CourseInAppPdfViewer";
+import { FiArrowRight } from "react-icons/fi";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { courseFilesApiError, getCourseFileDisplayName } from "../../api/courseFilesApi";
+import { useCourseFile } from "../../Hooks/course/useCourseFiles";
+import { getCourseFileViewBackPath } from "../../utils/courseFileView";
+import PdfViewer from "./components/PdfViewer";
 import useFileScrollIsolation from "./hooks/useFileScrollIsolation";
 import useLockPageScroll from "./hooks/useLockPageScroll";
-import {
-  getCourseFileViewBackPath,
-  isDriveFileView,
-  resolveCourseFileOpenUrl,
-} from "../../utils/courseFileView";
+
+function isNumericFileId(fileId) {
+  return fileId && fileId !== "view" && /^\d+$/.test(String(fileId));
+}
 
 export default function CourseFileViewPage() {
   const { courseId, fileId } = useParams();
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const viewerRef = useRef(null);
 
-  const titleParam = searchParams.get("title");
-  const urlParam = searchParams.get("url");
+  const validFileId = isNumericFileId(fileId) ? fileId : null;
+  const { data: file, isLoading, isError, error, refetch } = useCourseFile(validFileId, {
+    enabled: Boolean(validFileId),
+  });
 
-  const fileName = useMemo(() => {
-    if (!titleParam) return "معاينة الملف";
-    try {
-      return decodeURIComponent(titleParam);
-    } catch {
-      return titleParam;
-    }
-  }, [titleParam]);
-
-  const fileUrl = useMemo(() => {
-    if (!urlParam) return null;
-    try {
-      return decodeURIComponent(urlParam);
-    } catch {
-      return urlParam;
-    }
-  }, [urlParam]);
-
-  const openUrl = useMemo(
-    () => resolveCourseFileOpenUrl({ fileId, url: fileUrl }),
-    [fileId, fileUrl],
-  );
+  const fileName = file ? getCourseFileDisplayName(file) : "معاينة الملف";
 
   const goBack = useCallback(() => {
     navigate(getCourseFileViewBackPath(courseId, "files"));
@@ -109,36 +91,16 @@ export default function CourseFileViewPage() {
 
         <Box flex={1} minW={0} textAlign="right">
           <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }} noOfLines={1}>
-            {fileName}
+            {isLoading ? "جاري فتح الملف..." : fileName}
           </Text>
           <Text fontSize="xs" color={muted} mt={0.5}>
-            مرّر داخل منطقة الملف — scrollbar أزرق على اليمين
+            عرض داخل المنصة — لا يُفتح رابط خارجي
           </Text>
         </Box>
 
-        {openUrl ? (
-          <HStack spacing={2} flexShrink={0}>
-            <Box
-              as="a"
-              href={openUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              download={!isDriveFileView({ fileId, url: fileUrl }) || undefined}
-              display={{ base: "none", sm: "inline-flex" }}
-              alignItems="center"
-              gap={2}
-              px={3}
-              py={1.5}
-              fontSize="sm"
-              border="1px solid"
-              borderColor={headerBorder}
-              borderRadius="xl"
-            >
-              <Icon as={FiExternalLink} />
-              {isDriveFileView({ fileId, url: fileUrl }) ? "Drive" : "تحميل"}
-            </Box>
-          </HStack>
-        ) : null}
+        <Button size="sm" variant="outline" borderRadius="xl" onClick={goBack}>
+          إغلاق
+        </Button>
       </Flex>
 
       <Box
@@ -149,7 +111,27 @@ export default function CourseFileViewPage() {
         display="flex"
         flexDirection="column"
       >
-        <CourseInAppPdfViewer fileId={fileId} fileUrl={fileUrl} fileName={fileName} />
+        {!validFileId ? (
+          <Flex flex={1} align="center" justify="center" px={6}>
+            <Text color="red.500" textAlign="center" role="alert">
+              رابط الملف غير صالح. ارجع إلى ملفات الكورس وافتح الملف من هناك.
+            </Text>
+          </Flex>
+        ) : isError && !file ? (
+          <Flex flex={1} align="center" justify="center" direction="column" gap={3} px={6}>
+            <Text color="red.500" textAlign="center" role="alert">
+              {courseFilesApiError(error, "تعذّر فتح الملف")}
+            </Text>
+            <Button size="sm" variant="outline" borderRadius="xl" onClick={() => refetch()}>
+              إعادة المحاولة
+            </Button>
+            <Button size="sm" variant="ghost" onClick={goBack}>
+              العودة للكورس
+            </Button>
+          </Flex>
+        ) : (
+          <PdfViewer fileId={validFileId} fileName={fileName} onRetry={refetch} />
+        )}
       </Box>
     </Box>
   );
