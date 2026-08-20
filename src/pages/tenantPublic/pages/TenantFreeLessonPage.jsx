@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchPlatformPublicFreeLectures } from "../../../api/tenantPublicApi";
@@ -5,6 +6,7 @@ import TenantPublicShell from "../TenantPublicShell";
 import TenantBreadcrumb from "../components/TenantBreadcrumb";
 import TenantPublicImage from "../components/TenantPublicImage";
 import { TenantPublicSkeleton, TenantPublicNotFound } from "../components/TenantPublicStates";
+import { getYouTubeEmbedUrl, isYouTubeUrl } from "../../../utils/youtubeEmbed";
 
 /**
  * Public free lesson page — indexed when lecture is published.
@@ -21,6 +23,11 @@ export default function TenantFreeLessonPage({ subdomain }) {
 
   const lectures = data?.data?.lectures || [];
   const lecture = lectures.find((l) => String(l.id) === String(lectureId));
+  const iframeSrc = useMemo(() => {
+    if (!lecture?.link) return null;
+    if (isYouTubeUrl(lecture.link)) return getYouTubeEmbedUrl(lecture.link);
+    return lecture.link;
+  }, [lecture?.link]);
 
   if (isLoading) {
     return (
@@ -57,16 +64,25 @@ export default function TenantFreeLessonPage({ subdomain }) {
         <p className="mt-2 text-sm text-green-600 dark:text-green-400">محاضرة مجانية</p>
 
         <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700">
-          {lecture.link ? (
+          {lecture.link && iframeSrc ? (
             <div className="aspect-video w-full bg-black">
               <iframe
-                src={lecture.link}
+                src={iframeSrc}
                 title={title}
                 className="h-full w-full"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
                 loading="lazy"
               />
+            </div>
+          ) : lecture.link ? (
+            <div className="px-6 py-10 text-center">
+              <p className="text-sm font-semibold text-red-600 dark:text-red-400">
+                رابط الفيديو غير صالح
+              </p>
+              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                تعذر تشغيل هذا الرابط داخل المنصة.
+              </p>
             </div>
           ) : (
             <TenantPublicImage src={lecture.image_url} alt={title} priority />

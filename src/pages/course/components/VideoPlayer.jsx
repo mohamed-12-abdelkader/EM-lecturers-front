@@ -15,6 +15,7 @@ import {
   Button,
 } from '@chakra-ui/react';
 import { FaPlay, FaPause, FaExpand, FaCompress, FaTimes } from 'react-icons/fa';
+import { getYouTubeEmbedUrl, getYouTubeVideoId, isYouTubeUrl } from '../../../utils/youtubeEmbed';
 
 const VideoPlayer = ({ 
   videoUrl, 
@@ -36,15 +37,9 @@ const VideoPlayer = ({
   const borderColor = useColorModeValue('gray.200', 'gray.600');
   const textColor = useColorModeValue('gray.800', 'white');
 
-  // دالة لاستخراج معرف الفيديو من رابط YouTube
-  const getYouTubeVideoId = (url) => {
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-    const match = url.match(regExp);
-    return (match && match[2].length === 11) ? match[2] : null;
-  };
-
   // دالة لاستخراج معرف الفيديو من رابط Bunny
   const getBunnyVideoId = (url) => {
+    if (!url || typeof url !== 'string') return null;
     // مثال: https://iframe.mediadelivery.net/embed/12345/abcdef
     const match = url.match(/embed\/([^\/]+)\/([^\/\?]+)/);
     return match ? { libraryId: match[1], videoId: match[2] } : null;
@@ -52,9 +47,11 @@ const VideoPlayer = ({
 
   // تحديد نوع الفيديو
   const getVideoType = (url) => {
-    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+    if (!url || typeof url !== 'string') return 'unknown';
+    if (isYouTubeUrl(url) || url.includes('youtube.com') || url.includes('youtu.be')) {
       return 'youtube';
-    } else if (url.includes('mediadelivery.net') || url.includes('bunny.net')) {
+    }
+    if (url.includes('mediadelivery.net') || url.includes('bunny.net')) {
       return 'bunny';
     }
     return 'unknown';
@@ -63,18 +60,32 @@ const VideoPlayer = ({
   const videoType = getVideoType(videoUrl);
   const youtubeVideoId = videoType === 'youtube' ? getYouTubeVideoId(videoUrl) : null;
   const bunnyVideoData = videoType === 'bunny' ? getBunnyVideoId(videoUrl) : null;
+  const youtubeEmbedUrl = React.useMemo(
+    () =>
+      getYouTubeEmbedUrl(videoUrl, {
+        enablejsapi: 1,
+        playsinline: 1,
+        modestbranding: 1,
+        controls: 1,
+        iv_load_policy: 3,
+        fs: 0,
+        disablekb: 1,
+      }),
+    [videoUrl],
+  );
 
   // دالة لإنشاء iframe YouTube
   const renderYouTubePlayer = () => {
-    if (!youtubeVideoId) return null;
+    if (!youtubeEmbedUrl) return null;
     
     return (
       <Box position="relative" w="full" h="full">
         <iframe
+          key={youtubeVideoId}
           ref={videoRef}
           width="100%"
           height="100%"
-          src={`https://www.youtube.com/embed/${youtubeVideoId}?autoplay=${isPlaying ? 1 : 0}&rel=0&modestbranding=1&controls=1&showinfo=0&iv_load_policy=3&fs=0&disablekb=1&playsinline=1&enablejsapi=1`}
+          src={youtubeEmbedUrl}
           title={videoTitle || 'YouTube video player'}
           frameBorder="0"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

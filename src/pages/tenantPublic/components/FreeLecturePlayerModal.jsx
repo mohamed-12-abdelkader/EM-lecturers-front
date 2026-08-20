@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import Plyr from "plyr";
 import "plyr/dist/plyr.css";
 import { FaTimes } from "react-icons/fa";
+import { getYouTubeVideoId, isYouTubeUrl, YOUTUBE_PLYR_OPTIONS } from "../../../utils/youtubeEmbed";
 
 const PLYR_I18N = {
   restart: "إعادة التشغيل",
@@ -26,19 +27,6 @@ const PLYR_I18N = {
   quality: "الجودة",
 };
 
-function getYoutubeId(url) {
-  if (!url) return null;
-  if (url.includes("youtube.com/watch?v=")) {
-    return url.split("v=")[1].split("&")[0];
-  }
-  if (url.includes("youtu.be/")) {
-    return url.split("youtu.be/")[1].split("?")[0];
-  }
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-  const match = url.match(regExp);
-  return match && match[2]?.length === 11 ? match[2] : null;
-}
-
 function getBunnyEmbed(url) {
   const match = url?.match(/embed\/([^/]+)\/([^/?]+)/);
   return match ? { libraryId: match[1], videoId: match[2] } : null;
@@ -50,8 +38,11 @@ function getVimeoEmbed(url) {
 }
 
 export function resolveFreeLectureEmbed(url) {
-  const youtubeId = getYoutubeId(url);
+  if (!url) return { kind: "invalid" };
+
+  const youtubeId = getYouTubeVideoId(url);
   if (youtubeId) return { kind: "youtube", youtubeId };
+  if (isYouTubeUrl(url)) return { kind: "invalid" };
 
   const bunny = getBunnyEmbed(url);
   if (bunny) {
@@ -96,6 +87,8 @@ function PlyrYoutubePlayer({ youtubeId }) {
       speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2] },
       seekTime: 10,
       i18n: PLYR_I18N,
+      captions: { active: false },
+      youtube: { ...YOUTUBE_PLYR_OPTIONS },
     });
     playerRef.current = player;
 

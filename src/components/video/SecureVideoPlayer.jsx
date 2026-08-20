@@ -1,8 +1,9 @@
 import { useEffect, useRef, useMemo } from "react";
-import { Box } from "@chakra-ui/react";
+import { Box, Text } from "@chakra-ui/react";
 import Plyr from "plyr";
 import Hls from "hls.js";
 import "plyr/dist/plyr.css";
+import { getYouTubeVideoId, YOUTUBE_PLYR_OPTIONS } from "../../utils/youtubeEmbed";
 
 const PLYR_I18N = {
   restart: "إعادة التشغيل",
@@ -26,17 +27,6 @@ const PLYR_I18N = {
   normal: "عادي",
   quality: "الجودة",
 };
-
-function getYoutubeId(url) {
-  if (!url) return null;
-  if (url.includes("youtube.com/watch?v=")) {
-    return url.split("v=")[1].split("&")[0];
-  }
-  if (url.includes("youtu.be/")) {
-    return url.split("youtu.be/")[1].split("?")[0];
-  }
-  return null;
-}
 
 function getBunnyEmbed(url) {
   const match = url?.match(/embed\/([^/]+)\/([^/?]+)/);
@@ -166,16 +156,59 @@ function SecureHlsPlayer({
   );
 }
 
+function disableYouTubeCaptions(ytPlayer) {
+  if (!ytPlayer) return;
+  try {
+    ytPlayer.unloadModule("captions");
+  } catch {
+    /* module may not be loaded yet */
+  }
+  try {
+    ytPlayer.unloadModule("cc");
+  } catch {
+    /* ignore */
+  }
+  try {
+    ytPlayer.setOption("captions", "track", {});
+  } catch {
+    /* ignore */
+  }
+}
+
+function bindYouTubeCaptionGuard(player) {
+  const apply = () => disableYouTubeCaptions(player.embed);
+
+  player.on("ready", () => {
+    player.toggleCaptions(false);
+    apply();
+    player.embed?.addEventListener?.("onApiChange", apply);
+  });
+
+  player.on("captionsenabled", () => {
+    player.toggleCaptions(false);
+    apply();
+  });
+
+  player.on("statechange", apply);
+}
+
 function SecureYoutubePlayer({ youtubeUrl, onPlayerReady }) {
-  const youtubeId = getYoutubeId(youtubeUrl);
+  const youtubeId = getYouTubeVideoId(youtubeUrl);
   const playerId = useMemo(() => `secure-yt-${youtubeId}`, [youtubeId]);
 
   useEffect(() => {
     if (!youtubeId) return undefined;
     const player = new Plyr(`#${playerId}`, {
       ...buildPlyrOptions(),
-      youtube: { noCookie: true, rel: 0, iv_load_policy: 3, modestbranding: 1 },
+      captions: { active: false, update: false },
+      youtube: {
+        noCookie: true,
+        iv_load_policy: 3,
+        modestbranding: 1,
+        ...YOUTUBE_PLYR_OPTIONS,
+      },
     });
+    bindYouTubeCaptionGuard(player);
     onPlayerReady?.(player);
     return () => {
       try {
@@ -186,7 +219,13 @@ function SecureYoutubePlayer({ youtubeUrl, onPlayerReady }) {
     };
   }, [youtubeId, playerId, onPlayerReady]);
 
-  if (!youtubeId) return null;
+  if (!youtubeId) {
+    return (
+      <Box p={8} textAlign="center">
+        <Text color="white">رابط فيديو YouTube غير صالح</Text>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ ".plyr": { fontFamily: "'Cairo', 'Tajawal', sans-serif" } }}>

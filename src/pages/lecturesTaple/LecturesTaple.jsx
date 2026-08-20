@@ -28,6 +28,7 @@ import {
   FaTrophy,
   FaVideo,
 } from "react-icons/fa";
+import { getYouTubeVideoId } from "../../utils/youtubeEmbed";
 import { MdSchedule, MdReplay } from "react-icons/md";
 import { Link } from "react-router-dom";
 import baseUrl from "../../api/baseUrl";
@@ -109,8 +110,7 @@ const LecturesTaple = () => {
   };
 
   const getYouTubeThumbnail = (url) => {
-    if (!url) return "";
-    const videoId = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/)?.[1];
+    const videoId = getYouTubeVideoId(url);
     return videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : "";
   };
 

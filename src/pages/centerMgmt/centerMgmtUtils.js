@@ -121,6 +121,8 @@ export function groupName(row) {
 export function parseQrScan(text) {
   const raw = String(text || "").trim();
   if (!raw) return null;
+  const UUID_RE =
+    /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;
   try {
     const parsed = JSON.parse(raw);
     const token =
@@ -133,9 +135,13 @@ export function parseQrScan(text) {
       };
     }
   } catch {
-    // plain token
+    // parent card text, URL, or plain token
   }
-  return { qr_token: raw };
+  const uuid = raw.match(UUID_RE)?.[0]?.toLowerCase() || null;
+  return {
+    qr_token: uuid || raw,
+    qr_payload: raw,
+  };
 }
 
 export function monthFirstLast(year, month) {
