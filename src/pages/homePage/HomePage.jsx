@@ -1035,7 +1035,7 @@ const HomePage = () => {
 
         <HomeProMyCourses
           teacherName={teacherDisplayName}
-          limit={2}
+          limit={3}
           refreshKey={coursesRefreshKey}
         />
 

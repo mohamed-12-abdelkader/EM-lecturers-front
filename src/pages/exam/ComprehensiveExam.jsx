@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import {
   Box,
   VStack,
@@ -156,24 +156,28 @@ const ComprehensiveExam = () => {
     });
   }, [questions, questionSearch]);
 
-  // جلب درجات الطلاب
-  const fetchGrades = async () => {
+  const fetchGrades = useCallback(async () => {
+    if (!id) return;
     setGradesLoading(true);
     setGradesError(null);
     try {
       const token = localStorage.getItem("token");
       const res = await baseUrl.get(
         `/api/course/lecture-exam/${id}/submissions`,
-        token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+        token ? { headers: { Authorization: `Bearer ${token}` } } : {},
       );
       setGradesData(res.data.submissions || []);
-      setShowGrades(true);
     } catch (err) {
       setGradesError("حدث خطأ أثناء تحميل الدرجات");
     } finally {
       setGradesLoading(false);
     }
-  };
+  }, [id]);
+
+  const openGrades = useCallback(() => {
+    setShowGrades(true);
+    if (gradesData == null && !gradesLoading) fetchGrades();
+  }, [fetchGrades, gradesData, gradesLoading]);
 
   // استخدام useRef لتتبع الـ ID السابق
   const prevExamIdRef = useRef(null);
@@ -194,6 +198,9 @@ const ComprehensiveExam = () => {
         setStudentAnswers({});
         setSubmitResult(null);
         setCurrentQuestionIndex(0);
+        setGradesData(null);
+        setShowGrades(false);
+        setGradesError(null);
       }
 
       // تحديث الـ ref
@@ -206,6 +213,12 @@ const ComprehensiveExam = () => {
     }
     // eslint-disable-next-line
   }, [id, isTeacher, isAdmin]);
+
+  useEffect(() => {
+    if (!id || !(isTeacher || isAdmin)) return undefined;
+    fetchGrades();
+    return undefined;
+  }, [id, isTeacher, isAdmin, fetchGrades]);
 
   // عداد الوقت للمحاولة النشطة
   useEffect(() => {
@@ -1631,7 +1644,7 @@ const ComprehensiveExam = () => {
           filteredCount={filteredQuestions.length}
           searchQuery={questionSearch}
           onSearchChange={setQuestionSearch}
-          onGrades={fetchGrades}
+          onGrades={openGrades}
           onReport={() => navigate(`/lecture-exam/${id}/report`)}
           onAddImages={openAddImageModal}
           onBulkText={() => setBulkTextModalOpen(true)}
@@ -1678,8 +1691,10 @@ const ComprehensiveExam = () => {
               })}
             </VStack>
           ) : questions.length > 0 ? (
-            <Box py={10} textAlign="center">
-              <Text color="gray.500">لا توجد أسئلة تطابق البحث</Text>
+            <Box py={12} textAlign="center">
+              <Text color="gray.500" fontSize="sm">
+                لا توجد أسئلة تطابق البحث
+              </Text>
             </Box>
           ) : (
             <TeacherExamEmptyState

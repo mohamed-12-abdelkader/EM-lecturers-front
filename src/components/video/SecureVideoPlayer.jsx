@@ -26,6 +26,24 @@ const PLYR_I18N = {
   speed: "سرعة التشغيل",
   normal: "عادي",
   quality: "الجودة",
+  qualityLabel: {
+    0: "تلقائي",
+  },
+};
+
+const PLAYER_SX = {
+  ".plyr": { fontFamily: "'Cairo', 'Tajawal', sans-serif" },
+  ".plyr__control--overlaid": { bg: "blue.500" },
+  ".plyr__menu__container": { direction: "rtl", textAlign: "right" },
+};
+
+const YOUTUBE_PLAYER_SX = {
+  ...PLAYER_SX,
+  /* إظهار شريط يوتيوب الأصلي حتى تعمل قائمة الجودة */
+  ".plyr--full-ui .plyr__video-embed > .plyr__video-embed__container": {
+    paddingBottom: "56.25%",
+    transform: "none",
+  },
 };
 
 function getBunnyEmbed(url) {
@@ -55,6 +73,11 @@ function buildPlyrOptions() {
     seekTime: 10,
     i18n: PLYR_I18N,
     ratio: "16:9",
+    quality: {
+      default: 0,
+      options: [2160, 1440, 1080, 720, 576, 480, 360, 240, 0],
+      forced: false,
+    },
   };
 }
 
@@ -96,21 +119,24 @@ function SecureHlsPlayer({
       hls.loadSource(manifestUrl);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        if (hls.levels?.length) {
-          const heights = hls.levels.map((l) => l.height).filter(Boolean);
-          if (heights.length) {
-            plyrOpts.quality = {
-              default: heights[0],
-              options: heights,
-              forced: true,
-              onChange: (q) => {
-                hls.levels.forEach((level, i) => {
-                  if (level.height === q) hls.currentLevel = i;
-                });
-                onEvent?.("quality_change", { quality: q });
-              },
-            };
-          }
+        const heights = [
+          ...new Set((hls.levels || []).map((level) => level.height).filter(Boolean)),
+        ].sort((a, b) => b - a);
+        if (heights.length) {
+          plyrOpts.quality = {
+            default: 0,
+            options: [...heights, 0],
+            forced: true,
+            onChange: (quality) => {
+              if (quality === 0) {
+                hls.currentLevel = -1;
+              } else {
+                const index = hls.levels.findIndex((level) => level.height === quality);
+                if (index >= 0) hls.currentLevel = index;
+              }
+              onEvent?.("quality_change", { quality });
+            },
+          };
         }
         player = new Plyr(video, plyrOpts);
         onPlayerReady?.(player, video);
@@ -148,8 +174,7 @@ function SecureHlsPlayer({
       ref={containerRef}
       w="full"
       sx={{
-        ".plyr": { fontFamily: "'Cairo', 'Tajawal', sans-serif" },
-        ".plyr__control--overlaid": { bg: "blue.500" },
+        ...PLAYER_SX,
         video: { maxHeight: "70vh" },
       }}
     />
@@ -199,10 +224,12 @@ function SecureYoutubePlayer({ youtubeUrl, onPlayerReady }) {
   useEffect(() => {
     if (!youtubeId) return undefined;
     const player = new Plyr(`#${playerId}`, {
-      ...buildPlyrOptions(),
+      ratio: "16:9",
       captions: { active: false, update: false },
       youtube: {
-        noCookie: true,
+        customControls: false,
+        noCookie: false,
+        controls: 1,
         iv_load_policy: 3,
         modestbranding: 1,
         ...YOUTUBE_PLYR_OPTIONS,
@@ -228,8 +255,11 @@ function SecureYoutubePlayer({ youtubeUrl, onPlayerReady }) {
   }
 
   return (
-    <Box sx={{ ".plyr": { fontFamily: "'Cairo', 'Tajawal', sans-serif" } }}>
+    <Box sx={YOUTUBE_PLAYER_SX}>
       <div id={playerId} data-plyr-provider="youtube" data-plyr-embed-id={youtubeId} />
+      <Text mt={3} px={3} pb={2} fontSize="sm" color="whiteAlpha.800" textAlign="center">
+        لتغيير الجودة: شغّل الفيديو ثم اضغط أيقونة الإعدادات داخل مشغل يوتيوب واختر Quality
+      </Text>
     </Box>
   );
 }

@@ -1,0 +1,141 @@
+/* شاشة تحميل — نفس أسلوب #app-boot، بدون isolation/contain حتى لا تختفي الصورة */
+.brand-loading-screen {
+  --bls-bg: #ffffff;
+  --bls-text: #718096;
+  --bls-track: #ebf8ff;
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 32px;
+  box-sizing: border-box;
+  background: var(--bls-bg);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+html[data-theme="dark"] .brand-loading-screen,
+.chakra-ui-dark .brand-loading-screen {
+  --bls-bg: #171923;
+  --bls-text: #a0aec0;
+  --bls-track: rgba(255, 255, 255, 0.12);
+}
+
+.brand-loading-screen__top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(to left, #3182ce, #ed8936);
+}
+
+.brand-loading-screen__pulse {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation: brand-loading-pulse 2s ease-in-out infinite;
+}
+
+.brand-loading-screen__hero-wrap {
+  width: clamp(220px, 42vw, 300px);
+  height: clamp(220px, 42vw, 300px);
+  border-radius: 50%;
+  overflow: hidden;
+  margin-bottom: 16px;
+  background-color: var(--bls-bg);
+  background-image: url("/images/brand-loading-hero.jpg");
+  background-size: cover;
+  background-position: center;
+}
+
+.brand-loading-screen__hero {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.brand-loading-screen__text {
+  margin: 0 0 24px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--bls-text);
+  font-family: "Noto Sans Arabic", "Changa", Tahoma, sans-serif;
+}
+
+.brand-loading-screen__bar {
+  width: min(280px, 72vw);
+  height: 4px;
+  border-radius: 999px;
+  background: var(--bls-track);
+  overflow: hidden;
+  position: relative;
+}
+
+.brand-loading-screen__bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(to left, #3182ce, #ed8936);
+  transition: width 0.3s ease;
+}
+
+.brand-loading-screen__bar-indeterminate {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 40%;
+  border-radius: 999px;
+  background: linear-gradient(to left, #3182ce, #ed8936);
+  animation: brand-loading-bar 1.2s ease-in-out infinite;
+}
+
+/* صورة تسخين ظاهرة للمتصفح (opacity 0) بحجم العرض — بدون display:none */
+.brand-loading-hero-warm {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 300px;
+  height: 300px;
+  object-fit: cover;
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
+@keyframes brand-loading-pulse {
+  0%,
+  100% {
+    opacity: 0.88;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes brand-loading-bar {
+  0% {
+    left: 0;
+  }
+  100% {
+    left: 60%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-loading-screen__pulse,
+  .brand-loading-screen__bar-indeterminate {
+    animation: none !important;
+  }
+
+  .brand-loading-screen__bar-indeterminate {
+    left: 20%;
+    width: 60%;
+  }
+}

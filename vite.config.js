@@ -121,6 +121,7 @@ export default defineConfig(({ mode }) => {
             // لا ن precache الـ webmanifest — الـ SW يقدّم مانيفست ديناميكي لكل منصة مدرس
             "**/*.{js,css,html,woff2}",
             "icons/*.png",
+            "images/brand-loading-hero.jpg",
             "offline.html",
           ],
           // الباندل الرئيسي أكبر من الحد الافتراضي (2MB)

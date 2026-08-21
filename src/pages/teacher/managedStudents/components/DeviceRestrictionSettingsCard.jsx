@@ -25,7 +25,7 @@ const DeviceRestrictionSettingsCard = () => {
   const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [mode, setMode] = useState("single_device");
+  const [mode, setMode] = useState("multiple_devices");
   const [options, setOptions] = useState([]);
 
   const cardBg = useColorModeValue("white", "gray.800");
@@ -39,7 +39,7 @@ const DeviceRestrictionSettingsCard = () => {
       try {
         setLoading(true);
         const { settings, options: apiOptions } = await fetchTeacherDeviceRestrictionSettings();
-        setMode(settings?.student_device_limit || "single_device");
+        setMode(settings?.student_device_limit || "multiple_devices");
         setOptions(apiOptions);
       } catch (err) {
         toast({

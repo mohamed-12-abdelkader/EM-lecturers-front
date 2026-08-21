@@ -3521,7 +3521,7 @@ display:block;
   );
 
   return (
-    <Box minH="100vh" bg={pageBg} dir="rtl" overflowX="hidden">
+    <Box minH="100vh" bg={pageBg} dir="rtl" overflowX="hidden" mt={0} pt={0}>
       {/* Hero Section - Full Width Image with Overlay */}
       <CourseHeroSection
         course={course}

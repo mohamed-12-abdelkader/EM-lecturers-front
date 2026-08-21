@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Box,
   Badge,
   Button,
+  ButtonGroup,
   Collapse,
   Center,
   Container,
@@ -10,6 +11,10 @@ import {
   Heading,
   HStack,
   Icon,
+  Input,
+  InputGroup,
+  InputRightElement,
+  Progress,
   SimpleGrid,
   Spinner,
   Text,
@@ -22,7 +27,7 @@ import {
   AiOutlineCheckCircle,
   AiOutlineCloseCircle,
 } from "react-icons/ai";
-import { FiChevronDown, FiArrowRight } from "react-icons/fi";
+import { FiChevronDown, FiArrowRight, FiSearch, FiAward } from "react-icons/fi";
 import { FaChartBar } from "react-icons/fa";
 import { ExamQuestionImage } from "./ExamQuestionDisplay";
 import { renderFormattedExamText } from "../../../utils/renderFormattedExamText";
@@ -31,16 +36,155 @@ import {
   getWrongQuestionsCount,
 } from "../utils/examSubmissionUtils";
 
-function SubmissionStat({ label, value, accent }) {
-  const muted = useColorModeValue("gray.500", "gray.400");
+const FONT = "'Noto Sans Arabic', 'Noto Naskh Arabic', Tahoma, sans-serif";
+const NAVY = "#0E4C92";
+const GREEN = "#16A34A";
+const RED = "#DC2626";
+
+function resolveSubmissionOutcome(submission) {
+  const obtained = Number(submission?.obtained_grade ?? submission?.obtainedGrade ?? 0);
+  const total = Number(submission?.total_grade ?? submission?.totalGrade ?? 0);
+  const percentage =
+    submission?.percentage != null
+      ? Math.round(Number(submission.percentage))
+      : total > 0
+        ? Math.round((obtained / total) * 100)
+        : 0;
+  const passed =
+    submission?.passed != null ? Boolean(submission.passed) : percentage >= 50;
+
+  return { obtained, total, percentage, passed };
+}
+
+function studentInitials(name) {
+  const parts = String(name || "طالب")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (!parts.length) return "ط";
+  if (parts.length === 1) return parts[0].slice(0, 1);
+  return `${parts[0].slice(0, 1)}${parts[1].slice(0, 1)}`;
+}
+
+function ScoreRing({ percentage, passed, size = 92 }) {
+  const trackColor = useColorModeValue("#E8EEF5", "#334155");
+  const ringColor = passed ? GREEN : RED;
+  const stroke = 8;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (Math.min(100, Math.max(0, percentage)) / 100) * circumference;
+
   return (
-    <Box textAlign="center">
-      <Text fontSize="xs" color={muted} mb={1}>
+    <Box position="relative" w={`${size}px`} h={`${size}px`} flexShrink={0}>
+      <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={trackColor}
+          strokeWidth={stroke}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={ringColor}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          style={{ transition: "stroke-dashoffset 0.7s ease" }}
+        />
+      </svg>
+      <Flex
+        position="absolute"
+        inset={0}
+        direction="column"
+        align="center"
+        justify="center"
+        fontFamily={FONT}
+      >
+        <Text
+          fontSize={percentage >= 100 ? "lg" : "xl"}
+          fontWeight="800"
+          lineHeight="1"
+          color={passed ? "green.600" : "red.500"}
+          sx={{ fontVariantNumeric: "tabular-nums" }}
+        >
+          {percentage}%
+        </Text>
+      </Flex>
+    </Box>
+  );
+}
+
+function StatusBadge({ passed }) {
+  return (
+    <HStack
+      spacing={2}
+      px={3.5}
+      py={1.5}
+      borderRadius="full"
+      bg={passed ? "green.50" : "red.50"}
+      borderWidth="1px"
+      borderColor={passed ? "green.200" : "red.200"}
+      _dark={{
+        bg: passed ? "whiteAlpha.100" : "whiteAlpha.100",
+        borderColor: passed ? "green.700" : "red.700",
+      }}
+    >
+      <Icon
+        as={passed ? AiOutlineCheckCircle : AiOutlineCloseCircle}
+        color={passed ? "green.500" : "red.500"}
+        boxSize={4}
+      />
+      <Text
+        fontFamily={FONT}
+        fontSize="sm"
+        fontWeight="800"
+        color={passed ? "green.700" : "red.600"}
+        letterSpacing="0.02em"
+      >
+        {passed ? "ناجح" : "راسب"}
+      </Text>
+    </HStack>
+  );
+}
+
+function SummaryStat({ label, value, hint, accent }) {
+  const cardBg = useColorModeValue("white", "gray.900");
+  const border = useColorModeValue("gray.200", "gray.700");
+  const muted = useColorModeValue("gray.500", "gray.400");
+
+  return (
+    <Box
+      bg={cardBg}
+      borderWidth="1px"
+      borderColor={border}
+      borderRadius="xl"
+      p={4}
+      textAlign="center"
+      fontFamily={FONT}
+    >
+      <Text fontSize="xs" color={muted} mb={1} fontWeight="600">
         {label}
       </Text>
-      <Text fontSize="lg" fontWeight="bold" color={accent || "inherit"}>
+      <Text
+        fontSize={{ base: "xl", md: "2xl" }}
+        fontWeight="800"
+        color={accent || "inherit"}
+        sx={{ fontVariantNumeric: "tabular-nums" }}
+        lineHeight="1.1"
+      >
         {value}
       </Text>
+      {hint ? (
+        <Text fontSize="xs" color={muted} mt={1}>
+          {hint}
+        </Text>
+      ) : null}
     </Box>
   );
 }
@@ -59,6 +203,7 @@ function WrongQuestionCard({ question, index, onZoomImage }) {
       borderColor={border}
       bg={cardBg}
       overflow="hidden"
+      fontFamily={FONT}
     >
       <Box px={3} py={2} bg={softBg} borderBottomWidth="1px" borderColor={border}>
         <HStack spacing={2} flexWrap="wrap">
@@ -121,6 +266,7 @@ function AnswerRow({ type, label, text }) {
       borderRightWidth="3px"
       borderRightColor={isWrong ? "red.400" : "green.400"}
       align="start"
+      fontFamily={FONT}
     >
       <HStack spacing={1.5} minW="88px" flexShrink={0}>
         <IconComp size={14} color={isWrong ? "#ef4444" : "#16a34a"} />
@@ -142,16 +288,15 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
   const muted = useColorModeValue("gray.500", "gray.400");
   const heading = useColorModeValue("gray.900", "white");
   const hoverBg = useColorModeValue("blackAlpha.50", "whiteAlpha.100");
-  const accentBar = submission.passed ? "green.400" : "red.400";
+  const avatarBg = useColorModeValue("#E8F0FA", "whiteAlpha.100");
+  const progressTrack = useColorModeValue("gray.100", "gray.700");
   const perfectBg = useColorModeValue("green.50", "whiteAlpha.100");
   const perfectBorder = useColorModeValue("green.200", "green.700");
   const perfectText = useColorModeValue("green.700", "green.200");
+  const scorePanelBg = useColorModeValue("#F7FAFC", "whiteAlpha.50");
 
-  const wrongQuestions = getWrongQuestions(submission);
+  const { obtained, total, percentage, passed } = resolveSubmissionOutcome(submission);
   const wrongCount = getWrongQuestionsCount(submission);
-  const obtainedGrade = submission.obtained_grade ?? submission.obtainedGrade;
-  const totalGrade = submission.total_grade ?? submission.totalGrade;
-
   const statusLabel =
     submission.status === "submitted"
       ? "مُسلَّم"
@@ -161,77 +306,160 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
     <Box
       bg={cardBg}
       borderWidth="1px"
-      borderColor={border}
-      borderRadius="xl"
+      borderColor={passed ? "green.100" : "red.100"}
+      borderRadius="2xl"
       overflow="hidden"
+      fontFamily={FONT}
+      _dark={{ borderColor: passed ? "green.800" : "red.800" }}
     >
-      <Box h="3px" bg={accentBar} />
+      <Box h="4px" bg={passed ? GREEN : RED} />
       <Box p={{ base: 4, md: 5 }}>
         <Flex
           justify="space-between"
-          align="start"
-          gap={3}
-          flexWrap="wrap"
+          align={{ base: "stretch", md: "center" }}
+          gap={5}
+          direction={{ base: "column", md: "row" }}
           mb={4}
         >
-          <Box minW={0}>
-            <HStack spacing={2} mb={1} flexWrap="wrap">
-              <Badge colorScheme="blue" borderRadius="md">
-                #{index + 1}
-              </Badge>
-              <Badge colorScheme="gray" variant="subtle">
-                محاولة {submission.attempt_number ?? 1}
-              </Badge>
-              <Badge colorScheme={submission.passed ? "green" : "red"}>
-                {submission.passed ? "ناجح" : "راسب"}
-              </Badge>
-            </HStack>
-            <Heading size="md" color={heading} mb={1}>
-              {submission.name || "طالب"}
-            </Heading>
-            <HStack spacing={3} flexWrap="wrap" fontSize="sm" color={muted}>
-              {submission.phone && <Text>{submission.phone}</Text>}
-              {submission.email && <Text>{submission.email}</Text>}
-              <Text>ID: {submission.student_id}</Text>
-            </HStack>
-          </Box>
+          <HStack align="start" spacing={3} minW={0} flex={1}>
+            <Flex
+              w="48px"
+              h="48px"
+              borderRadius="xl"
+              bg={avatarBg}
+              color={NAVY}
+              align="center"
+              justify="center"
+              fontWeight="800"
+              fontSize="md"
+              flexShrink={0}
+            >
+              {studentInitials(submission.name)}
+            </Flex>
+            <Box minW={0} flex={1}>
+              <HStack spacing={2} mb={1.5} flexWrap="wrap">
+                <Badge colorScheme="blue" variant="subtle" borderRadius="md" fontFamily={FONT}>
+                  #{index + 1}
+                </Badge>
+                <Badge colorScheme="gray" variant="subtle" fontFamily={FONT}>
+                  محاولة {submission.attempt_number ?? 1}
+                </Badge>
+                <StatusBadge passed={passed} />
+              </HStack>
+              <Heading
+                as="h3"
+                fontSize={{ base: "lg", md: "xl" }}
+                fontWeight="800"
+                color={heading}
+                mb={1}
+                fontFamily={FONT}
+                lineHeight="1.4"
+                noOfLines={1}
+              >
+                {submission.name || "طالب"}
+              </Heading>
+              <HStack spacing={3} flexWrap="wrap" fontSize="sm" color={muted}>
+                {submission.phone && <Text>{submission.phone}</Text>}
+                {submission.email && <Text noOfLines={1}>{submission.email}</Text>}
+                {submission.student_id != null && <Text>رقم الطالب: {submission.student_id}</Text>}
+              </HStack>
+            </Box>
+          </HStack>
 
-          <VStack align={{ base: "start", sm: "end" }} spacing={1}>
-            <Text fontSize="2xl" fontWeight="bold" color={heading}>
-              {obtainedGrade != null ? obtainedGrade : "—"}
-              <Text as="span" fontSize="lg" color={muted} fontWeight="normal">
-                {" "}
-                / {totalGrade != null ? totalGrade : "—"}
+          <Flex
+            align="center"
+            gap={4}
+            bg={scorePanelBg}
+            borderRadius="2xl"
+            px={{ base: 3, md: 4 }}
+            py={3}
+            justify={{ base: "space-between", md: "flex-end" }}
+            minW={{ md: "280px" }}
+          >
+            <ScoreRing percentage={percentage} passed={passed} />
+            <Box textAlign="end">
+              <Text fontSize="xs" color={muted} fontWeight="600" mb={0.5}>
+                الدرجة
               </Text>
-            </Text>
-            <Text fontSize="xs" color={muted}>
-              الدرجة
-            </Text>
-          </VStack>
+              <Text
+                fontSize="2xl"
+                fontWeight="800"
+                color={heading}
+                lineHeight="1.1"
+                sx={{ fontVariantNumeric: "tabular-nums" }}
+              >
+                {Number.isFinite(obtained) ? obtained : "—"}
+                <Text as="span" fontSize="md" color={muted} fontWeight="600">
+                  {" "}
+                  / {Number.isFinite(total) && total > 0 ? total : "—"}
+                </Text>
+              </Text>
+              <Text
+                mt={1}
+                fontSize="sm"
+                fontWeight="800"
+                color={passed ? "green.600" : "red.500"}
+              >
+                {passed ? "اجتاز الامتحان" : "لم يجتز الامتحان"}
+              </Text>
+            </Box>
+          </Flex>
         </Flex>
 
-        <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3} mb={4}>
-          <SubmissionStat label="الحالة" value={statusLabel} />
-          <SubmissionStat
-            label="أخطاء"
-            value={wrongCount}
-            accent={wrongCount > 0 ? "red.500" : "green.500"}
+        <Box mb={4}>
+          <Flex justify="space-between" mb={1.5} fontFamily={FONT}>
+            <Text fontSize="xs" fontWeight="700" color={muted}>
+              النسبة المئوية
+            </Text>
+            <Text
+              fontSize="sm"
+              fontWeight="800"
+              color={passed ? "green.600" : "red.500"}
+              sx={{ fontVariantNumeric: "tabular-nums" }}
+            >
+              {percentage}%
+            </Text>
+          </Flex>
+          <Progress
+            value={percentage}
+            size="md"
+            borderRadius="full"
+            colorScheme={passed ? "green" : "red"}
+            bg={progressTrack}
+            sx={{ "& > div": { transition: "width 0.5s ease" } }}
           />
-          <SubmissionStat
-            label="رقم التسليم"
-            value={submission.submission_id ?? "—"}
-          />
-          <SubmissionStat
-            label="تاريخ التسليم"
-            value={
-              submission.submitted_at
+        </Box>
+
+        <SimpleGrid columns={{ base: 2, md: 3 }} spacing={3} mb={4}>
+          <Box textAlign="center">
+            <Text fontSize="xs" color={muted} fontWeight="600" mb={1}>
+              الحالة
+            </Text>
+            <Text fontSize="sm" fontWeight="700">
+              {statusLabel}
+            </Text>
+          </Box>
+          <Box textAlign="center">
+            <Text fontSize="xs" color={muted} fontWeight="600" mb={1}>
+              الأسئلة الخاطئة
+            </Text>
+            <Text fontSize="sm" fontWeight="800" color={wrongCount > 0 ? "red.500" : "green.500"}>
+              {wrongCount}
+            </Text>
+          </Box>
+          <Box textAlign="center" gridColumn={{ base: "span 2", md: "auto" }}>
+            <Text fontSize="xs" color={muted} fontWeight="600" mb={1}>
+              تاريخ التسليم
+            </Text>
+            <Text fontSize="sm" fontWeight="700">
+              {submission.submitted_at
                 ? new Date(submission.submitted_at).toLocaleString("ar-EG", {
-                    dateStyle: "short",
+                    dateStyle: "medium",
                     timeStyle: "short",
                   })
-                : "—"
-            }
-          />
+                : "—"}
+            </Text>
+          </Box>
         </SimpleGrid>
 
         {wrongCount > 0 ? (
@@ -271,10 +499,10 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
                 transform={wrongOpen ? "rotate(180deg)" : "rotate(0deg)"}
               />
             </Flex>
-            <Collapse in={wrongOpen} animateOpacity>
+            <Collapse in={wrongOpen} animateOpacity unmountOnExit>
               <Box px={4} pb={4} pt={1}>
                 <VStack spacing={3} align="stretch">
-                  {wrongQuestions.map((q, qIdx) => (
+                  {getWrongQuestions(submission).map((q, qIdx) => (
                     <WrongQuestionCard
                       key={q.questionId || qIdx}
                       question={q}
@@ -295,8 +523,8 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
             borderWidth="1px"
             borderColor={perfectBorder}
           >
-            <Icon as={AiOutlineCheckCircle} color="green.500" />
-            <Text fontSize="sm" color={perfectText}>
+            <Icon as={FiAward} color="green.500" />
+            <Text fontSize="sm" fontWeight="700" color={perfectText}>
               لا توجد أسئلة خاطئة — إجابة كاملة
             </Text>
           </HStack>
@@ -315,18 +543,57 @@ export default function ExamSubmissionsView({
   onReport,
   onZoomImage,
 }) {
+  const [query, setQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+
   const pageBg = useColorModeValue("#F4F7FB", "gray.950");
   const cardBg = useColorModeValue("white", "gray.900");
   const border = useColorModeValue("gray.200", "gray.700");
   const heading = useColorModeValue("gray.900", "white");
   const muted = useColorModeValue("gray.500", "gray.400");
+  const inputBg = useColorModeValue("gray.50", "whiteAlpha.100");
 
-  const passedCount = submissions.filter((s) => s.passed).length;
+  const outcomes = useMemo(
+    () => submissions.map(resolveSubmissionOutcome),
+    [submissions],
+  );
+  const passedCount = outcomes.filter((item) => item.passed).length;
   const failedCount = submissions.length - passedCount;
+  const averagePercentage =
+    outcomes.length > 0
+      ? Math.round(
+          outcomes.reduce((sum, item) => sum + item.percentage, 0) / outcomes.length,
+        )
+      : 0;
+  const passRate =
+    submissions.length > 0 ? Math.round((passedCount / submissions.length) * 100) : 0;
+
+  const filtered = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    return submissions.filter((submission, index) => {
+      const { passed } = outcomes[index] || resolveSubmissionOutcome(submission);
+      if (statusFilter === "passed" && !passed) return false;
+      if (statusFilter === "failed" && passed) return false;
+      if (!term) return true;
+      return (
+        (submission.name && submission.name.toLowerCase().includes(term)) ||
+        (submission.student_id != null && String(submission.student_id).includes(term)) ||
+        (submission.phone && String(submission.phone).includes(term)) ||
+        (submission.email && submission.email.toLowerCase().includes(term))
+      );
+    });
+  }, [submissions, outcomes, query, statusFilter]);
 
   return (
-    <Box minH="100vh" bg={pageBg} pt="100px" pb={10} dir="rtl">
-      <Container maxW="5xl" px={{ base: 4, md: 6 }}>
+    <Box
+      minH="100vh"
+      bg={pageBg}
+      pt={{ base: "4.75rem", md: "5.25rem" }}
+      pb={10}
+      dir="rtl"
+      fontFamily={FONT}
+    >
+      <Container maxW="6xl" px={{ base: 4, md: 6 }}>
         <VStack spacing={6} align="stretch">
           <Button
             alignSelf="flex-start"
@@ -335,6 +602,7 @@ export default function ExamSubmissionsView({
             onClick={onBack}
             color={muted}
             _hover={{ color: heading }}
+            fontFamily={FONT}
           >
             عودة للأسئلة
           </Button>
@@ -346,9 +614,9 @@ export default function ExamSubmissionsView({
             borderRadius="2xl"
             overflow="hidden"
           >
-            <Box h="3px" bgGradient="linear(to-l, blue.500, orange.400)" />
+            <Box h="3px" bgGradient={`linear(to-l, ${NAVY}, ${GREEN})`} />
             <Box p={{ base: 5, md: 6 }}>
-              <Text fontSize="xs" fontWeight="semibold" color={muted} mb={1}>
+              <Text fontSize="xs" fontWeight="700" color={muted} mb={1}>
                 نتائج الطلاب
               </Text>
               <Flex
@@ -356,9 +624,9 @@ export default function ExamSubmissionsView({
                 align={{ base: "flex-start", sm: "center" }}
                 direction={{ base: "column", sm: "row" }}
                 gap={3}
-                mb={4}
+                mb={5}
               >
-                <Heading size="lg" color={heading}>
+                <Heading size="lg" color={heading} fontFamily={FONT} fontWeight="800">
                   درجات الطلاب في الامتحان
                 </Heading>
                 {typeof onReport === "function" && (
@@ -369,6 +637,7 @@ export default function ExamSubmissionsView({
                     rightIcon={<Icon as={FiArrowRight} />}
                     onClick={onReport}
                     flexShrink={0}
+                    fontFamily={FONT}
                   >
                     تقرير الأسئلة
                   </Button>
@@ -376,37 +645,112 @@ export default function ExamSubmissionsView({
               </Flex>
 
               {submissions.length > 0 && (
-                <SimpleGrid columns={{ base: 3, md: 3 }} spacing={4} maxW="md">
-                  <SubmissionStat label="إجمالي التسليمات" value={submissions.length} />
-                  <SubmissionStat
-                    label="ناجح"
-                    value={passedCount}
-                    accent="green.500"
-                  />
-                  <SubmissionStat
-                    label="راسب"
-                    value={failedCount}
-                    accent="red.500"
-                  />
-                </SimpleGrid>
+                <VStack spacing={4} align="stretch">
+                  <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
+                    <SummaryStat label="إجمالي التسليمات" value={submissions.length} />
+                    <SummaryStat
+                      label="ناجح"
+                      value={passedCount}
+                      accent="green.500"
+                      hint={`${passRate}% من الطلاب`}
+                    />
+                    <SummaryStat
+                      label="راسب"
+                      value={failedCount}
+                      accent="red.500"
+                    />
+                    <SummaryStat
+                      label="متوسط النسبة"
+                      value={`${averagePercentage}%`}
+                      accent={averagePercentage >= 50 ? "green.500" : "red.500"}
+                    />
+                  </SimpleGrid>
+                  <Box>
+                    <Flex justify="space-between" mb={1.5}>
+                      <Text fontSize="xs" fontWeight="700" color={muted}>
+                        نسبة النجاح في المجموعة
+                      </Text>
+                      <Text
+                        fontSize="sm"
+                        fontWeight="800"
+                        color={passRate >= 50 ? "green.600" : "red.500"}
+                        sx={{ fontVariantNumeric: "tabular-nums" }}
+                      >
+                        {passRate}%
+                      </Text>
+                    </Flex>
+                    <Flex h="10px" borderRadius="full" overflow="hidden" bg="gray.100">
+                      {passedCount > 0 && <Box flex={passedCount} bg={GREEN} />}
+                      {failedCount > 0 && <Box flex={failedCount} bg={RED} />}
+                    </Flex>
+                  </Box>
+                </VStack>
               )}
             </Box>
           </Box>
 
-          {loading ? (
-            <Center minH="40vh" flexDirection="column">
-              <Spinner size="xl" color="blue.500" />
-              <Text mt={4} color={muted}>
+          {submissions.length > 0 && (
+            <Flex
+              gap={3}
+              direction={{ base: "column", md: "row" }}
+              align={{ md: "center" }}
+            >
+              <InputGroup size="md" maxW={{ md: "360px" }}>
+                <Input
+                  placeholder="ابحث باسم الطالب أو رقمه..."
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  bg={inputBg}
+                  borderRadius="xl"
+                  fontFamily={FONT}
+                />
+                <InputRightElement>
+                  <Icon as={FiSearch} color={muted} />
+                </InputRightElement>
+              </InputGroup>
+              <ButtonGroup size="sm" isAttached variant="outline">
+                <Button
+                  fontFamily={FONT}
+                  colorScheme={statusFilter === "all" ? "blue" : "gray"}
+                  variant={statusFilter === "all" ? "solid" : "outline"}
+                  onClick={() => setStatusFilter("all")}
+                >
+                  الكل
+                </Button>
+                <Button
+                  fontFamily={FONT}
+                  colorScheme={statusFilter === "passed" ? "green" : "gray"}
+                  variant={statusFilter === "passed" ? "solid" : "outline"}
+                  onClick={() => setStatusFilter("passed")}
+                >
+                  ناجح
+                </Button>
+                <Button
+                  fontFamily={FONT}
+                  colorScheme={statusFilter === "failed" ? "red" : "gray"}
+                  variant={statusFilter === "failed" ? "solid" : "outline"}
+                  onClick={() => setStatusFilter("failed")}
+                >
+                  راسب
+                </Button>
+              </ButtonGroup>
+            </Flex>
+          )}
+
+          {loading && submissions.length === 0 ? (
+            <Center minH="30vh" flexDirection="column">
+              <Spinner size="lg" color="blue.500" thickness="3px" />
+              <Text mt={4} color={muted} fontSize="sm">
                 جاري تحميل الدرجات...
               </Text>
             </Center>
-          ) : error ? (
+          ) : error && submissions.length === 0 ? (
             <Alert status="error" borderRadius="lg">
               <AlertIcon />
               <VStack align="start" spacing={2}>
                 <Text>{error}</Text>
                 {onRetry && (
-                  <Button size="sm" colorScheme="blue" onClick={onRetry}>
+                  <Button size="sm" colorScheme="blue" onClick={onRetry} fontFamily={FONT}>
                     إعادة المحاولة
                   </Button>
                 )}
@@ -414,14 +758,27 @@ export default function ExamSubmissionsView({
             </Alert>
           ) : submissions.length > 0 ? (
             <VStack spacing={4} align="stretch">
-              {submissions.map((submission, idx) => (
-                <SubmissionCard
-                  key={submission.submission_id || idx}
-                  submission={submission}
-                  index={idx}
-                  onZoomImage={onZoomImage}
-                />
-              ))}
+              {filtered.length === 0 ? (
+                <Box
+                  bg={cardBg}
+                  borderWidth="1px"
+                  borderColor={border}
+                  borderRadius="xl"
+                  p={8}
+                  textAlign="center"
+                >
+                  <Text color={muted}>لا توجد نتائج مطابقة للبحث أو التصفية.</Text>
+                </Box>
+              ) : (
+                filtered.map((submission, idx) => (
+                  <SubmissionCard
+                    key={submission.submission_id || idx}
+                    submission={submission}
+                    index={submissions.indexOf(submission)}
+                    onZoomImage={onZoomImage}
+                  />
+                ))
+              )}
             </VStack>
           ) : (
             <Box

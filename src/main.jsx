@@ -1,3 +1,4 @@
+import { warmupBrandLoadingHero } from "./utils/brandLoadingHero";
 import { purgeLegacyAuthKeys } from "./utils/tenantAuthStorage";
 import React, { useEffect } from "react";
 import ReactDOM from "react-dom/client";
@@ -23,6 +24,8 @@ import InstallAppPrompt from "./components/pwa/InstallAppPrompt.jsx";
 import BrandLoadingOverlayHost from "./components/loading/BrandLoadingOverlayHost.jsx";
 import { initPWA } from "./pwa/registerPWA.js";
 import { registerChunkLoadRecovery } from "./utils/chunkLoadRecovery.js";
+
+warmupBrandLoadingHero();
 
 // فرض العربية قبل أي رندر — مستقل عن لغة الجهاز
 forceArabicDocumentLocale();

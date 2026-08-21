@@ -23,7 +23,7 @@ export async function fetchPublicDeviceRestrictionSettings(subdomain) {
   );
   const payload = unwrap(data, "فشل تحميل إعدادات الجهاز");
   return {
-    student_device_limit: payload?.student_device_limit ?? "single_device",
+    student_device_limit: payload?.student_device_limit ?? "multiple_devices",
     single_device: payload?.single_device ?? payload?.student_device_limit === "single_device",
     multiple_devices: payload?.multiple_devices ?? payload?.student_device_limit === "multiple_devices",
   };

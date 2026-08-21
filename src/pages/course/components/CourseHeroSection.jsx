@@ -51,34 +51,41 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import baseUrl from "../../../api/baseUrl";
-import { crBtnOutline, crBtnSecondary, crContainer } from "../courseTheme";
+import { crBtnPrimary, crContainer } from "../courseTheme";
 
 function RatingStars({ value }) {
   const num = Math.min(5, Math.max(0, Number(value) || 0));
   return (
-    <span className="inline-flex items-center gap-1" aria-label={`تقييم ${num} من 5`}>
+    <span className="inline-flex items-center gap-0.5" aria-label={`تقييم ${num} من 5`}>
       {Array.from({ length: 5 }).map((_, i) => (
         <FaStar
           key={i}
-          className={`text-[11px] ${i < Math.round(num) ? "text-orange-400" : "text-slate-300"}`}
+          className={`text-[11px] ${i < Math.round(num) ? "text-orange-400" : "text-white/25"}`}
         />
       ))}
     </span>
   );
 }
 
-function MetaDivider() {
-  return <span className="hidden h-4 w-px bg-slate-200 sm:inline-block" aria-hidden />;
-}
-
-function InlineMeta({ icon: IconComp, children }) {
+function StatChip({ icon: IconComp, label, value, extra }) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300">
-      <IconComp className="shrink-0 text-xs text-blue-500" />
-      <span>{children}</span>
-    </span>
+    <div className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-3.5 py-3 backdrop-blur-md">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-bl from-white/20 to-white/5 text-orange-300">
+        <IconComp className="text-sm" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-[11px] font-medium text-white/65">{label}</p>
+        <div className="mt-0.5 flex items-center gap-2">
+          <p className="truncate font-heading text-sm font-bold text-white">{value}</p>
+          {extra}
+        </div>
+      </div>
+    </div>
   );
 }
+
+const heroGhostBtn =
+  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/10 px-5 py-2.5 text-sm font-bold text-white backdrop-blur-md transition-all duration-200 hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white";
 
 const CourseHeroSection = ({
   course,
@@ -221,88 +228,101 @@ const CourseHeroSection = ({
 
   return (
     <>
-      <section className="relative bg-white dark:bg-slate-950" dir="rtl" data-tour-id="course-hero">
-        {/* شريط علوي */}
-        <div className="bg-blue-500 pb-20 pt-5 md:pb-28 md:pt-6">
-          <div className={crContainer}>
-            <nav className="flex flex-wrap items-center gap-2 text-sm text-blue-100">
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                className="inline-flex cursor-pointer items-center gap-1.5 font-medium text-white/90 transition-colors hover:text-white"
-              >
-                <FaArrowRight className="text-[10px]" />
-                الكورسات
-              </button>
-              <FaChevronLeft className="text-[9px] text-blue-200" aria-hidden />
-              <span className="max-w-[200px] truncate font-medium text-white sm:max-w-md">{courseTitle}</span>
-            </nav>
-          </div>
-        </div>
+      <section
+        className="relative overflow-hidden pt-[5.5rem] md:pt-[6.25rem]"
+        dir="rtl"
+        data-tour-id="course-hero"
+      >
+        <div className="absolute inset-0 bg-[linear-gradient(125deg,#082B57_0%,#0E4C92_48%,#1A6BB8_100%)]" />
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            backgroundImage:
+              "radial-gradient(ellipse 80% 70% at 100% 0%, rgba(237,137,54,0.28), transparent 42%), radial-gradient(ellipse 70% 80% at 0% 100%, rgba(255,255,255,0.14), transparent 50%), linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px)",
+            backgroundSize: "auto, auto, 28px 28px, 28px 28px",
+          }}
+        />
+        <div className="pointer-events-none absolute -top-24 end-[-4rem] h-64 w-64 rounded-full bg-white/15 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-16 start-[-3rem] h-56 w-56 rounded-full bg-orange-400/20 blur-2xl" />
+        <div className="absolute inset-x-0 bottom-0 h-[3px] bg-gradient-to-l from-transparent via-orange-400 to-orange-500" />
 
-        {/* المحتوى الرئيسي */}
-        <div className={`${crContainer} relative z-10 -mt-16 pb-8 md:-mt-20`}>
-          <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-8">
-            {/* غلاف الكورس */}
-            <div className="mx-auto w-full max-w-[400px] shrink-0 md:mx-0 md:w-[min(100%,380px)]">
-              <div className="overflow-hidden rounded-xl border-[3px] border-white bg-slate-200 shadow-[0_12px_40px_rgba(15,23,42,0.18)] dark:border-slate-800">
+        <div className={`${crContainer} relative z-10 pb-7 pt-4 md:pb-10 md:pt-5 lg:pb-12`}>
+          <nav className="mb-6 inline-flex max-w-full items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-sm text-white/80 backdrop-blur-md">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="inline-flex cursor-pointer items-center gap-1.5 font-semibold text-white transition-colors hover:text-orange-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+              <FaArrowRight className="text-[10px]" />
+              الكورسات
+            </button>
+            <FaChevronLeft className="text-[9px] text-white/40" aria-hidden />
+            <span className="max-w-[180px] truncate font-medium text-white/90 sm:max-w-md">{courseTitle}</span>
+          </nav>
+
+          <div className="grid items-center gap-7 lg:grid-cols-[minmax(0,400px)_minmax(0,1fr)] lg:gap-10">
+            <div className="relative mx-auto w-full max-w-[400px] lg:mx-0">
+              <div className="absolute -inset-[10px] rounded-[1.75rem] bg-gradient-to-bl from-orange-400/55 via-transparent to-sky-300/25 blur-md" />
+              <div className="relative overflow-hidden rounded-3xl border-2 border-white/35 bg-slate-800 shadow-[0_28px_60px_-24px_rgba(0,0,0,0.55)]">
                 <img
                   src={courseCoverUrl}
                   alt={courseTitle}
                   className="aspect-video w-full object-cover"
                   loading="eager"
                 />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#082B57]/55 via-transparent to-white/10" />
+                {lecturesCount > 0 && (
+                  <span className="absolute bottom-3 start-3 inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-[#082B57]/70 px-3 py-1 text-xs font-bold text-white backdrop-blur-md">
+                    <FaBookOpen className="text-[10px] text-orange-300" />
+                    {lecturesCount} محاضرة
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* بطاقة التفاصيل */}
-            <div className="min-w-0 flex-1 rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:p-7">
-              <div className="flex flex-wrap items-center justify-start gap-2">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
                 {gradeName && (
-                  <span className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
+                  <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-extrabold text-white shadow-[0_8px_18px_-10px_rgba(221,107,32,0.9)]">
                     {gradeName}
                   </span>
                 )}
-                <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white/90 backdrop-blur-md">
                   {heroSubtitle}
                 </span>
               </div>
 
-              <h1 className="mt-3 font-heading text-2xl font-bold leading-snug text-slate-900 dark:text-white md:text-[1.65rem] lg:text-3xl">
+              <h1 className="mt-3 font-heading text-[1.7rem] font-black leading-[1.35] tracking-tight text-white md:text-3xl lg:text-[2.15rem]">
                 {courseTitle}
               </h1>
 
-              <p className="mt-3 line-clamp-3 text-sm leading-7 text-slate-600 dark:text-slate-400 md:text-[15px]">
+              <p className="mt-3 max-w-2xl line-clamp-3 text-sm leading-7 text-white/80 md:text-[15px]">
                 {course?.description || "محتوى تعليمي منظم يأخذك خطوة بخطوة من الأساسيات حتى الإتقان."}
               </p>
 
-              {/* بيانات سريعة */}
-              <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 border-y border-slate-100 py-4 dark:border-slate-800">
-                <InlineMeta icon={FaClock}>{durationText}</InlineMeta>
-                <MetaDivider />
-                <InlineMeta icon={FaUsers}>{studentsDisplay} طالب</InlineMeta>
-                <MetaDivider />
-                <span className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                  <RatingStars value={ratingDisplay} />
-                  <span className="font-bold text-slate-800 dark:text-white">{ratingDisplay}</span>
-                </span>
+              <div className={`mt-6 grid grid-cols-1 gap-2.5 sm:grid-cols-2 ${lecturesCount > 0 ? "xl:grid-cols-4" : "xl:grid-cols-3"}`}>
+                <StatChip icon={FaClock} label="المدة" value={durationText} />
+                <StatChip icon={FaUsers} label="الطلاب" value={`${studentsDisplay} طالب`} />
+                <StatChip
+                  icon={FaStar}
+                  label="التقييم"
+                  value={ratingDisplay}
+                  extra={<RatingStars value={ratingDisplay} />}
+                />
                 {lecturesCount > 0 && (
-                  <>
-                    <MetaDivider />
-                    <InlineMeta icon={FaBookOpen}>{lecturesCount} محاضرة</InlineMeta>
-                  </>
+                  <StatChip icon={FaBookOpen} label="المحاضرات" value={`${lecturesCount} محاضرة`} />
                 )}
               </div>
 
               {showProgress && completionPercent != null && (
-                <div className="mt-5">
+                <div className="mt-6 rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-md">
                   <div className="mb-2 flex items-center justify-between text-sm">
-                    <span className="font-semibold text-slate-700 dark:text-slate-200">تقدمك في الكورس</span>
-                    <span className="font-bold text-blue-500">{completionPercent}%</span>
+                    <span className="font-semibold text-white">تقدمك في الكورس</span>
+                    <span className="font-heading text-sm font-extrabold text-orange-300">{completionPercent}%</span>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                  <div className="h-2 overflow-hidden rounded-full bg-white/15">
                     <div
-                      className="h-full rounded-full bg-blue-500 transition-all duration-700"
+                      className="h-full rounded-full bg-gradient-to-l from-orange-300 to-orange-500 transition-all duration-700"
                       style={{ width: `${completionPercent}%` }}
                     />
                   </div>
@@ -310,21 +330,21 @@ const CourseHeroSection = ({
               )}
 
               {(canManageStudents || isTeacher) && (
-                <div className="mt-6 flex flex-wrap gap-2.5 border-t border-slate-100 pt-5 dark:border-slate-800">
+                <div className="mt-6 flex flex-wrap gap-2.5">
                   {(isTeacher || isAdmin) && (
-                    <button type="button" className={crBtnSecondary} onClick={onOpen}>
+                    <button type="button" className={crBtnPrimary} onClick={onOpen}>
                       <FaUserPlus />
                       تفعيل طالب
                     </button>
                   )}
                   {isTeacher && (
-                    <Link to={`/CourseStatisticsPage/${course.id}`} className={crBtnOutline}>
+                    <Link to={`/CourseStatisticsPage/${course.id}`} className={heroGhostBtn}>
                       <FaChartBar />
                       الإحصائيات
                     </Link>
                   )}
                   {canManageStudents && (
-                    <button type="button" className={crBtnOutline} onClick={handleOpenEnrollmentsModal}>
+                    <button type="button" className={heroGhostBtn} onClick={handleOpenEnrollmentsModal}>
                       <FaUserGraduate />
                       المشتركين ({studentsCountNum ?? enrollments.length ?? 0})
                     </button>

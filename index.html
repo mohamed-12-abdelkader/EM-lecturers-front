@@ -14,7 +14,7 @@
     <link rel="icon" type="image/png" href="/em-lectures-icon.png" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon-180.png" />
-    <link rel="preload" as="image" href="/images/brand-loading-hero.png" />
+    <link rel="preload" as="image" href="/images/brand-loading-hero.jpg" type="image/jpeg" fetchpriority="high" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#3182CE" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -105,9 +105,6 @@
           --boot-text: #a0aec0;
           --boot-track: rgba(255, 255, 255, 0.12);
         }
-        #app-boot .boot-hero {
-          mix-blend-mode: normal;
-        }
       }
       #app-boot .boot-top-line {
         position: absolute;
@@ -130,6 +127,10 @@
         border-radius: 50%;
         overflow: hidden;
         margin-bottom: 16px;
+        background-color: var(--boot-bg);
+        background-image: url("/images/brand-loading-hero.jpg");
+        background-size: cover;
+        background-position: center;
       }
       #app-boot .boot-hero {
         width: 100%;
@@ -138,7 +139,6 @@
         display: block;
         user-select: none;
         -webkit-user-drag: none;
-        mix-blend-mode: screen;
       }
       #app-boot .boot-text {
         margin: 0 0 24px;
@@ -182,6 +182,17 @@
           left: 60%;
         }
       }
+      #brand-loading-hero-warm {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 300px;
+        height: 300px;
+        object-fit: cover;
+        opacity: 0;
+        pointer-events: none;
+        z-index: -1;
+      }
       @media (prefers-reduced-motion: reduce) {
         #app-boot .boot-content,
         #app-boot .boot-bar-fill {
@@ -193,6 +204,16 @@
         }
       }
     </style>
+    <img
+      id="brand-loading-hero-warm"
+      src="/images/brand-loading-hero.jpg"
+      alt=""
+      width="300"
+      height="300"
+      decoding="async"
+      fetchpriority="high"
+      aria-hidden="true"
+    />
     <div id="root"></div>
     <script>
       (function () {
@@ -310,7 +331,7 @@
             '<div class="boot-top-line" aria-hidden="true"></div>' +
             '<div class="boot-content">' +
             '<div class="boot-hero-wrap">' +
-            '<img class="boot-hero" src="/images/brand-loading-hero.png" alt="جاري التحميل" width="300" height="300" decoding="async" fetchpriority="high" />' +
+            '<img class="boot-hero" src="/images/brand-loading-hero.jpg" alt="جاري التحميل" width="300" height="300" decoding="sync" fetchpriority="high" />' +
             "</div>" +
             '<p class="boot-text">جاري التحميل…</p>' +
             "</div>" +

@@ -25,7 +25,7 @@ import {
   AiFillDelete,
   AiFillPicture,
 } from "react-icons/ai";
-import { FaBookOpen, FaSearchPlus } from "react-icons/fa";
+import { FaSearchPlus } from "react-icons/fa";
 import { renderFormattedExamText } from "../../../utils/renderFormattedExamText";
 
 const CHOICE_LETTERS = ["أ", "ب", "ج", "د", "هـ", "و"];
@@ -177,48 +177,21 @@ export function ExamPassageBlock({ content, variant = "student" }) {
     );
   }
 
-  const passageBgTeacher = useColorModeValue("blue.50", "whiteAlpha.100");
-  const passageBorderTeacher = useColorModeValue("blue.200", "blue.700");
+  const passageBgTeacher = useColorModeValue("gray.50", "whiteAlpha.50");
+  const passageBorderTeacher = useColorModeValue("gray.200", "gray.700");
 
   return (
     <Box
       w="full"
       p={{ base: 4, md: 5 }}
-      borderRadius="2xl"
+      borderRadius="xl"
       bg={passageBgTeacher}
       borderWidth="1px"
       borderColor={passageBorderTeacher}
-      borderRightWidth="4px"
-      borderRightColor="blue.400"
-      position="relative"
-      overflow="hidden"
     >
-      <Box
-        position="absolute"
-        top={-8}
-        left={-8}
-        w="24"
-        h="24"
-        borderRadius="full"
-        bg="blue.200"
-        opacity={0.2}
-      />
-      <HStack spacing={2} mb={3}>
-        <Flex
-          w={8}
-          h={8}
-          borderRadius="lg"
-          bg="blue.500"
-          color="white"
-          align="center"
-          justify="center"
-        >
-          <FaBookOpen size={14} />
-        </Flex>
-        <Text fontWeight="bold" color="blue.600" fontSize="sm">
-          {variant === "student" ? "اقرأ القطعة التالية ثم أجب" : "قطعة القراءة"}
-        </Text>
-      </HStack>
+      <Text fontSize="xs" fontWeight="700" color="gray.500" mb={2}>
+        قطعة القراءة
+      </Text>
       <Text
         fontSize={{ base: "sm", md: "md" }}
         lineHeight="2"
@@ -523,8 +496,8 @@ export function TeacherQuestionCard({
   const borderColor = useColorModeValue("gray.200", "gray.700");
   const textColor = useColorModeValue("gray.800", "white");
   const muted = useColorModeValue("gray.500", "gray.400");
-  const headerBg = useColorModeValue("gray.50", "whiteAlpha.50");
-  const accent = index % 2 === 0 ? "blue.500" : "orange.500";
+  const indexBg = useColorModeValue("blue.50", "whiteAlpha.100");
+  const indexColor = useColorModeValue("#0E4C92", "blue.200");
   const hasCorrect = (displayChoices || []).some((c) => c.is_correct);
 
   return (
@@ -534,103 +507,84 @@ export function TeacherQuestionCard({
       borderColor={borderColor}
       borderRadius="2xl"
       overflow="hidden"
-      boxShadow="sm"
-      transition="box-shadow 0.2s ease"
-      _hover={{ boxShadow: "md" }}
     >
-      <Box h="3px" bg={accent} />
-
       <Flex
         align={{ base: "stretch", sm: "center" }}
         justify="space-between"
         gap={3}
         px={{ base: 4, md: 5 }}
         py={3}
-        bg={headerBg}
         borderBottomWidth="1px"
         borderColor={borderColor}
         direction={{ base: "column", sm: "row" }}
       >
         <HStack spacing={3} minW={0}>
           <Flex
-            minW="36px"
-            h="36px"
-            borderRadius="xl"
-            bg={accent}
-            color="white"
+            minW="34px"
+            h="34px"
+            borderRadius="lg"
+            bg={indexBg}
+            color={indexColor}
             align="center"
             justify="center"
             fontSize="sm"
-            fontWeight="black"
-            boxShadow="sm"
+            fontWeight="800"
           >
             {index + 1}
           </Flex>
-          <VStack align="start" spacing={0.5} minW={0}>
-            <HStack spacing={2} flexWrap="wrap">
-              <Badge colorScheme="gray" variant="subtle" borderRadius="md" fontSize="10px">
-                {displayChoices?.length || 0} اختيارات
+          <HStack spacing={2} flexWrap="wrap">
+            {passageContent ? (
+              <Badge colorScheme="blue" variant="subtle" borderRadius="full" fontSize="10px">
+                قطعة
               </Badge>
-              {passageContent ? (
-                <Badge colorScheme="blue" variant="subtle" borderRadius="md" fontSize="10px">
-                  قطعة قراءة
-                </Badge>
-              ) : null}
-              {displayImage && !displayText ? (
-                <Badge colorScheme="purple" variant="subtle" borderRadius="md" fontSize="10px">
-                  سؤال صورة
-                </Badge>
-              ) : null}
-              {hasCorrect ? (
-                <Badge colorScheme="green" variant="subtle" borderRadius="md" fontSize="10px">
-                  إجابة محددة
-                </Badge>
-              ) : (
-                <Badge colorScheme="orange" variant="subtle" borderRadius="md" fontSize="10px">
-                  بدون إجابة صحيحة
-                </Badge>
-              )}
-            </HStack>
-          </VStack>
+            ) : null}
+            {displayImage && !displayText ? (
+              <Badge colorScheme="purple" variant="subtle" borderRadius="full" fontSize="10px">
+                صورة
+              </Badge>
+            ) : null}
+            {!hasCorrect ? (
+              <Badge colorScheme="orange" variant="subtle" borderRadius="full" fontSize="10px">
+                بدون إجابة صحيحة
+              </Badge>
+            ) : null}
+          </HStack>
         </HStack>
 
-        <HStack spacing={2} flexShrink={0} justify={{ base: "stretch", sm: "flex-end" }}>
+        <HStack spacing={1} flexShrink={0} justify={{ base: "flex-end", sm: "flex-end" }}>
           <Tooltip label="إضافة صورة" hasArrow>
-            <Button
+            <IconButton
+              aria-label="إضافة صورة"
               size="sm"
-              variant="outline"
+              variant="ghost"
               borderRadius="lg"
-              leftIcon={<AiFillPicture />}
+              icon={<AiFillPicture />}
               onClick={() => onAddImage(displayId)}
-              display={{ base: "flex", md: "inline-flex" }}
-              flex={{ base: 1, md: "none" }}
-            >
-              <Text display={{ base: "inline", md: "none" }}>صورة</Text>
-            </Button>
+              cursor="pointer"
+            />
           </Tooltip>
           <Tooltip label="تعديل السؤال" hasArrow>
-            <Button
+            <IconButton
+              aria-label="تعديل"
               size="sm"
-              variant="outline"
+              variant="ghost"
               colorScheme="blue"
               borderRadius="lg"
-              leftIcon={<AiFillEdit />}
+              icon={<AiFillEdit />}
               onClick={() => onEdit(questionRef)}
-              display={{ base: "flex", md: "inline-flex" }}
-              flex={{ base: 1, md: "none" }}
-            >
-              <Text display={{ base: "inline", md: "none" }}>تعديل</Text>
-            </Button>
+              cursor="pointer"
+            />
           </Tooltip>
           <Tooltip label="حذف السؤال" hasArrow>
             <IconButton
               aria-label="حذف"
               size="sm"
+              variant="ghost"
               colorScheme="red"
-              variant="outline"
               borderRadius="lg"
               icon={<AiFillDelete />}
               onClick={() => onDelete(displayId)}
+              cursor="pointer"
             />
           </Tooltip>
         </HStack>
@@ -645,8 +599,8 @@ export function TeacherQuestionCard({
 
         {displayText ? (
           <Text
-            fontSize={{ base: "md", md: "lg" }}
-            fontWeight="semibold"
+            fontSize={{ base: "sm", md: "md" }}
+            fontWeight="600"
             color={textColor}
             lineHeight="1.95"
             dir="auto"
