@@ -468,7 +468,7 @@ export default function AiQuestionExtractionModal({
       scrollBehavior="inside"
     >
       <ModalOverlay />
-      <ModalContent borderRadius="2xl" boxShadow="2xl" maxH="90vh" dir="rtl">
+      <ModalContent borderRadius="2xl" boxShadow="2xl" maxH="90vh" dir="rtl" data-tour-id="exam-ai-modal">
         <ModalHeader fontWeight="bold" fontSize="xl" color="purple.700" textAlign="center">
           استخراج أسئلة بالذكاء الاصطناعي
           {examTitle ? ` — ${examTitle}` : ""}

@@ -34,6 +34,10 @@ import {
   ASSIGNMENT_MODE_LABELS,
   LECTURE_ACCESS_MODE_LABELS,
 } from "../../../utils/lectureAccessUtils";
+import {
+  TOUR_CLOSE_ACCESS_SETTINGS,
+  TOUR_OPEN_ACCESS_SETTINGS,
+} from "../../../utils/teacherCoursePageTour";
 
 const MODE_ICONS = {
   always_open: FaUnlock,
@@ -132,6 +136,7 @@ export default function CourseAccessSettingsPanel({
   loading = false,
   canManage = false,
   variant = "button",
+  tourTargetId,
 }) {
   const toast = useToast();
   const modal = useDisclosure();
@@ -152,6 +157,17 @@ export default function CourseAccessSettingsPanel({
       setAssignmentMode(settings.assignment_mode || ASSIGNMENT_MODES.lecture_based);
     }
   }, [modal.isOpen, settings]);
+
+  useEffect(() => {
+    const openSettings = () => modal.onOpen();
+    const closeSettings = () => modal.onClose();
+    window.addEventListener(TOUR_OPEN_ACCESS_SETTINGS, openSettings);
+    window.addEventListener(TOUR_CLOSE_ACCESS_SETTINGS, closeSettings);
+    return () => {
+      window.removeEventListener(TOUR_OPEN_ACCESS_SETTINGS, openSettings);
+      window.removeEventListener(TOUR_CLOSE_ACCESS_SETTINGS, closeSettings);
+    };
+  }, [modal.onOpen, modal.onClose]);
 
   if (!canManage) return null;
 
@@ -200,6 +216,7 @@ export default function CourseAccessSettingsPanel({
           onClick={modal.onOpen}
           isLoading={loading}
           loadingText="..."
+          data-tour-id={tourTargetId}
         >
           إعدادات الوصول
         </Button>
@@ -224,7 +241,7 @@ export default function CourseAccessSettingsPanel({
         scrollBehavior="inside"
       >
         <ModalOverlay backdropFilter="blur(4px)" />
-        <ModalContent borderRadius={{ base: "none", md: "2xl" }} mx={{ base: 0, md: 4 }} dir="rtl">
+        <ModalContent borderRadius={{ base: "none", md: "2xl" }} mx={{ base: 0, md: 4 }} dir="rtl" data-tour-id="course-access-settings-modal">
           <ModalHeader pb={2}>
             <HStack spacing={2}>
               <Box

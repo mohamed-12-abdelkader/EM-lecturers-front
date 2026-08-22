@@ -568,6 +568,7 @@ const LectureCard = ({
                     variant="ghost"
                     borderRadius="xl"
                     onClick={() => handleEditLecture?.(lecture)}
+                    data-tour-id={isTourTarget ? "course-lecture-edit" : undefined}
                   />
                 </Tooltip>
                 <Tooltip label="حذف المحاضرة">
@@ -579,6 +580,7 @@ const LectureCard = ({
                     variant="ghost"
                     borderRadius="xl"
                     onClick={() => handleDeleteLecture?.(lecture.id, lecture.title || "المحاضرة")}
+                    data-tour-id={isTourTarget ? "course-lecture-delete" : undefined}
                   />
                 </Tooltip>
                 <Tooltip label={isVisible ? "إخفاء عن الطلاب" : "إظهار للطلاب"}>
@@ -591,6 +593,7 @@ const LectureCard = ({
                     variant="ghost"
                     borderRadius="xl"
                     onClick={handleToggleVisibility}
+                    data-tour-id={isTourTarget ? "course-lecture-visibility" : undefined}
                   />
                 </Tooltip>
                 {lectureAccessMode === LECTURE_ACCESS_MODES.activation_code ? (
@@ -669,6 +672,7 @@ const LectureCard = ({
                             type="button"
                             className={`${crBtnSecondary} w-full !px-3.5 !py-2.5 !text-xs sm:w-auto sm:!py-2`}
                             onClick={() => handleAddVideo(lecture.id)}
+                            data-tour-id={isTourTarget ? "course-lecture-add-video" : undefined}
                           >
                             <FaPlus />
                             إضافة فيديو
@@ -720,6 +724,7 @@ const LectureCard = ({
                                   lock_next_lectures: true,
                                 })
                               }
+                              data-tour-id={isTourTarget ? "course-lecture-add-assignment" : undefined}
                             >
                               <FaPlus />
                               إضافة واجب

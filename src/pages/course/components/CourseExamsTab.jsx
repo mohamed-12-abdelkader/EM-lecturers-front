@@ -3,6 +3,10 @@ import { VStack, Heading, Center, Spinner, Text, Icon, SimpleGrid, Box, HStack, 
 import { FaGraduationCap, FaLightbulb, FaBookOpen, FaClock, FaStar, FaEdit, FaTrash, FaPlus, FaEye, FaEyeSlash, FaRegFileAlt, FaCalendarAlt, FaCog, FaTimes, FaCheck, FaCamera } from "react-icons/fa";
 import baseUrl from "../../../api/baseUrl";
 import { Link } from "react-router-dom";
+import {
+  TOUR_CLOSE_CREATE_EXAM,
+  TOUR_OPEN_CREATE_EXAM,
+} from "../../../utils/teacherCoursePageTour";
 
 const initialExamFormState = {
   title: "",
@@ -427,6 +431,17 @@ const CourseExamsTab = ({
   const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, exam: null });
   const [actionLoading, setActionLoading] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+
+  useEffect(() => {
+    const openCreate = () => setCreateModalOpen(true);
+    const closeCreate = () => setCreateModalOpen(false);
+    window.addEventListener(TOUR_OPEN_CREATE_EXAM, openCreate);
+    window.addEventListener(TOUR_CLOSE_CREATE_EXAM, closeCreate);
+    return () => {
+      window.removeEventListener(TOUR_OPEN_CREATE_EXAM, openCreate);
+      window.removeEventListener(TOUR_CLOSE_CREATE_EXAM, closeCreate);
+    };
+  }, []);
   const [createLoading, setCreateLoading] = useState(false);
   const [form, setForm] = useState(initialExamFormState);
   const modalSectionBg = useColorModeValue("gray.50", "gray.700");
@@ -1265,6 +1280,7 @@ const CourseExamsTab = ({
         </Heading>
         {isTeacher && (
           <Button
+            data-tour-id="course-create-exam-btn"
             colorScheme="blue"
             mb={{ base: 0, sm: 0 }}
             onClick={() => setCreateModalOpen(true)}
@@ -1290,6 +1306,7 @@ const CourseExamsTab = ({
       >
         <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
         <ModalContent
+          data-tour-id="course-create-exam-modal"
           mx={{ base: 0, sm: 3 }}
           my={{ base: 0, sm: 4 }}
           borderRadius={{ base: 0, sm: "2xl" }}

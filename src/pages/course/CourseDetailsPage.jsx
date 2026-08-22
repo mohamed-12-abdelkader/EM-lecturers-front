@@ -110,6 +110,7 @@ import {
   FaFolderOpen,
   FaTasks,
   FaChartBar,
+  FaCompass,
 } from "react-icons/fa";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import baseUrl from "../../api/baseUrl";
@@ -144,12 +145,28 @@ import html2canvas from "html2canvas";
 import ScrollToTop from "../../components/scollToTop/ScrollToTop";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import CoursePageTour from "../../components/onboarding/CoursePageTour";
+import TeacherCoursePageTour from "../../components/onboarding/TeacherCoursePageTour";
 import {
   shouldShowCoursePageTour,
   TOUR_SET_SECTION,
   buildLectureTourMeta,
   pickTourLecture,
 } from "../../utils/coursePageTour";
+import {
+  TOUR_CLOSE_ALL_MODALS,
+  TOUR_CLOSE_ASSIGNMENT_MODAL,
+  TOUR_CLOSE_COURSE_ASSIGNMENT_MODAL,
+  TOUR_CLOSE_CREATE_CODES,
+  TOUR_CLOSE_LECTURE_MODAL,
+  TOUR_CLOSE_VIDEO_MODAL,
+  TOUR_CLOSE_VIEW_CODES,
+  TOUR_OPEN_ASSIGNMENT_MODAL,
+  TOUR_OPEN_COURSE_ASSIGNMENT_MODAL,
+  TOUR_OPEN_CREATE_CODES,
+  TOUR_OPEN_LECTURE_MODAL,
+  TOUR_OPEN_VIDEO_MODAL,
+  TOUR_OPEN_VIEW_CODES,
+} from "../../utils/teacherCoursePageTour";
 import CourseStreams from "../../components/stream/courseStreams";
 import StudentStreamsList from "../../components/stream/studentStreamsList";
 import eduPlatformLogo from "../../img/2 (5).png";
@@ -272,6 +289,7 @@ const LectureModal = ({
       loading={loading}
       icon={FaChalkboardTeacher}
       accent="blue"
+      tourTargetId="course-lecture-modal"
       title={type === "add" ? "إضافة محاضرة جديدة" : "تعديل المحاضرة"}
       subtitle={
         type === "add"
@@ -462,6 +480,7 @@ const VideoModal = ({
       loading={loading}
       icon={FaFilm}
       accent="orange"
+      tourTargetId="course-video-modal"
       title={type === "add" ? "إضافة فيديو جديد" : "تعديل الفيديو"}
       subtitle={
         type === "add"
@@ -765,12 +784,13 @@ const CourseDetailsPage = () => {
     (m) => m.status === "started",
   );
 
-  // لو بدأ بث مباشر، انتقل تلقائيًا لقسم البث
+  // لو بدأ بث مباشر، انتقل تلقائيًا لقسم البث (ما لم تكن جولة الإدارة نشطة)
   useEffect(() => {
+    if (courseTourOpen) return;
     if (hasActiveLiveStream) {
       setActiveSection("live");
     }
-  }, [hasActiveLiveStream]);
+  }, [hasActiveLiveStream, courseTourOpen]);
 
   useEffect(() => {
     const onTourSection = (event) => {
@@ -1109,6 +1129,124 @@ const CourseDetailsPage = () => {
       setCodesLoading(false);
     }
   };
+
+  useEffect(() => {
+    const closeAll = () => {
+      setCodeModalOpen(false);
+      setShowCodesModal(false);
+      setSearchCode("");
+      setLectureModal({ isOpen: false, type: "add", data: null });
+      setVideoModal({ isOpen: false, type: "add", lectureId: null, data: null });
+      setFileModal({ isOpen: false, type: "add", lectureId: null, data: null });
+      setExamModal({
+        isOpen: false,
+        type: "add",
+        lectureId: null,
+        courseLevel: false,
+        data: null,
+      });
+    };
+    const openCreateCodes = () => setCodeModalOpen(true);
+    const closeCreateCodes = () => setCodeModalOpen(false);
+    const openViewCodes = () => {
+      setShowCodesModal(true);
+      fetchActivationCodes();
+    };
+    const closeViewCodes = () => {
+      setShowCodesModal(false);
+      setSearchCode("");
+    };
+    const openLecture = () => setLectureModal({ isOpen: true, type: "add", data: null });
+    const closeLecture = () => setLectureModal({ isOpen: false, type: "add", data: null });
+    const openVideo = (event) => {
+      const lectureId = event?.detail?.lectureId;
+      if (lectureId) {
+        setVideoModal({ isOpen: true, type: "add", lectureId, data: null });
+      }
+    };
+    const closeVideo = () =>
+      setVideoModal({ isOpen: false, type: "add", lectureId: null, data: null });
+    const openAssignment = (event) => {
+      const lectureId = event?.detail?.lectureId;
+      if (lectureId) {
+        setExamModal({
+          isOpen: true,
+          type: "add",
+          lectureId,
+          courseLevel: false,
+          data: {
+            title: "واجب المحاضرة",
+            type: "assignment",
+            total_grade: 20,
+            is_visible: true,
+            lock_next_lectures: true,
+          },
+        });
+      }
+    };
+    const closeAssignment = () =>
+      setExamModal({
+        isOpen: false,
+        type: "add",
+        lectureId: null,
+        courseLevel: false,
+        data: null,
+      });
+    const openCourseAssignment = () =>
+      setExamModal({
+        isOpen: true,
+        type: "add",
+        lectureId: null,
+        courseLevel: true,
+        data: {
+          title: "واجب 1",
+          type: "assignment",
+          total_grade: 20,
+          duration: 60,
+          is_visible: true,
+          show_answers_immediately: true,
+          show_answers_after_hours: 0,
+        },
+      });
+    const closeCourseAssignment = () =>
+      setExamModal({
+        isOpen: false,
+        type: "add",
+        lectureId: null,
+        courseLevel: false,
+        data: null,
+      });
+
+    window.addEventListener(TOUR_CLOSE_ALL_MODALS, closeAll);
+    window.addEventListener(TOUR_OPEN_CREATE_CODES, openCreateCodes);
+    window.addEventListener(TOUR_CLOSE_CREATE_CODES, closeCreateCodes);
+    window.addEventListener(TOUR_OPEN_VIEW_CODES, openViewCodes);
+    window.addEventListener(TOUR_CLOSE_VIEW_CODES, closeViewCodes);
+    window.addEventListener(TOUR_OPEN_LECTURE_MODAL, openLecture);
+    window.addEventListener(TOUR_CLOSE_LECTURE_MODAL, closeLecture);
+    window.addEventListener(TOUR_OPEN_VIDEO_MODAL, openVideo);
+    window.addEventListener(TOUR_CLOSE_VIDEO_MODAL, closeVideo);
+    window.addEventListener(TOUR_OPEN_ASSIGNMENT_MODAL, openAssignment);
+    window.addEventListener(TOUR_CLOSE_ASSIGNMENT_MODAL, closeAssignment);
+    window.addEventListener(TOUR_OPEN_COURSE_ASSIGNMENT_MODAL, openCourseAssignment);
+    window.addEventListener(TOUR_CLOSE_COURSE_ASSIGNMENT_MODAL, closeCourseAssignment);
+
+    return () => {
+      window.removeEventListener(TOUR_CLOSE_ALL_MODALS, closeAll);
+      window.removeEventListener(TOUR_OPEN_CREATE_CODES, openCreateCodes);
+      window.removeEventListener(TOUR_CLOSE_CREATE_CODES, closeCreateCodes);
+      window.removeEventListener(TOUR_OPEN_VIEW_CODES, openViewCodes);
+      window.removeEventListener(TOUR_CLOSE_VIEW_CODES, closeViewCodes);
+      window.removeEventListener(TOUR_OPEN_LECTURE_MODAL, openLecture);
+      window.removeEventListener(TOUR_CLOSE_LECTURE_MODAL, closeLecture);
+      window.removeEventListener(TOUR_OPEN_VIDEO_MODAL, openVideo);
+      window.removeEventListener(TOUR_CLOSE_VIDEO_MODAL, closeVideo);
+      window.removeEventListener(TOUR_OPEN_ASSIGNMENT_MODAL, openAssignment);
+      window.removeEventListener(TOUR_CLOSE_ASSIGNMENT_MODAL, closeAssignment);
+      window.removeEventListener(TOUR_OPEN_COURSE_ASSIGNMENT_MODAL, openCourseAssignment);
+      window.removeEventListener(TOUR_CLOSE_COURSE_ASSIGNMENT_MODAL, closeCourseAssignment);
+    };
+  }, [fetchActivationCodes]);
 
   // دالة جلب امتحان المحاضرة
   const fetchLectureExam = async (lectureId) => {
@@ -1903,6 +2041,7 @@ const CourseDetailsPage = () => {
       >
         <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(6px)" />
         <ModalContent
+          data-tour-id="course-assignment-modal"
           borderRadius={{ base: "none", md: "2xl" }}
           overflow="hidden"
           bg={cardBg}
@@ -3546,8 +3685,14 @@ display:block;
       {/* زر إنشاء أكواد للمدرس فقط */}
       {isTeacher && (
         <Box className={crContainer} dir="rtl" py={3}>
-          <Flex justify={{ base: "stretch", md: "flex-end" }} gap={3} flexWrap="wrap">
+          <Flex
+            justify={{ base: "stretch", md: "flex-end" }}
+            align="center"
+            gap={3}
+            flexWrap="wrap"
+          >
             <Button
+              data-tour-id="course-create-codes-btn"
               colorScheme="orange"
               leftIcon={<FaKey />}
               borderRadius="xl"
@@ -3558,6 +3703,7 @@ display:block;
               إنشاء أكواد
             </Button>
             <Button
+              data-tour-id="course-view-codes-btn"
               colorScheme="blue"
               variant="outline"
               leftIcon={<FaKey />}
@@ -3584,6 +3730,7 @@ display:block;
       >
         <ModalOverlay />
         <ModalContent
+          data-tour-id="course-create-codes-modal"
           mx={{ base: 0, md: 4 }}
           borderRadius={{ base: "none", md: "xl" }}
           maxH={{ base: "100vh", md: "90vh" }}
@@ -3654,6 +3801,7 @@ display:block;
       >
         <ModalOverlay />
         <ModalContent
+          data-tour-id="course-view-codes-modal"
           borderRadius={{ base: "none", md: "2xl" }}
           overflow="hidden"
           mx={{ base: 0, md: 4 }}
@@ -4237,6 +4385,21 @@ display:block;
           overflowX="hidden"
         >
           <VStack spacing={{ base: 3, md: 5 }} align="stretch" w="full">
+            {(isTeacher || isAdmin) && (
+              <Flex justify="flex-end">
+                <Button
+                  data-tour-id="course-tour-restart"
+                  size="sm"
+                  variant="outline"
+                  colorScheme="orange"
+                  leftIcon={<FaCompass />}
+                  borderRadius="xl"
+                  onClick={() => setCourseTourOpen(true)}
+                >
+                  جولة الإدارة
+                </Button>
+              </Flex>
+            )}
             {/* شريط أقسام المحتوى — أعلى الصفحة */}
             <Box data-tour-id="course-content-nav">
               <CourseContentNav
@@ -4584,12 +4747,23 @@ display:block;
 
       <ScrollToTop />
 
-      <CoursePageTour
-        isOpen={courseTourOpen}
-        courseId={id}
-        lectureTourMeta={lectureTourMeta}
-        onClose={() => setCourseTourOpen(false)}
-      />
+      {isTeacher || isAdmin ? (
+        <TeacherCoursePageTour
+          isOpen={courseTourOpen}
+          courseId={id}
+          lectureTourMeta={lectureTourMeta}
+          isCourseBasedAssignments={isCourseBasedAssignments}
+          showActivationCodes={isTeacher}
+          onClose={() => setCourseTourOpen(false)}
+        />
+      ) : (
+        <CoursePageTour
+          isOpen={courseTourOpen}
+          courseId={id}
+          lectureTourMeta={lectureTourMeta}
+          onClose={() => setCourseTourOpen(false)}
+        />
+      )}
     </Box>
   );
 };

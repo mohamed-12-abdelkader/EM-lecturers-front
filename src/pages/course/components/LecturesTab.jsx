@@ -183,6 +183,7 @@ const HStackWrap = ({
           settings={accessSettings}
           loading={accessSettingsLoading}
           canManage
+          tourTargetId="course-access-settings"
         />
         <Button
           size="sm"
@@ -190,6 +191,7 @@ const HStackWrap = ({
           leftIcon={<Icon as={FaPlus} />}
           borderRadius="xl"
           onClick={handleAddLecture}
+          data-tour-id="course-add-lecture"
         >
           إضافة محاضرة
         </Button>

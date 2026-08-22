@@ -278,6 +278,7 @@ function ExamChoicesSection({
   onSetCorrect,
   onZoomImage,
   headingColor,
+  tourTargetId,
 }) {
   const border = useColorModeValue("gray.200", "gray.600");
   const cardBg = useColorModeValue("white", "gray.800");
@@ -462,6 +463,7 @@ function ExamChoicesSection({
         </RadioGroup>
       ) : (
         <Box
+          data-tour-id={tourTargetId}
           p={3}
           borderRadius="xl"
           bg={teacherChoicesBg}
@@ -491,6 +493,7 @@ export function TeacherQuestionCard({
   onEdit,
   onDelete,
   onSetCorrect,
+  isTourTarget = false,
 }) {
   const cardBg = useColorModeValue("white", "gray.900");
   const borderColor = useColorModeValue("gray.200", "gray.700");
@@ -502,6 +505,7 @@ export function TeacherQuestionCard({
 
   return (
     <Box
+      data-tour-id={isTourTarget ? "exam-question-card" : undefined}
       bg={cardBg}
       borderWidth="1px"
       borderColor={borderColor}
@@ -561,6 +565,7 @@ export function TeacherQuestionCard({
               icon={<AiFillPicture />}
               onClick={() => onAddImage(displayId)}
               cursor="pointer"
+              data-tour-id={isTourTarget ? "exam-question-add-image" : undefined}
             />
           </Tooltip>
           <Tooltip label="تعديل السؤال" hasArrow>
@@ -573,6 +578,7 @@ export function TeacherQuestionCard({
               icon={<AiFillEdit />}
               onClick={() => onEdit(questionRef)}
               cursor="pointer"
+              data-tour-id={isTourTarget ? "exam-question-edit" : undefined}
             />
           </Tooltip>
           <Tooltip label="حذف السؤال" hasArrow>
@@ -585,6 +591,7 @@ export function TeacherQuestionCard({
               icon={<AiFillDelete />}
               onClick={() => onDelete(displayId)}
               cursor="pointer"
+              data-tour-id={isTourTarget ? "exam-question-delete" : undefined}
             />
           </Tooltip>
         </HStack>
@@ -636,6 +643,7 @@ export function TeacherQuestionCard({
           onSetCorrect={onSetCorrect}
           onZoomImage={onZoomImage}
           headingColor={textColor}
+          tourTargetId={isTourTarget ? "exam-question-choices" : undefined}
         />
       </Box>
     </Box>

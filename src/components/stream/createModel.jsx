@@ -61,6 +61,7 @@ const CreateStreamModal = ({ isOpen, onClose, onSuccess, courseId }) => {
       size={{ base: "full", md: "md" }}
       icon={FaBroadcastTower}
       accent="blue"
+      tourTargetId="course-create-stream-modal"
       title="إنشاء بث مباشر"
       subtitle="ابدأ جلسة بث مباشرة للطلاب داخل هذا الكورس"
       onSubmit={handleSubmit}

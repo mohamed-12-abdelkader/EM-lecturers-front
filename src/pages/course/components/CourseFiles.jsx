@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Box,
   Button,
@@ -21,6 +21,10 @@ import CourseFileCard from "./CourseFileCard";
 import DeleteCourseFileModal from "./DeleteCourseFileModal";
 import EditCourseFileModal from "./EditCourseFileModal";
 import UploadCourseFileModal from "./UploadCourseFileModal";
+import {
+  TOUR_CLOSE_FILE_UPLOAD,
+  TOUR_OPEN_FILE_UPLOAD,
+} from "../../../utils/teacherCoursePageTour";
 
 function CourseFilesSkeleton() {
   return (
@@ -49,6 +53,17 @@ export default function CourseFiles({
     enabled: Boolean(courseId),
   });
   const { uploadMutation, updateMutation, deleteMutation } = useCourseFileMutations(courseId);
+
+  useEffect(() => {
+    const openUpload = () => uploadModal.onOpen();
+    const closeUpload = () => uploadModal.onClose();
+    window.addEventListener(TOUR_OPEN_FILE_UPLOAD, openUpload);
+    window.addEventListener(TOUR_CLOSE_FILE_UPLOAD, closeUpload);
+    return () => {
+      window.removeEventListener(TOUR_OPEN_FILE_UPLOAD, openUpload);
+      window.removeEventListener(TOUR_CLOSE_FILE_UPLOAD, closeUpload);
+    };
+  }, [uploadModal.onOpen, uploadModal.onClose]);
 
   const handleUpload = async (payload) => {
     try {
@@ -165,6 +180,7 @@ export default function CourseFiles({
 
           {canManage ? (
             <Button
+              data-tour-id="course-add-file-btn"
               colorScheme="orange"
               size="md"
               borderRadius="xl"

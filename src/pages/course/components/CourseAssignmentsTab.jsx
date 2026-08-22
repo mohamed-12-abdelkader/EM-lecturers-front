@@ -197,6 +197,7 @@ export default function CourseAssignmentsTab({
               borderRadius="xl"
               leftIcon={<Icon as={FaPlus} />}
               onClick={openAdd}
+              data-tour-id="course-assignments-add-btn"
             >
               إضافة واجب
             </Button>

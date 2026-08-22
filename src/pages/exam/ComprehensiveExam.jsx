@@ -60,6 +60,24 @@ import {
   StudentQuestionPanel,
 } from "./components/ExamQuestionDisplay";
 import ExamSubmissionsView from "./components/ExamSubmissionsView";
+import TeacherExamTour from "../../components/onboarding/TeacherExamTour";
+import {
+  TOUR_CLOSE_AI,
+  TOUR_CLOSE_ALL,
+  TOUR_CLOSE_BULK,
+  TOUR_CLOSE_DELETE,
+  TOUR_CLOSE_EDIT,
+  TOUR_CLOSE_IMAGES,
+  TOUR_CLOSE_PASSAGE,
+  TOUR_CLOSE_Q_IMAGE,
+  TOUR_OPEN_AI,
+  TOUR_OPEN_BULK,
+  TOUR_OPEN_DELETE,
+  TOUR_OPEN_EDIT,
+  TOUR_OPEN_IMAGES,
+  TOUR_OPEN_PASSAGE,
+  TOUR_OPEN_Q_IMAGE,
+} from "../../utils/teacherExamTour";
 import baseUrl from "../../api/baseUrl";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import { useParams, useNavigate } from "react-router-dom";
@@ -135,6 +153,7 @@ const ComprehensiveExam = () => {
   const [imageZoomOpen, setImageZoomOpen] = useState(false);
   const [imageZoomSrc, setImageZoomSrc] = useState(null);
   const [questionSearch, setQuestionSearch] = useState("");
+  const [examTourOpen, setExamTourOpen] = useState(false);
 
   // ألوان الصفحة
   const pageBg = useColorModeValue("#E8EEF5", "gray.950");
@@ -616,14 +635,109 @@ const ComprehensiveExam = () => {
   // Open edit modal
   const openEditModal = (q) => {
     setEditForm({
-      text: q.text,
-      choices: q.choices.map((c) => ({ ...c })),
+      text: q.text || "",
+      choices: (q.choices || []).map((c) => ({ ...c })),
       image: q.image || "",
     });
     setImagePreview(q.image || "");
     setSelectedFile(null);
     setEditModal({ open: true, question: q });
   };
+
+  const getTourQuestionRef = useCallback(() => {
+    const q = questions[0];
+    if (!q) return null;
+    if (q.type === "passage_sub" && q.sub_question) return q.sub_question;
+    return q;
+  }, [questions]);
+
+  useEffect(() => {
+    if (!isStaff) return undefined;
+
+    const closeAll = () => {
+      setAiExtractionModalOpen(false);
+      setBulkTextModalOpen(false);
+      setBulkTextInput("");
+      setBulkCorrectAnswers("");
+      setPassageModalOpen(false);
+      setAddImageModal({ open: false });
+      setEditModal({ open: false, question: null });
+      setDeleteModal({ open: false, qid: null });
+      setAddQuestionImageModal({ open: false, questionId: null });
+      setSelectedQuestionImage(null);
+      setQuestionImagePreview("");
+    };
+
+    const openAi = () => setAiExtractionModalOpen(true);
+    const closeAi = () => setAiExtractionModalOpen(false);
+    const openBulk = () => setBulkTextModalOpen(true);
+    const closeBulk = () => {
+      setBulkTextModalOpen(false);
+      setBulkTextInput("");
+      setBulkCorrectAnswers("");
+    };
+    const openPassage = () => setPassageModalOpen(true);
+    const closePassage = () => setPassageModalOpen(false);
+    const openImages = () => {
+      setSelectedImages([]);
+      setImagePreviews([]);
+      setAddImageModal({ open: true });
+    };
+    const closeImages = () => {
+      setAddImageModal({ open: false });
+      setSelectedImages([]);
+      setImagePreviews([]);
+    };
+    const openEdit = () => {
+      const ref = getTourQuestionRef();
+      if (ref) openEditModal(ref);
+    };
+    const closeEdit = () => setEditModal({ open: false, question: null });
+    const openDelete = () => {
+      const ref = getTourQuestionRef();
+      if (ref?.id != null) setDeleteModal({ open: true, qid: ref.id });
+    };
+    const closeDelete = () => setDeleteModal({ open: false, qid: null });
+    const openQImage = () => {
+      const ref = getTourQuestionRef();
+      if (ref?.id != null) openAddQuestionImageModal(ref.id);
+    };
+    const closeQImage = () => closeAddQuestionImageModal();
+
+    window.addEventListener(TOUR_CLOSE_ALL, closeAll);
+    window.addEventListener(TOUR_OPEN_AI, openAi);
+    window.addEventListener(TOUR_CLOSE_AI, closeAi);
+    window.addEventListener(TOUR_OPEN_BULK, openBulk);
+    window.addEventListener(TOUR_CLOSE_BULK, closeBulk);
+    window.addEventListener(TOUR_OPEN_PASSAGE, openPassage);
+    window.addEventListener(TOUR_CLOSE_PASSAGE, closePassage);
+    window.addEventListener(TOUR_OPEN_IMAGES, openImages);
+    window.addEventListener(TOUR_CLOSE_IMAGES, closeImages);
+    window.addEventListener(TOUR_OPEN_EDIT, openEdit);
+    window.addEventListener(TOUR_CLOSE_EDIT, closeEdit);
+    window.addEventListener(TOUR_OPEN_DELETE, openDelete);
+    window.addEventListener(TOUR_CLOSE_DELETE, closeDelete);
+    window.addEventListener(TOUR_OPEN_Q_IMAGE, openQImage);
+    window.addEventListener(TOUR_CLOSE_Q_IMAGE, closeQImage);
+
+    return () => {
+      window.removeEventListener(TOUR_CLOSE_ALL, closeAll);
+      window.removeEventListener(TOUR_OPEN_AI, openAi);
+      window.removeEventListener(TOUR_CLOSE_AI, closeAi);
+      window.removeEventListener(TOUR_OPEN_BULK, openBulk);
+      window.removeEventListener(TOUR_CLOSE_BULK, closeBulk);
+      window.removeEventListener(TOUR_OPEN_PASSAGE, openPassage);
+      window.removeEventListener(TOUR_CLOSE_PASSAGE, closePassage);
+      window.removeEventListener(TOUR_OPEN_IMAGES, openImages);
+      window.removeEventListener(TOUR_CLOSE_IMAGES, closeImages);
+      window.removeEventListener(TOUR_OPEN_EDIT, openEdit);
+      window.removeEventListener(TOUR_CLOSE_EDIT, closeEdit);
+      window.removeEventListener(TOUR_OPEN_DELETE, openDelete);
+      window.removeEventListener(TOUR_CLOSE_DELETE, closeDelete);
+      window.removeEventListener(TOUR_OPEN_Q_IMAGE, openQImage);
+      window.removeEventListener(TOUR_CLOSE_Q_IMAGE, closeQImage);
+    };
+  }, [isStaff, getTourQuestionRef]);
 
   // Handle edit form change
   const handleEditChange = (field, value) => {
@@ -1652,6 +1766,10 @@ const ComprehensiveExam = () => {
           onAiExtract={() => setAiExtractionModalOpen(true)}
           onReload={fetchExamData}
           loading={loading}
+          onStartTour={() => {
+            setShowGrades(false);
+            setExamTourOpen(true);
+          }}
         >
           {filteredQuestions.length > 0 ? (
             <VStack spacing={4} align="stretch" w="full">
@@ -1678,6 +1796,14 @@ const ComprehensiveExam = () => {
                     passageContent={passageContent}
                     questionRef={isPassageSub ? { ...q.sub_question } : q}
                     pendingCorrect={pendingCorrect}
+                    isTourTarget={
+                      questions[0] != null &&
+                      String(
+                        questions[0].type === "passage_sub"
+                          ? questions[0].sub_question?.id
+                          : questions[0].id,
+                      ) === String(displayId)
+                    }
                     onZoomImage={(src) => {
                       setImageZoomSrc(src);
                       setImageZoomOpen(true);
@@ -1873,7 +1999,7 @@ const ComprehensiveExam = () => {
               size={{ base: "sm", sm: "md", md: "lg" }}
             >
               <ModalOverlay />
-              <ModalContent mx={{ base: 2, sm: 4 }}>
+              <ModalContent mx={{ base: 2, sm: 4 }} data-tour-id="exam-edit-modal">
                 <ModalHeader fontSize={{ base: "md", sm: "lg" }}>
                   تعديل السؤال
                 </ModalHeader>
@@ -2052,7 +2178,7 @@ const ComprehensiveExam = () => {
               isCentered
             >
               <ModalOverlay />
-              <ModalContent>
+              <ModalContent data-tour-id="exam-delete-modal">
                 <ModalHeader>تأكيد الحذف</ModalHeader>
                 <ModalCloseButton />
                 <ModalBody>
@@ -2097,7 +2223,7 @@ const ComprehensiveExam = () => {
               size="xl"
             >
               <ModalOverlay />
-              <ModalContent mx={{ base: 2, sm: 4 }}>
+              <ModalContent mx={{ base: 2, sm: 4 }} data-tour-id="exam-images-modal">
                 <ModalHeader fontSize={{ base: "md", sm: "lg" }}>
                   إضافة أسئلة كصور
                 </ModalHeader>
@@ -2304,7 +2430,7 @@ const ComprehensiveExam = () => {
               isCentered
             >
               <ModalOverlay />
-              <ModalContent mx={{ base: 2, sm: 4 }} maxH="90vh">
+              <ModalContent mx={{ base: 2, sm: 4 }} maxH="90vh" data-tour-id="exam-bulk-modal">
                 <ModalHeader fontSize={{ base: "md", sm: "lg" }}>
                   إضافة مجموعة أسئلة (نص)
                 </ModalHeader>
@@ -2390,7 +2516,7 @@ const ComprehensiveExam = () => {
               isCentered
             >
               <ModalOverlay />
-              <ModalContent mx={{ base: 2, sm: 4 }}>
+              <ModalContent mx={{ base: 2, sm: 4 }} data-tour-id="exam-passage-modal">
                 <ModalHeader fontSize={{ base: "md", sm: "lg" }}>
                   إنشاء قطعة وإضافة أسئلتها
                 </ModalHeader>
@@ -2493,7 +2619,7 @@ const ComprehensiveExam = () => {
               size="md"
             >
               <ModalOverlay />
-              <ModalContent mx={{ base: 2, sm: 4 }}>
+              <ModalContent mx={{ base: 2, sm: 4 }} data-tour-id="exam-q-image-modal">
                 <ModalHeader fontSize={{ base: "md", sm: "lg" }}>
                   إضافة صورة للسؤال
                 </ModalHeader>
@@ -2662,6 +2788,13 @@ const ComprehensiveExam = () => {
                 </ModalBody>
               </ModalContent>
             </Modal>
+      {isStaff ? (
+        <TeacherExamTour
+          isOpen={examTourOpen}
+          hasQuestions={questions.length > 0}
+          onClose={() => setExamTourOpen(false)}
+        />
+      ) : null}
     </>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { getHeroImageUrl, resolvePublicImageUrl } from "../../../utils/highQualityImageUrl";
 import {
   Icon,
@@ -52,6 +52,12 @@ import { Link, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import baseUrl from "../../../api/baseUrl";
 import { crBtnPrimary, crContainer } from "../courseTheme";
+import {
+  TOUR_CLOSE_ACTIVATE_STUDENT,
+  TOUR_CLOSE_ENROLLMENTS,
+  TOUR_OPEN_ACTIVATE_STUDENT,
+  TOUR_OPEN_ENROLLMENTS,
+} from "../../../utils/teacherCoursePageTour";
 
 function RatingStars({ value }) {
   const num = Math.min(5, Math.max(0, Number(value) || 0));
@@ -140,6 +146,25 @@ const CourseHeroSection = ({
     onEnrollmentsOpen();
     fetchEnrollments();
   };
+
+  useEffect(() => {
+    const openActivate = () => onOpen();
+    const closeActivate = () => onClose();
+    const openEnroll = () => handleOpenEnrollmentsModal();
+    const closeEnroll = () => onEnrollmentsClose();
+
+    window.addEventListener(TOUR_OPEN_ACTIVATE_STUDENT, openActivate);
+    window.addEventListener(TOUR_CLOSE_ACTIVATE_STUDENT, closeActivate);
+    window.addEventListener(TOUR_OPEN_ENROLLMENTS, openEnroll);
+    window.addEventListener(TOUR_CLOSE_ENROLLMENTS, closeEnroll);
+
+    return () => {
+      window.removeEventListener(TOUR_OPEN_ACTIVATE_STUDENT, openActivate);
+      window.removeEventListener(TOUR_CLOSE_ACTIVATE_STUDENT, closeActivate);
+      window.removeEventListener(TOUR_OPEN_ENROLLMENTS, openEnroll);
+      window.removeEventListener(TOUR_CLOSE_ENROLLMENTS, closeEnroll);
+    };
+  }, [onOpen, onClose, onEnrollmentsClose, handleOpenEnrollmentsModal]);
 
   const filteredEnrollments = useMemo(() => {
     const query = enrollmentSearch.trim().toLowerCase();
@@ -330,21 +355,30 @@ const CourseHeroSection = ({
               )}
 
               {(canManageStudents || isTeacher) && (
-                <div className="mt-6 flex flex-wrap gap-2.5">
+                <div className="mt-6 flex flex-wrap gap-2.5" data-tour-id="course-hero-actions">
                   {(isTeacher || isAdmin) && (
-                    <button type="button" className={crBtnPrimary} onClick={onOpen}>
+                    <button type="button" className={crBtnPrimary} onClick={onOpen} data-tour-id="course-hero-activate">
                       <FaUserPlus />
                       تفعيل طالب
                     </button>
                   )}
                   {isTeacher && (
-                    <Link to={`/CourseStatisticsPage/${course.id}`} className={heroGhostBtn}>
+                    <Link
+                      to={`/CourseStatisticsPage/${course.id}`}
+                      className={heroGhostBtn}
+                      data-tour-id="course-hero-stats"
+                    >
                       <FaChartBar />
                       الإحصائيات
                     </Link>
                   )}
                   {canManageStudents && (
-                    <button type="button" className={heroGhostBtn} onClick={handleOpenEnrollmentsModal}>
+                    <button
+                      type="button"
+                      className={heroGhostBtn}
+                      onClick={handleOpenEnrollmentsModal}
+                      data-tour-id="course-hero-enrollments"
+                    >
                       <FaUserGraduate />
                       المشتركين ({studentsCountNum ?? enrollments.length ?? 0})
                     </button>
@@ -360,6 +394,7 @@ const CourseHeroSection = ({
       <Modal isOpen={isOpen} onClose={onClose} isCentered size={{ base: "full", md: "md" }} scrollBehavior="inside">
         <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(5px)" />
         <ModalContent
+          data-tour-id="course-activate-student-modal"
           bg={useColorModeValue("white", "gray.800")}
           borderRadius={{ base: "none", md: "2xl" }}
           mx={{ base: 0, md: 4 }}
@@ -418,7 +453,13 @@ const CourseHeroSection = ({
         scrollBehavior="inside"
       >
         <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(5px)" />
-        <ModalContent bg={modalBg} borderRadius={{ base: "none", md: "2xl" }} maxH={{ base: "100vh", md: "90vh" }} mx={{ base: 0, md: 4 }}>
+        <ModalContent
+          data-tour-id="course-enrollments-modal"
+          bg={modalBg}
+          borderRadius={{ base: "none", md: "2xl" }}
+          maxH={{ base: "100vh", md: "90vh" }}
+          mx={{ base: 0, md: 4 }}
+        >
           <ModalHeader borderBottomWidth="1px" borderColor={borderColor}>
             <HStack spacing={3}>
               <Center w={10} h={10} bg="blue.50" borderRadius="lg">

@@ -38,6 +38,7 @@ export default function CourseFormModal({
   isCentered = true,
   hideSubmit = false,
   onPrimaryClick,
+  tourTargetId,
 }) {
   const cardBg = useColorModeValue("white", "gray.800");
   const modalBodyBg = useColorModeValue("gray.50", "gray.900");
@@ -119,6 +120,7 @@ export default function CourseFormModal({
     >
       <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(6px)" />
       <ModalContent
+        data-tour-id={tourTargetId}
         borderRadius={{ base: "none", md: "2xl" }}
         overflow="hidden"
         bg={cardBg}

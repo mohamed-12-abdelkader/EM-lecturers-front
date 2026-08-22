@@ -99,7 +99,7 @@ export default function UploadCourseFileModal({ isOpen, onClose, onSubmit, loadi
       scrollBehavior="inside"
     >
       <ModalOverlay backdropFilter="blur(4px)" />
-      <ModalContent borderRadius={{ base: "none", md: "2xl" }} mx={{ base: 0, md: 4 }}>
+      <ModalContent borderRadius={{ base: "none", md: "2xl" }} mx={{ base: 0, md: 4 }} data-tour-id="course-file-upload-modal">
         <ModalHeader fontSize={{ base: "md", md: "lg" }}>إضافة ملف PDF</ModalHeader>
         <ModalCloseButton isDisabled={loading} />
         <ModalBody>

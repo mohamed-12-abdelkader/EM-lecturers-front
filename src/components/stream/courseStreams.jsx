@@ -11,6 +11,7 @@ import {
   Icon,
   VStack,
 } from "@chakra-ui/react";
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   FaExternalLinkAlt,
@@ -20,6 +21,10 @@ import {
 import baseUrl from "../../api/baseUrl";
 import CreateStreamModal from "./createModel";
 import CourseStreamsList from "./courseStreamsList";
+import {
+  TOUR_CLOSE_CREATE_STREAM,
+  TOUR_OPEN_CREATE_STREAM,
+} from "../../utils/teacherCoursePageTour";
 
 const STREAM_REDIRECT_URL = import.meta.env.VITE_STREAM_REDIRECT_URL;
 
@@ -45,6 +50,18 @@ function LivePulseDot() {
 
 function CourseStreams({ courseId }) {
   const { isOpen, onOpen, onClose } = useDisclosure();
+
+  useEffect(() => {
+    const openStream = () => onOpen();
+    const closeStream = () => onClose();
+    window.addEventListener(TOUR_OPEN_CREATE_STREAM, openStream);
+    window.addEventListener(TOUR_CLOSE_CREATE_STREAM, closeStream);
+    return () => {
+      window.removeEventListener(TOUR_OPEN_CREATE_STREAM, openStream);
+      window.removeEventListener(TOUR_CLOSE_CREATE_STREAM, closeStream);
+    };
+  }, [onOpen, onClose]);
+
   const border = useColorModeValue("gray.200", "gray.700");
   const titleColor = useColorModeValue("gray.900", "white");
   const muted = useColorModeValue("gray.500", "gray.400");
@@ -163,6 +180,7 @@ function CourseStreams({ courseId }) {
             </HStack>
           ) : (
             <Button
+              data-tour-id="course-create-stream-btn"
               leftIcon={<Icon as={FaPlus} boxSize={3} />}
               colorScheme="orange"
               onClick={onOpen}

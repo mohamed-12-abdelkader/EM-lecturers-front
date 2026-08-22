@@ -1,6 +1,7 @@
 import { safeLocalGet, safeLocalSet } from "./safeStorage";
 
 const DONE_KEY = "course_page_tours_done";
+const TEACHER_DONE_KEY = "teacher_course_page_tours_done";
 
 /** عرض الجولة أول مرة فقط لكل كورس */
 const ALWAYS_SHOW_COURSE_PAGE_TOUR = false;
@@ -33,6 +34,42 @@ export function completeCoursePageTour(courseId) {
   if (!done.includes(id)) {
     writeDoneSet([...done, id]);
   }
+}
+
+function readTeacherDoneSet() {
+  try {
+    const raw = safeLocalGet(TEACHER_DONE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeTeacherDoneSet(ids) {
+  safeLocalSet(TEACHER_DONE_KEY, JSON.stringify([...new Set(ids.map(String))]));
+}
+
+export function shouldShowTeacherCoursePageTour(courseId) {
+  if (courseId == null || courseId === "") return false;
+  if (ALWAYS_SHOW_COURSE_PAGE_TOUR) return true;
+  return !readTeacherDoneSet().includes(String(courseId));
+}
+
+export function completeTeacherCoursePageTour(courseId) {
+  if (courseId == null || courseId === "") return;
+  const id = String(courseId);
+  const done = readTeacherDoneSet();
+  if (!done.includes(id)) {
+    writeTeacherDoneSet([...done, id]);
+  }
+}
+
+export function resetTeacherCoursePageTour(courseId) {
+  if (courseId == null || courseId === "") return;
+  const id = String(courseId);
+  writeTeacherDoneSet(readTeacherDoneSet().filter((item) => item !== id));
 }
 
 export const TOUR_SET_SECTION = "course-page-tour:set-section";

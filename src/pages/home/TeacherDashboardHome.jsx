@@ -73,6 +73,7 @@ import {
   FaSync,
   FaBuilding,
   FaFire,
+  FaCompass,
 } from "react-icons/fa";
 import { MdAssignment, MdQuiz } from "react-icons/md";
 import { Link } from "react-router-dom";
@@ -82,6 +83,13 @@ import ScrollToTop from "../../components/scollToTop/ScrollToTop";
 import TeacherSubscriptionExpiryAlert from "../../components/teacher/TeacherSubscriptionExpiryAlert";
 import { useTeacherSubscriptionExpiryAlert } from "../../Hooks/useTeacherSubscriptionExpiryAlert";
 import InstallPWAButton from "../../components/pwa/InstallPWAButton";
+import TeacherDashboardTour from "../../components/onboarding/TeacherDashboardTour";
+import {
+  shouldShowTeacherDashboardTour,
+  resetTeacherDashboardTour,
+  TOUR_OPEN_CREATE_COURSE,
+  TOUR_CLOSE_CREATE_COURSE,
+} from "../../utils/teacherDashboardTour";
 
 function KpiCard({ icon, label, value, accent = "blue" }) {
   const bg = useColorModeValue("white", "gray.800");
@@ -491,10 +499,17 @@ const TeacherDashboardHome = () => {
   const [courseSearch, setCourseSearch] = useState("");
   const [courseSort, setCourseSort] = useState("newest");
   const [alertRefreshing, setAlertRefreshing] = useState(false);
+  const [dashboardTourOpen, setDashboardTourOpen] = useState(false);
   const {
     alert: subscriptionAlert,
     refresh: refreshSubscriptionAlert,
   } = useTeacherSubscriptionExpiryAlert({ days: 3, grace_days: 3 });
+
+  useEffect(() => {
+    if (!shouldShowTeacherDashboardTour()) return undefined;
+    const timer = window.setTimeout(() => setDashboardTourOpen(true), 800);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   // Modal states
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -509,6 +524,17 @@ const TeacherDashboardHome = () => {
     onClose: onDeleteClose,
   } = useDisclosure();
   const toast = useToast();
+
+  useEffect(() => {
+    const openCreate = () => onOpen();
+    const closeCreate = () => onClose();
+    window.addEventListener(TOUR_OPEN_CREATE_COURSE, openCreate);
+    window.addEventListener(TOUR_CLOSE_CREATE_COURSE, closeCreate);
+    return () => {
+      window.removeEventListener(TOUR_OPEN_CREATE_COURSE, openCreate);
+      window.removeEventListener(TOUR_CLOSE_CREATE_COURSE, closeCreate);
+    };
+  }, [onOpen, onClose]);
   const cancelRef = useRef();
   const [formData, setFormData] = useState({
     title: "",
@@ -1053,6 +1079,7 @@ const TeacherDashboardHome = () => {
         <VStack spacing={{ base: 5, md: 6 }} align="stretch">
           {/* Hero */}
           <Box
+            data-tour-id="teacher-hero"
             color="white"
             borderRadius={{ base: "2xl", md: "3xl" }}
             overflow="hidden"
@@ -1177,6 +1204,7 @@ const TeacherDashboardHome = () => {
                 backdropFilter="blur(10px)"
               >
                 <Button
+                  data-tour-id="teacher-create-course-trigger"
                   leftIcon={<FaPlus />}
                   size="sm"
                   bg="#DD6B20"
@@ -1210,18 +1238,38 @@ const TeacherDashboardHome = () => {
                   variant="hero"
                   className="!w-auto !py-2 !px-4 !text-xs !rounded-xl flex-[1] sm:flex-initial"
                 />
+                <Button
+                  data-tour-id="teacher-tour-restart"
+                  leftIcon={<FaCompass />}
+                  size="sm"
+                  variant="ghost"
+                  color="white"
+                  borderRadius="xl"
+                  fontWeight="700"
+                  cursor="pointer"
+                  onClick={() => {
+                    resetTeacherDashboardTour();
+                    setDashboardTourOpen(true);
+                  }}
+                  _hover={{ bg: "whiteAlpha.200" }}
+                  flex={{ base: 1, sm: "initial" }}
+                >
+                  جولة المنصة
+                </Button>
               </Flex>
             </Flex>
           </Box>
 
-          <TeacherSubscriptionExpiryAlert
-            alert={subscriptionAlert}
-            onRefresh={refreshSubscriptionAlert}
-            refreshing={alertRefreshing}
-          />
+          <Box data-tour-id="teacher-subscription-alert">
+            <TeacherSubscriptionExpiryAlert
+              alert={subscriptionAlert}
+              onRefresh={refreshSubscriptionAlert}
+              refreshing={alertRefreshing}
+            />
+          </Box>
 
           {/* KPIs */}
-          <SimpleGrid columns={{ base: 1, sm: 3 }} spacing={3}>
+          <SimpleGrid columns={{ base: 1, sm: 3 }} spacing={3} data-tour-id="teacher-kpis">
             <KpiCard icon={FaBookOpen} label="كورساتي" value={courses.length} accent="blue" />
             <KpiCard icon={FaUsers} label="المواد الدراسية" value={subjects.length} accent="orange" />
             <KpiCard icon={MdAssignment} label="المجموعات" value={totalGroups} accent="green" />
@@ -1229,6 +1277,7 @@ const TeacherDashboardHome = () => {
 
           {/* Quick Links */}
           <Box
+            data-tour-id="teacher-quick-links"
             bg={sectionCardBg}
             borderWidth="1px"
             borderColor={sectionBorder}
@@ -1249,7 +1298,7 @@ const TeacherDashboardHome = () => {
           </Box>
 
           {/* Courses */}
-          <Box>
+          <Box data-tour-id="teacher-courses">
             <Flex
               mb={3}
               direction={{ base: "column", sm: "row" }}
@@ -1280,6 +1329,7 @@ const TeacherDashboardHome = () => {
             </Flex>
 
             <Flex
+              data-tour-id="teacher-courses-toolbar"
               mb={4}
               direction={{ base: "column", md: "row" }}
               gap={2}
@@ -1331,6 +1381,7 @@ const TeacherDashboardHome = () => {
               </Select>
             </Flex>
 
+            <Box data-tour-id="teacher-courses-list">
             {loading && courses.length === 0 ? (
               <Center py={10} bg={sectionCardBg} borderRadius="2xl" borderWidth="1px" borderColor={sectionBorder}>
                 <VStack spacing={3}>
@@ -1503,9 +1554,15 @@ const TeacherDashboardHome = () => {
                 ))}
               </SimpleGrid>
             )}
+            </Box>
           </Box>
         </VStack>
       </Container>
+
+      <TeacherDashboardTour
+        isOpen={dashboardTourOpen}
+        onClose={() => setDashboardTourOpen(false)}
+      />
 
       {/* Create Course Modal */}
       <Modal
@@ -1517,6 +1574,7 @@ const TeacherDashboardHome = () => {
       >
         <ModalOverlay bg="blackAlpha.700" backdropFilter="blur(8px)" />
         <ModalContent
+          data-tour-id="teacher-create-course-modal"
           bg={cardBg}
           borderRadius={{ base: "none", md: "2xl" }}
           overflow="hidden"
@@ -1563,6 +1621,7 @@ const TeacherDashboardHome = () => {
             <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={{ base: 6, lg: 8 }}>
               {/* العمود الأيمن — النموذج */}
               <VStack spacing={6} align="stretch">
+                <Box data-tour-id="teacher-create-course-basic">
                 <CreateCourseModalSection
                   title="المعلومات الأساسية"
                   subtitle="العنوان والوصف يظهران للطلاب في صفحة الكورس"
@@ -1593,7 +1652,9 @@ const TeacherDashboardHome = () => {
                     />
                   </FormControl>
                 </CreateCourseModalSection>
+                </Box>
 
+                <Box data-tour-id="teacher-create-course-pricing">
                 <CreateCourseModalSection
                   title="التسعير والصفوف"
                   subtitle="اختر نوع الكورس والصفوف الدراسية المرتبطة به"
@@ -1724,10 +1785,11 @@ const TeacherDashboardHome = () => {
                     )}
                   </FormControl>
                 </CreateCourseModalSection>
+                </Box>
               </VStack>
 
               {/* العمود الأيسر — صورة الغلاف */}
-              <Box>
+              <Box data-tour-id="teacher-create-course-cover">
                 <CreateCourseModalSection
                   title="صورة الغلاف"
                   subtitle="صورة جذابة تزيد من ثقة الطلاب — اختيارية"
@@ -1839,6 +1901,7 @@ const TeacherDashboardHome = () => {
           </ModalBody>
 
           <ModalFooter
+            data-tour-id="teacher-create-course-submit"
             bg={modalFooterBg}
             borderTop="1px solid"
             borderColor={borderColor}

@@ -1,15 +1,158 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  FaCamera,
+  FaCalendarAlt,
+  FaEdit,
+  FaGraduationCap,
+  FaPhone,
+  FaUserFriends,
+  FaIdCard,
+  FaUsers,
+  FaBookOpen,
+  FaClock,
+  FaCheckCircle,
+  FaExclamationTriangle,
+} from "react-icons/fa";
 import { IoPersonCircleSharp } from "react-icons/io5";
-import { MdAttachEmail } from "react-icons/md";
-import { MdClose } from "react-icons/md";
-import { FaCamera, FaCalendarAlt, FaEdit, FaGraduationCap, FaPhone, FaUserFriends } from "react-icons/fa";
-import ScrollToTop from "../../components/scollToTop/ScrollToTop"; // Ensure this path is correct
+import { MdAttachEmail, MdClose, MdLock } from "react-icons/md";
+import ScrollToTop from "../../components/scollToTop/ScrollToTop";
 import baseUrl from "../../api/baseUrl";
+import { resolvePublicImageUrl } from "../../utils/highQualityImageUrl";
+
+const ACCOUNT_STATUS_LABELS = {
+  active: { label: "نشط", tone: "ok" },
+  pending: { label: "قيد المراجعة", tone: "warn" },
+  blocked: { label: "محظور", tone: "bad" },
+  inactive: { label: "غير نشط", tone: "muted" },
+};
+
+function formatDate(value) {
+  if (!value) return "—";
+  try {
+    return new Date(value).toLocaleDateString("ar-EG", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  } catch {
+    return "—";
+  }
+}
+
+function formatTimeRange(start, end) {
+  if (!start && !end) return null;
+  if (start && end) return `${start} – ${end}`;
+  return start || end;
+}
+
+function InfoChip({ icon: Icon, label, value, accent = "blue" }) {
+  const accents = {
+    blue: "border-blue-100 bg-blue-50/80 text-blue-700",
+    orange: "border-orange-100 bg-orange-50/80 text-orange-700",
+    emerald: "border-emerald-100 bg-emerald-50/80 text-emerald-700",
+    amber: "border-amber-100 bg-amber-50/80 text-amber-700",
+    violet: "border-violet-100 bg-violet-50/80 text-violet-700",
+    slate: "border-slate-200 bg-slate-50 text-slate-600",
+  };
+  const iconBox = {
+    blue: "bg-blue-500/15 text-blue-600",
+    orange: "bg-orange-500/15 text-orange-600",
+    emerald: "bg-emerald-500/15 text-emerald-600",
+    amber: "bg-amber-500/15 text-amber-600",
+    violet: "bg-violet-500/15 text-violet-600",
+    slate: "bg-slate-200/80 text-slate-600",
+  };
+
+  return (
+    <div className={`rounded-2xl border p-4 ${accents[accent] || accents.blue}`}>
+      <div className="flex items-start gap-3">
+        <div
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${iconBox[accent] || iconBox.blue}`}
+        >
+          <Icon className="text-sm" />
+        </div>
+        <div className="min-w-0 flex-1 text-right">
+          <p className="text-[11px] font-bold opacity-80">{label}</p>
+          <p className="mt-1 break-words text-sm font-extrabold text-slate-900">{value || "—"}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GroupCard({ title, icon: Icon, group, emptyText, canChoose }) {
+  return (
+    <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.05)] md:p-6">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0E4C92]/10 text-[#0E4C92]">
+            <Icon />
+          </div>
+          <div>
+            <h3 className="font-heading text-base font-bold text-slate-900 md:text-lg">{title}</h3>
+            {canChoose ? (
+              <p className="mt-0.5 text-xs text-emerald-600">يمكنك تغييرها من «تعديل البيانات»</p>
+            ) : (
+              <p className="mt-0.5 text-xs text-slate-500">يُدار من قبل المنصة / المدرس</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {group ? (
+        <div className="rounded-2xl border border-blue-100 bg-gradient-to-bl from-[#0E4C92]/5 to-orange-50/40 p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="font-heading text-lg font-extrabold text-slate-900">{group.name}</p>
+              {group.grade_name ? (
+                <p className="mt-1 text-sm text-slate-600">{group.grade_name}</p>
+              ) : null}
+            </div>
+            {group.status ? (
+              <span className="rounded-full bg-white/80 px-3 py-1 text-xs font-bold text-[#0E4C92]">
+                {group.status === "active" ? "نشطة" : group.status}
+              </span>
+            ) : null}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
+            {group.days ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-2.5 py-1">
+                <FaCalendarAlt className="text-[10px] text-orange-500" />
+                {group.days}
+              </span>
+            ) : null}
+            {formatTimeRange(group.start_time, group.end_time) ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-2.5 py-1">
+                <FaClock className="text-[10px] text-blue-500" />
+                {formatTimeRange(group.start_time, group.end_time)}
+              </span>
+            ) : null}
+            {group.number_in_group != null ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-2.5 py-1">
+                رقمك في المجموعة: {group.number_in_group}
+              </span>
+            ) : null}
+            {group.joined_at ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/80 px-2.5 py-1">
+                انضممت: {formatDate(group.joined_at)}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+          {emptyText}
+        </div>
+      )}
+    </section>
+  );
+}
 
 const Profile = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [pageMessage, setPageMessage] = useState(null);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -18,83 +161,73 @@ const Profile = () => {
     phone: "",
     parent_phone: "",
     password: "",
+    group_id: "",
+    course_group_id: "",
   });
   const [selectedAvatarFile, setSelectedAvatarFile] = useState(null);
   const [selectedAvatarPreview, setSelectedAvatarPreview] = useState(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
 
   const directAvatarInputRef = useRef(null);
   const modalAvatarInputRef = useRef(null);
 
-  // Prevent memory leaks from object URLs
   useEffect(() => {
     return () => {
       if (selectedAvatarPreview) URL.revokeObjectURL(selectedAvatarPreview);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAvatarPreview]);
-  
-  useEffect(() => {
-    const fetchMe = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        if (!token) {
-          setError("يرجى تسجيل الدخول للوصول إلى الملف الشخصي.");
-          setLoading(false);
-          return;
-        }
-        const response = await baseUrl.get("/api/student/me", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setUser(response.data);
-      } catch (err) {
-        setError(
-          err.response?.data?.message || "فشل في جلب البيانات. حاول مرة أخرى."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchMe();
+
+  const applyProfile = useCallback((data) => {
+    if (!data) return;
+    const { success, message, ...profile } = data;
+    setUser(profile);
+    if (message) setPageMessage(message);
   }, []);
 
-  // Helper to render grade text from array or id/string
-  const getGradeText = useMemo(() => {
-    if (!user) return "غير محدد";
-    const grade = user?.grades;
-    if (Array.isArray(grade)) {
-      if (grade.length === 0) return "غير محدد";
-      return grade.map((g) => g?.name).filter(Boolean).join("، ");
-    }
-    if (typeof grade === "string") return grade || "غير محدد";
-    switch (parseInt(grade)) {
-      case 1:
-        return "الصف الأول الثانوي";
-      case 2:
-        return "الصف الثاني الثانوي";
-      case 3:
-        return "الصف الثالث الثانوي";
-      default:
-        return "غير محدد";
-    }
-  }, [user]);
-
-  const roleText = useMemo(() => {
-    if (!user) return "";
-    return user?.role === "student" ? "طالب" : user?.role || "عضو";
-  }, [user]);
-
-  const joinedText = useMemo(() => {
-    if (!user?.created_at) return "غير متوفر";
+  const fetchMe = useCallback(async () => {
     try {
-      return new Date(user.created_at).toLocaleDateString("ar-EG", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
+      setLoading(true);
+      setError(null);
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setError("يرجى تسجيل الدخول للوصول إلى الملف الشخصي.");
+        setUser(null);
+        return;
+      }
+      const response = await baseUrl.get("/api/student/me", {
+        headers: { Authorization: `Bearer ${token}` },
       });
-    } catch {
-      return "غير متوفر";
+      applyProfile(response.data);
+    } catch (err) {
+      setError(err.response?.data?.message || "فشل في جلب البيانات. حاول مرة أخرى.");
+      setUser(null);
+    } finally {
+      setLoading(false);
     }
+  }, [applyProfile]);
+
+  useEffect(() => {
+    fetchMe();
+  }, [fetchMe]);
+
+  const gradeText = useMemo(() => {
+    if (!user) return "غير محدد";
+    const grades = user.grades;
+    if (Array.isArray(grades) && grades.length > 0) {
+      return grades.map((g) => g?.name).filter(Boolean).join("، ");
+    }
+    return "غير محدد";
   }, [user]);
+
+  const statusMeta = ACCOUNT_STATUS_LABELS[user?.account_status] || {
+    label: user?.account_status || "—",
+    tone: "muted",
+  };
+
+  const avatarSrc = useMemo(() => {
+    if (selectedAvatarPreview) return selectedAvatarPreview;
+    return resolvePublicImageUrl(user?.avatar) || user?.avatar || null;
+  }, [selectedAvatarPreview, user?.avatar]);
 
   const openEditModal = () => {
     setEditForm({
@@ -103,50 +236,51 @@ const Profile = () => {
       phone: user?.phone || "",
       parent_phone: user?.parent_phone || "",
       password: "",
+      group_id: user?.study_group?.id ?? "",
+      course_group_id: user?.course_group?.id ?? "",
     });
     setSelectedAvatarFile(null);
     setSelectedAvatarPreview(null);
     setEditModalVisible(true);
     setError(null);
+    setPageMessage(null);
   };
 
   const closeEditModal = () => {
     setEditModalVisible(false);
     setEditing(false);
-    setError(null);
+    setSelectedAvatarFile(null);
+    setSelectedAvatarPreview(null);
   };
 
-  const onPickAvatarDirect = () => {
-    directAvatarInputRef.current?.click();
-  };
-
-  const onPickAvatarInModal = () => {
-    modalAvatarInputRef.current?.click();
-  };
-
-  const uploadAvatarDirect = async (file) => {
+  const uploadAvatar = async (file) => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setError("يرجى تسجيل الدخول لتغيير الصورة الشخصية.");
+      return false;
+    }
+    const formData = new FormData();
+    formData.append("avatar", file);
+    setAvatarUploading(true);
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        setError("يرجى تسجيل الدخول لتغيير الصورة الشخصية.");
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append("avatar", file);
-
-      setLoading(true);
-      const response = await baseUrl.put("/api/user/me", formData, {
+      const response = await baseUrl.put("/api/student/me/avatar", formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "multipart/form-data",
         },
       });
-      setUser(response.data);
+      const avatarUrl = response.data?.data?.avatar;
+      if (avatarUrl) {
+        setUser((prev) => (prev ? { ...prev, avatar: avatarUrl } : prev));
+      }
+      setPageMessage(response.data?.message || "تم تحديث الصورة الشخصية");
+      setError(null);
+      return true;
     } catch (err) {
       setError(err?.response?.data?.message || "فشل في تحديث الصورة الشخصية.");
+      return false;
     } finally {
-      setLoading(false);
+      setAvatarUploading(false);
     }
   };
 
@@ -161,51 +295,62 @@ const Profile = () => {
         return;
       }
 
-      const hasAvatar = !!selectedAvatarFile;
-      const hasData =
-        editForm.name ||
-        editForm.email ||
-        editForm.phone ||
-        editForm.parent_phone ||
-        editForm.password;
+      if (selectedAvatarFile) {
+        const ok = await uploadAvatar(selectedAvatarFile);
+        if (!ok) return;
+      }
 
-      if (!hasData && !hasAvatar) {
-        setError("يرجى إدخال بيانات للتحديث.");
+      const payload = {};
+      if (editForm.name?.trim() && editForm.name.trim() !== user?.name) {
+        payload.name = editForm.name.trim();
+      }
+      if ((editForm.phone || "") !== (user?.phone || "")) {
+        payload.phone = editForm.phone.trim();
+      }
+      if ((editForm.parent_phone || "") !== (user?.parent_phone || "")) {
+        payload.parent_phone = editForm.parent_phone.trim() || null;
+      }
+      if ((editForm.email || "") !== (user?.email || "")) {
+        payload.email = editForm.email.trim() || null;
+      }
+      if (editForm.password?.trim()) {
+        payload.password = editForm.password.trim();
+      }
+
+      if (user?.can_choose_study_group) {
+        const nextGroupId = editForm.group_id === "" ? null : Number(editForm.group_id);
+        const currentGroupId = user?.study_group?.id ?? null;
+        if (nextGroupId && nextGroupId !== currentGroupId) {
+          payload.group_id = nextGroupId;
+        }
+      }
+
+      if (user?.can_choose_course_group) {
+        const nextCourseGroupId =
+          editForm.course_group_id === "" ? null : Number(editForm.course_group_id);
+        const currentCourseGroupId = user?.course_group?.id ?? null;
+        if (nextCourseGroupId && nextCourseGroupId !== currentCourseGroupId) {
+          payload.course_group_id = nextCourseGroupId;
+        }
+      }
+
+      const avatarOnly = Boolean(selectedAvatarFile) && Object.keys(payload).length === 0;
+      if (Object.keys(payload).length === 0 && !selectedAvatarFile) {
+        setError("لم يتم تغيير أي بيانات.");
         return;
       }
 
-      if (hasAvatar) {
-        const formData = new FormData();
-        if (editForm.name) formData.append("name", editForm.name);
-        if (editForm.email) formData.append("email", editForm.email);
-        if (editForm.phone) formData.append("phone", editForm.phone);
-        if (editForm.parent_phone) formData.append("parent_phone", editForm.parent_phone);
-        if (editForm.password) formData.append("password", editForm.password);
-        formData.append("avatar", selectedAvatarFile);
-
-        const response = await baseUrl.put("/api/user/me", formData, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
-          },
-        });
-        setUser(response.data);
-      } else {
-        const payload = {
-          ...(editForm.name ? { name: editForm.name } : {}),
-          ...(editForm.email ? { email: editForm.email } : {}),
-          ...(editForm.phone ? { phone: editForm.phone } : {}),
-          ...(editForm.parent_phone ? { parent_phone: editForm.parent_phone } : {}),
-          ...(editForm.password ? { password: editForm.password } : {}),
-        };
-
-        const response = await baseUrl.put("/api/user/me", payload, {
+      if (Object.keys(payload).length > 0) {
+        const response = await baseUrl.put("/api/student/me", payload, {
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
         });
-        setUser(response.data);
+        applyProfile(response.data);
+        setPageMessage(response.data?.message || "تم تحديث البيانات بنجاح");
+      } else if (avatarOnly) {
+        setPageMessage((prev) => prev || "تم تحديث الصورة الشخصية");
       }
 
       closeEditModal();
@@ -219,352 +364,364 @@ const Profile = () => {
   const onAvatarFileChangeDirect = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    await uploadAvatarDirect(file);
-    // Clear input so selecting the same file again triggers change
+    await uploadAvatar(file);
     e.target.value = "";
   };
 
   const onAvatarFileChangeModal = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (selectedAvatarPreview) URL.revokeObjectURL(selectedAvatarPreview);
     setSelectedAvatarFile(file);
     setSelectedAvatarPreview(URL.createObjectURL(file));
-    // eslint-disable-next-line no-param-reassign
     e.target.value = "";
   };
 
+  const statusToneClass = {
+    ok: "bg-emerald-500/15 text-emerald-700 border-emerald-200",
+    warn: "bg-amber-500/15 text-amber-700 border-amber-200",
+    bad: "bg-red-500/15 text-red-700 border-red-200",
+    muted: "bg-slate-500/10 text-slate-600 border-slate-200",
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-blue-50/40 to-slate-100 flex flex-col items-center py-16 md:py-20 px-4" dir="rtl">
-      <div className="w-full max-w-3xl bg-white/95 dark:bg-gray-900/85 rounded-3xl shadow-[0_30px_80px_-20px_rgba(15,23,42,0.22)] overflow-hidden my-8 md:my-10 transition-all duration-500 border border-blue-100/70 dark:border-blue-400/10 backdrop-blur-xl">
+    <div
+      className="min-h-screen bg-[linear-gradient(180deg,#E8EEF5_0%,#F7F9FC_45%,#EEF2F7_100%)] pb-16 pt-[5.5rem] md:pt-[6.25rem]"
+      dir="rtl"
+    >
+      <div className="mx-auto w-full max-w-4xl px-4 md:px-6">
         {loading ? (
-          <div className="p-10 text-center">
-            <p className="text-xl font-semibold text-gray-600">جاري تحميل البيانات...</p>
+          <div className="rounded-3xl border border-slate-200/80 bg-white p-12 text-center shadow-sm">
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-[#0E4C92] border-t-transparent" />
+            <p className="font-semibold text-slate-600">جاري تحميل الملف الشخصي...</p>
           </div>
-        ) : error ? (
-          <div className="p-10 text-center">
-            <p className="text-xl font-semibold text-red-600">{error}</p>
+        ) : error && !user ? (
+          <div className="rounded-3xl border border-red-100 bg-white p-10 text-center shadow-sm">
+            <FaExclamationTriangle className="mx-auto mb-3 text-3xl text-red-500" />
+            <p className="text-lg font-bold text-red-600">{error}</p>
+            <button
+              type="button"
+              onClick={fetchMe}
+              className="mt-5 rounded-xl bg-[#0E4C92] px-5 py-2.5 text-sm font-bold text-white"
+            >
+              إعادة المحاولة
+            </button>
           </div>
         ) : user ? (
-          <>
-            {/* Cover */}
-            <div className="relative h-32 md:h-40 w-full overflow-hidden">
-              {user?.cover_photo ? (
-                <img
-                  src={user.cover_photo}
-                  alt="cover"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-r from-[#0f3f96] via-[#1e63d6] to-[#3b82f6]" />
-              )}
-              {/* Decorative overlays */}
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.24),transparent_40%),linear-gradient(to_bottom,rgba(15,23,42,0.12),rgba(15,23,42,0.22))]" />
-              <div className="absolute -top-12 -left-12 w-52 h-52 rounded-full bg-blue-300/25 blur-3xl" />
-              <div className="absolute -bottom-16 -right-16 w-60 h-60 rounded-full bg-orange-300/20 blur-3xl" />
-
-              <div className="absolute inset-x-0 bottom-5 px-6">
-                <div className="inline-flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-orange-400" />
-                  <div className="text-white font-extrabold text-lg md:text-xl drop-shadow">
-                    ملفي الشخصي
-                  </div>
-                </div>
+          <div className="space-y-5">
+            {pageMessage ? (
+              <div className="flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
+                <FaCheckCircle />
+                {pageMessage}
               </div>
-            </div>
-
-            {/* Profile Section */}
-            <div className="relative -mt-16 md:-mt-14 px-5 md:px-7 pb-7 md:pb-8">
-              {/* Avatar + Direct Update Badge */}
-              <div className="flex justify-center mb-3">
-                <div className="relative">
-                  <div className="w-28 h-28 md:w-32 md:h-32 rounded-full overflow-hidden ring-4 ring-white/90 shadow-[0_12px_28px_rgba(15,23,42,0.22)] bg-indigo-50 flex items-center justify-center">
-                    {user?.avatar ? (
-                      <img src={user.avatar} alt="avatar" className="w-full h-full object-cover" />
-                    ) : (
-                      <IoPersonCircleSharp className="text-indigo-600" style={{ fontSize: 72 }} />
-                    )}
-                  </div>
-                  <div
-                    className="absolute -bottom-2 -right-2 w-10 h-10 rounded-full bg-blue-600 border-2 border-white shadow-lg flex items-center justify-center cursor-pointer hover:scale-[1.05] transition-transform"
-                    role="button"
-                    tabIndex={0}
-                    onClick={onPickAvatarDirect}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") onPickAvatarDirect();
-                    }}
-                  >
-                    <FaCamera className="text-white" />
-                  </div>
-                </div>
+            ) : null}
+            {error && editModalVisible === false ? (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
+                {error}
               </div>
+            ) : null}
 
-              {/* Hidden inputs */}
-              <input
-                ref={directAvatarInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={onAvatarFileChangeDirect}
+            {/* Hero */}
+            <section className="relative overflow-hidden rounded-3xl border border-white/20 shadow-[0_24px_60px_-28px_rgba(8,43,87,0.55)]">
+              <div className="absolute inset-0 bg-[linear-gradient(125deg,#082B57_0%,#0E4C92_48%,#1A6BB8_100%)]" />
+              <div
+                className="pointer-events-none absolute inset-0"
+                style={{
+                  backgroundImage:
+                    "radial-gradient(ellipse 70% 80% at 100% 0%, rgba(221,107,32,0.28), transparent 45%), radial-gradient(ellipse 60% 70% at 0% 100%, rgba(255,255,255,0.12), transparent 50%)",
+                }}
               />
-
-              {/* User Info */}
-              <div className="mb-6 md:flex md:items-start md:justify-between md:gap-7">
-                <div className="text-center md:text-right flex-1">
-                  <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 dark:text-white mb-2">
-                    {user?.name || "طالب جديد"}
-                  </h2>
-                  <div className="inline-flex items-center px-5 py-2 rounded-2xl bg-blue-500/15 border border-blue-200/70 dark:border-blue-300/20 gap-2">
-                    <FaGraduationCap className="text-blue-600 dark:text-blue-400" />
-                    <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
-                      {roleText}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-4 md:mt-0 md:w-[260px]">
-                  <div className="rounded-3xl border border-blue-200/70 dark:border-blue-400/20 bg-white dark:bg-gray-800/50 p-4 shadow-[0_8px_24px_rgba(15,23,42,0.08)]">
-                    <div className="flex items-center justify-center md:justify-end gap-3">
-                      <FaCalendarAlt className="text-blue-600 dark:text-blue-400 text-lg" />
-                      <div className="text-right">
-                        <div className="text-xs font-extrabold text-blue-700/80 dark:text-blue-300 mb-1">
-                          تاريخ الانضمام
-                        </div>
-                        <div className="text-sm font-bold text-gray-900 dark:text-white">
-                          {joinedText}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Account Summary */}
-              <div className="rounded-3xl p-5 md:p-6 shadow-[0_12px_32px_rgba(15,23,42,0.08)] dark:shadow-none bg-white dark:bg-gray-800/60 border border-gray-100/80 dark:border-gray-700/60 backdrop-blur">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="text-sm font-extrabold text-gray-900 dark:text-white">
-                    ملخص الحساب
-                  </div>
-                  <div className="w-10 h-10 rounded-2xl bg-blue-500/15 flex items-center justify-center">
-                    <FaEdit className="text-blue-600 dark:text-blue-400" />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Grade */}
-                  <div className="rounded-2xl border border-blue-100/70 dark:border-blue-400/20 bg-blue-50/60 dark:bg-blue-400/10 p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-blue-500/20 flex items-center justify-center">
-                        <FaGraduationCap className="text-blue-600 dark:text-blue-400" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-xs font-extrabold text-blue-700/80 dark:text-blue-300">
-                          المرحلة
-                        </div>
-                        <div className="text-sm font-bold text-gray-900 dark:text-white mt-1">
-                          {getGradeText}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Mobile */}
-                  <div className="rounded-2xl border border-emerald-100/70 dark:border-emerald-400/20 bg-emerald-50/60 dark:bg-emerald-400/10 p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 flex items-center justify-center">
-                        <FaPhone className="text-emerald-600 dark:text-emerald-400" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-xs font-extrabold text-emerald-700/80 dark:text-emerald-300">
-                          موبايل
-                        </div>
-                        <div className="text-sm font-bold text-gray-900 dark:text-white mt-1">
-                          {user?.phone || "--"}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Parent */}
-                  <div className="rounded-2xl border border-amber-100/70 dark:border-amber-400/20 bg-amber-50/60 dark:bg-amber-400/10 p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-amber-500/20 flex items-center justify-center">
-                        <FaUserFriends className="text-amber-600 dark:text-amber-400" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-xs font-extrabold text-amber-700/80 dark:text-amber-300">
-                          ولي الأمر
-                        </div>
-                        <div className="text-sm font-bold text-gray-900 dark:text-white mt-1">
-                          {user?.parent_phone || "--"}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Email */}
-                  <div className="rounded-2xl border border-violet-100/70 dark:border-violet-400/20 bg-violet-50/60 dark:bg-violet-400/10 p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-violet-500/20 flex items-center justify-center">
-                        <MdAttachEmail className="text-violet-600 dark:text-violet-400" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="text-xs font-extrabold text-violet-700/80 dark:text-violet-300">
-                          البريد
-                        </div>
-                        <div className="text-sm font-bold text-gray-900 dark:text-white mt-1 truncate">
-                          {user?.email || "--"}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Edit CTA */}
-              <div className="mt-5 flex justify-center md:justify-end">
-                <button
-                  type="button"
-                  className="relative inline-flex items-center gap-3 px-9 py-3.5 rounded-2xl font-extrabold text-white bg-gradient-to-r from-blue-600 to-indigo-600 shadow-[0_12px_30px_rgba(37,99,235,0.35)] hover:brightness-105 transition"
-                  onClick={openEditModal}
-                  aria-label="تعديل البيانات"
-                >
-                  <FaEdit />
-                  تعديل البيانات
-                </button>
-              </div>
-            </div>
-
-            {/* Edit Modal */}
-            {editModalVisible && (
-              <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60" role="dialog" aria-modal="true">
-                <div
-                  className="absolute inset-0"
-                  onClick={closeEditModal}
-                  aria-hidden="true"
-                />
-
-                <div className="relative w-full max-w-lg bg-white dark:bg-gray-900 rounded-t-3xl p-6 pb-8" onClick={(e) => e.stopPropagation()}>
-                  <div className="w-11 h-1.5 rounded-full bg-blue-500/30 mx-auto mb-5" />
-
-                  <div className="flex items-center justify-between mb-5" dir="rtl">
-                    <h3 className="text-xl font-extrabold text-gray-900 dark:text-white">تعديل الملف الشخصي</h3>
-                    <button
-                      type="button"
-                      className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
-                      onClick={closeEditModal}
-                      aria-label="اغلاق"
-                    >
-                      <MdClose className="text-gray-700 dark:text-gray-200" />
-                    </button>
-                  </div>
-
-                  {/* Avatar picker */}
-                  <div className="flex justify-center mb-6">
+              <div className="relative z-10 px-5 pb-6 pt-6 md:px-8 md:pb-8 md:pt-8">
+                <div className="flex flex-col items-center gap-5 md:flex-row md:items-end md:justify-between">
+                  <div className="flex flex-col items-center gap-4 md:flex-row md:items-center">
                     <div className="relative">
-                      <div className="w-28 h-28 rounded-full overflow-hidden ring-4 ring-white/80 shadow-lg bg-indigo-50 flex items-center justify-center">
-                        {selectedAvatarPreview ? (
-                          <img
-                            src={selectedAvatarPreview}
-                            alt="selected avatar"
-                            className="w-full h-full object-cover"
-                          />
-                        ) : user?.avatar ? (
-                          <img src={user.avatar} alt="current avatar" className="w-full h-full object-cover" />
+                      <div className="h-28 w-28 overflow-hidden rounded-full border-4 border-white/90 bg-white/10 shadow-xl md:h-32 md:w-32">
+                        {avatarSrc ? (
+                          <img src={avatarSrc} alt={user.name || "avatar"} className="h-full w-full object-cover" />
                         ) : (
-                          <IoPersonCircleSharp className="text-indigo-600" style={{ fontSize: 70 }} />
+                          <div className="flex h-full w-full items-center justify-center">
+                            <IoPersonCircleSharp className="text-6xl text-white/80" />
+                          </div>
                         )}
                       </div>
-
                       <button
                         type="button"
-                        className="absolute -bottom-2 -right-2 w-10 h-10 rounded-full bg-blue-600 border-2 border-white shadow-lg flex items-center justify-center cursor-pointer"
-                        onClick={onPickAvatarInModal}
-                        aria-label="اختيار صورة"
+                        disabled={avatarUploading}
+                        onClick={() => directAvatarInputRef.current?.click()}
+                        className="absolute -bottom-1 -left-1 flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-[#DD6B20] text-white shadow-lg transition hover:bg-[#C05621] disabled:opacity-60"
+                        aria-label="تغيير الصورة"
                       >
-                        <FaEdit className="text-white" />
+                        <FaCamera className="text-sm" />
                       </button>
+                      <input
+                        ref={directAvatarInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/gif"
+                        className="hidden"
+                        onChange={onAvatarFileChangeDirect}
+                      />
+                    </div>
+
+                    <div className="text-center md:text-right">
+                      <div className="mb-2 flex flex-wrap items-center justify-center gap-2 md:justify-start">
+                        <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-bold text-white/90 backdrop-blur">
+                          طالب
+                        </span>
+                        <span
+                          className={`rounded-full border px-3 py-1 text-xs font-bold ${statusToneClass[statusMeta.tone]}`}
+                        >
+                          {statusMeta.label}
+                        </span>
+                        {user.must_change_password ? (
+                          <span className="rounded-full border border-amber-200 bg-amber-500/20 px-3 py-1 text-xs font-bold text-amber-100">
+                            يُفضّل تغيير كلمة المرور
+                          </span>
+                        ) : null}
+                      </div>
+                      <h1 className="font-heading text-2xl font-black tracking-tight text-white md:text-3xl">
+                        {user.name || "طالب"}
+                      </h1>
+                      <p className="mt-2 text-sm text-white/75">
+                        {gradeText}
+                        {user.student_code ? ` · كود الطالب ${user.student_code}` : ""}
+                      </p>
                     </div>
                   </div>
-
-                  <input
-                    ref={modalAvatarInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={onAvatarFileChangeModal}
-                  />
-
-                  {/* Fields */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3 bg-blue-50 dark:bg-gray-800 rounded-2xl px-4 py-3">
-                      <IoPersonCircleSharp className="text-blue-600" />
-                      <input
-                        className="w-full bg-transparent outline-none text-gray-900 dark:text-white font-semibold"
-                        placeholder="الاسم"
-                        value={editForm.name}
-                        onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3 bg-blue-50 dark:bg-gray-800 rounded-2xl px-4 py-3">
-                      <FaPhone className="text-blue-600" />
-                      <input
-                        className="w-full bg-transparent outline-none text-gray-900 dark:text-white font-semibold"
-                        placeholder="رقم الهاتف"
-                        value={editForm.phone}
-                        onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))}
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3 bg-blue-50 dark:bg-gray-800 rounded-2xl px-4 py-3">
-                      <MdAttachEmail className="text-blue-600" />
-                      <input
-                        className="w-full bg-transparent outline-none text-gray-900 dark:text-white font-semibold"
-                        placeholder="البريد الإلكتروني"
-                        value={editForm.email}
-                        onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))}
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3 bg-blue-50 dark:bg-gray-800 rounded-2xl px-4 py-3">
-                      <FaUserFriends className="text-blue-600" />
-                      <input
-                        className="w-full bg-transparent outline-none text-gray-900 dark:text-white font-semibold"
-                        placeholder="رقم ولي الأمر"
-                        value={editForm.parent_phone}
-                        onChange={(e) => setEditForm((p) => ({ ...p, parent_phone: e.target.value }))}
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-3 bg-blue-50 dark:bg-gray-800 rounded-2xl px-4 py-3">
-                      <input
-                        type="password"
-                        className="w-full bg-transparent outline-none text-gray-900 dark:text-white font-semibold"
-                        placeholder="كلمة المرور (اختياري)"
-                        value={editForm.password}
-                        onChange={(e) => setEditForm((p) => ({ ...p, password: e.target.value }))}
-                      />
-                    </div>
-                  </div>
-
-                  {error && <p className="text-red-600 text-center mt-4 font-semibold">{error}</p>}
 
                   <button
                     type="button"
-                    className="w-full mt-6 bg-blue-600 text-white py-4 rounded-2xl font-extrabold shadow-md disabled:opacity-70"
-                    disabled={editing}
+                    onClick={openEditModal}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-[#DD6B20] px-5 py-3 text-sm font-extrabold text-white shadow-[0_12px_28px_-12px_rgba(221,107,32,0.9)] transition hover:bg-[#C05621]"
+                  >
+                    <FaEdit />
+                    تعديل البيانات
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            {/* Account summary */}
+            <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.05)] md:p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="font-heading text-lg font-bold text-slate-900">بيانات الحساب</h2>
+                <span className="text-xs font-semibold text-slate-500">
+                  انضممت: {formatDate(user.created_at)}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <InfoChip icon={FaIdCard} label="كود الطالب" value={user.student_code || "—"} accent="blue" />
+                <InfoChip icon={FaGraduationCap} label="الصف / المرحلة" value={gradeText} accent="orange" />
+                <InfoChip icon={FaPhone} label="رقم الهاتف" value={user.phone} accent="emerald" />
+                <InfoChip icon={FaUserFriends} label="ولي الأمر" value={user.parent_phone} accent="amber" />
+                <InfoChip icon={MdAttachEmail} label="البريد الإلكتروني" value={user.email} accent="violet" />
+                <InfoChip icon={FaCalendarAlt} label="تاريخ الانضمام" value={formatDate(user.created_at)} accent="slate" />
+              </div>
+            </section>
+
+            {/* Groups */}
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              <GroupCard
+                title="المجموعة الدراسية"
+                icon={FaUsers}
+                group={user.study_group}
+                emptyText="لست منضمًا لمجموعة دراسية بعد"
+                canChoose={Boolean(user.can_choose_study_group)}
+              />
+              <GroupCard
+                title="مجموعة الكورس"
+                icon={FaBookOpen}
+                group={user.course_group}
+                emptyText="لست منضمًا لمجموعة كورس بعد"
+                canChoose={Boolean(user.can_choose_course_group)}
+              />
+            </div>
+
+            {(user.can_choose_study_group || user.can_choose_course_group) && (
+              <p className="text-center text-sm text-slate-500">
+                لتغيير مجموعتك، اضغط «تعديل البيانات» واختر المجموعة المناسبة ثم احفظ.
+              </p>
+            )}
+
+            {/* Edit Modal */}
+            {editModalVisible && (
+              <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/55 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true">
+                <button type="button" className="absolute inset-0 cursor-default" aria-label="إغلاق" onClick={closeEditModal} />
+                <div
+                  className="relative z-10 max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-white p-5 pb-8 shadow-2xl sm:rounded-3xl sm:p-6"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="mb-5 flex items-center justify-between">
+                    <h3 className="font-heading text-xl font-extrabold text-slate-900">تعديل الملف الشخصي</h3>
+                    <button
+                      type="button"
+                      className="rounded-full p-2 text-slate-500 hover:bg-slate-100"
+                      onClick={closeEditModal}
+                      aria-label="إغلاق"
+                    >
+                      <MdClose className="text-xl" />
+                    </button>
+                  </div>
+
+                  <div className="mb-6 flex justify-center">
+                    <div className="relative">
+                      <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full bg-blue-50 ring-4 ring-white shadow-lg">
+                        {avatarSrc ? (
+                          <img src={avatarSrc} alt="avatar preview" className="h-full w-full object-cover" />
+                        ) : (
+                          <IoPersonCircleSharp className="text-6xl text-[#0E4C92]" />
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        className="absolute -bottom-1 -left-1 flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-[#0E4C92] text-white shadow-lg"
+                        onClick={() => modalAvatarInputRef.current?.click()}
+                        aria-label="اختيار صورة"
+                      >
+                        <FaCamera />
+                      </button>
+                      <input
+                        ref={modalAvatarInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/gif"
+                        className="hidden"
+                        onChange={onAvatarFileChangeModal}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="block">
+                      <span className="mb-1.5 flex items-center gap-2 text-xs font-bold text-slate-600">
+                        <IoPersonCircleSharp className="text-[#0E4C92]" /> الاسم
+                      </span>
+                      <input
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-[#0E4C92] focus:ring-2 focus:ring-[#0E4C92]/15"
+                        value={editForm.name}
+                        onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1.5 flex items-center gap-2 text-xs font-bold text-slate-600">
+                        <FaPhone className="text-[#0E4C92]" /> رقم الهاتف
+                      </span>
+                      <input
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-[#0E4C92] focus:ring-2 focus:ring-[#0E4C92]/15"
+                        value={editForm.phone}
+                        onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))}
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1.5 flex items-center gap-2 text-xs font-bold text-slate-600">
+                        <FaUserFriends className="text-[#0E4C92]" /> رقم ولي الأمر
+                      </span>
+                      <input
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-[#0E4C92] focus:ring-2 focus:ring-[#0E4C92]/15"
+                        value={editForm.parent_phone}
+                        onChange={(e) => setEditForm((p) => ({ ...p, parent_phone: e.target.value }))}
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1.5 flex items-center gap-2 text-xs font-bold text-slate-600">
+                        <MdAttachEmail className="text-[#0E4C92]" /> البريد الإلكتروني
+                      </span>
+                      <input
+                        type="email"
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-[#0E4C92] focus:ring-2 focus:ring-[#0E4C92]/15"
+                        value={editForm.email}
+                        onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))}
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-1.5 flex items-center gap-2 text-xs font-bold text-slate-600">
+                        <MdLock className="text-[#0E4C92]" /> كلمة مرور جديدة (اختياري)
+                      </span>
+                      <input
+                        type="password"
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-[#0E4C92] focus:ring-2 focus:ring-[#0E4C92]/15"
+                        placeholder="اتركها فارغة إن لم ترد التغيير"
+                        value={editForm.password}
+                        onChange={(e) => setEditForm((p) => ({ ...p, password: e.target.value }))}
+                      />
+                    </label>
+
+                    {user.can_choose_study_group ? (
+                      <label className="block">
+                        <span className="mb-1.5 flex items-center gap-2 text-xs font-bold text-slate-600">
+                          <FaUsers className="text-[#0E4C92]" /> المجموعة الدراسية
+                        </span>
+                        <select
+                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-[#0E4C92] focus:ring-2 focus:ring-[#0E4C92]/15"
+                          value={editForm.group_id}
+                          onChange={(e) =>
+                            setEditForm((p) => ({
+                              ...p,
+                              group_id: e.target.value ? Number(e.target.value) : "",
+                            }))
+                          }
+                        >
+                          <option value="">— اختر مجموعة —</option>
+                          {(user.available_study_groups || []).map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.name}
+                              {g.days ? ` · ${g.days}` : ""}
+                              {formatTimeRange(g.start_time, g.end_time)
+                                ? ` · ${formatTimeRange(g.start_time, g.end_time)}`
+                                : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+
+                    {user.can_choose_course_group ? (
+                      <label className="block">
+                        <span className="mb-1.5 flex items-center gap-2 text-xs font-bold text-slate-600">
+                          <FaBookOpen className="text-[#0E4C92]" /> مجموعة الكورس
+                        </span>
+                        <select
+                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-[#0E4C92] focus:ring-2 focus:ring-[#0E4C92]/15"
+                          value={editForm.course_group_id}
+                          onChange={(e) =>
+                            setEditForm((p) => ({
+                              ...p,
+                              course_group_id: e.target.value ? Number(e.target.value) : "",
+                            }))
+                          }
+                        >
+                          <option value="">— اختر مجموعة —</option>
+                          {(user.available_course_groups || []).map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.name}
+                              {g.grade_name ? ` · ${g.grade_name}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+                  </div>
+
+                  {error ? <p className="mt-4 text-center text-sm font-semibold text-red-600">{error}</p> : null}
+
+                  <button
+                    type="button"
+                    disabled={editing || avatarUploading}
                     onClick={handleUpdateProfile}
+                    className="mt-6 w-full rounded-2xl bg-[#0E4C92] py-3.5 text-sm font-extrabold text-white shadow-md transition hover:bg-[#0a3a70] disabled:opacity-70"
                   >
                     {editing ? "جارٍ الحفظ..." : "حفظ التغييرات"}
                   </button>
                 </div>
               </div>
             )}
-          </>
+          </div>
         ) : (
-          <div className="p-10 text-center">
-            <p className="text-2xl font-bold text-gray-600">لا تتوفر بيانات حالياً.</p>
-            <p className="text-md text-gray-500 mt-2">يرجى تسجيل الدخول لعرض ملفك الشخصي.</p>
+          <div className="rounded-3xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+            <p className="text-xl font-bold text-slate-700">لا تتوفر بيانات حالياً</p>
+            <p className="mt-2 text-sm text-slate-500">يرجى تسجيل الدخول لعرض ملفك الشخصي.</p>
           </div>
         )}
       </div>

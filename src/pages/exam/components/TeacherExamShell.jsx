@@ -24,11 +24,13 @@ import {
   FaMagic,
   FaSync,
   FaSearch,
+  FaCompass,
 } from "react-icons/fa";
 
-function HeaderBtn({ icon, label, onClick, isLoading, solid = false }) {
+function HeaderBtn({ icon, label, onClick, isLoading, solid = false, tourId }) {
   return (
     <Button
+      data-tour-id={tourId}
       size="sm"
       leftIcon={<Icon as={icon} />}
       bg={solid ? "#DD6B20" : "whiteAlpha.150"}
@@ -72,6 +74,7 @@ export default function TeacherExamShell({
   searchQuery = "",
   onSearchChange,
   filteredCount,
+  onStartTour,
 }) {
   const pageBg = useColorModeValue("#F4F6F9", "gray.950");
   const border = useColorModeValue("gray.200", "gray.700");
@@ -111,6 +114,7 @@ export default function TeacherExamShell({
       fontFamily="'Noto Sans Arabic', system-ui, sans-serif"
     >
       <Box
+        data-tour-id="exam-teacher-hero"
         bg="linear-gradient(125deg, #082B57 0%, #0E4C92 55%, #1A6BB8 100%)"
         pt={{ base: "4.75rem", md: "5.25rem" }}
         pb={5}
@@ -153,34 +157,52 @@ export default function TeacherExamShell({
               ) : null}
             </Box>
 
-            {typeof onReload === "function" && (
-              <Button
-                size="sm"
-                variant="ghost"
-                color="white"
-                borderRadius="lg"
-                leftIcon={loading ? <Spinner size="xs" /> : <FaSync />}
-                onClick={onReload}
-                isDisabled={loading}
-                cursor="pointer"
-                flexShrink={0}
-                _hover={{ bg: "whiteAlpha.200" }}
-              >
-                تحديث
-              </Button>
-            )}
+            <HStack spacing={2} flexShrink={0} flexWrap="wrap" justify="flex-end">
+              {typeof onStartTour === "function" && (
+                <Button
+                  data-tour-id="exam-teacher-tour-btn"
+                  size="sm"
+                  variant="ghost"
+                  color="white"
+                  borderRadius="lg"
+                  leftIcon={<FaCompass />}
+                  onClick={onStartTour}
+                  cursor="pointer"
+                  _hover={{ bg: "whiteAlpha.200" }}
+                >
+                  جولة الإدارة
+                </Button>
+              )}
+              {typeof onReload === "function" && (
+                <Button
+                  data-tour-id="exam-teacher-reload"
+                  size="sm"
+                  variant="ghost"
+                  color="white"
+                  borderRadius="lg"
+                  leftIcon={loading ? <Spinner size="xs" /> : <FaSync />}
+                  onClick={onReload}
+                  isDisabled={loading}
+                  cursor="pointer"
+                  _hover={{ bg: "whiteAlpha.200" }}
+                >
+                  تحديث
+                </Button>
+              )}
+            </HStack>
           </Flex>
 
           <Flex gap={2} wrap="wrap" align="center" justify="space-between">
             <HStack spacing={2} flexWrap="wrap">
-              <HeaderBtn icon={FaMagic} label="استخراج ذكي" solid onClick={onAiExtract} />
-              <HeaderBtn icon={FaAlignLeft} label="أسئلة كنص" onClick={onBulkText} />
-              <HeaderBtn icon={FaBookOpen} label="من قطعة" onClick={onPassage} />
-              <HeaderBtn icon={FaImage} label="أسئلة كصور" onClick={onAddImages} />
+              <HeaderBtn tourId="exam-teacher-ai" icon={FaMagic} label="استخراج ذكي" solid onClick={onAiExtract} />
+              <HeaderBtn tourId="exam-teacher-bulk" icon={FaAlignLeft} label="أسئلة كنص" onClick={onBulkText} />
+              <HeaderBtn tourId="exam-teacher-passage" icon={FaBookOpen} label="من قطعة" onClick={onPassage} />
+              <HeaderBtn tourId="exam-teacher-images" icon={FaImage} label="أسئلة كصور" onClick={onAddImages} />
             </HStack>
             <HStack spacing={2} flexWrap="wrap">
-              <HeaderBtn icon={FaUsers} label="درجات الطلاب" onClick={onGrades} />
+              <HeaderBtn tourId="exam-teacher-grades" icon={FaUsers} label="درجات الطلاب" onClick={onGrades} />
               <HeaderBtn
+                tourId="exam-teacher-report"
                 icon={FaChartBar}
                 label="تقرير الأسئلة"
                 onClick={onReport}
@@ -207,7 +229,7 @@ export default function TeacherExamShell({
           </Text>
 
           {typeof onSearchChange === "function" && questionsCount > 0 ? (
-            <InputGroup maxW={{ base: "full", md: "280px" }} size="sm">
+            <InputGroup maxW={{ base: "full", md: "280px" }} size="sm" data-tour-id="exam-teacher-search">
               <InputLeftElement pointerEvents="none" color={muted} h="full">
                 <FaSearch size={12} />
               </InputLeftElement>
@@ -236,6 +258,7 @@ export function TeacherExamEmptyState({ onAiExtract, onBulkText, onReload, loadi
 
   return (
     <Flex
+      data-tour-id="exam-teacher-empty"
       direction="column"
       align="center"
       justify="center"
