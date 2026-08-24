@@ -82,12 +82,13 @@ export function lectureFilesQueryKey(lectureId) {
   return ["lectureFiles", String(lectureId)];
 }
 
-export function useLectureFiles(lectureId, { enabled = true, initialData } = {}) {
+export function useLectureFiles(lectureId, { enabled = true, initialData, placeholderData } = {}) {
   return useQuery({
     queryKey: lectureFilesQueryKey(lectureId),
     queryFn: () => getLectureFiles(lectureId),
     enabled: Boolean(lectureId) && enabled,
     initialData,
+    placeholderData,
     staleTime: 30_000,
     retry: retryUnlessAuthError,
   });
