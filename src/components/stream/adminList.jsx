@@ -30,6 +30,7 @@ import {
   FiPlayCircle,
 } from "react-icons/fi";
 import baseUrl from "../../api/baseUrl";
+import MeetingRecordingPlayerModal from "./MeetingRecordingPlayerModal";
 
 const STREAM_REDIRECT_URL = import.meta.env.VITE_STREAM_REDIRECT_URL;
 
@@ -56,6 +57,11 @@ const StreamList = () => {
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [updateTitle, setUpdateTitle] = useState("");
+  const [recordingModal, setRecordingModal] = useState({
+    open: false,
+    url: "",
+    title: "",
+  });
   const limit = 10;
   const toast = useToast();
 
@@ -199,15 +205,18 @@ const StreamList = () => {
 
                 {stream.status === "ended" && stream.egress_url && (
                   <Button
-                    as="a"
-                    href={stream.egress_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     leftIcon={<FiPlayCircle />}
                     size="sm"
                     colorScheme="purple"
+                    onClick={() =>
+                      setRecordingModal({
+                        open: true,
+                        url: stream.egress_url,
+                        title: stream.title || "تسجيل المحاضرة",
+                      })
+                    }
                   >
-                    تسجيل
+                    مشاهدة التسجيل
                   </Button>
                 )}
 
@@ -326,6 +335,13 @@ const StreamList = () => {
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      <MeetingRecordingPlayerModal
+        isOpen={recordingModal.open}
+        onClose={() => setRecordingModal({ open: false, url: "", title: "" })}
+        videoUrl={recordingModal.url}
+        title={recordingModal.title}
+      />
     </Box>
   );
 };

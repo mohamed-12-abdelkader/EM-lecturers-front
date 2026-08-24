@@ -15,7 +15,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   FaPlay,
   FaPlayCircle,
-  FaExternalLinkAlt,
   FaVideo,
   FaTimesCircle,
   FaClock,
@@ -23,7 +22,9 @@ import {
   FaHourglassHalf,
   FaCheckCircle,
 } from "react-icons/fa";
+import { useState } from "react";
 import baseUrl from "../../api/baseUrl";
+import MeetingRecordingPlayerModal from "./MeetingRecordingPlayerModal";
 
 const STREAM_REDIRECT_URL = import.meta.env.VITE_STREAM_REDIRECT_URL;
 
@@ -60,7 +61,7 @@ const fetchCourseStreams = async (courseId) => {
   return res.data;
 };
 
-function StudentStreamRow({ stream }) {
+function StudentStreamRow({ stream, onWatchRecording }) {
   const meta = STATUS_META[stream.status] || STATUS_META.ended;
   const isLive = stream.status === "started";
   const isIdle = stream.status === "idle";
@@ -156,17 +157,18 @@ function StudentStreamRow({ stream }) {
 
           {isEnded && stream.egress_url ? (
             <Button
-              as="a"
-              href={stream.egress_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              leftIcon={<Icon as={FaExternalLinkAlt} boxSize={3} />}
+              leftIcon={<Icon as={FaPlayCircle} boxSize={3} />}
               colorScheme="blue"
-              variant="outline"
               size="sm"
               borderRadius="lg"
               fontWeight="700"
               w={{ base: "full", md: "auto" }}
+              onClick={() =>
+                onWatchRecording({
+                  url: stream.egress_url,
+                  title: stream.title || "تسجيل المحاضرة",
+                })
+              }
             >
               مشاهدة التسجيل
             </Button>
@@ -178,6 +180,12 @@ function StudentStreamRow({ stream }) {
 }
 
 const StudentStreamsList = ({ courseId }) => {
+  const [recordingModal, setRecordingModal] = useState({
+    open: false,
+    url: "",
+    title: "",
+  });
+
   const { data, isLoading, isError } = useQuery({
     queryKey: ["studentCourseStreams", courseId],
     queryFn: () => fetchCourseStreams(courseId),
@@ -296,7 +304,13 @@ const StudentStreamsList = ({ courseId }) => {
       {streams.length > 0 ? (
         <VStack spacing={2} align="stretch">
           {streams.map((stream) => (
-            <StudentStreamRow key={stream.id} stream={stream} />
+            <StudentStreamRow
+              key={stream.id}
+              stream={stream}
+              onWatchRecording={({ url, title }) =>
+                setRecordingModal({ open: true, url, title })
+              }
+            />
           ))}
         </VStack>
       ) : (
@@ -312,6 +326,12 @@ const StudentStreamsList = ({ courseId }) => {
           </div>
         </Center>
       )}
+      <MeetingRecordingPlayerModal
+        isOpen={recordingModal.open}
+        onClose={() => setRecordingModal({ open: false, url: "", title: "" })}
+        videoUrl={recordingModal.url}
+        title={recordingModal.title}
+      />
     </Box>
   );
 };
