@@ -26,6 +26,7 @@ import {
   FaClock,
   FaKey,
   FaChartBar,
+  FaFilePdf,
 } from "react-icons/fa";
 import baseUrl from "../../../api/baseUrl";
 import { Link } from "react-router-dom";
@@ -57,6 +58,7 @@ import {
 import { LECTURE_ACCESS_MODES } from "../../../api/courseAccessApi";
 import LectureActivateCodeForm, { LectureActivationTimer } from "./LectureActivateCodeForm";
 import LectureActivationCodesModal from "./LectureActivationCodesModal";
+import LectureFilesSection from "./LectureFilesSection";
 
 const EASE = [0.22, 1, 0.36, 1];
 
@@ -315,6 +317,7 @@ function AssignmentRow({
 const LectureCard = ({
   lecture,
   lectureIndex = 0,
+  courseId,
   lectureAccessMode = "always_open",
   hideLectureAssignments = false,
   onRefreshCourse,
@@ -416,6 +419,7 @@ const LectureCard = ({
 
   const progress = lecture.progress;
   const videosCount = progress?.total_videos ?? lecture.videos?.length ?? 0;
+  const filesCount = lecture.files?.length ?? 0;
   const watchedVideos = progress?.watched_videos ?? lecture.videos?.filter((v) => v.is_watched).length ?? 0;
 
   const assignments = getLectureAssignments(
@@ -533,6 +537,10 @@ const LectureCard = ({
                 <span className="inline-flex items-center gap-1.5">
                   <FaVideo className="text-[10px] text-blue-500" />
                   {videosCount} فيديو
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <FaFilePdf className="text-[10px] text-purple-500" />
+                  {filesCount} PDF
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                   <FaTasks className="text-[10px] text-orange-500" />
@@ -698,6 +706,15 @@ const LectureCard = ({
                       </div>
                     )}
                   </section>
+
+                  <LectureFilesSection
+                    lectureId={lecture.id}
+                    courseId={courseId}
+                    canManage={canManage}
+                    initialFiles={lecture.files || []}
+                    onFilesChanged={onRefreshCourse}
+                    isTourTarget={isTourTarget}
+                  />
 
                   {/* الواجبات */}
                   {!hideLectureAssignments && (canManage || hasAssignments) && (

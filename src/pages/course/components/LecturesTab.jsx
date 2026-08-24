@@ -29,9 +29,6 @@ const LecturesTab = ({
   handleAddVideo,
   handleEditVideo,
   handleDeleteVideo,
-  handleAddFile,
-  handleEditFile,
-  handleDeleteFile,
   setExamModal,
   setDeleteExamDialog,
   examActionLoading,
@@ -130,9 +127,6 @@ const LecturesTab = ({
             handleAddVideo={handleAddVideo}
             handleEditVideo={handleEditVideo}
             handleDeleteVideo={handleDeleteVideo}
-            handleAddFile={handleAddFile}
-            handleEditFile={handleEditFile}
-            handleDeleteFile={handleDeleteFile}
             setExamModal={setExamModal}
             setDeleteExamDialog={setDeleteExamDialog}
             examActionLoading={examActionLoading}

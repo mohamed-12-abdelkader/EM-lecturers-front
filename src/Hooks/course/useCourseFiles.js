@@ -3,9 +3,11 @@ import {
   deleteCourseFile,
   getCourseFile,
   getCourseFiles,
+  getLectureFiles,
   getCourseFileView,
   updateCourseFile,
   uploadCourseFile,
+  uploadLectureFile,
 } from "../../api/courseFilesApi";
 
 export function courseFilesQueryKey(courseId) {
@@ -39,6 +41,53 @@ export function useCourseFile(fileId, { enabled = true } = {}) {
     queryKey: courseFileQueryKey(fileId),
     queryFn: () => getCourseFile(fileId),
     enabled: Boolean(fileId) && enabled,
+    staleTime: 30_000,
+    retry: retryUnlessAuthError,
+  });
+}
+
+export function useLectureFileMutations(lectureId, courseId) {
+  const queryClient = useQueryClient();
+
+  const invalidate = (fileId) => {
+    queryClient.invalidateQueries({ queryKey: lectureFilesQueryKey(lectureId) });
+    if (courseId) {
+      queryClient.invalidateQueries({ queryKey: courseFilesQueryKey(courseId) });
+    }
+    if (fileId != null) {
+      queryClient.invalidateQueries({ queryKey: courseFileQueryKey(fileId) });
+    }
+  };
+
+  const uploadMutation = useMutation({
+    mutationFn: ({ onUploadProgress, ...payload }) =>
+      uploadLectureFile(lectureId, payload, onUploadProgress),
+    onSuccess: () => invalidate(),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ fileId, ...payload }) => updateCourseFile(fileId, payload),
+    onSuccess: (_data, variables) => invalidate(variables?.fileId),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (fileId) => deleteCourseFile(fileId),
+    onSuccess: (_data, fileId) => invalidate(fileId),
+  });
+
+  return { uploadMutation, updateMutation, deleteMutation };
+}
+
+export function lectureFilesQueryKey(lectureId) {
+  return ["lectureFiles", String(lectureId)];
+}
+
+export function useLectureFiles(lectureId, { enabled = true, initialData } = {}) {
+  return useQuery({
+    queryKey: lectureFilesQueryKey(lectureId),
+    queryFn: () => getLectureFiles(lectureId),
+    enabled: Boolean(lectureId) && enabled,
+    initialData,
     staleTime: 30_000,
     retry: retryUnlessAuthError,
   });

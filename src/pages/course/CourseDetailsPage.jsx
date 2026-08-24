@@ -559,114 +559,6 @@ const VideoModal = ({
   );
 };
 
-const FileModal = ({
-  isOpen,
-  onClose,
-  type,
-  data,
-  lectureId,
-  onSubmit,
-  loading,
-}) => {
-  const [formData, setFormData] = useState({
-    file_url: data?.file_url || "",
-    filename: data?.filename || "",
-  });
-
-  useEffect(() => {
-    if (data) {
-      setFormData({
-        file_url: data.file_url || "",
-        filename: data.filename || "",
-      });
-    }
-  }, [data]);
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (type === "edit") {
-      onSubmit(data.id, formData);
-    } else {
-      onSubmit(lectureId, formData);
-    }
-    // لا نغلق الموديل هنا، سيتم إغلاقه بعد نجاح العملية
-  };
-
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={loading ? undefined : onClose}
-      closeOnOverlayClick={!loading}
-      size={{ base: "full", md: "md" }}
-      scrollBehavior="inside"
-    >
-      <ModalOverlay />
-      <ModalContent
-        borderRadius={{ base: "none", md: "xl" }}
-        mx={{ base: 0, md: 4 }}
-        maxH={{ base: "100vh", md: "90vh" }}
-      >
-        <ModalHeader p={{ base: 3, md: 4 }} fontSize={{ base: "md", md: "lg" }}>
-          {type === "add" ? "إضافة ملف جديد" : "تعديل الملف"}
-        </ModalHeader>
-        <ModalCloseButton isDisabled={loading} />
-        <form onSubmit={handleSubmit}>
-          <ModalBody p={{ base: 3, md: 4 }}>
-            <VStack spacing={4}>
-              <FormControl isRequired>
-                <FormLabel>رابط الملف</FormLabel>
-                <Input
-                  value={formData.file_url}
-                  onChange={(e) =>
-                    setFormData({ ...formData, file_url: e.target.value })
-                  }
-                  placeholder="أدخل رابط الملف"
-                  isDisabled={loading}
-                  size={{ base: "sm", md: "md" }}
-                />
-              </FormControl>
-              <FormControl isRequired>
-                <FormLabel>اسم الملف</FormLabel>
-                <Input
-                  value={formData.filename}
-                  onChange={(e) =>
-                    setFormData({ ...formData, filename: e.target.value })
-                  }
-                  placeholder="أدخل اسم الملف"
-                  isDisabled={loading}
-                  size={{ base: "sm", md: "md" }}
-                />
-              </FormControl>
-            </VStack>
-          </ModalBody>
-          <ModalFooter p={{ base: 3, md: 4 }} flexWrap="wrap" gap={2}>
-            <Button
-              variant="ghost"
-              mr={{ base: 0, md: 3 }}
-              onClick={onClose}
-              isDisabled={loading}
-              size={{ base: "sm", md: "md" }}
-            >
-              إلغاء
-            </Button>
-            <Button
-              colorScheme="blue"
-              type="submit"
-              isLoading={loading}
-              loadingText={
-                type === "add" ? "جاري الإضافة..." : "جاري التعديل..."
-              }
-              size={{ base: "sm", md: "md" }}
-            >
-              {type === "add" ? "إضافة" : "تعديل"}
-            </Button>
-          </ModalFooter>
-        </form>
-      </ModalContent>
-    </Modal>
-  );
-};
-
 // Static Images - الصور الثابتة
 const courseHeroImage = "/lE7lWBexvOTPM2MPEKyTRRBo1TQtNGMoL1pxWCxD.jpg";
 const instructorImage = "/lE7lWBexvOTPM2MPEKyTRRBo1TQtNGMoL1pxWCxD.jpg";
@@ -701,12 +593,6 @@ const CourseDetailsPage = () => {
     data: null,
   });
   const [videoModal, setVideoModal] = useState({
-    isOpen: false,
-    type: "add",
-    lectureId: null,
-    data: null,
-  });
-  const [fileModal, setFileModal] = useState({
     isOpen: false,
     type: "add",
     lectureId: null,
@@ -1137,7 +1023,6 @@ const CourseDetailsPage = () => {
       setSearchCode("");
       setLectureModal({ isOpen: false, type: "add", data: null });
       setVideoModal({ isOpen: false, type: "add", lectureId: null, data: null });
-      setFileModal({ isOpen: false, type: "add", lectureId: null, data: null });
       setExamModal({
         isOpen: false,
         type: "add",
@@ -1329,18 +1214,6 @@ const CourseDetailsPage = () => {
 
   const handleDeleteVideo = (videoId, title) => {
     setDeleteDialog({ isOpen: true, type: "video", id: videoId, title });
-  };
-
-  const handleAddFile = (lectureId) => {
-    setFileModal({ isOpen: true, type: "add", lectureId, data: null });
-  };
-
-  const handleEditFile = (file, lectureId) => {
-    setFileModal({ isOpen: true, type: "edit", lectureId, data: file });
-  };
-
-  const handleDeleteFile = (fileId, title) => {
-    setDeleteDialog({ isOpen: true, type: "file", id: fileId, title });
   };
 
   // API Functions
@@ -1598,104 +1471,6 @@ const CourseDetailsPage = () => {
     }
   };
 
-  const createFile = async (lectureId, data) => {
-    try {
-      setActionLoading(true);
-      const response = await baseUrl.post(
-        `api/course/lecture/${lectureId}/files`,
-        data,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      toast({
-        title: "تم إضافة الملف بنجاح",
-        status: "success",
-        duration: 3000,
-        isClosable: true,
-      });
-      // تحديث البيانات بدون إعادة تحميل
-      await refreshCourseData();
-      // إغلاق الموديل بعد النجاح
-      setFileModal({ isOpen: false, type: "add", data: null, lectureId: null });
-    } catch (error) {
-      toast({
-        title: "خطأ في إضافة الملف",
-        description: error.response?.data?.message || "حدث خطأ غير متوقع",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const updateFile = async (fileId, data) => {
-    try {
-      setActionLoading(true);
-      const response = await baseUrl.put(
-        `api/course/lecture-file/${fileId}`,
-        data,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      toast({
-        title: "تم تعديل الملف بنجاح",
-        status: "success",
-        duration: 3000,
-        isClosable: true,
-      });
-      // تحديث البيانات بدون إعادة تحميل
-      await refreshCourseData();
-      // إغلاق الموديل بعد النجاح
-      setFileModal({
-        isOpen: false,
-        type: "edit",
-        data: null,
-        lectureId: null,
-      });
-    } catch (error) {
-      toast({
-        title: "خطأ في تعديل الملف",
-        description: error.response?.data?.message || "حدث خطأ غير متوقع",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const deleteFile = async (fileId) => {
-    try {
-      setActionLoading(true);
-      await baseUrl.delete(`api/course/lecture-file/${fileId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      toast({
-        title: "تم حذف الملف بنجاح",
-        status: "success",
-        duration: 3000,
-        isClosable: true,
-      });
-      // تحديث البيانات بدون إعادة تحميل
-      await refreshCourseData();
-    } catch (error) {
-      toast({
-        title: "خطأ في حذف الملف",
-        description: error.response?.data?.message || "حدث خطأ غير متوقع",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   const handleDeleteConfirm = async () => {
     const { type, id } = deleteDialog;
 
@@ -1705,9 +1480,6 @@ const CourseDetailsPage = () => {
         break;
       case "video":
         await deleteVideo(id);
-        break;
-      case "file":
-        await deleteFile(id);
         break;
     }
 
@@ -4455,9 +4227,6 @@ display:block;
                     handleAddVideo={handleAddVideo}
                     handleEditVideo={handleEditVideo}
                     handleDeleteVideo={handleDeleteVideo}
-                    handleAddFile={handleAddFile}
-                    handleEditFile={handleEditFile}
-                    handleDeleteFile={handleDeleteFile}
                     setExamModal={setExamModal}
                     setDeleteExamDialog={setDeleteExamDialog}
                     examActionLoading={actionLoading}
@@ -4576,24 +4345,6 @@ display:block;
         data={videoModal.data}
         lectureId={videoModal.lectureId}
         onSubmit={videoModal.type === "add" ? createVideo : updateVideo}
-        loading={actionLoading}
-      />
-
-      {/* File Modal */}
-      <FileModal
-        isOpen={fileModal.isOpen}
-        onClose={() =>
-          setFileModal({
-            isOpen: false,
-            type: "add",
-            lectureId: null,
-            data: null,
-          })
-        }
-        type={fileModal.type}
-        data={fileModal.data}
-        lectureId={fileModal.lectureId}
-        onSubmit={fileModal.type === "add" ? createFile : updateFile}
         loading={actionLoading}
       />
 
