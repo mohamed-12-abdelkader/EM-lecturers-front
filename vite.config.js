@@ -72,6 +72,11 @@ export default defineConfig(({ mode }) => {
             });
           },
         },
+        "/uploads": {
+          target: proxyTarget,
+          changeOrigin: true,
+          secure: false,
+        },
         "/socket.io": {
           target: proxyTarget,
           changeOrigin: true,
