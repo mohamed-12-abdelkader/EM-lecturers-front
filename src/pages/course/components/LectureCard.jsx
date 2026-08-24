@@ -318,6 +318,7 @@ const LectureCard = ({
   lecture,
   lectureIndex = 0,
   courseId,
+  canManageCourseFiles = false,
   lectureAccessMode = "always_open",
   hideLectureAssignments = false,
   onRefreshCourse,
@@ -341,6 +342,8 @@ const LectureCard = ({
   const [lectureExam, setLectureExam] = React.useState(null);
   const [examLoading, setExamLoading] = React.useState(false);
   const canManage = isTeacher || isAdmin;
+  const canManageFiles = canManageCourseFiles || canManage;
+  const resolvedCourseId = courseId ?? lecture.course_id ?? lecture.courseId;
 
   const handleToggleVisibility = async (e) => {
     e.stopPropagation();
@@ -694,7 +697,7 @@ const LectureCard = ({
                       </p>
                     ) : (
                       <div className="grid grid-cols-1 gap-2.5">
-                        {lecture.videos.map((video, index) => (
+                        {(lecture.videos || []).map((video, index) => (
                           <VideoRow
                             key={video.id}
                             video={video}
@@ -709,8 +712,8 @@ const LectureCard = ({
 
                   <LectureFilesSection
                     lectureId={lecture.id}
-                    courseId={courseId}
-                    canManage={canManage}
+                    courseId={resolvedCourseId}
+                    canManage={canManageFiles}
                     initialFiles={lecture.files || []}
                     onFilesChanged={onRefreshCourse}
                     isTourTarget={isTourTarget}

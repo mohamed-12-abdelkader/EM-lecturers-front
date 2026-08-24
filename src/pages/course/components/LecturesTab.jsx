@@ -45,6 +45,7 @@ const LecturesTab = ({
   tourLectureId,
   accessSettings,
   accessSettingsLoading,
+  canManageCourseFiles = false,
 }) => (
   <VStack spacing={{ base: 4, md: 5 }} align="stretch" dir="rtl" className={lcRoot}>
     <Flex
@@ -114,6 +115,8 @@ const LecturesTab = ({
             key={lecture.id}
             lecture={lecture}
             lectureIndex={index}
+            courseId={courseId}
+            canManageCourseFiles={canManageCourseFiles}
             lectureAccessMode={lectureAccessMode}
             hideLectureAssignments={isCourseBasedAssignments}
             onRefreshCourse={onRefreshCourse}

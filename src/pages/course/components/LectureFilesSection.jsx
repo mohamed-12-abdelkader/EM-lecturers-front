@@ -9,7 +9,7 @@ import {
   getCourseFileDisplayName,
 } from "../../../api/courseFilesApi";
 import { useLectureFileMutations, useLectureFiles } from "../../../Hooks/course/useCourseFiles";
-import { crBtnSecondary, lcBodySm, lcLabel } from "../courseTheme";
+import { crBtnSecondary, lcBodySm, lcLabel, lcBadge, lcTitleSm } from "../courseTheme";
 import DeleteCourseFileModal from "./DeleteCourseFileModal";
 import EditCourseFileModal from "./EditCourseFileModal";
 import UploadCourseFileModal from "./UploadCourseFileModal";
@@ -192,7 +192,7 @@ export default function LectureFilesSection({
 
   return (
     <section
-      className="space-y-3"
+      className="space-y-3 rounded-2xl border border-purple-100 bg-white/80 p-3.5 dark:border-purple-900/40 dark:bg-slate-900/60 sm:p-4"
       data-tour-id={isTourTarget ? "course-lecture-files" : undefined}
     >
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
@@ -200,15 +200,17 @@ export default function LectureFilesSection({
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-purple-500 text-white sm:h-9 sm:w-9">
             <FaFilePdf className="text-xs sm:text-sm" />
           </div>
-          <h4 className="text-sm font-bold text-slate-800 sm:text-base dark:text-slate-100">ملفات PDF</h4>
-          <span className="rounded-full bg-purple-50 px-2 py-0.5 text-xs font-bold text-purple-600 sm:px-2.5 dark:bg-purple-950/40 dark:text-purple-400">
+          <h4 className={`${lcTitleSm} !text-sm sm:!text-base`}>ملفات PDF</h4>
+          <span
+            className={`rounded-full px-2 py-0.5 ${lcBadge} bg-purple-50 text-purple-600 sm:px-2.5 dark:bg-purple-950/40 dark:text-purple-400`}
+          >
             {filesCount}
           </span>
         </div>
         {canManage ? (
           <button
             type="button"
-            className={`${crBtnSecondary} w-full !px-3.5 !py-2.5 !text-xs sm:w-auto sm:!py-2`}
+            className={`${crBtnSecondary} w-full !border-purple-200 !px-3.5 !py-2.5 !text-xs !text-purple-700 hover:!bg-purple-50 sm:w-auto sm:!py-2 dark:!border-purple-800 dark:!text-purple-300`}
             onClick={() => setUploadOpen(true)}
             data-tour-id={isTourTarget ? "course-lecture-add-file" : undefined}
           >

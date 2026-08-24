@@ -4216,6 +4216,7 @@ display:block;
                   lectureAccessMode={lectureAccessMode}
                   isCourseBasedAssignments={isCourseBasedAssignments}
                   courseId={id}
+                  canManageCourseFiles={canManageCourseFiles}
                   accessSettings={accessSettings}
                   accessSettingsLoading={accessSettingsLoading}
                   onRefreshCourse={refreshCourseData}
