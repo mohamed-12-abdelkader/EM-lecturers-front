@@ -26,6 +26,7 @@ import {
   AiFillPicture,
 } from "react-icons/ai";
 import { FaSearchPlus } from "react-icons/fa";
+import { examQuestionTextSx } from "../../../components/question/FormattedQuestionText";
 import { renderFormattedExamText } from "../../../utils/renderFormattedExamText";
 
 const CHOICE_LETTERS = ["أ", "ب", "ج", "د", "هـ", "و"];
@@ -170,7 +171,7 @@ export function ExamPassageBlock({ content, variant = "student" }) {
         <Text fontSize="xs" fontWeight="semibold" color="gray.500" mb={2}>
           قطعة القراءة
         </Text>
-        <Text fontSize="sm" lineHeight="1.9" color={passageTextColor} whiteSpace="pre-wrap">
+        <Text fontSize="sm" lineHeight="1.9" color={passageTextColor} whiteSpace="pre-wrap" sx={examQuestionTextSx}>
           {renderFormattedExamText(content)}
         </Text>
       </Box>
@@ -197,6 +198,7 @@ export function ExamPassageBlock({ content, variant = "student" }) {
         lineHeight="2"
         color={passageTextColor}
         whiteSpace="pre-wrap"
+        sx={examQuestionTextSx}
       >
         {renderFormattedExamText(content)}
       </Text>
@@ -340,10 +342,11 @@ function ExamChoicesSection({
           {choice.text ? (
             <Text
               fontSize="sm"
-              fontWeight={isCorrect ? "semibold" : "normal"}
+              fontWeight={isCorrect ? "semibold" : "500"}
               color={headingColor}
               lineHeight="1.75"
               dir="auto"
+              sx={examQuestionTextSx}
             >
               {renderFormattedExamText(choice.text)}
             </Text>
@@ -419,7 +422,7 @@ function ExamChoicesSection({
               {letter}
             </Flex>
             {choice.text && (
-              <Text flex={1} fontSize="sm" fontWeight={isSelected ? "semibold" : "normal"} color={headingColor} lineHeight="1.65">
+              <Text flex={1} fontSize="sm" fontWeight={isSelected ? "semibold" : "500"} color={headingColor} lineHeight="1.75" sx={examQuestionTextSx}>
                 {renderFormattedExamText(choice.text)}
               </Text>
             )}
@@ -613,6 +616,7 @@ export function TeacherQuestionCard({
             dir="auto"
             mb={displayImage || displayChoices?.length ? 4 : 0}
             whiteSpace="pre-wrap"
+            sx={examQuestionTextSx}
           >
             {renderFormattedExamText(displayText)}
           </Text>
@@ -709,7 +713,7 @@ export function StudentQuestionPanel({
           alignItems="start"
         >
           {questionText && (
-            <Text fontSize={{ base: "sm", md: "md" }} fontWeight="semibold" color={textColor} lineHeight="1.8">
+            <Text fontSize={{ base: "sm", md: "md" }} fontWeight="semibold" color={textColor} lineHeight="1.9" sx={examQuestionTextSx}>
               {renderFormattedExamText(questionText)}
             </Text>
           )}

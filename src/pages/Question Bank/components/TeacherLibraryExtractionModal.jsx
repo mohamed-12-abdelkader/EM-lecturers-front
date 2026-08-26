@@ -65,6 +65,7 @@ export default function TeacherLibraryExtractionModal({
   const [isExtractingOcr, setIsExtractingOcr] = useState(false);
   const [inferCorrectAnswer, setInferCorrectAnswer] = useState(false);
   const [includeQuestionImages, setIncludeQuestionImages] = useState(true);
+  const [extractionSubject, setExtractionSubject] = useState("");
   const [pdfStartPage, setPdfStartPage] = useState("");
   const [pdfEndPage, setPdfEndPage] = useState("");
   const [ocrNotes, setOcrNotes] = useState("");
@@ -110,6 +111,7 @@ export default function TeacherLibraryExtractionModal({
     setPdfEndPage("");
     setInferCorrectAnswer(false);
     setIncludeQuestionImages(true);
+    setExtractionSubject("");
   };
 
   const handleClose = () => {
@@ -238,6 +240,7 @@ export default function TeacherLibraryExtractionModal({
           includeQuestionImages,
           startPage: pdfStartPage || undefined,
           endPage: pdfEndPage || undefined,
+          subject: extractionSubject.trim() || undefined,
         },
         token,
       );
@@ -383,6 +386,7 @@ export default function TeacherLibraryExtractionModal({
             draftPassages,
             draftQuestions,
             token,
+            extractionMeta || {},
           )
         : await importDraftsToTeacherLibrary(
             lessonId,
@@ -490,6 +494,25 @@ export default function TeacherLibraryExtractionModal({
               <Text fontWeight="semibold" fontSize="sm" mb={3}>
                 رفع PDF أو صورة لاستخراج الأسئلة
               </Text>
+              <FormControl mb={3}>
+                <FormLabel htmlFor="extraction-subject-library" mb={1} fontSize="sm">
+                  اسم المادة
+                </FormLabel>
+                <Input
+                  id="extraction-subject-library"
+                  size="sm"
+                  placeholder="مثال: اللغة العربية / الكيمياء / الفيزياء"
+                  value={extractionSubject}
+                  onChange={(e) => setExtractionSubject(e.target.value)}
+                  isDisabled={isExtractingOcr || isImporting}
+                  bg="white"
+                  _dark={{ bg: "gray.800" }}
+                />
+                <Text fontSize="xs" color={subTextColor} mt={1}>
+                  للعربية: ARABIC_HIGH_ACCURACY_MODE. لغيرها: STANDARD_EXTRACTION_MODE. القطع
+                  تُملأ تلقائياً عند content_type=reading_passage.
+                </Text>
+              </FormControl>
               <FormControl display="flex" alignItems="center" mb={3}>
                 <FormLabel htmlFor="infer-answer-library" mb={0} flex="1" fontSize="sm">
                   تخمين الإجابة الصحيحة إن لم تكن مذكورة
@@ -504,7 +527,7 @@ export default function TeacherLibraryExtractionModal({
               </FormControl>
               <FormControl display="flex" alignItems="center" mb={3}>
                 <FormLabel htmlFor="include-images-library" mb={0} flex="1" fontSize="sm">
-                  استخراج صور الأسئلة من الملف
+                  استخراج صور الأسئلة ورفعها إلى Bunny CDN
                 </FormLabel>
                 <Switch
                   id="include-images-library"
@@ -733,6 +756,21 @@ export default function TeacherLibraryExtractionModal({
                 {extractionMeta.filename && (
                   <Badge colorScheme="blue">{extractionMeta.filename}</Badge>
                 )}
+                {extractionMeta.subject && (
+                  <Badge colorScheme="orange" variant="subtle">
+                    {extractionMeta.subject}
+                  </Badge>
+                )}
+                {extractionMeta.extraction_mode && (
+                  <Badge colorScheme="blue" variant="outline">
+                    {extractionMeta.extraction_mode === "ARABIC_HIGH_ACCURACY_MODE"
+                      ? "دقة عالية (عربي)"
+                      : "استخراج عادي"}
+                  </Badge>
+                )}
+                {extractionMeta.content_type === "reading_passage" && (
+                  <Badge colorScheme="teal">قطعة قراءة</Badge>
+                )}
                 {extractionMeta.source_files?.length > 1 && (
                   <Badge colorScheme="blue" variant="subtle">
                     {extractionMeta.source_files.length} ملفات
@@ -745,6 +783,9 @@ export default function TeacherLibraryExtractionModal({
                   </Badge>
                 )}
                 <Badge>{extractionMeta.question_count} سؤال</Badge>
+                {extractionMeta.passage_count > 0 && (
+                  <Badge colorScheme="teal">{extractionMeta.passage_count} قطعة</Badge>
+                )}
                 {extractionMeta.extracted_images_count > 0 && (
                   <Badge colorScheme="orange">
                     {extractionMeta.extracted_images_count} صورة مستخرجة

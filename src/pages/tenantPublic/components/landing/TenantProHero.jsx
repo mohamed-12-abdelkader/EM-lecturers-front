@@ -122,19 +122,35 @@ function HeroActions({
           whileTap={reduceMotion ? undefined : { scale: 0.98 }}
           className={compact ? "col-span-1" : "w-full sm:w-auto"}
         >
-          <TenantAppLink
-            href={signupHref}
-            className={`inline-flex w-full items-center justify-center rounded-xl font-bold text-white shadow-lg transition hover:brightness-110 ${
-              compact ? "px-3 py-3 text-[13px]" : "px-5 py-3.5 text-sm sm:min-w-[160px] sm:w-auto"
-            }`}
-            style={{
-              background: CYAN,
-              boxShadow: `0 10px 28px -8px ${CYAN}99`,
-            }}
-          >
-            إنشاء حساب
-          </TenantAppLink>
+          {signupHref ? (
+            <TenantAppLink
+              href={signupHref}
+              className={`inline-flex w-full items-center justify-center rounded-xl font-bold text-white shadow-lg transition hover:brightness-110 ${
+                compact ? "px-3 py-3 text-[13px]" : "px-5 py-3.5 text-sm sm:min-w-[160px] sm:w-auto"
+              }`}
+              style={{
+                background: CYAN,
+                boxShadow: `0 10px 28px -8px ${CYAN}99`,
+              }}
+            >
+              إنشاء حساب
+            </TenantAppLink>
+          ) : (
+            <TenantAppLink
+              href={loginHref}
+              className={`inline-flex w-full items-center justify-center rounded-xl font-bold text-white shadow-lg transition hover:brightness-110 ${
+                compact ? "px-3 py-3 text-[13px]" : "px-5 py-3.5 text-sm sm:min-w-[160px] sm:w-auto"
+              }`}
+              style={{
+                background: CYAN,
+                boxShadow: `0 10px 28px -8px ${CYAN}99`,
+              }}
+            >
+              تسجيل الدخول برقم الطالب
+            </TenantAppLink>
+          )}
         </motion.div>
+        {signupHref ? (
         <motion.div
           whileHover={reduceMotion ? undefined : { y: -2, scale: 1.01 }}
           whileTap={reduceMotion ? undefined : { scale: 0.98 }}
@@ -149,6 +165,7 @@ function HeroActions({
             تسجيل دخول
           </TenantAppLink>
         </motion.div>
+        ) : null}
         {whatsappHref ? (
           <motion.a
             href={whatsappHref}

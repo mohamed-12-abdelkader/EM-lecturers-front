@@ -69,6 +69,7 @@ export default function AiQuestionExtractionModal({
   const [isExtractingOcr, setIsExtractingOcr] = useState(false);
   const [inferCorrectAnswer, setInferCorrectAnswer] = useState(false);
   const [includeQuestionImages, setIncludeQuestionImages] = useState(true);
+  const [extractionSubject, setExtractionSubject] = useState("");
   const [pdfStartPage, setPdfStartPage] = useState("");
   const [pdfEndPage, setPdfEndPage] = useState("");
   const [ocrNotes, setOcrNotes] = useState("");
@@ -114,6 +115,7 @@ export default function AiQuestionExtractionModal({
     setPdfEndPage("");
     setInferCorrectAnswer(false);
     setIncludeQuestionImages(true);
+    setExtractionSubject("");
   };
 
   const handleClose = () => {
@@ -244,6 +246,7 @@ export default function AiQuestionExtractionModal({
           includeQuestionImages,
           startPage: pdfStartPage || undefined,
           endPage: pdfEndPage || undefined,
+          subject: extractionSubject.trim() || undefined,
         },
         token,
       );
@@ -487,6 +490,24 @@ export default function AiQuestionExtractionModal({
               <Text fontWeight="bold" mb={3}>
                 استخراج من PDF أو صورة (ذكاء اصطناعي)
               </Text>
+              <FormControl mb={4}>
+                <FormLabel htmlFor="extraction-subject-exam" mb={1}>
+                  اسم المادة
+                </FormLabel>
+                <Input
+                  id="extraction-subject-exam"
+                  placeholder="مثال: اللغة العربية / الكيمياء / الفيزياء"
+                  value={extractionSubject}
+                  onChange={(e) => setExtractionSubject(e.target.value)}
+                  isDisabled={isExtractingOcr || isImporting}
+                  bg="white"
+                  _dark={{ bg: "gray.800" }}
+                />
+                <Text fontSize="xs" color={subTextColor} mt={1}>
+                  للعربية يُفعَّل ARABIC_HIGH_ACCURACY_MODE (تشكيل + أبيات). لباقي المواد
+                  STANDARD_EXTRACTION_MODE. عند وجود قطعة قراءة تُملأ passages تلقائياً.
+                </Text>
+              </FormControl>
               <FormControl display="flex" alignItems="center" mb={4}>
                 <FormLabel htmlFor="infer-answer-exam" mb={0} flex="1">
                   تخمين الإجابة الصحيحة إن لم تكن مذكورة في الملف
@@ -501,7 +522,7 @@ export default function AiQuestionExtractionModal({
               </FormControl>
               <FormControl display="flex" alignItems="center" mb={4}>
                 <FormLabel htmlFor="include-images-exam" mb={0} flex="1">
-                  استخراج صور الأسئلة ورفعها إلى Cloudinary
+                  استخراج صور الأسئلة ورفعها إلى Bunny CDN
                 </FormLabel>
                 <Switch
                   id="include-images-exam"
@@ -730,6 +751,21 @@ export default function AiQuestionExtractionModal({
                 {extractionMeta.filename && (
                   <Badge colorScheme="purple">{extractionMeta.filename}</Badge>
                 )}
+                {extractionMeta.subject && (
+                  <Badge colorScheme="orange" variant="subtle">
+                    {extractionMeta.subject}
+                  </Badge>
+                )}
+                {extractionMeta.extraction_mode && (
+                  <Badge colorScheme="purple" variant="outline">
+                    {extractionMeta.extraction_mode === "ARABIC_HIGH_ACCURACY_MODE"
+                      ? "دقة عالية (عربي)"
+                      : "استخراج عادي"}
+                  </Badge>
+                )}
+                {extractionMeta.content_type === "reading_passage" && (
+                  <Badge colorScheme="teal">قطعة قراءة</Badge>
+                )}
                 {extractionMeta.source_files?.length > 1 && (
                   <Badge colorScheme="purple" variant="subtle">
                     {extractionMeta.source_files.length} ملفات
@@ -742,6 +778,9 @@ export default function AiQuestionExtractionModal({
                   </Badge>
                 )}
                 <Badge>{extractionMeta.question_count} سؤال</Badge>
+                {extractionMeta.passage_count > 0 && (
+                  <Badge colorScheme="blue">{extractionMeta.passage_count} قطعة</Badge>
+                )}
                 {extractionMeta.extracted_images_count > 0 && (
                   <Badge colorScheme="cyan">
                     {extractionMeta.extracted_images_count} صورة مستخرجة

@@ -62,6 +62,9 @@ import {
   Container,
   Switch,
   Checkbox,
+  Radio,
+  RadioGroup,
+  Stack,
   Menu,
   MenuButton,
   MenuList,
@@ -126,11 +129,9 @@ import CourseFiles from "./components/CourseFiles";
 import { useCourseFiles } from "../../Hooks/course/useCourseFiles";
 import { useCourseAccessSettings } from "../../Hooks/course/useCourseAccessSettings";
 import { useCourseAssignments, courseAssignmentsQueryKey } from "../../Hooks/course/useCourseAssignments";
-import { createCourseExam as postCourseExam } from "../../api/courseAccessApi";
-import {
-  useCourseGroupSettings,
-  useTeacherCourseGroups,
-} from "../../Hooks/course/useCourseGroups";
+import { createCourseExam as postCourseExam, PER_LECTURE_ACCESS_MODES, resolveLectureAccessMode } from "../../api/courseAccessApi";
+import { PER_LECTURE_ACCESS_MODE_LABELS, PER_LECTURE_ACCESS_MODE_HINTS, toDateTimeLocalValue, lectureSupportsActivationCodes } from "../../utils/lectureAccessUtils";
+import { useTeacherCourseGroups } from "../../Hooks/course/useCourseGroups";
 import CourseAssignmentsTab from "./components/CourseAssignmentsTab";
 import CourseAssignmentReportsPanel from "./components/CourseAssignmentReportsPanel";
 import CourseFormModal, {
@@ -190,6 +191,16 @@ async function fetchImageAsDataUrl(url) {
   });
 }
 
+const LECTURE_DURATION_PRESETS = [
+  { label: "ساعة", value: 1 },
+  { label: "ساعتان", value: 2 },
+  { label: "6 ساعات", value: 6 },
+  { label: "12 ساعة", value: 12 },
+  { label: "24 ساعة", value: 24 },
+  { label: "48 ساعة", value: 48 },
+  { label: "7 أيام", value: 168 },
+];
+
 // Modal Components
 const LectureModal = ({
   isOpen,
@@ -198,19 +209,32 @@ const LectureModal = ({
   data,
   onSubmit,
   loading,
-  lectureAccessMode = "always_open",
-  groupsEnabled = false,
   availableGroups = [],
 }) => {
   const toast = useToast();
   const inputProps = useCourseModalInputProps("blue");
-  const requiresExpiry = lectureAccessMode === "time_limited";
+
+  const initialAccessMode = resolveLectureAccessMode(data);
+
+  const emptyForm = {
+    title: "",
+    description: "",
+    position: 1,
+    expires_at: "",
+    access_mode: PER_LECTURE_ACCESS_MODES.open,
+    group_ids: [],
+    duration_hours: 48,
+    max_uses: 0,
+    activation_code: "",
+  };
+
   const [formData, setFormData] = useState({
+    ...emptyForm,
     title: data?.title || "",
     description: data?.description || "",
     position: data?.position || 1,
-    expires_at: "",
-    access_type: data?.access_type || "all",
+    expires_at: toDateTimeLocalValue(data?.expires_at),
+    access_mode: initialAccessMode,
     group_ids: Array.isArray(data?.group_ids)
       ? data.group_ids.map(Number)
       : Array.isArray(data?.groups)
@@ -221,19 +245,12 @@ const LectureModal = ({
   useEffect(() => {
     if (data) {
       setFormData({
+        ...emptyForm,
         title: data.title || "",
         description: data.description || "",
         position: data.position || 1,
-        expires_at: data.expires_at
-          ? (() => {
-              const date = new Date(data.expires_at);
-              if (Number.isNaN(date.getTime())) return "";
-              const offset = date.getTimezoneOffset();
-              const local = new Date(date.getTime() - offset * 60000);
-              return local.toISOString().slice(0, 16);
-            })()
-          : "",
-        access_type: data.access_type || "all",
+        expires_at: toDateTimeLocalValue(data.expires_at),
+        access_mode: resolveLectureAccessMode(data),
         group_ids: Array.isArray(data.group_ids)
           ? data.group_ids.map(Number)
           : Array.isArray(data.groups)
@@ -241,28 +258,33 @@ const LectureModal = ({
             : [],
       });
     } else if (isOpen) {
-      setFormData({
-        title: "",
-        description: "",
-        position: 1,
-        expires_at: "",
-        access_type: "all",
-        group_ids: [],
-      });
+      setFormData({ ...emptyForm });
     }
   }, [data, isOpen]);
+
+  const needsCodesOnCreate =
+    type === "add" && lectureSupportsActivationCodes(formData.access_mode);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (
-      groupsEnabled &&
-      formData.access_type === "groups" &&
+      formData.access_mode === PER_LECTURE_ACCESS_MODES.groups &&
       (!Array.isArray(formData.group_ids) || formData.group_ids.length === 0)
     ) {
       toast({
         title: "يجب اختيار مجموعة واحدة على الأقل",
         status: "warning",
         duration: 3500,
+        isClosable: true,
+      });
+      return;
+    }
+    if (needsCodesOnCreate && !(Number(formData.duration_hours) > 0)) {
+      toast({
+        title: "مدة كود التفعيل مطلوبة",
+        description: "حدد مدة فتح المحاضرة للطالب بعد استخدام الكود (بالساعات)",
+        status: "warning",
+        duration: 4000,
         isClosable: true,
       });
       return;
@@ -282,6 +304,27 @@ const LectureModal = ({
     }));
   };
 
+  const accessOptions = [
+    {
+      value: PER_LECTURE_ACCESS_MODES.open,
+      label: PER_LECTURE_ACCESS_MODE_LABELS.open,
+      hint: PER_LECTURE_ACCESS_MODE_HINTS.open,
+      icon: FaUnlock,
+    },
+    {
+      value: PER_LECTURE_ACCESS_MODES.activation_code,
+      label: PER_LECTURE_ACCESS_MODE_LABELS.activation_code,
+      hint: PER_LECTURE_ACCESS_MODE_HINTS.activation_code,
+      icon: FaKey,
+    },
+    {
+      value: PER_LECTURE_ACCESS_MODES.groups,
+      label: PER_LECTURE_ACCESS_MODE_LABELS.groups,
+      hint: PER_LECTURE_ACCESS_MODE_HINTS.groups,
+      icon: FaUsers,
+    },
+  ];
+
   return (
     <CourseFormModal
       isOpen={isOpen}
@@ -293,8 +336,8 @@ const LectureModal = ({
       title={type === "add" ? "إضافة محاضرة جديدة" : "تعديل المحاضرة"}
       subtitle={
         type === "add"
-          ? "أضف محاضرة للمحتوى وحدد ترتيبها داخل الكورس"
-          : "حدّث عنوان المحاضرة ووصفها وترتيبها"
+          ? "حدّد العنوان وطريقة الوصول: مفتوحة، بكود للجميع، أو لمجموعات (+ كود للباقي)"
+          : "حدّث بيانات المحاضرة ووضع الوصول"
       }
       onSubmit={handleSubmit}
       submitLabel={type === "add" ? "إضافة المحاضرة" : "حفظ التعديلات"}
@@ -359,55 +402,66 @@ const LectureModal = ({
           </FormControl>
         </CourseModalFieldCard>
 
-        {requiresExpiry ? (
-          <CourseModalFieldCard>
-            <FormControl isRequired={type === "add"}>
-              <CourseModalFieldLabel icon={FaClock} color="orange">
-                موعد انتهاء الوصول
-              </CourseModalFieldLabel>
-              <Input
-                type="datetime-local"
-                value={formData.expires_at}
-                onChange={(e) =>
-                  setFormData({ ...formData, expires_at: e.target.value })
-                }
-                isDisabled={loading}
-                {...inputProps}
-              />
-              <Text mt={2} fontSize="xs" color="gray.500">
-                بعد هذا الموعد لن يتمكن الطلاب من فتح المحاضرة
-              </Text>
-            </FormControl>
-          </CourseModalFieldCard>
-        ) : null}
+        <CourseModalFieldCard>
+          <FormControl as="fieldset">
+            <CourseModalFieldLabel icon={FaUnlock} color="blue">
+              طريقة وصول المحاضرة
+            </CourseModalFieldLabel>
+            <RadioGroup
+              value={formData.access_mode}
+              onChange={(value) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  access_mode: value,
+                  group_ids:
+                    value === PER_LECTURE_ACCESS_MODES.groups ? prev.group_ids : [],
+                }))
+              }
+              isDisabled={loading}
+            >
+              <Stack spacing={2} mt={2}>
+                {accessOptions.map((opt) => {
+                  const OptIcon = opt.icon;
+                  const selected = formData.access_mode === opt.value;
+                  return (
+                    <Box
+                      key={opt.value}
+                      className={`rounded-xl border px-3 py-2.5 transition-colors ${
+                        selected
+                          ? "border-blue-400 bg-blue-50/80 dark:bg-blue-950/40"
+                          : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
+                      }`}
+                    >
+                      <Radio value={opt.value} colorScheme="blue">
+                        <HStack spacing={2} mr={2} align="start">
+                          <OptIcon className="mt-0.5 text-blue-500" />
+                          <Box>
+                            <Text fontSize="sm" fontWeight="semibold">
+                              {opt.label}
+                            </Text>
+                            <Text fontSize="xs" color="gray.500">
+                              {opt.hint}
+                            </Text>
+                          </Box>
+                        </HStack>
+                      </Radio>
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </RadioGroup>
+          </FormControl>
 
-        {groupsEnabled && availableGroups.length > 0 ? (
-          <CourseModalFieldCard>
-            <FormControl>
-              <CourseModalFieldLabel icon={FaUsers} color="blue">
-                من يرى المحاضرة؟
-              </CourseModalFieldLabel>
-              <Select
-                value={formData.access_type}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    access_type: e.target.value,
-                    group_ids: e.target.value === "all" ? [] : formData.group_ids,
-                  })
-                }
-                isDisabled={loading}
-                {...inputProps}
-              >
-                <option value="all">كل المشتركين</option>
-                <option value="groups">مجموعات محددة فقط</option>
-              </Select>
-            </FormControl>
-            {formData.access_type === "groups" ? (
-              <FormControl mt={4}>
-                <FormLabel fontSize="sm">
-                  اختر المجموعات <Text as="span" color="red.500">*</Text>
-                </FormLabel>
+          {formData.access_mode === PER_LECTURE_ACCESS_MODES.groups ? (
+            <FormControl mt={4}>
+              <FormLabel fontSize="sm">
+                اختر المجموعات <Text as="span" color="red.500">*</Text>
+              </FormLabel>
+              {availableGroups.length === 0 ? (
+                <Text fontSize="sm" color="orange.500">
+                  لا توجد مجموعات بعد — أنشئ مجموعات من إدارة مجموعات الكورس أولاً.
+                </Text>
+              ) : (
                 <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={2} mt={2}>
                   {availableGroups.map((group) => {
                     const gid = Number(group.id);
@@ -417,6 +471,7 @@ const LectureModal = ({
                         key={group.id}
                         isChecked={checked}
                         isDisabled={loading}
+                        isRequired={false}
                         onChange={(e) => toggleGroupId(group.id, e.target.checked)}
                       >
                         {group.name}
@@ -425,15 +480,115 @@ const LectureModal = ({
                     );
                   })}
                 </SimpleGrid>
-                {formData.group_ids.length === 0 ? (
-                  <Text mt={2} fontSize="xs" color="orange.500">
-                    اختر مجموعة واحدة على الأقل
-                  </Text>
-                ) : null}
+              )}
+              {availableGroups.length > 0 && formData.group_ids.length === 0 ? (
+                <Text mt={2} fontSize="xs" color="orange.500">
+                  اختر مجموعة واحدة على الأقل
+                </Text>
+              ) : null}
+              <Text mt={2} fontSize="xs" color="blue.600">
+                أعضاء هذه المجموعات يدخلون بدون كود — باقي الطلاب يستخدمون كود التفعيل أدناه.
+              </Text>
+            </FormControl>
+          ) : null}
+
+          {needsCodesOnCreate ? (
+            <Box
+              mt={4}
+              p={3}
+              borderRadius="xl"
+              borderWidth="1px"
+              borderColor="purple.200"
+              bg="purple.50"
+              _dark={{ bg: "purple.950", borderColor: "purple.700" }}
+            >
+              <Text fontSize="sm" fontWeight="bold" color="purple.700" mb={3} _dark={{ color: "purple.200" }}>
+                كود التفعيل (إلزامي عند الإنشاء)
+              </Text>
+              <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={3}>
+                <FormControl isRequired>
+                  <FormLabel fontSize="sm">مدة الفتح بعد التفعيل (ساعات)</FormLabel>
+                  <Select
+                    value={String(formData.duration_hours)}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        duration_hours: Number(e.target.value) || 48,
+                      })
+                    }
+                    isDisabled={loading}
+                    {...inputProps}
+                  >
+                    {LECTURE_DURATION_PRESETS.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label} ({p.value} ساعة)
+                      </option>
+                    ))}
+                  </Select>
+                </FormControl>
+                <FormControl>
+                  <FormLabel fontSize="sm">حد الاستخدام (0 = بلا حد)</FormLabel>
+                  <NumberInput
+                    min={0}
+                    value={formData.max_uses}
+                    onChange={(_, num) =>
+                      setFormData({
+                        ...formData,
+                        max_uses: Number.isFinite(num) ? num : 0,
+                      })
+                    }
+                    isDisabled={loading}
+                  >
+                    <NumberInputField {...inputProps} />
+                  </NumberInput>
+                </FormControl>
+              </SimpleGrid>
+              <FormControl mt={3}>
+                <FormLabel fontSize="sm">كود مخصص (اختياري)</FormLabel>
+                <Input
+                  value={formData.activation_code}
+                  onChange={(e) =>
+                    setFormData({ ...formData, activation_code: e.target.value })
+                  }
+                  placeholder="يُولَّد تلقائياً إن تُرك فارغاً"
+                  dir="ltr"
+                  textAlign="left"
+                  isDisabled={loading}
+                  {...inputProps}
+                />
               </FormControl>
-            ) : null}
-          </CourseModalFieldCard>
-        ) : null}
+              <Text mt={2} fontSize="xs" color="gray.600">
+                يمكنك إضافة أكواد أخرى لاحقاً من زر «أكواد التفعيل» على بطاقة المحاضرة.
+              </Text>
+            </Box>
+          ) : null}
+
+          {type === "edit" && lectureSupportsActivationCodes(formData.access_mode) ? (
+            <Text mt={3} fontSize="xs" color="purple.600">
+              لإدارة الأكواد استخدم زر «أكواد التفعيل» من بطاقة المحاضرة.
+            </Text>
+          ) : null}
+        </CourseModalFieldCard>
+
+        <CourseModalFieldCard>
+          <FormControl>
+            <CourseModalFieldLabel icon={FaClock} color="orange">
+              موعد انتهاء إضافي (اختياري)
+            </CourseModalFieldLabel>
+            <Input
+              type="datetime-local"
+              value={formData.expires_at}
+              onChange={(e) =>
+                setFormData({ ...formData, expires_at: e.target.value })
+              }
+              isDisabled={loading}
+              {...inputProps}
+            />
+            <Text mt={2} fontSize="xs" color="gray.500">
+              اختياري — إن وُجد، ينتهي الوصول بعد هذا الموعد بغض النظر عن وضع الوصول
+            </Text>
+          </FormControl>
+        </CourseModalFieldCard>
       </VStack>
     </CourseFormModal>
   );
@@ -700,6 +855,7 @@ const CourseDetailsPage = () => {
     type: "add",
     data: null,
   });
+  const [openCodesLectureId, setOpenCodesLectureId] = useState(null);
   const [videoModal, setVideoModal] = useState({
     isOpen: false,
     type: "add",
@@ -830,19 +986,14 @@ const CourseDetailsPage = () => {
   const { data: accessSettings, isLoading: accessSettingsLoading } = useCourseAccessSettings(id, {
     enabled: Boolean(id) && Boolean(token) && Boolean(courseData),
   });
-  const lectureAccessMode = accessSettings?.lecture_access_mode || "always_open";
   const assignmentMode = accessSettings?.assignment_mode || "lecture_based";
   const isCourseBasedAssignments = assignmentMode === "course_based";
 
   const canManageCourse = isTeacher || isAdmin;
   const canManageCourseFiles =
     isTeacher || isAdmin || isAcademy || isAcademyTeacher;
-  const { data: courseGroupSettings } = useCourseGroupSettings({
-    enabled: canManageCourse,
-  });
-  const courseGroupsEnabled = Boolean(courseGroupSettings?.course_group_access_enabled);
   const { data: teacherCourseGroups = [] } = useTeacherCourseGroups(undefined, {
-    enabled: canManageCourse && courseGroupsEnabled,
+    enabled: canManageCourse,
   });
   const activeTeacherGroups = useMemo(
     () => teacherCourseGroups.filter((g) => g.status !== "inactive"),
@@ -1358,16 +1509,17 @@ const CourseDetailsPage = () => {
         });
         return;
       }
-      // التوكن يُرفَق تلقائياً من interceptor في baseUrl (Bearer + X-Tenant-Subdomain)
+      const accessMode = resolveLectureAccessMode(data.access_mode);
       const payload = {
         title: data.title,
         description: data.description || "",
         position: Number(data.position) || 1,
+        access_mode: accessMode,
       };
       if (data.expires_at) {
         payload.expires_at = new Date(data.expires_at).toISOString();
       }
-      if (data.access_type === "groups") {
+      if (accessMode === PER_LECTURE_ACCESS_MODES.groups) {
         if (!Array.isArray(data.group_ids) || data.group_ids.length === 0) {
           toast({
             title: "يجب اختيار مجموعة واحدة على الأقل",
@@ -1377,22 +1529,60 @@ const CourseDetailsPage = () => {
           });
           return;
         }
-        payload.access_type = "groups";
-        payload.group_ids = data.group_ids.map(Number).filter((id) => id > 0);
-      } else if (data.access_type) {
-        payload.access_type = data.access_type;
+        payload.group_ids = data.group_ids.map(Number).filter((gid) => gid > 0);
       }
-      await baseUrl.post(`api/course/${id}/lectures`, payload);
+      const needsCodes =
+        accessMode === PER_LECTURE_ACCESS_MODES.activation_code ||
+        accessMode === PER_LECTURE_ACCESS_MODES.groups;
+      if (needsCodes) {
+        const durationHours = Number(data.duration_hours);
+        if (!(durationHours > 0)) {
+          toast({
+            title: "مدة كود التفعيل مطلوبة",
+            description: "حدد مدة فتح المحاضرة بعد استخدام الكود (بالساعات)",
+            status: "warning",
+            duration: 4000,
+            isClosable: true,
+          });
+          return;
+        }
+        const maxUses = Number(data.max_uses);
+        const safeMaxUses = Number.isFinite(maxUses) && maxUses >= 0 ? maxUses : 0;
+        const customCode = String(data.activation_code || "").trim();
+        if (customCode) {
+          payload.activation_codes = [
+            {
+              code: customCode,
+              duration_hours: durationHours,
+              max_uses: safeMaxUses,
+            },
+          ];
+        } else {
+          payload.duration_hours = durationHours;
+          payload.max_uses = safeMaxUses;
+        }
+      }
+      const { data: res } = await baseUrl.post(`api/course/${id}/lectures`, payload);
+      const created = res?.lecture || res;
+      const createdCodes = Array.isArray(res?.activation_codes)
+        ? res.activation_codes
+        : [];
       toast({
         title: "تم إضافة المحاضرة بنجاح",
+        description: needsCodes
+          ? createdCodes.length > 0
+            ? `تم إنشاء ${createdCodes.length} كود تفعيل — يمكنك إدارة الأكواد من بطاقة المحاضرة`
+            : "يمكنك إدارة أكواد التفعيل من بطاقة المحاضرة"
+          : undefined,
         status: "success",
-        duration: 3000,
+        duration: 4000,
         isClosable: true,
       });
-      // تحديث البيانات بدون إعادة تحميل
       await refreshCourseData();
-      // إغلاق الموديل بعد النجاح
       setLectureModal({ isOpen: false, type: "add", data: null });
+      if (needsCodes && created?.id) {
+        setOpenCodesLectureId(created.id);
+      }
     } catch (error) {
       const apiMsg =
         error.response?.data?.message ||
@@ -1416,17 +1606,19 @@ const CourseDetailsPage = () => {
   const updateLecture = async (lectureId, data) => {
     try {
       setActionLoading(true);
+      const accessMode = resolveLectureAccessMode(data.access_mode);
       const payload = {
         title: data.title,
         description: data.description || "",
         position: Number(data.position) || 1,
+        access_mode: accessMode,
       };
       if (data.expires_at !== undefined) {
         payload.expires_at = data.expires_at
           ? new Date(data.expires_at).toISOString()
           : null;
       }
-      if (data.access_type === "groups") {
+      if (accessMode === PER_LECTURE_ACCESS_MODES.groups) {
         if (!Array.isArray(data.group_ids) || data.group_ids.length === 0) {
           toast({
             title: "يجب اختيار مجموعة واحدة على الأقل",
@@ -1436,13 +1628,9 @@ const CourseDetailsPage = () => {
           });
           return;
         }
-        payload.access_type = "groups";
-        payload.group_ids = data.group_ids.map(Number).filter((id) => id > 0);
-      } else if (data.access_type) {
-        payload.access_type = data.access_type;
-        if (data.access_type === "all") {
-          payload.group_ids = [];
-        }
+        payload.group_ids = data.group_ids.map(Number).filter((gid) => gid > 0);
+      } else {
+        payload.group_ids = [];
       }
       await baseUrl.patch(`/api/course/lecture/${lectureId}`, payload);
       toast({
@@ -4441,8 +4629,9 @@ display:block;
                   lectures={lectures}
                   isTeacher={isTeacher}
                   isAdmin={isAdmin}
-                  lectureAccessMode={lectureAccessMode}
                   isCourseBasedAssignments={isCourseBasedAssignments}
+                  openCodesLectureId={openCodesLectureId}
+                  onCodesModalClosed={() => setOpenCodesLectureId(null)}
                   courseId={id}
                   accessSettings={accessSettings}
                   accessSettingsLoading={accessSettingsLoading}
@@ -4554,8 +4743,6 @@ display:block;
         }
         type={lectureModal.type}
         data={lectureModal.data}
-        lectureAccessMode={lectureAccessMode}
-        groupsEnabled={courseGroupsEnabled}
         availableGroups={activeTeacherGroups}
         onSubmit={lectureModal.type === "add" ? createLecture : updateLecture}
         loading={actionLoading}

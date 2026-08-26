@@ -146,12 +146,14 @@ export function formatOcrApiError(error) {
 
 export const newDraftId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
-/** عدد الاختيارات المدعوم من الاستخراج والبنك (أحياناً 3 / 4 / 5) */
+/** عدد الاختيارات حسب API الاستخراج (2–5) */
 export const MCQ_CHOICE_MIN = 2;
-export const MCQ_CHOICE_MAX = 6;
+export const MCQ_CHOICE_MAX = 5;
+/** امتحانات المحاضرة/الكورس تدعم أ–د فقط */
+export const EXAM_MCQ_CHOICE_MAX = 4;
 
-export const CHOICE_LETTERS_LATIN = ["A", "B", "C", "D", "E", "F"];
-export const CHOICE_LETTERS_AR = ["أ", "ب", "ج", "د", "هـ", "و"];
+export const CHOICE_LETTERS_LATIN = ["A", "B", "C", "D", "E"];
+export const CHOICE_LETTERS_AR = ["أ", "ب", "ج", "د", "هـ"];
 
 export const getChoiceLetter = (index, script = "latin") => {
   const list = script === "ar" ? CHOICE_LETTERS_AR : CHOICE_LETTERS_LATIN;
@@ -173,8 +175,18 @@ export const isValidMcqChoiceCount = (choices = []) => {
 export const emptyDraftQuestion = () => ({
   id: newDraftId(),
   question_text: "",
+  intro_text: null,
+  stimulus_text: null,
+  prompt_text: null,
+  display_blocks: [],
+  underlined_phrases: [],
+  poetry: false,
+  verses: [],
+  score: null,
+  confidence: null,
   question_type: "choice",
   choices: ["", "", "", ""],
+  optionLabels: ["أ", "ب", "ج", "د"],
   answer: "",
   correctAnswerIndex: null,
   answerInferred: false,
@@ -182,7 +194,66 @@ export const emptyDraftQuestion = () => ({
   imageDescription: "",
   questionImages: [],
   passage_id: null,
+  source_number: null,
 });
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** يلف العبارات المستخرجة بـ <u> إن لم تكن مُسطَّرة مسبقاً */
+export function applyUnderlinedPhrases(text, phrases) {
+  let result = String(text ?? "");
+  const list = Array.isArray(phrases) ? phrases : [];
+  for (const phrase of list) {
+    const p = String(phrase || "").trim();
+    if (!p) continue;
+    if (new RegExp(`<u[^>]*>\\s*${escapeRegExp(p)}\\s*</u>`, "i").test(result)) continue;
+    result = result.replace(new RegExp(escapeRegExp(p), "g"), `<u>${p}</u>`);
+  }
+  return result;
+}
+
+/**
+ * يبني نص السؤال من حقول الاستخراج (display_blocks / أجزاء النص / الأبيات)
+ * @param {object} q — سؤال من extract-questions
+ */
+export function composeOcrQuestionText(q) {
+  const phrases = q?.underlined_phrases;
+  const blocks = Array.isArray(q?.display_blocks)
+    ? q.display_blocks.filter((b) => String(b?.text ?? "").trim())
+    : [];
+  if (blocks.length > 0) {
+    return applyUnderlinedPhrases(
+      blocks.map((b) => String(b.text).trim()).join("\n\n"),
+      phrases,
+    );
+  }
+
+  const structured = [q?.intro_text, q?.stimulus_text, q?.prompt_text]
+    .map((t) => String(t ?? "").trim())
+    .filter(Boolean);
+  if (structured.length > 0) {
+    return applyUnderlinedPhrases(structured.join("\n\n"), phrases);
+  }
+
+  let text = String(q?.question_text ?? "").trim();
+  const verses = Array.isArray(q?.verses) ? q.verses : [];
+  if (!text && verses.length > 0) {
+    text = verses
+      .map((v) => {
+        const a = String(v?.firstHemistich ?? "").trim();
+        const b = String(v?.secondHemistich ?? "").trim();
+        if (!a && !b) return "";
+        if (a && b) return `${a} . : ${b}`;
+        return a || b;
+      })
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  return applyUnderlinedPhrases(text, phrases);
+}
 
 export const resolveOcrAnswer = (q) => {
   const options = Array.isArray(q.options) ? q.options : [];
@@ -221,12 +292,17 @@ function resolveOcrCorrectIndex(q, optionTexts) {
 }
 
 /**
- * يحوّل سؤال OCR إلى مسودة — يدعم 2–6 اختيارات (غالباً 3 / 4 / 5)
+ * يحوّل سؤال OCR إلى مسودة — يدعم 2–5 اختيارات + قطع القراءة + display_blocks
  * @param {object} q
  */
 export const mapOcrQuestionToDraft = (q) => {
   const rawOptions = Array.isArray(q.options) ? q.options : [];
-  const optionTexts = normalizeMcqChoices(rawOptions.map((o) => o?.text ?? ""));
+  const optionTexts = normalizeMcqChoices(
+    rawOptions.map((o) => (o?.text == null ? "" : String(o.text))),
+  );
+  const optionLabels = rawOptions
+    .slice(0, optionTexts.length)
+    .map((o, i) => String(o?.label ?? "").trim() || CHOICE_LETTERS_AR[i] || String(i + 1));
   const hasMcqOptions = optionTexts.length >= MCQ_CHOICE_MIN;
 
   const questionImages = Array.isArray(q.question_images)
@@ -249,12 +325,44 @@ export const mapOcrQuestionToDraft = (q) => {
     ? resolveOcrCorrectIndex(q, optionTexts)
     : null;
 
+  const display_blocks = Array.isArray(q.display_blocks)
+    ? q.display_blocks
+        .filter((b) => b?.text && ["intro", "stimulus", "prompt"].includes(b.role))
+        .map((b) => ({ role: b.role, text: String(b.text) }))
+    : [];
+
+  const verses = Array.isArray(q.verses)
+    ? q.verses
+        .map((v) => ({
+          firstHemistich: String(v?.firstHemistich ?? "").trim(),
+          secondHemistich: String(v?.secondHemistich ?? "").trim(),
+        }))
+        .filter((v) => v.firstHemistich || v.secondHemistich)
+    : [];
+
   return {
     id: newDraftId(),
-    question_text: (q.question_text ?? "").trim(),
+    question_text: composeOcrQuestionText(q),
+    intro_text: q.intro_text != null ? String(q.intro_text) : null,
+    stimulus_text: q.stimulus_text != null ? String(q.stimulus_text) : null,
+    prompt_text: q.prompt_text != null ? String(q.prompt_text) : null,
+    display_blocks,
+    underlined_phrases: Array.isArray(q.underlined_phrases)
+      ? q.underlined_phrases.map((p) => String(p)).filter(Boolean)
+      : [],
+    poetry: !!q.poetry || verses.length > 0,
+    verses,
+    score: q.score != null && !Number.isNaN(Number(q.score)) ? Number(q.score) : null,
+    confidence:
+      q.confidence != null && !Number.isNaN(Number(q.confidence))
+        ? Number(q.confidence)
+        : null,
     passage_id: q.passage_id ?? null,
     question_type: questionType,
     choices,
+    optionLabels: hasMcqOptions
+      ? optionLabels
+      : ["أ", "ب", "ج", "د"],
     answer:
       hasMcqOptions && correctAnswerIndex != null
         ? optionTexts[correctAnswerIndex] || resolveOcrAnswer(q)
@@ -325,12 +433,16 @@ export const validateLectureExamDraftQuestion = (draft, index) => {
   }
 
   if (draft.question_type === "text") {
-    return `السؤال ${n}: امتحان المحاضرة يدعم أسئلة اختيار من متعدد (2–6 خيارات) أو أسئلة بالصورة`;
+    return `السؤال ${n}: امتحان المحاضرة يدعم أسئلة اختيار من متعدد (2–4 خيارات) أو أسئلة بالصورة`;
   }
 
   const choices = draft.choices.map((c) => c.trim());
-  if (!isValidMcqChoiceCount(choices)) {
-    return `السؤال ${n}: أدخل من ${MCQ_CHOICE_MIN} إلى ${MCQ_CHOICE_MAX} اختيارات كاملة (حالياً ${choices.filter(Boolean).length})`;
+  if (choices.filter(Boolean).length > EXAM_MCQ_CHOICE_MAX) {
+    return `السؤال ${n}: امتحان المحاضرة يدعم حتى ${EXAM_MCQ_CHOICE_MAX} اختيارات (أ–د)`;
+  }
+  if (!isValidMcqChoiceCount(choices) || choices.filter(Boolean).length > EXAM_MCQ_CHOICE_MAX) {
+    const filled = choices.filter(Boolean).length;
+    return `السؤال ${n}: أدخل من ${MCQ_CHOICE_MIN} إلى ${EXAM_MCQ_CHOICE_MAX} اختيارات كاملة (حالياً ${filled})`;
   }
 
   const correctAnswerIndex = getDraftCorrectAnswerIndex(draft);
@@ -356,7 +468,7 @@ const draftToLecturePayload = (draft) => ({
 
 async function urlToImageFile(imageUrl) {
   const response = await fetch(imageUrl);
-  if (!response.ok) throw new Error("تعذر تحميل صورة السؤال من Cloudinary");
+  if (!response.ok) throw new Error("تعذر تحميل صورة السؤال من CDN");
   const blob = await response.blob();
   const ext = imageUrl.split(".").pop()?.split("?")[0] || "png";
   return new File([blob], `question-image.${ext}`, {
@@ -427,12 +539,19 @@ function buildBulkTextFromDrafts(drafts) {
  *   includeQuestionImages?: boolean,
  *   startPage?: number|string,
  *   endPage?: number|string,
+ *   subject?: string,
  * }} options
  * @param {string} token
  */
 export async function extractQuestions(
   source,
-  { inferCorrectAnswer = false, includeQuestionImages = true, startPage, endPage } = {},
+  {
+    inferCorrectAnswer = false,
+    includeQuestionImages = true,
+    startPage,
+    endPage,
+    subject,
+  } = {},
   token,
 ) {
   const files = Array.isArray(source) ? source : [source];
@@ -466,6 +585,10 @@ export async function extractQuestions(
     "include_question_images",
     includeQuestionImages ? "true" : "false",
   );
+
+  if (typeof subject === "string" && subject.trim()) {
+    formData.append("subject", subject.trim());
+  }
 
   if (singlePdf) {
     if (startPage != null && startPage !== "") {
@@ -507,18 +630,27 @@ export function mapExtractionResponseMeta(data) {
   const questionCount =
     data?.question_count ??
     (Array.isArray(data?.questions) ? data.questions.length : 0);
+  const passageCount = Array.isArray(data?.passages) ? data.passages.length : 0;
 
   return {
     filename: data?.filename ?? null,
+    mime_type: data?.mime_type ?? null,
+    document_type: data?.document_type ?? null,
+    page_count: data?.page_count ?? null,
     source_files: Array.isArray(data?.source_files) ? data.source_files : null,
     page_range: data?.page_range ?? null,
     question_count: questionCount,
+    passage_count: passageCount,
     ocr_model: data?.ocr_model ?? null,
     chat_model: data?.chat_model ?? null,
     infer_correct_answer: data?.infer_correct_answer ?? null,
+    subject: data?.subject ?? null,
+    extraction_mode: data?.extraction_mode ?? null,
+    content_type: data?.content_type ?? (passageCount > 0 ? "reading_passage" : "general"),
     extracted_images_count: Array.isArray(data?.extracted_images)
       ? data.extracted_images.length
       : 0,
+    notes: data?.notes ?? null,
   };
 }
 
@@ -732,12 +864,15 @@ function draftToTeacherQuestionPayload(draft) {
       question_text: draft.question_text.trim(),
       question_type: "choice",
       choices,
-      answer: correctAnswerIndex != null ? choices[correctAnswerIndex] : draft.answer || null,
+      answer:
+        correctAnswerIndex != null
+          ? choices[correctAnswerIndex]
+          : draft.answer?.trim() || null,
       correct_answer_index: correctAnswerIndex,
       image_url: imageUrl,
       explanation: null,
       difficulty_level: "medium",
-      points: 1,
+      points: draft.score != null ? Number(draft.score) || 1 : 1,
     };
   }
 
@@ -750,7 +885,7 @@ function draftToTeacherQuestionPayload(draft) {
     image_url: imageUrl,
     explanation: null,
     difficulty_level: "medium",
-    points: 1,
+    points: draft.score != null ? Number(draft.score) || 1 : 1,
   };
 }
 
@@ -887,38 +1022,77 @@ function draftToExtractionQuestion(draft, index) {
 
   const correctAnswerIndex = getDraftCorrectAnswerIndex({ ...draft, choices });
   const questionImages = draftQuestionImagesToExtraction(draft);
+  const labels = Array.isArray(draft.optionLabels) ? draft.optionLabels : QUESTION_BANK_OPTION_LABELS;
+
+  const display_blocks = Array.isArray(draft.display_blocks)
+    ? draft.display_blocks
+        .filter((b) => b?.text && ["intro", "stimulus", "prompt"].includes(b.role))
+        .map((b) => ({ role: b.role, text: String(b.text) }))
+    : [];
+
+  const verses = Array.isArray(draft.verses)
+    ? draft.verses
+        .map((v) => ({
+          firstHemistich: String(v?.firstHemistich ?? "").trim(),
+          secondHemistich: String(v?.secondHemistich ?? "").trim(),
+        }))
+        .filter((v) => v.firstHemistich || v.secondHemistich)
+    : [];
 
   return {
-    number: normalizeQuestionNumber(draft.source_number, index + 1),
+    number: normalizeQuestionNumber(
+      String(draft.source_number ?? "").split("-")[0],
+      index + 1,
+    ),
     source_number:
       draft.source_number != null ? String(draft.source_number) : String(index + 1),
     passage_id: draft.passage_id ?? null,
     question_text:
       draft.question_text?.trim() ||
       (questionImages.length > 0 ? "سؤال بالصورة" : ""),
+    intro_text: draft.intro_text ?? null,
+    stimulus_text: draft.stimulus_text ?? null,
+    prompt_text: draft.prompt_text ?? null,
+    display_blocks,
+    underlined_phrases: Array.isArray(draft.underlined_phrases)
+      ? draft.underlined_phrases
+      : [],
+    poetry: !!draft.poetry || verses.length > 0,
+    verses,
+    score: draft.score ?? null,
     options: isMcq
       ? choices.map((text, i) => ({
-          label: QUESTION_BANK_OPTION_LABELS[i],
+          label: labels[i] || QUESTION_BANK_OPTION_LABELS[i] || String(i + 1),
           text,
         }))
       : [],
     question_images: questionImages,
     correct_answer:
       correctAnswerIndex != null
-        ? QUESTION_BANK_OPTION_LABELS[correctAnswerIndex] ?? null
+        ? labels[correctAnswerIndex] ||
+          QUESTION_BANK_OPTION_LABELS[correctAnswerIndex] ||
+          null
         : null,
     correct_answer_index: correctAnswerIndex,
     correct_answer_inferred: !!draft.answerInferred,
+    confidence: draft.confidence ?? undefined,
   };
 }
 
 /**
- * يبني body POST /api/ocr/import-question-bank-v2
+ * يبني body POST import وفق الشكل الموصى به في الـ doc:
+ * { lesson_id, success: true, data: { passages, questions, ... } }
  * @param {number|string} lessonId
  * @param {object[]} draftPassages
  * @param {object[]} draftQuestions
+ * @param {object} [meta]
  */
-export function buildExtractionImportPayload(lessonId, draftPassages, draftQuestions) {
+export function buildExtractionImportPayload(
+  lessonId,
+  draftPassages,
+  draftQuestions,
+  meta = {},
+) {
   const passages = draftPassages
     .filter((passage) => passage.content?.trim())
     .map((passage) => ({
@@ -931,11 +1105,25 @@ export function buildExtractionImportPayload(lessonId, draftPassages, draftQuest
     draftToExtractionQuestion(draft, index),
   );
 
+  const content_type =
+    meta.content_type ||
+    (passages.length > 0 ? "reading_passage" : "general");
+
   return {
     lesson_id: Number(lessonId),
-    extraction: {
+    success: true,
+    data: {
+      filename: meta.filename ?? undefined,
+      mime_type: meta.mime_type ?? undefined,
+      document_type: meta.document_type ?? undefined,
+      page_count: meta.page_count ?? undefined,
+      subject: meta.subject ?? undefined,
+      extraction_mode: meta.extraction_mode ?? undefined,
+      content_type,
       passages,
       questions,
+      question_count: questions.length,
+      notes: meta.notes ?? undefined,
     },
   };
 }
@@ -958,26 +1146,48 @@ function parseQuestionBankImportResponse(data) {
 
 /**
  * استيراد ناتج extract-questions إلى درس بنك الأسئلة V2.
+ * يستخدم الشكل الموصى به + مسار الدرس من الـ doc.
  * @param {number|string} lessonId
- * @param {object} payload — { lesson_id, extraction } أو يُبنى من المسودات
+ * @param {object} payload — { lesson_id, success, data } أو { lesson_id, extraction } أو مسودات
  * @param {string} token
  */
 export async function importExtractionToQuestionBankLesson(lessonId, payload, token) {
-  const body =
-    payload?.lesson_id != null && payload?.extraction
-      ? payload
-      : buildExtractionImportPayload(
-          lessonId,
-          payload?.passages ?? [],
-          payload?.questions ?? [],
-        );
+  let body;
+  if (payload?.lesson_id != null && (payload?.data || payload?.extraction)) {
+    body = payload;
+  } else {
+    body = buildExtractionImportPayload(
+      lessonId,
+      payload?.passages ?? [],
+      payload?.questions ?? [],
+      payload?.meta ?? {},
+    );
+  }
 
-  const { data } = await baseUrl.post(`${OCR_API}/import-question-bank-v2`, body, {
-    headers: {
-      ...authHeaders(token),
-      "Content-Type": "application/json",
-    },
-  });
+  const headers = {
+    ...authHeaders(token),
+    "Content-Type": "application/json",
+  };
+
+  let data;
+  try {
+    const res = await baseUrl.post(
+      `/api/question-bank-v2/lesson/${lessonId}/import-extraction`,
+      body,
+      { headers },
+    );
+    data = res.data;
+  } catch (err) {
+    // توافق خلفي مع المسار العام إن لم يتوفر مسار الدرس
+    if (err?.response?.status === 404) {
+      const res = await baseUrl.post(`${OCR_API}/import-question-bank-v2`, body, {
+        headers,
+      });
+      data = res.data;
+    } else {
+      throw err;
+    }
+  }
 
   if (!data?.success) {
     const err = new Error(data?.message || "فشل استيراد الأسئلة");
@@ -993,13 +1203,20 @@ export async function importExtractionToQuestionBankLesson(lessonId, payload, to
  * @param {object[]} draftPassages
  * @param {object[]} draftQuestions
  * @param {string} token
+ * @param {object} [meta] — من mapExtractionResponseMeta
  */
 export async function importDraftsToQuestionBankV2(
   lessonId,
   draftPassages,
   draftQuestions,
   token,
+  meta = {},
 ) {
-  const payload = buildExtractionImportPayload(lessonId, draftPassages, draftQuestions);
+  const payload = buildExtractionImportPayload(
+    lessonId,
+    draftPassages,
+    draftQuestions,
+    meta,
+  );
   return importExtractionToQuestionBankLesson(lessonId, payload, token);
 }

@@ -109,7 +109,7 @@ export function TenantProReviews({ testimonials }) {
   );
 }
 
-export function TenantProCta({ signupHref, loginHref }) {
+export function TenantProCta({ signupHref, loginHref, hideSignup = false }) {
   return (
     <section
       id="cta"
@@ -151,18 +151,31 @@ export function TenantProCta({ signupHref, loginHref }) {
                   ابدأ رحلة التعلم اليوم
                 </h2>
                 <p className="mt-3 text-sm leading-7 text-[var(--tl-muted)] md:text-base">
-                  انضم الآن واستفد من الشرح المنظم والمتابعة المستمرة.
+                  {hideSignup
+                    ? "احصل على رقم الطالب من مدرسك ثم سجّل الدخول للمنصة."
+                    : "انضم الآن واستفد من الشرح المنظم والمتابعة المستمرة."}
                 </p>
                 <div className="mt-6 grid grid-cols-1 gap-3 sm:flex sm:flex-wrap">
-                  <ShimmerCTA>
-                    <TenantAppLink href={signupHref} className={`w-full sm:w-auto ${tlBtnPrimary}`}>
-                      سجّل الآن
-                      <FaArrowLeft className="text-xs" />
-                    </TenantAppLink>
-                  </ShimmerCTA>
-                  <TenantAppLink href={loginHref} className={`w-full sm:w-auto ${tlBtnOutline}`}>
-                    تسجيل الدخول
-                  </TenantAppLink>
+                  {hideSignup ? (
+                    <ShimmerCTA>
+                      <TenantAppLink href={loginHref} className={`w-full sm:w-auto ${tlBtnPrimary}`}>
+                        تسجيل الدخول برقم الطالب
+                        <FaArrowLeft className="text-xs" />
+                      </TenantAppLink>
+                    </ShimmerCTA>
+                  ) : (
+                    <>
+                      <ShimmerCTA>
+                        <TenantAppLink href={signupHref} className={`w-full sm:w-auto ${tlBtnPrimary}`}>
+                          سجّل الآن
+                          <FaArrowLeft className="text-xs" />
+                        </TenantAppLink>
+                      </ShimmerCTA>
+                      <TenantAppLink href={loginHref} className={`w-full sm:w-auto ${tlBtnOutline}`}>
+                        تسجيل الدخول
+                      </TenantAppLink>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3" style={{ perspective: 900 }}>

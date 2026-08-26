@@ -35,6 +35,17 @@ body {
   direction: rtl;
 }
 
+/* نص الأسئلة: اتصال الحروف ووضوح العربية بدون letter-spacing من Changa */
+.exam-q-text,
+[data-exam-q-text] {
+  font-family: "Noto Sans Arabic", "Noto Naskh Arabic", Tahoma, sans-serif !important;
+  letter-spacing: normal !important;
+  font-variation-settings: normal;
+  font-feature-settings: "liga" 1, "calt" 1;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
 html {
   direction: rtl;
 }

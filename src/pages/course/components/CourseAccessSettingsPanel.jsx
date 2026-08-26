@@ -4,7 +4,6 @@ import {
   Box,
   Button,
   FormControl,
-  FormHelperText,
   FormLabel,
   HStack,
   Icon,
@@ -23,80 +22,32 @@ import {
   useToast,
   VStack,
 } from "@chakra-ui/react";
-import { FaCog, FaKey, FaClock, FaUnlock, FaTasks } from "react-icons/fa";
+import { FaCog, FaTasks } from "react-icons/fa";
 import {
   ASSIGNMENT_MODES,
   courseAccessApiError,
-  LECTURE_ACCESS_MODES,
 } from "../../../api/courseAccessApi";
 import { useUpdateCourseAccessSettings } from "../../../Hooks/course/useCourseAccessSettings";
-import {
-  ASSIGNMENT_MODE_LABELS,
-  LECTURE_ACCESS_MODE_LABELS,
-} from "../../../utils/lectureAccessUtils";
+import { ASSIGNMENT_MODE_LABELS } from "../../../utils/lectureAccessUtils";
 import {
   TOUR_CLOSE_ACCESS_SETTINGS,
   TOUR_OPEN_ACCESS_SETTINGS,
 } from "../../../utils/teacherCoursePageTour";
 
-const MODE_ICONS = {
-  always_open: FaUnlock,
-  time_limited: FaClock,
-  activation_code: FaKey,
-};
-
-function SettingsForm({
-  lectureAccessMode,
-  setLectureAccessMode,
-  assignmentMode,
-  setAssignmentMode,
-}) {
+function SettingsForm({ assignmentMode, setAssignmentMode }) {
   return (
     <VStack align="stretch" spacing={5}>
-      <FormControl>
-        <FormLabel fontSize="sm" fontWeight="semibold">
-          <HStack spacing={2}>
-            <FaUnlock />
-            <span>طريقة فتح المحاضرات</span>
-          </HStack>
-        </FormLabel>
-        <RadioGroup value={lectureAccessMode} onChange={setLectureAccessMode}>
-          <Stack spacing={2}>
-            {Object.entries(LECTURE_ACCESS_MODE_LABELS).map(([value, label]) => {
-              const ModeIcon = MODE_ICONS[value] || FaUnlock;
-              return (
-                <Box
-                  key={value}
-                  className={`rounded-xl border px-3 py-2.5 transition-colors ${
-                    lectureAccessMode === value
-                      ? "border-blue-400 bg-blue-50/80 dark:bg-blue-950/40"
-                      : "border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900"
-                  }`}
-                >
-                  <Radio value={value} colorScheme="blue">
-                    <HStack spacing={2} mr={2}>
-                      <ModeIcon className="text-blue-500" />
-                      <Text fontSize="sm" fontWeight="medium">
-                        {label}
-                      </Text>
-                    </HStack>
-                  </Radio>
-                  {value === LECTURE_ACCESS_MODES.time_limited ? (
-                    <FormHelperText mt={1} mr={6} fontSize="xs">
-                      عند إضافة محاضرة يجب تحديد موعد انتهاء الوصول
-                    </FormHelperText>
-                  ) : null}
-                  {value === LECTURE_ACCESS_MODES.activation_code ? (
-                    <FormHelperText mt={1} mr={6} fontSize="xs">
-                      الطالب يفعّل كل محاضرة بكود — المدة تُحسب من لحظة الاستخدام
-                    </FormHelperText>
-                  ) : null}
-                </Box>
-              );
-            })}
-          </Stack>
-        </RadioGroup>
-      </FormControl>
+      <Box
+        className="rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-3 text-sm dark:border-blue-800 dark:bg-blue-950/30"
+      >
+        <Text fontWeight="semibold" color="blue.700" mb={1} _dark={{ color: "blue.200" }}>
+          وصول المحاضرات
+        </Text>
+        <Text fontSize="xs" color="gray.600" _dark={{ color: "gray.400" }}>
+          يُحدد عند إضافة كل محاضرة: مفتوحة للكل، مقفولة بكود للجميع، أو لمجموعات محددة
+          (أعضاء المجموعة يدخلون مباشرة وباقي الطلاب بالكود). لم يعد هناك وضع وصول موحّد على مستوى الكورس.
+        </Text>
+      </Box>
 
       <FormControl>
         <FormLabel fontSize="sm" fontWeight="semibold">
@@ -141,19 +92,16 @@ export default function CourseAccessSettingsPanel({
   const toast = useToast();
   const modal = useDisclosure();
   const updateMutation = useUpdateCourseAccessSettings(courseId);
-  const [lectureAccessMode, setLectureAccessMode] = useState(LECTURE_ACCESS_MODES.always_open);
   const [assignmentMode, setAssignmentMode] = useState(ASSIGNMENT_MODES.lecture_based);
 
   useEffect(() => {
     if (settings) {
-      setLectureAccessMode(settings.lecture_access_mode || LECTURE_ACCESS_MODES.always_open);
       setAssignmentMode(settings.assignment_mode || ASSIGNMENT_MODES.lecture_based);
     }
   }, [settings]);
 
   useEffect(() => {
     if (modal.isOpen && settings) {
-      setLectureAccessMode(settings.lecture_access_mode || LECTURE_ACCESS_MODES.always_open);
       setAssignmentMode(settings.assignment_mode || ASSIGNMENT_MODES.lecture_based);
     }
   }, [modal.isOpen, settings]);
@@ -174,7 +122,6 @@ export default function CourseAccessSettingsPanel({
   const handleSave = async () => {
     try {
       await updateMutation.mutateAsync({
-        lecture_access_mode: lectureAccessMode,
         assignment_mode: assignmentMode,
       });
       toast({
@@ -196,11 +143,8 @@ export default function CourseAccessSettingsPanel({
   };
 
   const dirty =
-    lectureAccessMode !== (settings?.lecture_access_mode || LECTURE_ACCESS_MODES.always_open) ||
     assignmentMode !== (settings?.assignment_mode || ASSIGNMENT_MODES.lecture_based);
 
-  const currentAccessLabel =
-    LECTURE_ACCESS_MODE_LABELS[settings?.lecture_access_mode || LECTURE_ACCESS_MODES.always_open];
   const currentAssignmentLabel =
     ASSIGNMENT_MODE_LABELS[settings?.assignment_mode || ASSIGNMENT_MODES.lecture_based];
 
@@ -218,7 +162,7 @@ export default function CourseAccessSettingsPanel({
           loadingText="..."
           data-tour-id={tourTargetId}
         >
-          إعدادات الوصول
+          إعدادات الواجبات
         </Button>
       ) : (
         <Button
@@ -241,21 +185,24 @@ export default function CourseAccessSettingsPanel({
         scrollBehavior="inside"
       >
         <ModalOverlay backdropFilter="blur(4px)" />
-        <ModalContent borderRadius={{ base: "none", md: "2xl" }} mx={{ base: 0, md: 4 }} dir="rtl" data-tour-id="course-access-settings-modal">
+        <ModalContent
+          borderRadius={{ base: "none", md: "2xl" }}
+          mx={{ base: 0, md: 4 }}
+          dir="rtl"
+          data-tour-id="course-access-settings-modal"
+        >
           <ModalHeader pb={2}>
             <HStack spacing={2}>
-              <Box
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500 text-white"
-              >
+              <Box className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500 text-white">
                 <FaCog />
               </Box>
               <Box>
                 <Text fontSize="lg" fontWeight="bold">
-                  إعدادات الوصول والواجبات
+                  إعدادات الواجبات
                 </Text>
                 <HStack mt={1} spacing={2} flexWrap="wrap">
                   <Badge colorScheme="blue" borderRadius="full" fontSize="xs">
-                    {currentAccessLabel}
+                    وصول لكل محاضرة
                   </Badge>
                   <Badge colorScheme="orange" borderRadius="full" fontSize="xs" variant="subtle">
                     {currentAssignmentLabel}
@@ -268,11 +215,9 @@ export default function CourseAccessSettingsPanel({
 
           <ModalBody pt={2}>
             <Text fontSize="sm" color="gray.500" mb={4}>
-              اختر كيف يفتح الطلاب المحاضرات وأين تُعرض الواجبات في هذا الكورس
+              وصول المحاضرات يُختار عند إضافة كل محاضرة. هنا تضبط مكان عرض الواجبات فقط.
             </Text>
             <SettingsForm
-              lectureAccessMode={lectureAccessMode}
-              setLectureAccessMode={setLectureAccessMode}
               assignmentMode={assignmentMode}
               setAssignmentMode={setAssignmentMode}
             />

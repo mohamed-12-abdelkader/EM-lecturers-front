@@ -52,9 +52,10 @@ import {
 import {
   getAccessStatusMeta,
   getLectureLockMessage,
-  LECTURE_ACCESS_MODE_LABELS,
+  getLectureAccessModeLabel,
+  resolveLectureAccessMode,
+  lectureSupportsActivationCodes,
 } from "../../../utils/lectureAccessUtils";
-import { LECTURE_ACCESS_MODES } from "../../../api/courseAccessApi";
 import LectureActivateCodeForm, { LectureActivationTimer } from "./LectureActivateCodeForm";
 import LectureActivationCodesModal from "./LectureActivationCodesModal";
 
@@ -315,7 +316,6 @@ function AssignmentRow({
 const LectureCard = ({
   lecture,
   lectureIndex = 0,
-  lectureAccessMode = "always_open",
   hideLectureAssignments = false,
   onRefreshCourse,
   isTourTarget = false,
@@ -329,6 +329,8 @@ const LectureCard = ({
   setDeleteExamDialog,
   examActionLoading,
   formatDate,
+  autoOpenCodes = false,
+  onCodesModalClosed,
 }) => {
   const toast = useToast();
   const codesModal = useDisclosure();
@@ -338,6 +340,7 @@ const LectureCard = ({
   const [lectureExam, setLectureExam] = React.useState(null);
   const [examLoading, setExamLoading] = React.useState(false);
   const canManage = isTeacher || isAdmin;
+  const lectureAccessMode = resolveLectureAccessMode(lecture);
 
   const handleToggleVisibility = async (e) => {
     e.stopPropagation();
@@ -447,12 +450,17 @@ const LectureCard = ({
   const showActivationTimer =
     !canManage && (accessStatus === "activated" || accessStatus === "open") && lecture.activation;
   const lectureDescription = lecture.description || lecture.objective || "";
-  const expiresLabel =
-    lecture.expires_at && lectureAccessMode === LECTURE_ACCESS_MODES.time_limited
-      ? formatDate
-        ? formatDate(lecture.expires_at)
-        : new Date(lecture.expires_at).toLocaleString("ar-EG")
-      : null;
+  const expiresLabel = lecture.expires_at
+    ? formatDate
+      ? formatDate(lecture.expires_at)
+      : new Date(lecture.expires_at).toLocaleString("ar-EG")
+    : null;
+
+  React.useEffect(() => {
+    if (!autoOpenCodes || !canManage) return undefined;
+    codesModal.onOpen();
+    return undefined;
+  }, [autoOpenCodes, canManage, lecture.id]);
 
   const openExamModal = (type, data = null) => {
     setExamModal({ isOpen: true, type, lectureId: lecture.id, data });
@@ -502,9 +510,22 @@ const LectureCard = ({
                       : "مفتوح"
                     : accessMeta.label}
                 </span>
-                {canManage && lectureAccessMode !== LECTURE_ACCESS_MODES.always_open ? (
+                {canManage ? (
                   <span className={`rounded-full bg-violet-50 px-2 py-0.5 ${lcBadge} text-violet-600 sm:px-2.5 dark:bg-violet-950/40 dark:text-violet-400`}>
-                    {LECTURE_ACCESS_MODE_LABELS[lectureAccessMode]}
+                    {getLectureAccessModeLabel(lectureAccessMode)}
+                  </span>
+                ) : null}
+                {canManage &&
+                lectureAccessMode === "groups" &&
+                Array.isArray(lecture.group_ids) &&
+                lecture.group_ids.length > 0 ? (
+                  <span className={`rounded-full bg-amber-50 px-2 py-0.5 ${lcBadge} text-amber-700 sm:px-2.5`}>
+                    {lecture.group_ids.length} مجموعة
+                  </span>
+                ) : null}
+                {!canManage && lecture.open_via_group === true ? (
+                  <span className={`rounded-full bg-teal-50 px-2 py-0.5 ${lcBadge} text-teal-700 sm:px-2.5 dark:bg-teal-950/40 dark:text-teal-300`}>
+                    مفتوحة عبر مجموعتك
                   </span>
                 ) : null}
                 {expiresLabel ? (
@@ -596,7 +617,7 @@ const LectureCard = ({
                     data-tour-id={isTourTarget ? "course-lecture-visibility" : undefined}
                   />
                 </Tooltip>
-                {lectureAccessMode === LECTURE_ACCESS_MODES.activation_code ? (
+                {lectureSupportsActivationCodes(lecture) ? (
                   <Tooltip label="أكواد التفعيل">
                     <IconButton
                       aria-label="أكواد التفعيل"
@@ -782,7 +803,10 @@ const LectureCard = ({
 
       <LectureActivationCodesModal
         isOpen={codesModal.isOpen}
-        onClose={codesModal.onClose}
+        onClose={() => {
+          codesModal.onClose();
+          onCodesModalClosed?.();
+        }}
         lecture={lecture}
       />
     </motion.article>

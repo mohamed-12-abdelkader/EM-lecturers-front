@@ -33,6 +33,8 @@ import { FaMoon, FaSun, FaBars, FaTimes } from "react-icons/fa";
 import baseUrl from "../../api/baseUrl";
 import {
   ensureTenantAuthContext,
+  getTenantSubdomain,
+  normalizeTenantSlug,
   resolveLoginTenantSubdomain,
   resolveTenantSubdomain,
   withTenantQuery,
@@ -81,12 +83,31 @@ const LoginPage = () => {
   } = useDisclosure();
   const [identifier, setIdentifier] = useState("");
   const [pass, setPass] = useState("");
+  const [manualSubdomain, setManualSubdomain] = useState("");
   const [loading, setLoading] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [singleDeviceMode, setSingleDeviceMode] = useState(false);
+  const [loginWithCodeOnly, setLoginWithCodeOnly] = useState(false);
+  const [selfRegistrationEnabled, setSelfRegistrationEnabled] = useState(true);
+  const [registrationMessage, setRegistrationMessage] = useState("");
   const [loginErrorMessage, setLoginErrorMessage] = useState("");
   const [deviceMismatchMessage, setDeviceMismatchMessage] = useState("");
+
+  const hostHasTenant = Boolean(getTenantSubdomain());
+  const resolvedLoginSubdomain = resolveLoginTenantSubdomain();
+  const [debouncedManualSubdomain, setDebouncedManualSubdomain] = useState("");
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedManualSubdomain(normalizeTenantSlug(manualSubdomain) || "");
+    }, 400);
+    return () => clearTimeout(t);
+  }, [manualSubdomain]);
+
+  const settingsSubdomain =
+    tenantSubdomain || resolvedLoginSubdomain || debouncedManualSubdomain || null;
+  const needsManualSubdomain = !hostHasTenant && !resolvedLoginSubdomain;
 
   useEffect(() => {
     const resolved = ensureTenantAuthContext();
@@ -94,8 +115,11 @@ const LoginPage = () => {
   }, []);
 
   useEffect(() => {
-    if (!tenantSubdomain) {
+    if (!settingsSubdomain) {
       setSingleDeviceMode(false);
+      setLoginWithCodeOnly(false);
+      setSelfRegistrationEnabled(true);
+      setRegistrationMessage("");
       return;
     }
 
@@ -103,21 +127,34 @@ const LoginPage = () => {
     (async () => {
       try {
         const [deviceSettings, registrationSettings] = await Promise.all([
-          fetchPublicDeviceRestrictionSettings(tenantSubdomain).catch(() => null),
-          fetchPublicRegistrationSettings(tenantSubdomain).catch(() => null),
+          fetchPublicDeviceRestrictionSettings(settingsSubdomain).catch(() => null),
+          fetchPublicRegistrationSettings(settingsSubdomain).catch(() => null),
         ]);
         if (cancelled) return;
-        const settings = deviceSettings || registrationSettings;
+        const settings = {
+          ...(registrationSettings || {}),
+          ...(deviceSettings || {}),
+        };
         setSingleDeviceMode(isSingleDeviceLimit(settings));
+        setLoginWithCodeOnly(Boolean(registrationSettings?.login_with_code_only));
+        setSelfRegistrationEnabled(
+          registrationSettings?.self_registration_enabled !== false,
+        );
+        setRegistrationMessage(registrationSettings?.message || "");
       } catch {
-        if (!cancelled) setSingleDeviceMode(false);
+        if (!cancelled) {
+          setSingleDeviceMode(false);
+          setLoginWithCodeOnly(false);
+          setSelfRegistrationEnabled(true);
+          setRegistrationMessage("");
+        }
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [tenantSubdomain]);
+  }, [settingsSubdomain]);
 
   const pageBg = useColorModeValue("#f8fafc", "gray.950");
   const illustrationBg = useColorModeValue("#f0f6ff", "gray.900");
@@ -186,7 +223,12 @@ const LoginPage = () => {
   };
 
   const identifierChange = (e) => {
-    setIdentifier(e.target.value);
+    const value = e.target.value;
+    if (loginWithCodeOnly) {
+      setIdentifier(String(value).replace(/\D/g, ""));
+      return;
+    }
+    setIdentifier(value);
   };
 
   const passChange = (e) => {
@@ -195,7 +237,80 @@ const LoginPage = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    
+
+    if (loginWithCodeOnly) {
+      const studentCode = String(identifier).replace(/\D/g, "");
+      const subdomain =
+        resolveLoginTenantSubdomain() ||
+        normalizeTenantSlug(manualSubdomain) ||
+        null;
+
+      if (!studentCode) {
+        toast.warn("أدخل رقم الطالب");
+        return;
+      }
+      if (!subdomain) {
+        toast.warn("أدخل اسم منصة المدرس (subdomain)");
+        return;
+      }
+
+      try {
+        setLoading(true);
+        setLoginErrorMessage("");
+        setDeviceMismatchMessage("");
+
+        const requestData = appendDeviceIp({
+          student_code: studentCode,
+          subdomain,
+        });
+
+        const response = await baseUrl.post("/api/login", requestData);
+
+        saveAuthSession(response.data);
+        handleAuthIpRegistered(response.data);
+
+        setShowSuccessModal(true);
+        void playAuthSuccessSound();
+
+        if (response.data?.ip_registered) {
+          toast.info("تم ربط حسابك بهذا المتصفح");
+        }
+
+        const params = new URLSearchParams(window.location.search);
+        const redirectTarget = params.get("redirect");
+        const user = response.data?.user ?? response.data?.data?.user;
+        const destination = getPostLoginPath(user, redirectTarget);
+        setTimeout(() => {
+          navigate(destination, { replace: true });
+        }, 1400);
+      } catch (error) {
+        console.error("Login error:", error);
+        const apiCode = error.response?.data?.code;
+        const apiMsg =
+          apiCode === "STUDENT_ACCOUNT_INACTIVE"
+            ? error.response?.data?.message || "حساب الطالب موقوف. تواصل مع مدرسك."
+            : getAuthDeviceErrorMessage(error);
+        const legacyDeviceMsg =
+          error.response?.data?.msg === "You must login from the same device";
+        const mismatch = isAccountIpMismatchError(error) || legacyDeviceMsg;
+
+        if (mismatch) {
+          setDeviceMismatchMessage(
+            apiMsg ||
+              "هذا الحساب مسجّل على جهاز أو متصفح آخر من قبل. تواصل مع المدرس للسماح لك باستخدام جهاز آخر.",
+          );
+          onDeviceMismatchOpen();
+        } else {
+          setLoginErrorMessage(apiMsg);
+          onOpen();
+          toast.error(apiMsg);
+        }
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     if (!identifier || !pass) {
       toast.warn("يجب ادخال جميع البيانات");
       return;
@@ -273,7 +388,10 @@ const LoginPage = () => {
       style={{ fontFamily: "'Changa', sans-serif" }}
     >
       {hasTenantNavbar ? (
-        <TenantPublicNavbarShell variant="auth" />
+        <TenantPublicNavbarShell
+          variant="auth"
+          showSignup={selfRegistrationEnabled}
+        />
       ) : (
       <header className="fixed top-0 right-0 left-0 z-50 border-b border-slate-200/70 bg-white/70 shadow-[0_12px_32px_rgb(15,23,42,0.06)] backdrop-blur-2xl backdrop-saturate-150 dark:border-slate-800 dark:bg-slate-900/70">
         <div className="mx-auto flex h-[4.65rem] max-w-[1200px] items-center justify-between gap-3 px-4 md:px-6 lg:px-8">
@@ -296,12 +414,14 @@ const LoginPage = () => {
             >
               {colorMode === "dark" ? <FaSun className="text-sm" /> : <FaMoon className="text-sm" />}
             </button>
-            <Link
-              to={withTenantQuery("/signup", tenantSubdomain)}
-              className="rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:hover:text-white"
-            >
-              إنشاء حساب
-            </Link>
+            {selfRegistrationEnabled ? (
+              <Link
+                to={withTenantQuery("/signup", tenantSubdomain)}
+                className="rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-100 dark:hover:bg-slate-800 dark:hover:text-white"
+              >
+                إنشاء حساب
+              </Link>
+            ) : null}
             <Link
               to={withTenantQuery("/login", tenantSubdomain)}
               className="rounded-xl bg-gradient-to-l from-blue-600 to-blue-500 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-600/30 transition hover:brightness-110"
@@ -332,14 +452,16 @@ const LoginPage = () => {
         </div>
         {isMobileMenuOpen ? (
           <div className="border-t border-slate-200 bg-white/95 px-4 pb-4 pt-3 shadow-sm backdrop-blur-lg dark:border-slate-800 dark:bg-slate-900/95 sm:hidden">
-            <div className="grid grid-cols-2 gap-2">
-              <Link
-                to={withTenantQuery("/signup", tenantSubdomain)}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-              >
-                إنشاء حساب
-              </Link>
+            <div className={`grid gap-2 ${selfRegistrationEnabled ? "grid-cols-2" : "grid-cols-1"}`}>
+              {selfRegistrationEnabled ? (
+                <Link
+                  to={withTenantQuery("/signup", tenantSubdomain)}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="inline-flex h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                >
+                  إنشاء حساب
+                </Link>
+              ) : null}
               <Link
                 to={withTenantQuery("/login", tenantSubdomain)}
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -522,8 +644,25 @@ const LoginPage = () => {
                 تسجيل الدخول
               </Text>
               <Text fontSize="md" color={subtextColor} lineHeight="1.7">
-                أدخل بيانات حسابك للمتابعة إلى لوحة التعلم
+                {loginWithCodeOnly
+                  ? "أدخل رقم الطالب للمتابعة إلى لوحة التعلم"
+                  : "أدخل بيانات حسابك للمتابعة إلى لوحة التعلم"}
               </Text>
+              {loginWithCodeOnly && registrationMessage ? (
+                <Box
+                  mt={4}
+                  p={3}
+                  borderRadius="xl"
+                  bg="blue.50"
+                  border="1px solid"
+                  borderColor="blue.200"
+                  _dark={{ bg: "whiteAlpha.100", borderColor: "blue.700" }}
+                >
+                  <Text fontSize="xs" color="blue.800" _dark={{ color: "blue.200" }} lineHeight="tall">
+                    {registrationMessage}
+                  </Text>
+                </Box>
+              ) : null}
               {singleDeviceMode ? (
                 <Box
                   mt={4}
@@ -543,24 +682,60 @@ const LoginPage = () => {
 
             <Box as="form" onSubmit={handleLogin}>
               <VStack spacing={5} align="stretch">
+                {needsManualSubdomain ? (
+                  <FormControl>
+                    <FormLabel fontWeight="semibold" color={labelColor} mb={2} fontSize="sm">
+                      اسم منصة المدرس (subdomain)
+                    </FormLabel>
+                    <InputGroup size="lg">
+                      <InputLeftElement pointerEvents="none" h="full">
+                        <Icon as={FiUser} color="gray.400" />
+                      </InputLeftElement>
+                      <Input
+                        placeholder="مثال: omar"
+                        value={manualSubdomain}
+                        onChange={(e) => setManualSubdomain(e.target.value.trim().toLowerCase())}
+                        pl={12}
+                        h="52px"
+                        borderRadius="xl"
+                        borderColor={inputBorder}
+                        bg={inputBg}
+                        fontSize="sm"
+                        dir="ltr"
+                        textAlign="left"
+                        _placeholder={{ color: "gray.400" }}
+                        _hover={{ borderColor: "blue.300" }}
+                        _focus={{
+                          borderColor: BLUE,
+                          boxShadow: `0 0 0 3px rgba(49,130,206,0.15)`,
+                        }}
+                        transition="all 0.15s"
+                      />
+                    </InputGroup>
+                  </FormControl>
+                ) : null}
+
                 <FormControl>
                   <FormLabel fontWeight="semibold" color={labelColor} mb={2} fontSize="sm">
-                    رقم الهاتف أو البريد الإلكتروني
+                    {loginWithCodeOnly ? "رقم الطالب" : "رقم الهاتف أو البريد الإلكتروني"}
                   </FormLabel>
                   <InputGroup size="lg">
                     <InputLeftElement pointerEvents="none" h="full">
                       <Icon as={FiUser} color="gray.400" />
                     </InputLeftElement>
                     <Input
-                      placeholder="01xxxxxxxxx أو name@email.com"
+                      placeholder={loginWithCodeOnly ? "10001" : "01xxxxxxxxx أو name@email.com"}
                       value={identifier}
                       onChange={identifierChange}
+                      inputMode={loginWithCodeOnly ? "numeric" : "text"}
                       pl={12}
                       h="52px"
                       borderRadius="xl"
                       borderColor={inputBorder}
                       bg={inputBg}
                       fontSize="sm"
+                      dir={loginWithCodeOnly ? "ltr" : undefined}
+                      textAlign={loginWithCodeOnly ? "left" : undefined}
                       _placeholder={{ color: "gray.400" }}
                       _hover={{ borderColor: "blue.300" }}
                       _focus={{
@@ -572,43 +747,45 @@ const LoginPage = () => {
                   </InputGroup>
                 </FormControl>
 
-                <FormControl>
-                  <Flex justify="space-between" align="center" mb={2}>
-                    <FormLabel fontWeight="semibold" color={labelColor} mb={0} fontSize="sm">
-                      كلمة المرور
-                    </FormLabel>
-                    <Link
-                      to="/verify_code"
-                      style={{ fontSize: "0.8125rem", color: BLUE, fontWeight: 600 }}
-                    >
-                      نسيت كلمة المرور؟
-                    </Link>
-                  </Flex>
-                  <InputGroup size="lg">
-                    <InputLeftElement pointerEvents="none" h="full">
-                      <Icon as={FiLock} color="gray.400" />
-                    </InputLeftElement>
-                    <Input
-                      type="password"
-                      placeholder="••••••••"
-                      value={pass}
-                      onChange={passChange}
-                      pl={12}
-                      h="52px"
-                      borderRadius="xl"
-                      borderColor={inputBorder}
-                      bg={inputBg}
-                      fontSize="sm"
-                      _placeholder={{ color: "gray.400" }}
-                      _hover={{ borderColor: "blue.300" }}
-                      _focus={{
-                        borderColor: BLUE,
-                        boxShadow: `0 0 0 3px rgba(49,130,206,0.15)`,
-                      }}
-                      transition="all 0.15s"
-                    />
-                  </InputGroup>
-                </FormControl>
+                {!loginWithCodeOnly ? (
+                  <FormControl>
+                    <Flex justify="space-between" align="center" mb={2}>
+                      <FormLabel fontWeight="semibold" color={labelColor} mb={0} fontSize="sm">
+                        كلمة المرور
+                      </FormLabel>
+                      <Link
+                        to="/verify_code"
+                        style={{ fontSize: "0.8125rem", color: BLUE, fontWeight: 600 }}
+                      >
+                        نسيت كلمة المرور؟
+                      </Link>
+                    </Flex>
+                    <InputGroup size="lg">
+                      <InputLeftElement pointerEvents="none" h="full">
+                        <Icon as={FiLock} color="gray.400" />
+                      </InputLeftElement>
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        value={pass}
+                        onChange={passChange}
+                        pl={12}
+                        h="52px"
+                        borderRadius="xl"
+                        borderColor={inputBorder}
+                        bg={inputBg}
+                        fontSize="sm"
+                        _placeholder={{ color: "gray.400" }}
+                        _hover={{ borderColor: "blue.300" }}
+                        _focus={{
+                          borderColor: BLUE,
+                          boxShadow: `0 0 0 3px rgba(49,130,206,0.15)`,
+                        }}
+                        transition="all 0.15s"
+                      />
+                    </InputGroup>
+                  </FormControl>
+                ) : null}
 
                 <Checkbox
                   isChecked={false}
@@ -650,27 +827,35 @@ const LoginPage = () => {
               </VStack>
             </Box>
 
-            <Box mt={8} pt={8} borderTop="1px solid" borderColor={panelDivider} textAlign="center">
-              <Text fontSize="sm" color={subtextColor} mb={4}>
-                ليس لديك حساب بعد؟
-              </Text>
-              <Button
-                variant="outline"
-                borderColor={inputBorder}
-                color={headingColor}
-                _hover={{ bg: outlineHoverBg, borderColor: BLUE }}
-                size="lg"
-                w="full"
-                h="48px"
-                borderRadius="xl"
-                fontSize="sm"
-                fontWeight="semibold"
-                transition="all 0.2s"
-                onClick={() => navigate(withTenantQuery("/signup", tenantSubdomain))}
-              >
-                إنشاء حساب جديد
-              </Button>
-            </Box>
+            {selfRegistrationEnabled ? (
+              <Box mt={8} pt={8} borderTop="1px solid" borderColor={panelDivider} textAlign="center">
+                <Text fontSize="sm" color={subtextColor} mb={4}>
+                  ليس لديك حساب بعد؟
+                </Text>
+                <Button
+                  variant="outline"
+                  borderColor={inputBorder}
+                  color={headingColor}
+                  _hover={{ bg: outlineHoverBg, borderColor: BLUE }}
+                  size="lg"
+                  w="full"
+                  h="48px"
+                  borderRadius="xl"
+                  fontSize="sm"
+                  fontWeight="semibold"
+                  transition="all 0.2s"
+                  onClick={() => navigate(withTenantQuery("/signup", tenantSubdomain || settingsSubdomain))}
+                >
+                  إنشاء حساب جديد
+                </Button>
+              </Box>
+            ) : (
+              <Box mt={8} pt={8} borderTop="1px solid" borderColor={panelDivider} textAlign="center">
+                <Text fontSize="sm" color={subtextColor} lineHeight="tall">
+                  إنشاء الحساب يتم بواسطة المدرس. اطلب رقم الطالب من مدرسك ثم سجّل الدخول به.
+                </Text>
+              </Box>
+            )}
 
             <Text mt={8} textAlign="center" fontSize="xs" color={bottomTextColor}>
               محمي بتشفير آمن · Next Edu © {new Date().getFullYear()}
@@ -836,20 +1021,22 @@ const LoginPage = () => {
                 >
                   إعادة المحاولة
                 </Button>
-                <Button
-                  bg="orange.500"
-                  color="white"
-                  _hover={{ bg: "orange.400", boxShadow: "0 10px 25px rgba(237, 137, 54, 0.35)" }}
-                  flex={1}
-                  borderRadius="xl"
-                  onClick={() => {
-                    onClose();
-                    navigate("/signup");
-                  }}
-                  boxShadow="0 8px 20px rgba(237, 137, 54, 0.3)"
-                >
-                  إنشاء حساب جديد
-                </Button>
+                {selfRegistrationEnabled ? (
+                  <Button
+                    bg="orange.500"
+                    color="white"
+                    _hover={{ bg: "orange.400", boxShadow: "0 10px 25px rgba(237, 137, 54, 0.35)" }}
+                    flex={1}
+                    borderRadius="xl"
+                    onClick={() => {
+                      onClose();
+                      navigate(withTenantQuery("/signup", tenantSubdomain || settingsSubdomain));
+                    }}
+                    boxShadow="0 8px 20px rgba(237, 137, 54, 0.3)"
+                  >
+                    إنشاء حساب جديد
+                  </Button>
+                ) : null}
               </HStack>
             </VStack>
           </ModalFooter>

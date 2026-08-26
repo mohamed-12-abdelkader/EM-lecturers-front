@@ -103,7 +103,31 @@ export async function fetchPublicRegistrationSettings(subdomain) {
     `/api/tenants/public/${encodeURIComponent(subdomain)}/registration-settings`,
   );
   const payload = unwrapPublic(data);
+  const registrationMode =
+    payload?.registration_mode === "teacher_registration"
+      ? "teacher_registration"
+      : "self_registration";
+  const selfRegistrationEnabled =
+    payload?.self_registration_enabled != null
+      ? Boolean(payload.self_registration_enabled)
+      : registrationMode !== "teacher_registration";
+  const loginWithCodeOnly =
+    payload?.login_with_code_only != null
+      ? Boolean(payload.login_with_code_only)
+      : registrationMode === "teacher_registration";
+
   return {
+    registration_mode: registrationMode,
+    self_registration_enabled: selfRegistrationEnabled,
+    login_with_student_code: Boolean(
+      payload?.login_with_student_code ?? loginWithCodeOnly,
+    ),
+    login_with_code_only: loginWithCodeOnly,
+    student_code_digits_only: Boolean(
+      payload?.student_code_digits_only ?? loginWithCodeOnly,
+    ),
+    message: payload?.message || "",
+    default_password_from_phone: payload?.default_password_from_phone !== false,
     course_group_access_enabled: Boolean(payload?.course_group_access_enabled),
     requires_course_group_selection: Boolean(payload?.requires_course_group_selection),
     student_device_limit: payload?.student_device_limit ?? "multiple_devices",

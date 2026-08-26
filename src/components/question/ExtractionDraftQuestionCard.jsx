@@ -25,8 +25,14 @@ import {
 import ExtractionMathPreview from "./ExtractionMathPreview";
 import FormattedQuestionText from "./FormattedQuestionText";
 
+const BLOCK_ROLE_META = {
+  intro: { label: "تمهيد", color: "green" },
+  stimulus: { label: "المرجع / البيت", color: "red" },
+  prompt: { label: "نص السؤال", color: "blue" },
+};
+
 /**
- * بطاقة مراجعة سؤال مستخرج — تعرض 2–6 اختيارات بوضوح
+ * بطاقة مراجعة سؤال مستخرج — تدعم 2–5 اختيارات + display_blocks حسب API الاستخراج
  */
 export default function ExtractionDraftQuestionCard({
   draft,
@@ -52,6 +58,11 @@ export default function ExtractionDraftQuestionCard({
   const isChoice = draft.question_type === "choice";
   const canAddChoice = choices.length < MCQ_CHOICE_MAX;
   const canRemoveChoice = choices.length > MCQ_CHOICE_MIN;
+  const displayBlocks = Array.isArray(draft.display_blocks) ? draft.display_blocks : [];
+  const verses = Array.isArray(draft.verses) ? draft.verses : [];
+
+  const letterFor = (cIdx) =>
+    draft.optionLabels?.[cIdx] || getChoiceLetter(cIdx, "ar");
 
   const patch = (data) => onUpdate(draft.id, data);
 
@@ -66,14 +77,17 @@ export default function ExtractionDraftQuestionCard({
 
   const addChoice = () => {
     if (!canAddChoice) return;
-    patch({ choices: [...choices, ""] });
+    const nextLabels = [...(draft.optionLabels || [])];
+    nextLabels[choices.length] = getChoiceLetter(choices.length, "ar");
+    patch({ choices: [...choices, ""], optionLabels: nextLabels });
   };
 
   const removeChoice = (cIdx) => {
     if (!canRemoveChoice) return;
     const removed = choices[cIdx];
     const next = choices.filter((_, i) => i !== cIdx);
-    const update = { choices: next };
+    const nextLabels = (draft.optionLabels || []).filter((_, i) => i !== cIdx);
+    const update = { choices: next, optionLabels: nextLabels };
     if (Number.isInteger(draft.correctAnswerIndex)) {
       if (draft.correctAnswerIndex === cIdx) {
         update.correctAnswerIndex = null;
@@ -127,6 +141,16 @@ export default function ExtractionDraftQuestionCard({
               سؤال قطعة
             </Badge>
           )}
+          {draft.poetry && (
+            <Badge colorScheme="pink" variant="subtle" borderRadius="full">
+              شعر
+            </Badge>
+          )}
+          {draft.score != null && (
+            <Badge colorScheme="teal" variant="subtle" borderRadius="full">
+              {draft.score} درجة
+            </Badge>
+          )}
           {draft.answerInferred && (
             <Badge colorScheme="orange" fontSize="xs" borderRadius="full">
               إجابة مُستنتجة
@@ -164,6 +188,12 @@ export default function ExtractionDraftQuestionCard({
                     ? choices
                     : ["", "", "", ""]
                   : ["", "", "", ""],
+              optionLabels:
+                type === "choice"
+                  ? draft.optionLabels?.length
+                    ? draft.optionLabels
+                    : ["أ", "ب", "ج", "د"]
+                  : ["أ", "ب", "ج", "د"],
               answer: type === "choice" ? draft.answer : "",
               correctAnswerIndex: type === "choice" ? draft.correctAnswerIndex : null,
             });
@@ -171,12 +201,72 @@ export default function ExtractionDraftQuestionCard({
           dir="rtl"
           borderRadius="xl"
         >
-          <option value="choice">اختيار من متعدد (2–6 خيارات)</option>
+          <option value="choice">اختيار من متعدد (2–5 خيارات)</option>
           <option value="text_with_image">سؤال بصورة (بدون اختيارات)</option>
+          <option value="text">نص فقط</option>
         </Select>
       </FormControl>
 
-      {/* معاينة السؤال بوضوح */}
+      {displayBlocks.length > 0 && (
+        <VStack align="stretch" spacing={2} mb={4}>
+          <Text fontSize="xs" fontWeight="bold" color={muted}>
+            أجزاء السؤال المستخرجة
+          </Text>
+          {displayBlocks.map((block, bi) => {
+            const meta = BLOCK_ROLE_META[block.role] || {
+              label: block.role,
+              color: "gray",
+            };
+            return (
+              <Box
+                key={`${draft.id}-block-${bi}`}
+                p={3}
+                borderRadius="xl"
+                borderWidth="1px"
+                borderColor={`${meta.color}.200`}
+                bg={`${meta.color}.50`}
+                _dark={{ bg: "whiteAlpha.100", borderColor: `${meta.color}.400` }}
+              >
+                <Badge colorScheme={meta.color} mb={2} fontSize="xs">
+                  {meta.label}
+                </Badge>
+                <Box dir="auto" whiteSpace="pre-wrap">
+                  <FormattedQuestionText
+                    value={block.text}
+                    fontSize="md"
+                    lineHeight="1.85"
+                  />
+                </Box>
+              </Box>
+            );
+          })}
+        </VStack>
+      )}
+
+      {verses.length > 0 && displayBlocks.length === 0 && (
+        <VStack align="stretch" spacing={2} mb={4}>
+          <Text fontSize="xs" fontWeight="bold" color={muted}>
+            أبيات الشعر
+          </Text>
+          {verses.map((verse, vi) => (
+            <Box
+              key={`${draft.id}-verse-${vi}`}
+              p={3}
+              borderRadius="xl"
+              bg={questionPanelBg}
+              borderWidth="1px"
+              borderColor={borderColor}
+            >
+              <FormattedQuestionText
+                value={`${verse.firstHemistich} . : ${verse.secondHemistich}`}
+                fontSize="md"
+                lineHeight="1.9"
+              />
+            </Box>
+          ))}
+        </VStack>
+      )}
+
       <Box
         mb={4}
         p={{ base: 3, md: 4 }}
@@ -185,8 +275,8 @@ export default function ExtractionDraftQuestionCard({
         borderWidth="1px"
         borderColor={borderColor}
       >
-        <Text fontSize="xs" fontWeight="bold" color={muted} mb={2} letterSpacing="0.02em">
-          نص السؤال
+        <Text fontSize="xs" fontWeight="bold" color={muted} mb={2}>
+          نص السؤال (للحفظ)
         </Text>
         {draft.question_text?.trim() ? (
           <Box
@@ -308,7 +398,7 @@ export default function ExtractionDraftQuestionCard({
         <Box>
           <Flex justify="space-between" align="center" mb={3} gap={2} flexWrap="wrap">
             <FormLabel mb={0} fontSize="sm" fontWeight="semibold">
-              الاختيارات ({choices.length}) — اضغط على اختيار لتحديد الإجابة الصحيحة
+              الاختيارات ({choices.length}) — اضغط الحرف لتحديد الإجابة الصحيحة
             </FormLabel>
             <Button
               size="sm"
@@ -325,7 +415,7 @@ export default function ExtractionDraftQuestionCard({
 
           <VStack align="stretch" spacing={2.5}>
             {choices.map((choice, cIdx) => {
-              const letter = getChoiceLetter(cIdx, "latin");
+              const letter = letterFor(cIdx);
               const isCorrect = draft.correctAnswerIndex === cIdx;
               return (
                 <Box
@@ -336,7 +426,10 @@ export default function ExtractionDraftQuestionCard({
                   borderRadius="xl"
                   p={3}
                   transition="0.15s ease"
-                  _hover={{ borderColor: isCorrect ? correctBorder : selectedBorder, bg: isCorrect ? correctBg : optionHoverBg }}
+                  _hover={{
+                    borderColor: isCorrect ? correctBorder : selectedBorder,
+                    bg: isCorrect ? correctBg : optionHoverBg,
+                  }}
                 >
                   <HStack align="start" spacing={3}>
                     <Box
@@ -420,10 +513,10 @@ export default function ExtractionDraftQuestionCard({
               {choices.map((c, cIdx) => (
                 <option key={`${cIdx}-${c}`} value={cIdx} disabled={!String(c).trim()}>
                   {String(c).trim()
-                    ? `${getChoiceLetter(cIdx, "latin")}: ${
+                    ? `${letterFor(cIdx)}: ${
                         c.length > 60 ? `${c.slice(0, 60)}…` : c
                       }`
-                    : `اختيار ${getChoiceLetter(cIdx, "latin")}`}
+                    : `اختيار ${letterFor(cIdx)}`}
                 </option>
               ))}
             </Select>
@@ -438,7 +531,7 @@ export default function ExtractionDraftQuestionCard({
                   bg={correctBg}
                 >
                   <Text fontSize="xs" color="green.700" mb={1} fontWeight="bold">
-                    الإجابة المحددة: {getChoiceLetter(draft.correctAnswerIndex, "latin")}
+                    الإجابة المحددة: {letterFor(draft.correctAnswerIndex)}
                   </Text>
                   <Box dir="auto">
                     <FormattedQuestionText

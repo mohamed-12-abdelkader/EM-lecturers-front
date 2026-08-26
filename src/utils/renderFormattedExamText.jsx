@@ -155,8 +155,9 @@ const renderPlainText = (value, keyPrefix) =>
           as="span"
           key={`${keyPrefix}-num-${index}`}
           dir="ltr"
-          display="inline-block"
-          mx="0.5"
+          display="inline"
+          whiteSpace="nowrap"
+          mx="0.15em"
           sx={{ unicodeBidi: "isolate" }}
         >
           {part}
@@ -393,7 +394,13 @@ const renderMathSegment = (value, keyPrefix, display = false) => (
 const MARKUP_RE =
   /<\/?(u|ins|b|strong|i|em|mark|sub|sup)(?:\s[^>]*)?>|<(?:br)\s*\/?>/gi;
 
-const VERSE_SPLIT_RE = /^(.{8,}?)\s+[.\u06D4،,]*\s*:\s+(.{8,})$/;
+/**
+ * أبيات الشعر فقط: شطر . : شطر
+ * النقطة قبل النقطتين إلزامية حتى لا تنقسم أسئلة عادية فيها ":" (مثل قوائم I/II).
+ */
+const VERSE_SPLIT_RE = /^(.{8,110}?)\s+[.\u06D4]\s*:\s+(.{8,110})$/;
+const VERSE_REJECT_RE =
+  /\(([IVXLC]+|[0-9٠-٩]{1,2})\)|(?:^|\s)(?:R|r)\d|أمبير|مقاوم|دائر|كهرب|تيار|جهد/;
 
 function decodeBasicEntities(text) {
   return String(text ?? "")
@@ -405,9 +412,44 @@ function decodeBasicEntities(text) {
     .replace(/&amp;/g, "&");
 }
 
+/** يزيل محارف تمنع اتصال الحروف العربية ويعالج مسافات OCR بين الحروف */
+function normalizeArabicShaping(text) {
+  let t = String(text ?? "")
+    .replace(/[\u200B\u200C\uFEFF]/g, "")
+    .replace(/\u00A0/g, " ");
+
+  // "ا ل م ق ا ب ل" → "المقابل" عندما تكون الرموز حروفاً مفردة (بقايا OCR)
+  t = t.replace(
+    /(?:[\u0600-\u06FF](?:[\u064B-\u065F\u0670\u0640])*(?:\s+)){2,}[\u0600-\u06FF](?:[\u064B-\u065F\u0670\u0640])*/g,
+    (run) => {
+      const tokens = run.trim().split(/\s+/);
+      if (tokens.length < 3) return run;
+      const single = tokens.filter((tok) =>
+        /^[\u0600-\u06FF](?:[\u064B-\u065F\u0670\u0640])*$/.test(tok),
+      ).length;
+      return single / tokens.length >= 0.85 ? tokens.join("") : run;
+    },
+  );
+
+  return t;
+}
+
+function tryParsePoetryVerse(trimmed) {
+  const verse = trimmed.match(VERSE_SPLIT_RE);
+  if (!verse) return null;
+  if (VERSE_REJECT_RE.test(trimmed)) return null;
+  const sadr = verse[1].trim();
+  const ajuz = verse[2].trim();
+  const ratio =
+    Math.max(sadr.length, ajuz.length) / Math.max(1, Math.min(sadr.length, ajuz.length));
+  if (ratio > 2.8) return null;
+  return { sadr, ajuz };
+}
+
 /** ينظّف بقايا OCR (JSON boxes وأسئلة مدمجة بعد السؤال الأصلي) */
 export function cleanQuestionStemForDisplay(value) {
   let text = decodeBasicEntities(value);
+  text = normalizeArabicShaping(text);
   text = text.replace(/\s*\[\{\s*"box_2d"[\s\S]*$/i, "");
   text = text.replace(/<br\s*\/?>/gi, "\n");
   const extra = text.search(/\n\s*[٠-٩0-9]{2,}\s+/);
@@ -443,6 +485,13 @@ function VerseLine({ sadr, ajuz, keyPrefix }) {
       borderWidth="1px"
       borderColor="blackAlpha.100"
       fontFamily="'Noto Naskh Arabic', 'Noto Sans Arabic', Tahoma, serif"
+      letterSpacing="normal"
+      fontWeight="500"
+      sx={{
+        fontFeatureSettings: '"liga" 1, "calt" 1',
+        fontVariationSettings: "normal",
+        textRendering: "optimizeLegibility",
+      }}
       _dark={{ bg: "whiteAlpha.100", borderColor: "whiteAlpha.200" }}
     >
       <Box
@@ -455,11 +504,13 @@ function VerseLine({ sadr, ajuz, keyPrefix }) {
           {renderLatexAwarePlain(sadr, `${keyPrefix}-sadr`)}
         </Box>
         <Box
+          aria-hidden
           display={{ base: "none", md: "block" }}
-          w="8px"
-          h="8px"
+          w="6px"
+          h="6px"
           borderRadius="full"
-          bg="orange.400"
+          bg="blue.400"
+          opacity={0.55}
           flexShrink={0}
         />
         <Box flex="1" textAlign={{ base: "right", md: "left" }} lineHeight="2">
@@ -477,14 +528,14 @@ function renderLiteraryPlain(value, keyPrefix) {
   const renderLine = (line, lineKey) => {
     const trimmed = line.trim();
     if (!trimmed) return null;
-    const verse = trimmed.match(VERSE_SPLIT_RE);
+    const verse = tryParsePoetryVerse(trimmed);
     if (verse) {
       return (
         <VerseLine
           key={lineKey}
           keyPrefix={lineKey}
-          sadr={verse[1].trim()}
-          ajuz={verse[2].trim()}
+          sadr={verse.sadr}
+          ajuz={verse.ajuz}
         />
       );
     }
@@ -620,5 +671,20 @@ function renderMarkupTree(text, keyPrefix = "mk") {
 export function renderFormattedExamText(value) {
   const text = cleanQuestionStemForDisplay(value);
   if (!text) return null;
-  return renderMarkupTree(text, "q");
+  return (
+    <Box
+      as="span"
+      display="contents"
+      fontFamily="'Noto Sans Arabic', 'Noto Naskh Arabic', Tahoma, sans-serif"
+      letterSpacing="normal"
+      sx={{
+        fontFeatureSettings: '"liga" 1, "calt" 1',
+        fontVariationSettings: "normal",
+        textRendering: "optimizeLegibility",
+        WebkitFontSmoothing: "antialiased",
+      }}
+    >
+      {renderMarkupTree(text, "q")}
+    </Box>
+  );
 }

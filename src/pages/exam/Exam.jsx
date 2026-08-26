@@ -11,7 +11,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import UserType from "../../Hooks/auth/userType";
 import {
   FaBookOpen, FaCheckCircle, FaChevronLeft, FaChevronRight,
-  FaUser, FaTimesCircle, FaImage, FaChartBar
+  FaUser, FaTimesCircle, FaImage, FaChartBar, FaCompass
 } from 'react-icons/fa';
 import { BiSearch } from "react-icons/bi";
 import {
@@ -24,6 +24,16 @@ import AiQuestionExtractionModal from "./components/AiQuestionExtractionModal";
 import { SubmissionCard } from "./components/ExamSubmissionsView";
 import FormattedQuestionText from "../../components/question/FormattedQuestionText";
 import { MdArrowBack } from "react-icons/md";
+import TeacherExamTour from "../../components/onboarding/TeacherExamTour";
+import {
+  TOUR_CLOSE_AI,
+  TOUR_CLOSE_ALL,
+  TOUR_CLOSE_DELETE,
+  TOUR_CLOSE_EDIT,
+  TOUR_OPEN_AI,
+  TOUR_OPEN_DELETE,
+  TOUR_OPEN_EDIT,
+} from "../../utils/teacherExamTour";
 const Exam = () => {
   const { examId } = useParams();
   const navigate = useNavigate();
@@ -59,6 +69,7 @@ const Exam = () => {
   const [imageUploadQuestionId, setImageUploadQuestionId] = useState(null);
   const [imageUploadLoading, setImageUploadLoading] = useState(false);
   const [aiExtractionModalOpen, setAiExtractionModalOpen] = useState(false);
+  const [examTourOpen, setExamTourOpen] = useState(false);
   const questionImageInputRef = useRef(null);
   const timerIntervalRef = useRef(null);
   const timerExpiredRef = useRef(false);
@@ -300,6 +311,52 @@ const Exam = () => {
     });
     setEditModal({ open: true, question: q });
   };
+
+  const isStaff = Boolean(isTeacher || isAdmin);
+
+  useEffect(() => {
+    if (!isStaff) return undefined;
+
+    const closeAll = () => {
+      setAiExtractionModalOpen(false);
+      setEditModal({ open: false, question: null });
+      setDeleteModal({ open: false, qid: null });
+      setShowGrades(false);
+    };
+    const openAi = () => {
+      setShowGrades(false);
+      setAiExtractionModalOpen(true);
+    };
+    const closeAi = () => setAiExtractionModalOpen(false);
+    const openEdit = () => {
+      const q = questions[0];
+      if (q) openEditModal(q);
+    };
+    const closeEdit = () => setEditModal({ open: false, question: null });
+    const openDelete = () => {
+      const q = questions[0];
+      if (q?.id != null) setDeleteModal({ open: true, qid: q.id });
+    };
+    const closeDelete = () => setDeleteModal({ open: false, qid: null });
+
+    window.addEventListener(TOUR_CLOSE_ALL, closeAll);
+    window.addEventListener(TOUR_OPEN_AI, openAi);
+    window.addEventListener(TOUR_CLOSE_AI, closeAi);
+    window.addEventListener(TOUR_OPEN_EDIT, openEdit);
+    window.addEventListener(TOUR_CLOSE_EDIT, closeEdit);
+    window.addEventListener(TOUR_OPEN_DELETE, openDelete);
+    window.addEventListener(TOUR_CLOSE_DELETE, closeDelete);
+
+    return () => {
+      window.removeEventListener(TOUR_CLOSE_ALL, closeAll);
+      window.removeEventListener(TOUR_OPEN_AI, openAi);
+      window.removeEventListener(TOUR_CLOSE_AI, closeAi);
+      window.removeEventListener(TOUR_OPEN_EDIT, openEdit);
+      window.removeEventListener(TOUR_CLOSE_EDIT, closeEdit);
+      window.removeEventListener(TOUR_OPEN_DELETE, openDelete);
+      window.removeEventListener(TOUR_CLOSE_DELETE, closeDelete);
+    };
+  }, [isStaff, questions]);
 
   // حفظ التعديل
   const handleEditSave = async () => {
@@ -590,6 +647,7 @@ const Exam = () => {
       {/* هيدر المدرس: عنوان + إحصائيات + زر التبديل */}
       {!isStudentView && (isTeacher || isAdmin) && (
         <Box
+          data-tour-id="platform-exam-hero"
           mb={{ base: 6, md: 8 }}
           borderRadius="xl"
           borderWidth="1px"
@@ -615,9 +673,25 @@ const Exam = () => {
                 {questions.length} سؤال — يدعم LaTeX والكسور والرموز الكيميائية
               </Text>
             </VStack>
-            {isTeacher && (
+            {(isTeacher || isAdmin) && (
               <HStack spacing={2} flexWrap="wrap" justify={{ base: "center", sm: "flex-end" }}>
                 <Button
+                  data-tour-id="platform-exam-tour-btn"
+                  variant="outline"
+                  colorScheme="orange"
+                  size={{ base: "sm", md: "md" }}
+                  leftIcon={<FaCompass />}
+                  onClick={() => {
+                    setShowGrades(false);
+                    setExamTourOpen(true);
+                  }}
+                  borderRadius="xl"
+                  fontWeight="600"
+                >
+                  جولة الإدارة
+                </Button>
+                <Button
+                  data-tour-id="platform-exam-ai"
                   variant="outline"
                   borderColor="purple.400"
                   color="purple.600"
@@ -631,6 +705,7 @@ const Exam = () => {
                   استخراج بالذكاء الاصطناعي
                 </Button>
                 <Button
+                  data-tour-id="platform-exam-grades"
                   colorScheme={showGrades ? "gray" : "blue"}
                   size={{ base: "sm", md: "md" }}
                   leftIcon={<FaUser />}
@@ -644,6 +719,7 @@ const Exam = () => {
                   {showGrades ? "عرض الأسئلة" : "عرض درجات الطلاب"}
                 </Button>
                 <Button
+                  data-tour-id="platform-exam-report"
                   variant="outline"
                   colorScheme="blue"
                   size={{ base: "sm", md: "md" }}
@@ -1009,7 +1085,7 @@ const Exam = () => {
                 id="question-image-upload"
               />
               {questions.length === 0 ? (
-                <Center py={16} px={4}>
+                <Center py={16} px={4} data-tour-id="platform-exam-empty">
                   <VStack spacing={4}>
                     <Box p={4} borderRadius="full" bg="blue.50" color="blue.500">
                       <FaBookOpen size={48} />
@@ -1031,11 +1107,13 @@ const Exam = () => {
                       index={idx}
                       pendingCorrect={pendingCorrect}
                       onSetCorrect={handleSetCorrect}
+                      isTourTarget={idx === 0}
                       onZoomImage={(src) => { setImageModalSrc(src); setImageModalOpen(true); }}
                       actions={
                         <HStack spacing={0}>
                           <Tooltip label="إضافة أو تحديث صورة السؤال" placement="top" hasArrow>
                             <IconButton
+                              data-tour-id={idx === 0 ? "exam-question-add-image" : undefined}
                               icon={<FaImage />}
                               colorScheme="blue"
                               variant="ghost"
@@ -1045,8 +1123,24 @@ const Exam = () => {
                               isLoading={imageUploadLoading && imageUploadQuestionId === q.id}
                             />
                           </Tooltip>
-                          <IconButton icon={<AiFillEdit />} colorScheme="yellow" variant="ghost" size="xs" aria-label="تعديل" onClick={() => openEditModal(q)} />
-                          <IconButton icon={<AiFillDelete />} colorScheme="red" variant="ghost" size="xs" aria-label="حذف" onClick={() => setDeleteModal({ open: true, qid: q.id })} />
+                          <IconButton
+                            data-tour-id={idx === 0 ? "exam-question-edit" : undefined}
+                            icon={<AiFillEdit />}
+                            colorScheme="yellow"
+                            variant="ghost"
+                            size="xs"
+                            aria-label="تعديل"
+                            onClick={() => openEditModal(q)}
+                          />
+                          <IconButton
+                            data-tour-id={idx === 0 ? "exam-question-delete" : undefined}
+                            icon={<AiFillDelete />}
+                            colorScheme="red"
+                            variant="ghost"
+                            size="xs"
+                            aria-label="حذف"
+                            onClick={() => setDeleteModal({ open: true, qid: q.id })}
+                          />
                         </HStack>
                       }
                     />
@@ -1061,7 +1155,7 @@ const Exam = () => {
       {/* Edit Modal */}
       <Modal isOpen={editModal.open} onClose={() => setEditModal({ open: false, question: null })} size="xl" isCentered scrollBehavior="inside">
         <ModalOverlay />
-        <ModalContent borderRadius="2xl" mx={4} dir="rtl">
+        <ModalContent borderRadius="2xl" mx={4} dir="rtl" data-tour-id="exam-edit-modal">
           <ModalHeader color={teacherHeadingColor} borderBottomWidth="1px" pb={4}>تعديل السؤال</ModalHeader>
           <ModalCloseButton />
           <ModalBody py={6}>
@@ -1129,7 +1223,7 @@ const Exam = () => {
       {/* Delete Modal */}
       <Modal isOpen={deleteModal.open} onClose={() => setDeleteModal({ open: false, qid: null })} isCentered>
         <ModalOverlay />
-        <ModalContent borderRadius="2xl" mx={4}>
+        <ModalContent borderRadius="2xl" mx={4} data-tour-id="exam-delete-modal">
           <ModalHeader color="red.600" borderBottomWidth="1px" pb={4}>تأكيد الحذف</ModalHeader>
           <ModalCloseButton />
           <ModalBody py={6}>
@@ -1187,6 +1281,15 @@ const Exam = () => {
           examTitle={examMeta?.examTitle}
           examKind="course"
           onImported={fetchQuestions}
+        />
+      )}
+
+      {(isTeacher || isAdmin) && (
+        <TeacherExamTour
+          isOpen={examTourOpen}
+          hasQuestions={questions.length > 0}
+          variant="platform"
+          onClose={() => setExamTourOpen(false)}
         />
       )}
     </Box>

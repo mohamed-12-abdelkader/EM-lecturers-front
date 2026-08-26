@@ -27,6 +27,7 @@ export default function TenantProFooter({
   bioSnippet,
   loginHref,
   signupHref,
+  showSignup = true,
   joinHref,
   contact = {},
   quickLinks = [
@@ -97,11 +98,13 @@ export default function TenantProFooter({
                   تسجيل الدخول
                 </TenantAppLink>
               </li>
-              <li>
-                <TenantAppLink href={signupHref} className="cursor-pointer transition-colors duration-200 hover:text-[#D4E157]">
-                  إنشاء حساب
-                </TenantAppLink>
-              </li>
+              {showSignup && signupHref ? (
+                <li>
+                  <TenantAppLink href={signupHref} className="cursor-pointer transition-colors duration-200 hover:text-[#D4E157]">
+                    إنشاء حساب
+                  </TenantAppLink>
+                </li>
+              ) : null}
               <li>
                 <a href={joinHref} className="cursor-pointer transition-colors duration-200 hover:text-[#00A0E3]">
                   تواصل معنا

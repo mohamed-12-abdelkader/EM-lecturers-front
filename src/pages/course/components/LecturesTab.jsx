@@ -19,7 +19,6 @@ const LecturesTab = ({
   lectures,
   isTeacher,
   isAdmin,
-  lectureAccessMode = "always_open",
   isCourseBasedAssignments = false,
   courseId,
   onRefreshCourse,
@@ -48,6 +47,8 @@ const LecturesTab = ({
   tourLectureId,
   accessSettings,
   accessSettingsLoading,
+  openCodesLectureId = null,
+  onCodesModalClosed,
 }) => (
   <VStack spacing={{ base: 4, md: 5 }} align="stretch" dir="rtl" className={lcRoot}>
     <Flex
@@ -67,7 +68,7 @@ const LecturesTab = ({
           محاضرات الكورس
         </h2>
         <p className={`mt-2 max-w-md ${lcLabel}`}>
-          تابع الفيديوهات والملفات لكل محاضرة
+          لكل محاضرة وضع وصول خاص: مفتوحة، بكود تفعيل، أو لمجموعات محددة
         </p>
       </div>
       <HStackWrap
@@ -117,7 +118,6 @@ const LecturesTab = ({
             key={lecture.id}
             lecture={lecture}
             lectureIndex={index}
-            lectureAccessMode={lectureAccessMode}
             hideLectureAssignments={isCourseBasedAssignments}
             onRefreshCourse={onRefreshCourse}
             isTourTarget={
@@ -146,6 +146,11 @@ const LecturesTab = ({
             formatDate={formatDate}
             onAddBulkQuestions={onAddBulkQuestions}
             handleOpenVideo={handleOpenVideo}
+            autoOpenCodes={
+              openCodesLectureId != null &&
+              String(openCodesLectureId) === String(lecture.id)
+            }
+            onCodesModalClosed={onCodesModalClosed}
           />
         ))}
       </VStack>

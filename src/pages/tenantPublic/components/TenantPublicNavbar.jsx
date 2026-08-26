@@ -106,6 +106,7 @@ export function TenantPublicNavbar({
   tenantAvatar,
   loginHref = "/login",
   signupHref = "/signup",
+  showSignup = true,
   isDarkMode,
   onToggleTheme,
   toggleTheme,
@@ -212,14 +213,16 @@ export function TenantPublicNavbar({
               >
                 تسجيل الدخول
               </TenantAppLink>
-              <TenantAppLink
-                href={signupHref}
-                className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-bold text-white shadow-[0_8px_20px_-8px_#00A0E399] transition-[filter,transform] duration-200 hover:brightness-110 active:scale-[0.98]"
-                style={{ background: TL_CYAN }}
-              >
-                إنشاء حساب
-                <FaArrowLeft className="text-[9px] opacity-90" />
-              </TenantAppLink>
+              {showSignup ? (
+                <TenantAppLink
+                  href={signupHref}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-bold text-white shadow-[0_8px_20px_-8px_#00A0E399] transition-[filter,transform] duration-200 hover:brightness-110 active:scale-[0.98]"
+                  style={{ background: TL_CYAN }}
+                >
+                  إنشاء حساب
+                  <FaArrowLeft className="text-[9px] opacity-90" />
+                </TenantAppLink>
+              ) : null}
             </div>
 
             <button
@@ -264,7 +267,7 @@ export function TenantPublicNavbar({
                 ))}
               </nav>
 
-              <div className="grid grid-cols-2 gap-2 border-t border-white/10 px-3 py-3">
+              <div className={`grid gap-2 border-t border-white/10 px-3 py-3 ${showSignup ? "grid-cols-2" : "grid-cols-1"}`}>
                 <TenantAppLink
                   href={loginHref}
                   onClick={() => setIsMobileMenuOpen(false)}
@@ -272,15 +275,17 @@ export function TenantPublicNavbar({
                 >
                   تسجيل الدخول
                 </TenantAppLink>
-                <TenantAppLink
-                  href={signupHref}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="inline-flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl text-sm font-bold text-white"
-                  style={{ background: TL_CYAN }}
-                >
-                  إنشاء حساب
-                  <FaArrowLeft className="text-[9px]" />
-                </TenantAppLink>
+                {showSignup ? (
+                  <TenantAppLink
+                    href={signupHref}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="inline-flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl text-sm font-bold text-white"
+                    style={{ background: TL_CYAN }}
+                  >
+                    إنشاء حساب
+                    <FaArrowLeft className="text-[9px]" />
+                  </TenantAppLink>
+                ) : null}
               </div>
             </motion.div>
           ) : null}
@@ -297,6 +302,7 @@ export function TenantPublicNavbarShell({
   variant = "landing",
   loginHref = "/login",
   signupHref = "/signup",
+  showSignup = true,
 }) {
   const subdomain = getTenantSubdomain();
   const { isDarkMode, toggleTheme } = useTenantPublicTheme();
@@ -348,6 +354,7 @@ export function TenantPublicNavbarShell({
         tenantAvatar={tenant?.avatar_url}
         loginHref={loginHref}
         signupHref={signupHref}
+        showSignup={showSignup}
         isDarkMode={isDarkMode}
         onToggleTheme={toggleTheme}
         isMobileMenuOpen={isMobileMenuOpen}

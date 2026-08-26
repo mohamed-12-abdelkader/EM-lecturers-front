@@ -1,9 +1,20 @@
 import baseUrl from "./baseUrl";
 
-export const LECTURE_ACCESS_MODES = {
-  always_open: "always_open",
-  time_limited: "time_limited",
+/** وصول كل محاضرة عند إنشائها/تعديلها — ليس إعداداً على مستوى الكورس */
+export const PER_LECTURE_ACCESS_MODES = {
+  open: "open",
   activation_code: "activation_code",
+  groups: "groups",
+};
+
+/** @deprecated استخدم PER_LECTURE_ACCESS_MODES — أسماء قديمة للتوافق */
+export const LECTURE_ACCESS_MODES = {
+  always_open: "open",
+  open: "open",
+  time_limited: "open",
+  activation_code: "activation_code",
+  groups: "groups",
+  per_lecture: "open",
 };
 
 export const ASSIGNMENT_MODES = {
@@ -15,19 +26,48 @@ export function courseAccessApiError(err, fallback = "حدث خطأ غير مت�
   return err?.response?.data?.message || err?.message || fallback;
 }
 
+/**
+ * يوحّد access_mode من رد الـ API (يشمل الحقول القديمة).
+ * @param {object|string|null|undefined} lectureOrMode
+ */
+export function resolveLectureAccessMode(lectureOrMode) {
+  const raw =
+    typeof lectureOrMode === "string"
+      ? lectureOrMode
+      : lectureOrMode?.access_mode ||
+        lectureOrMode?.lecture_access_mode ||
+        lectureOrMode?.access_type;
+
+  if (!raw || raw === "all" || raw === "always_open" || raw === "time_limited" || raw === "per_lecture") {
+    return PER_LECTURE_ACCESS_MODES.open;
+  }
+  if (raw === "groups") return PER_LECTURE_ACCESS_MODES.groups;
+  if (raw === "activation_code") return PER_LECTURE_ACCESS_MODES.activation_code;
+  if (raw === "open") return PER_LECTURE_ACCESS_MODES.open;
+  return PER_LECTURE_ACCESS_MODES.open;
+}
+
 export async function fetchCourseAccessSettings(courseId) {
   const { data } = await baseUrl.get(`/api/course/${courseId}/access-settings`);
   return {
-    lecture_access_mode: data.lecture_access_mode || LECTURE_ACCESS_MODES.always_open,
+    // الكورس لم يعد يملك وضع وصول موحّد — القيمة للتوافق فقط
+    lecture_access_mode: data.lecture_access_mode || "per_lecture",
     assignment_mode: data.assignment_mode || ASSIGNMENT_MODES.lecture_based,
+    note: data.note || null,
   };
 }
 
+/** لا ترسل lecture_access_mode — الـ API يرفضه بـ 400 */
 export async function updateCourseAccessSettings(courseId, payload) {
-  const { data } = await baseUrl.patch(`/api/course/${courseId}/access-settings`, payload);
+  const body = {};
+  if (payload?.assignment_mode) {
+    body.assignment_mode = payload.assignment_mode;
+  }
+  const { data } = await baseUrl.patch(`/api/course/${courseId}/access-settings`, body);
   return {
-    lecture_access_mode: data.lecture_access_mode || LECTURE_ACCESS_MODES.always_open,
+    lecture_access_mode: data.lecture_access_mode || "per_lecture",
     assignment_mode: data.assignment_mode || ASSIGNMENT_MODES.lecture_based,
+    note: data.note || null,
   };
 }
 

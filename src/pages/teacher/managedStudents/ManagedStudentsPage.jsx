@@ -8,7 +8,6 @@ import {
   SimpleGrid,
   useColorModeValue,
   Icon,
-  Badge,
   VStack,
   HStack,
   Button,
@@ -16,19 +15,6 @@ import {
   InputGroup,
   InputLeftElement,
   Select,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  TableContainer,
-  Avatar,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
-  IconButton,
   useDisclosure,
   useToast,
   AlertDialog,
@@ -39,21 +25,16 @@ import {
   AlertDialogOverlay,
   Spinner,
   Code,
+  Collapse,
 } from "@chakra-ui/react";
 import {
   FaUsers,
   FaPlus,
   FaFileImport,
-  FaEllipsisV,
-  FaKey,
   FaTrash,
-  FaEdit,
   FaSync,
-  FaShareAlt,
-  FaCopy,
-  FaMobileAlt,
 } from "react-icons/fa";
-import { FiSearch, FiUserCheck } from "react-icons/fi";
+import { FiSearch, FiChevronDown, FiSettings } from "react-icons/fi";
 import BrandLoadingScreen from "../../../components/loading/BrandLoadingScreen";
 import UserType from "../../../Hooks/auth/userType";
 import {
@@ -61,7 +42,8 @@ import {
   createManagedStudent,
   updateManagedStudent,
   deleteManagedStudent,
-  resetManagedStudentPassword,
+  deleteAllManagedStudents,
+  changeManagedStudentPassword,
   updateManagedStudentStatus,
   importManagedStudentsCsv,
   fetchTeacherGrades,
@@ -71,47 +53,15 @@ import {
 import { resetStudentDevice } from "../../../api/deviceRestrictionApi";
 import RegistrationSettingsCard from "./components/RegistrationSettingsCard";
 import DeviceRestrictionSettingsCard from "./components/DeviceRestrictionSettingsCard";
+import ManagedStudentCard from "./components/ManagedStudentCard";
 import StudentFormModal from "./components/StudentFormModal";
+import ChangePasswordModal from "./components/ChangePasswordModal";
 import CredentialsModal from "./components/CredentialsModal";
 import ImportCsvModal from "./components/ImportCsvModal";
 import { formatStudentCode, isTeacherRegistrationMode } from "./managedStudentsUtils";
 
 const ACCENT = "#0056b3";
-
-function KpiCard({ label, value, sub, icon }) {
-  const bg = useColorModeValue("white", "gray.800");
-  const border = useColorModeValue("gray.200", "gray.700");
-  const titleColor = useColorModeValue("gray.800", "white");
-
-  return (
-    <Box p={5} bg={bg} borderRadius="xl" borderWidth="1px" borderColor={border}>
-      <Flex justify="space-between" align="flex-start" gap={3}>
-        <Box>
-          <Text fontSize="xs" color="gray.500" mb={1}>
-            {label}
-          </Text>
-          <Text fontSize="2xl" fontWeight="bold" color={titleColor}>
-            {value}
-          </Text>
-          {sub && (
-            <Text fontSize="xs" color="gray.400" mt={1}>
-              {sub}
-            </Text>
-          )}
-        </Box>
-        <Flex w={10} h={10} borderRadius="lg" bg="blue.50" align="center" justify="center" flexShrink={0}>
-          <Icon as={icon} color="blue.600" boxSize={4} />
-        </Flex>
-      </Flex>
-    </Box>
-  );
-}
-
-const statusMeta = {
-  active: { label: "نشط", scheme: "green" },
-  inactive: { label: "غير نشط", scheme: "gray" },
-  suspended: { label: "موقوف", scheme: "red" },
-};
+const WARM = "#c2410c";
 
 const ManagedStudentsPage = () => {
   const toast = useToast();
@@ -139,22 +89,29 @@ const ManagedStudentsPage = () => {
   const [credentialsStudent, setCredentialsStudent] = useState(null);
   const [importResult, setImportResult] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteAllConfirm, setDeleteAllConfirm] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [passwordTarget, setPasswordTarget] = useState(null);
 
   const formDisclosure = useDisclosure();
   const credentialsDisclosure = useDisclosure();
   const importDisclosure = useDisclosure();
   const deleteDisclosure = useDisclosure();
+  const deleteAllDisclosure = useDisclosure();
+  const passwordDisclosure = useDisclosure();
   const cancelRef = React.useRef();
+  const deleteAllCancelRef = React.useRef();
 
-  const pageBg = useColorModeValue("gray.100", "gray.900");
+  const pageBg = useColorModeValue("#f4f7fb", "gray.900");
   const cardBg = useColorModeValue("white", "gray.800");
-  const textColor = useColorModeValue("gray.800", "gray.100");
-  const subTextColor = useColorModeValue("gray.600", "gray.400");
-  const borderColor = useColorModeValue("gray.200", "gray.700");
-  const tableHeadBg = useColorModeValue("gray.50", "gray.700");
-  const rowHoverBg = useColorModeValue("gray.50", "whiteAlpha.50");
+  const textColor = useColorModeValue("gray.900", "gray.100");
+  const subTextColor = useColorModeValue("gray.500", "gray.400");
+  const borderColor = useColorModeValue("blackAlpha.100", "whiteAlpha.200");
   const inputBg = useColorModeValue("white", "gray.800");
-  const headerIconBg = useColorModeValue("blue.50", "blue.900");
+  const heroBg = useColorModeValue(
+    "linear-gradient(135deg, #eef5ff 0%, #fff7ed 48%, #ffffff 100%)",
+    "linear-gradient(135deg, rgba(0,86,179,0.22) 0%, rgba(194,65,12,0.14) 50%, rgba(26,32,44,1) 100%)",
+  );
 
   const isCodeOnlyLogin = isTeacherRegistrationMode(registrationMode);
   const showInitialLoader = loading && students.length === 0 && !debouncedSearch;
@@ -285,24 +242,41 @@ const ManagedStudentsPage = () => {
     }
   };
 
-  const handleResetPassword = async (student) => {
+  const openChangePassword = (student) => {
+    setPasswordTarget(student);
+    passwordDisclosure.onOpen();
+  };
+
+  const handleChangePassword = async (newPassword) => {
+    if (!passwordTarget?.id) return;
     try {
-      const data = await resetManagedStudentPassword(student.id, { use_phone_as_password: true });
-      showCredentials(student, {
-        student_code: data.student_code,
-        temporary_password: data.temporary_password,
-        must_change_password: data.must_change_password,
+      setSubmitting(true);
+      const data = await changeManagedStudentPassword(passwordTarget.id, newPassword);
+      passwordDisclosure.onClose();
+      showCredentials(passwordTarget, {
+        student_code: data.student_code || passwordTarget.student_code,
+        temporary_password: newPassword,
+        must_change_password: data.must_change_password === true,
         login_with_code_only: false,
       });
-      toast({ title: "تم إعادة تعيين كلمة المرور", status: "success", duration: 3000 });
+      toast({
+        title: "تم تغيير كلمة المرور",
+        description: "احفظها أو أرسلها لولي الأمر الآن",
+        status: "success",
+        duration: 4000,
+        isClosable: true,
+      });
+      setPasswordTarget(null);
     } catch (err) {
       toast({
-        title: "فشل إعادة التعيين",
+        title: "فشل تغيير كلمة المرور",
         description: apiErrorMessage(err),
         status: "error",
         duration: 4000,
         isClosable: true,
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -370,6 +344,41 @@ const ManagedStudentsPage = () => {
     }
   };
 
+  const confirmDeleteAll = async () => {
+    if (deleteAllConfirm !== "DELETE_ALL_STUDENTS") {
+      toast({
+        title: "تأكيد غير صحيح",
+        description: "اكتب DELETE_ALL_STUDENTS حرفياً للمتابعة",
+        status: "warning",
+        duration: 4000,
+      });
+      return;
+    }
+    try {
+      setSubmitting(true);
+      const result = await deleteAllManagedStudents();
+      toast({
+        title: "تم حذف كل الطلاب",
+        description: result?.message || `تم حذف ${result?.deleted_count ?? ""} حساب`,
+        status: "success",
+        duration: 5000,
+      });
+      deleteAllDisclosure.onClose();
+      setDeleteAllConfirm("");
+      await loadStudents();
+    } catch (err) {
+      toast({
+        title: "تعذر حذف الكل",
+        description: apiErrorMessage(err),
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleImport = async (file) => {
     try {
       setSubmitting(true);
@@ -403,357 +412,343 @@ const ManagedStudentsPage = () => {
   return (
     <Box minH="100vh" bg={pageBg} pt="100px" pb={14} dir="rtl">
       <Container maxW="6xl" px={{ base: 4, md: 6 }}>
-        <VStack spacing={6} align="stretch">
-          <Box bg={cardBg} borderRadius="xl" borderWidth="1px" borderColor={borderColor} overflow="hidden">
-            <Box h="3px" bg={ACCENT} />
+        <VStack spacing={5} align="stretch">
+          {/* Hero */}
+          <Box
+            borderRadius="3xl"
+            borderWidth="1px"
+            borderColor={borderColor}
+            overflow="hidden"
+            bg={heroBg}
+            position="relative"
+          >
+            <Box
+              position="absolute"
+              insetStart={0}
+              top={0}
+              bottom={0}
+              w="5px"
+              bgGradient={`linear(to-b, ${ACCENT}, ${WARM})`}
+              aria-hidden
+            />
             <Flex
-              direction={{ base: "column", md: "row" }}
-              align={{ base: "stretch", md: "center" }}
+              direction={{ base: "column", lg: "row" }}
+              align={{ base: "stretch", lg: "center" }}
               justify="space-between"
-              gap={4}
-              p={{ base: 5, md: 6 }}
+              gap={5}
+              p={{ base: 5, md: 7 }}
             >
-              <HStack spacing={4} align="start">
-                <Flex
-                  w={12}
-                  h={12}
-                  borderRadius="xl"
-                  bg={headerIconBg}
-                  align="center"
-                  justify="center"
-                  flexShrink={0}
-                >
-                  <Icon as={FiUserCheck} color={ACCENT} boxSize={5} />
-                </Flex>
-                <Box>
-                  <Text fontSize="xs" fontWeight="semibold" color="gray.500" mb={1}>
-                    إدارة الحسابات
-                  </Text>
-                  <Heading size="lg" color={textColor} fontWeight="bold">
-                    طلاب المنصة
-                  </Heading>
-                  <Text fontSize="sm" color={subTextColor} mt={1}>
-                    {isCodeOnlyLogin
-                      ? "إنشاء حسابات الطلاب ومشاركة رقم الدخول مع أولياء الأمور"
-                      : "إنشاء حسابات الطلاب وإدارتها وإرسال بيانات الدخول"}
-                  </Text>
-                </Box>
-              </HStack>
-              <HStack spacing={2} flexWrap="wrap">
+              <Box>
+                <Text fontSize="xs" fontWeight="800" color={subTextColor} letterSpacing="0.04em" mb={2}>
+                  إدارة الحسابات · المنصة
+                </Text>
+                <Heading size="lg" color={textColor} fontWeight="900" letterSpacing="-0.02em">
+                  طلابك
+                </Heading>
+                <Text fontSize="sm" color={subTextColor} mt={2} maxW="34rem" lineHeight="tall">
+                  {isCodeOnlyLogin
+                    ? "أنشئ الحساب، انسخ رقم الطالب، وشاركه مع ولي الأمر — الدخول بدون كلمة مرور."
+                    : "أنشئ الحسابات، أدر الحالة، وأرسل بيانات الدخول لأولياء الأمور."}
+                </Text>
+
+                <HStack spacing={3} mt={4} flexWrap="wrap">
+                  <StatChip label="الإجمالي" value={pagination.total || 0} />
+                  <StatChip label="نشطون هنا" value={activeCount} tone="green" />
+                  <StatChip
+                    label="الصفحة"
+                    value={`${pagination.page}/${pagination.total_pages || 1}`}
+                    tone="orange"
+                  />
+                </HStack>
+              </Box>
+
+              <HStack spacing={2} flexWrap="wrap" justify={{ base: "flex-start", lg: "flex-end" }}>
                 <Button
-                  size="sm"
-                  variant="outline"
-                  leftIcon={<Icon as={FaSync} />}
-                  onClick={loadStudents}
-                  isLoading={loading}
+                  size="md"
+                  bg={ACCENT}
+                  color="white"
+                  _hover={{ bg: "#004494" }}
+                  leftIcon={<Icon as={FaPlus} />}
+                  onClick={openAdd}
+                  borderRadius="xl"
+                  px={5}
                 >
-                  تحديث
+                  إضافة طالب
                 </Button>
                 <Button
-                  size="sm"
+                  size="md"
                   variant="outline"
                   leftIcon={<Icon as={FaFileImport} />}
                   onClick={() => {
                     setImportResult(null);
                     importDisclosure.onOpen();
                   }}
+                  borderRadius="xl"
+                  bg={cardBg}
                 >
-                  استيراد CSV
+                  استيراد
                 </Button>
-                <Button size="sm" colorScheme="blue" leftIcon={<Icon as={FaPlus} />} onClick={openAdd}>
-                  إضافة طالب
+                <Button
+                  size="md"
+                  variant="ghost"
+                  leftIcon={<Icon as={FaSync} />}
+                  onClick={loadStudents}
+                  isLoading={loading}
+                  borderRadius="xl"
+                >
+                  تحديث
                 </Button>
               </HStack>
             </Flex>
           </Box>
 
-          <RegistrationSettingsCard onSettingsChange={(data) => setRegistrationMode(data.registration_mode)} />
-          <DeviceRestrictionSettingsCard />
-
-          <SimpleGrid columns={{ base: 1, sm: 3 }} spacing={4}>
-            <KpiCard label="إجمالي الطلاب" value={pagination.total || 0} sub="مسجّلون على المنصة" icon={FaUsers} />
-            <KpiCard label="نشطون" value={activeCount} sub="في النتائج الحالية" icon={FiUserCheck} />
-            <KpiCard
-              label="الصفحة"
-              value={`${pagination.page}/${pagination.total_pages || 1}`}
-              sub={`${pagination.limit} طالب لكل صفحة`}
-              icon={FaUsers}
-            />
-          </SimpleGrid>
-
-          <Box bg={cardBg} borderRadius="xl" borderWidth="1px" borderColor={borderColor} p={4}>
-            <Text fontSize="xs" fontWeight="semibold" color="gray.500" mb={3}>
-              تصفية وبحث
-            </Text>
-            <SimpleGrid columns={{ base: 1, md: 2, lg: 5 }} spacing={3}>
-              <InputGroup>
-                <InputLeftElement pointerEvents="none">
-                  <Icon as={FiSearch} color="gray.400" />
-                </InputLeftElement>
-                <Input
-                  placeholder="بحث بالاسم، رقم الطالب، الهاتف..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  bg={inputBg}
-                  borderRadius="lg"
+          {/* Settings accordion */}
+          <Box bg={cardBg} borderRadius="2xl" borderWidth="1px" borderColor={borderColor} overflow="hidden">
+            <Button
+              variant="ghost"
+              w="full"
+              h="auto"
+              py={4}
+              px={5}
+              justifyContent="space-between"
+              borderRadius="0"
+              onClick={() => setSettingsOpen((v) => !v)}
+              rightIcon={
+                <Icon
+                  as={FiChevronDown}
+                  transform={settingsOpen ? "rotate(180deg)" : undefined}
+                  transition="0.2s"
                 />
-              </InputGroup>
-              <Select
-                placeholder="كل الصفوف"
-                value={gradeFilter}
-                onChange={(e) => setGradeFilter(e.target.value)}
-                borderRadius="lg"
-                bg={inputBg}
-              >
-                {grades.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </Select>
-              <Select
-                placeholder="كل المجموعات"
-                value={groupFilter}
-                onChange={(e) => setGroupFilter(e.target.value)}
-                borderRadius="lg"
-                bg={inputBg}
-              >
-                {groups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </Select>
-              <Select
-                placeholder="كل الحالات"
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                borderRadius="lg"
-                bg={inputBg}
-              >
-                <option value="active">نشط</option>
-                <option value="inactive">غير نشط</option>
-                <option value="suspended">موقوف</option>
-              </Select>
-              <Select
-                value={`${sort}:${order}`}
-                onChange={(e) => {
-                  const [s, o] = e.target.value.split(":");
-                  setSort(s);
-                  setOrder(o);
-                }}
-                borderRadius="lg"
-                bg={inputBg}
-              >
-                <option value="created_at:desc">الأحدث</option>
-                <option value="created_at:asc">الأقدم</option>
-                <option value="name:asc">الاسم (أ-ي)</option>
-                <option value="student_code:asc">رقم الطالب</option>
-              </Select>
-            </SimpleGrid>
+              }
+            >
+              <HStack spacing={3}>
+                <Flex
+                  w={9}
+                  h={9}
+                  borderRadius="lg"
+                  bg="blue.50"
+                  align="center"
+                  justify="center"
+                  _dark={{ bg: "blue.900" }}
+                >
+                  <Icon as={FiSettings} color={ACCENT} />
+                </Flex>
+                <Box textAlign="right">
+                  <Text fontSize="sm" fontWeight="800" color={textColor}>
+                    إعدادات المنصة
+                  </Text>
+                  <Text fontSize="xs" color={subTextColor} fontWeight="500">
+                    طريقة التسجيل · تقييد الأجهزة
+                  </Text>
+                </Box>
+              </HStack>
+            </Button>
+            <Collapse in={settingsOpen} animateOpacity>
+              <VStack align="stretch" spacing={4} px={5} pb={5}>
+                <RegistrationSettingsCard
+                  compact
+                  onSettingsChange={(data) => setRegistrationMode(data.registration_mode)}
+                />
+                <DeviceRestrictionSettingsCard />
+                <Button
+                  alignSelf="flex-start"
+                  size="sm"
+                  variant="outline"
+                  colorScheme="red"
+                  leftIcon={<Icon as={FaTrash} />}
+                  onClick={() => {
+                    setDeleteAllConfirm("");
+                    deleteAllDisclosure.onOpen();
+                  }}
+                  isDisabled={!pagination.total}
+                  borderRadius="lg"
+                >
+                  حذف كل الطلاب
+                </Button>
+              </VStack>
+            </Collapse>
           </Box>
 
-          <Box
-            bg={cardBg}
-            borderRadius="xl"
-            borderWidth="1px"
-            borderColor={borderColor}
-            overflow="hidden"
-            position="relative"
-          >
-            {loading && students.length > 0 && (
-              <Flex
-                position="absolute"
-                inset={0}
-                bg="blackAlpha.50"
-                zIndex={1}
-                align="center"
-                justify="center"
-              >
-                <Spinner color="blue.500" />
+          {/* Filters + list */}
+          <Box bg={cardBg} borderRadius="2xl" borderWidth="1px" borderColor={borderColor} overflow="hidden">
+            <Box px={{ base: 4, md: 5 }} pt={5} pb={4} borderBottomWidth="1px" borderColor={borderColor}>
+              <Flex justify="space-between" align="center" mb={3} gap={3}>
+                <Text fontSize="sm" fontWeight="800" color={textColor}>
+                  قائمة الطلاب
+                </Text>
+                <Text fontSize="xs" color={subTextColor}>
+                  {pagination.total || 0} نتيجة
+                </Text>
               </Flex>
-            )}
+              <SimpleGrid columns={{ base: 1, md: 2, lg: 5 }} spacing={3}>
+                <InputGroup>
+                  <InputLeftElement pointerEvents="none">
+                    <Icon as={FiSearch} color="gray.400" />
+                  </InputLeftElement>
+                  <Input
+                    placeholder="بحث بالاسم، الرقم، الهاتف..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    bg={inputBg}
+                    borderRadius="xl"
+                  />
+                </InputGroup>
+                <Select
+                  placeholder="كل الصفوف"
+                  value={gradeFilter}
+                  onChange={(e) => setGradeFilter(e.target.value)}
+                  borderRadius="xl"
+                  bg={inputBg}
+                >
+                  {grades.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </Select>
+                <Select
+                  placeholder="كل المجموعات"
+                  value={groupFilter}
+                  onChange={(e) => setGroupFilter(e.target.value)}
+                  borderRadius="xl"
+                  bg={inputBg}
+                >
+                  {groups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </Select>
+                <Select
+                  placeholder="كل الحالات"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  borderRadius="xl"
+                  bg={inputBg}
+                >
+                  <option value="active">نشط</option>
+                  <option value="inactive">غير نشط</option>
+                  <option value="suspended">موقوف</option>
+                </Select>
+                <Select
+                  value={`${sort}:${order}`}
+                  onChange={(e) => {
+                    const [s, o] = e.target.value.split(":");
+                    setSort(s);
+                    setOrder(o);
+                  }}
+                  borderRadius="xl"
+                  bg={inputBg}
+                >
+                  <option value="created_at:desc">الأحدث</option>
+                  <option value="created_at:asc">الأقدم</option>
+                  <option value="name:asc">الاسم (أ-ي)</option>
+                  <option value="student_code:asc">رقم الطالب</option>
+                </Select>
+              </SimpleGrid>
+            </Box>
 
-            {students.length === 0 && !loading ? (
-              <Box py={16} textAlign="center" px={6}>
-                <Icon as={FaUsers} boxSize={8} color="gray.300" mb={3} />
-                <Text color={textColor} fontSize="sm" fontWeight="medium" mb={1}>
-                  لا يوجد طلاب مطابقون
-                </Text>
-                <Text color={subTextColor} fontSize="xs" mb={4}>
-                  غيّر معايير البحث أو أضف طالباً جديداً للبدء
-                </Text>
-                <Button size="sm" colorScheme="blue" leftIcon={<Icon as={FaPlus} />} onClick={openAdd}>
-                  إضافة أول طالب
-                </Button>
-              </Box>
-            ) : students.length > 0 ? (
-              <TableContainer>
-                <Table size="sm">
-                  <Thead bg={tableHeadBg}>
-                    <Tr>
-                      <Th fontSize="xs">الطالب</Th>
-                      <Th fontSize="xs">رقم الطالب</Th>
-                      <Th fontSize="xs" display={{ base: "none", md: "table-cell" }}>
-                        الصف / المجموعة
-                      </Th>
-                      <Th fontSize="xs" display={{ base: "none", lg: "table-cell" }}>
-                        التواصل
-                      </Th>
-                      <Th fontSize="xs" display={{ base: "none", xl: "table-cell" }}>
-                        المتصفح
-                      </Th>
-                      <Th fontSize="xs">الحالة</Th>
-                      <Th fontSize="xs" textAlign="center">
-                        إجراءات
-                      </Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {students.map((student) => {
-                      const st = statusMeta[student.account_status] || statusMeta.inactive;
-                      const code = formatStudentCode(student.student_code);
-                      return (
-                        <Tr key={student.id} _hover={{ bg: rowHoverBg }}>
-                          <Td py={3}>
-                            <HStack spacing={3}>
-                              <Avatar size="sm" name={student.name} bg="blue.600" />
-                              <Box minW={0}>
-                                <Text fontWeight="semibold" fontSize="sm" noOfLines={1}>
-                                  {student.name}
-                                </Text>
-                                {!isCodeOnlyLogin && student.must_change_password && (
-                                  <Badge colorScheme="orange" variant="subtle" fontSize="10px" mt={0.5}>
-                                    يجب تغيير كلمة المرور
-                                  </Badge>
-                                )}
-                              </Box>
-                            </HStack>
-                          </Td>
-                          <Td py={3}>
-                            <HStack spacing={1}>
-                              <Code fontSize="sm" px={2} py={0.5} borderRadius="md" dir="ltr">
-                                {code}
-                              </Code>
-                              <IconButton
-                                aria-label="نسخ رقم الطالب"
-                                icon={<FaCopy />}
-                                size="xs"
-                                variant="ghost"
-                                onClick={() => copyStudentCode(code)}
-                              />
-                            </HStack>
-                          </Td>
-                          <Td py={3} display={{ base: "none", md: "table-cell" }}>
-                            <Text fontSize="xs" color={textColor} noOfLines={1}>
-                              {student.grade?.name || "—"}
-                            </Text>
-                            <Text fontSize="xs" color={subTextColor} noOfLines={1}>
-                              {student.group?.name || "بدون مجموعة"}
-                            </Text>
-                          </Td>
-                          <Td py={3} display={{ base: "none", lg: "table-cell" }}>
-                            <Text fontSize="xs" dir="ltr" textAlign="right">
-                              {student.phone || "—"}
-                            </Text>
-                            <Text fontSize="xs" color={subTextColor} dir="ltr" textAlign="right">
-                              ولي الأمر: {student.parent_phone || "—"}
-                            </Text>
-                          </Td>
-                          <Td py={3} display={{ base: "none", xl: "table-cell" }}>
-                            {student.device_bound || student.registered_ip || student.device_ip ? (
-                              <VStack align="start" spacing={0.5}>
-                                <Badge colorScheme="blue" variant="subtle" fontSize="10px">
-                                  مربوط
-                                </Badge>
-                                <Text fontSize="10px" color={subTextColor} dir="ltr" noOfLines={1} maxW="140px">
-                                  {(student.registered_ip || student.device_ip || "").slice(0, 18)}
-                                  {(student.registered_ip || student.device_ip || "").length > 18 ? "…" : ""}
-                                </Text>
-                              </VStack>
-                            ) : (
-                              <Badge colorScheme="gray" variant="subtle" fontSize="10px">
-                                غير مربوط
-                              </Badge>
-                            )}
-                          </Td>
-                          <Td py={3}>
-                            <Badge colorScheme={st.scheme} variant="subtle" fontSize="xs">
-                              {st.label}
-                            </Badge>
-                          </Td>
-                          <Td py={3} textAlign="center">
-                            <Menu>
-                              <MenuButton
-                                as={IconButton}
-                                icon={<FaEllipsisV />}
-                                variant="ghost"
-                                size="sm"
-                                aria-label="إجراءات"
-                              />
-                              <MenuList fontSize="sm">
-                                <MenuItem icon={<FaEdit />} onClick={() => openEdit(student)}>
-                                  تعديل
-                                </MenuItem>
-                                {isCodeOnlyLogin ? (
-                                  <MenuItem icon={<FaShareAlt />} onClick={() => handleShareLogin(student)}>
-                                    مشاركة بيانات الدخول
-                                  </MenuItem>
-                                ) : (
-                                  <MenuItem icon={<FaKey />} onClick={() => handleResetPassword(student)}>
-                                    إعادة تعيين كلمة المرور
-                                  </MenuItem>
-                                )}
-                                <MenuItem icon={<FaMobileAlt />} onClick={() => handleResetDevice(student)}>
-                                  إعادة تعيين الجهاز
-                                </MenuItem>
-                                {student.account_status !== "active" && (
-                                  <MenuItem onClick={() => handleStatusChange(student, "active")}>
-                                    تفعيل الحساب
-                                  </MenuItem>
-                                )}
-                                {student.account_status !== "suspended" && (
-                                  <MenuItem onClick={() => handleStatusChange(student, "suspended")}>
-                                    إيقاف الحساب
-                                  </MenuItem>
-                                )}
-                                <MenuItem
-                                  icon={<FaTrash />}
-                                  color="red.500"
-                                  onClick={() => {
-                                    setDeleteTarget(student);
-                                    deleteDisclosure.onOpen();
-                                  }}
-                                >
-                                  حذف
-                                </MenuItem>
-                              </MenuList>
-                            </Menu>
-                          </Td>
-                        </Tr>
-                      );
-                    })}
-                  </Tbody>
-                </Table>
-              </TableContainer>
-            ) : null}
+            <Box p={{ base: 4, md: 5 }} position="relative" minH="200px">
+              {loading && students.length > 0 && (
+                <Flex
+                  position="absolute"
+                  inset={0}
+                  bg="blackAlpha.40"
+                  zIndex={1}
+                  align="center"
+                  justify="center"
+                  borderRadius="2xl"
+                >
+                  <Spinner color="blue.500" thickness="3px" />
+                </Flex>
+              )}
+
+              {students.length === 0 && !loading ? (
+                <Box py={14} textAlign="center" px={4}>
+                  <Flex
+                    mx="auto"
+                    mb={4}
+                    w={14}
+                    h={14}
+                    borderRadius="2xl"
+                    bg="blue.50"
+                    align="center"
+                    justify="center"
+                    _dark={{ bg: "blue.900" }}
+                  >
+                    <Icon as={FaUsers} boxSize={6} color={ACCENT} />
+                  </Flex>
+                  <Text color={textColor} fontSize="md" fontWeight="800" mb={1}>
+                    لا يوجد طلاب هنا بعد
+                  </Text>
+                  <Text color={subTextColor} fontSize="sm" mb={5} maxW="22rem" mx="auto">
+                    ابدأ بإضافة طالب أو استيراد ملف CSV لملء القائمة.
+                  </Text>
+                  <HStack justify="center" spacing={2}>
+                    <Button colorScheme="blue" leftIcon={<Icon as={FaPlus} />} onClick={openAdd} borderRadius="xl">
+                      إضافة طالب
+                    </Button>
+                    <Button
+                      variant="outline"
+                      leftIcon={<Icon as={FaFileImport} />}
+                      borderRadius="xl"
+                      onClick={() => {
+                        setImportResult(null);
+                        importDisclosure.onOpen();
+                      }}
+                    >
+                      استيراد
+                    </Button>
+                  </HStack>
+                </Box>
+              ) : (
+                <VStack align="stretch" spacing={3}>
+                  {students.map((student) => (
+                    <ManagedStudentCard
+                      key={student.id}
+                      student={student}
+                      isCodeOnlyLogin={isCodeOnlyLogin}
+                      onCopyCode={copyStudentCode}
+                      onEdit={openEdit}
+                      onShareLogin={handleShareLogin}
+                      onResetPassword={openChangePassword}
+                      onResetDevice={handleResetDevice}
+                      onStatusChange={handleStatusChange}
+                      onDelete={(s) => {
+                        setDeleteTarget(s);
+                        deleteDisclosure.onOpen();
+                      }}
+                    />
+                  ))}
+                </VStack>
+              )}
+            </Box>
 
             {pagination.total_pages > 1 && (
-              <Flex justify="center" gap={2} p={4} borderTopWidth="1px" borderColor={borderColor}>
+              <Flex
+                justify="center"
+                align="center"
+                gap={3}
+                p={4}
+                borderTopWidth="1px"
+                borderColor={borderColor}
+              >
                 <Button
                   size="sm"
                   variant="outline"
+                  borderRadius="lg"
                   isDisabled={page <= 1}
                   onClick={() => setPage((p) => p - 1)}
                 >
                   السابق
                 </Button>
-                <Text fontSize="sm" color={subTextColor} alignSelf="center">
-                  صفحة {page} من {pagination.total_pages}
+                <Text fontSize="sm" color={subTextColor}>
+                  {page} / {pagination.total_pages}
                 </Text>
                 <Button
                   size="sm"
                   variant="outline"
+                  borderRadius="lg"
                   isDisabled={page >= pagination.total_pages}
                   onClick={() => setPage((p) => p + 1)}
                 >
@@ -775,6 +770,17 @@ const ManagedStudentsPage = () => {
         onSubmit={handleFormSubmit}
         submitting={submitting}
         teacherRegistrationMode={isCodeOnlyLogin}
+      />
+
+      <ChangePasswordModal
+        isOpen={passwordDisclosure.isOpen}
+        onClose={() => {
+          passwordDisclosure.onClose();
+          setPasswordTarget(null);
+        }}
+        student={passwordTarget}
+        onSubmit={handleChangePassword}
+        submitting={submitting}
       />
 
       <CredentialsModal
@@ -801,17 +807,71 @@ const ManagedStudentsPage = () => {
         isCentered
       >
         <AlertDialogOverlay>
-          <AlertDialogContent dir="rtl" borderRadius="xl">
+          <AlertDialogContent dir="rtl" borderRadius="2xl">
             <AlertDialogHeader fontSize="md">حذف الطالب</AlertDialogHeader>
             <AlertDialogBody fontSize="sm">
               هل أنت متأكد من حذف <strong>{deleteTarget?.name}</strong>؟ لا يمكن التراجع عن هذا الإجراء.
+              إن تعذّر الحذف بسبب سجلات مرتبطة، أوقف الحساب بدلاً من ذلك.
             </AlertDialogBody>
             <AlertDialogFooter gap={2}>
-              <Button ref={cancelRef} onClick={deleteDisclosure.onClose}>
+              <Button ref={cancelRef} onClick={deleteDisclosure.onClose} borderRadius="lg">
                 إلغاء
               </Button>
-              <Button colorScheme="red" onClick={confirmDelete} isLoading={submitting}>
+              <Button colorScheme="red" onClick={confirmDelete} isLoading={submitting} borderRadius="lg">
                 حذف
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
+
+      <AlertDialog
+        isOpen={deleteAllDisclosure.isOpen}
+        leastDestructiveRef={deleteAllCancelRef}
+        onClose={() => {
+          deleteAllDisclosure.onClose();
+          setDeleteAllConfirm("");
+        }}
+        isCentered
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent dir="rtl" borderRadius="2xl">
+            <AlertDialogHeader fontSize="md">حذف كل طلاب المنصة</AlertDialogHeader>
+            <AlertDialogBody fontSize="sm">
+              <Text mb={3}>
+                سيتم حذف <strong>كل</strong> حسابات الطلاب على منصتك (بما فيها المسجّلون ذاتياً). لا يمكن التراجع.
+              </Text>
+              <Text mb={2} fontSize="xs" color="gray.500">
+                للتأكيد اكتب حرفياً: <Code>DELETE_ALL_STUDENTS</Code>
+              </Text>
+              <Input
+                value={deleteAllConfirm}
+                onChange={(e) => setDeleteAllConfirm(e.target.value)}
+                placeholder="DELETE_ALL_STUDENTS"
+                dir="ltr"
+                textAlign="left"
+                borderRadius="lg"
+              />
+            </AlertDialogBody>
+            <AlertDialogFooter gap={2}>
+              <Button
+                ref={deleteAllCancelRef}
+                borderRadius="lg"
+                onClick={() => {
+                  deleteAllDisclosure.onClose();
+                  setDeleteAllConfirm("");
+                }}
+              >
+                إلغاء
+              </Button>
+              <Button
+                colorScheme="red"
+                borderRadius="lg"
+                onClick={confirmDeleteAll}
+                isLoading={submitting}
+                isDisabled={deleteAllConfirm !== "DELETE_ALL_STUDENTS"}
+              >
+                حذف الكل
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -820,5 +880,31 @@ const ManagedStudentsPage = () => {
     </Box>
   );
 };
+
+function StatChip({ label, value, tone = "blue" }) {
+  const tones = {
+    blue: { bg: "blue.50", color: "blue.700" },
+    green: { bg: "green.50", color: "green.700" },
+    orange: { bg: "orange.50", color: "orange.700" },
+  };
+  const t = tones[tone] || tones.blue;
+  return (
+    <HStack
+      spacing={2}
+      bg={t.bg}
+      px={3}
+      py={1.5}
+      borderRadius="full"
+      _dark={{ bg: "whiteAlpha.100" }}
+    >
+      <Text fontSize="xs" color="gray.500" _dark={{ color: "gray.400" }}>
+        {label}
+      </Text>
+      <Text fontSize="sm" fontWeight="900" color={t.color} _dark={{ color: "white" }}>
+        {value}
+      </Text>
+    </HStack>
+  );
+}
 
 export default ManagedStudentsPage;

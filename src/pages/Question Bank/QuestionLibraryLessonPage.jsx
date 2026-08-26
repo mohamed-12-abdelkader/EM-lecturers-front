@@ -564,14 +564,37 @@ const QuestionLibraryLessonPage = () => {
     }
   };
 
-  const toggleQuestionSelect = useCallback((id, checked) => {
-    setSelectedQuestions((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(id);
-      else next.delete(id);
-      return next;
-    });
-  }, []);
+  const getPassageSiblingQuestionIds = useCallback(
+    (questionId) => {
+      for (const passage of passages) {
+        const qs = passage.questions || [];
+        if (qs.some((q) => q.id === questionId)) {
+          return qs.map((q) => q.id);
+        }
+      }
+      const target = allQuestions.find((q) => q.id === questionId);
+      if (target?.passage_id != null && target.passage_id !== "") {
+        return allQuestions
+          .filter((q) => String(q.passage_id) === String(target.passage_id))
+          .map((q) => q.id);
+      }
+      return [questionId];
+    },
+    [passages, allQuestions],
+  );
+
+  const toggleQuestionSelect = useCallback(
+    (id, checked) => {
+      const siblingIds = getPassageSiblingQuestionIds(id);
+      setSelectedQuestions((prev) => {
+        const next = new Set(prev);
+        if (checked) siblingIds.forEach((qid) => next.add(qid));
+        else siblingIds.forEach((qid) => next.delete(qid));
+        return next;
+      });
+    },
+    [getPassageSiblingQuestionIds],
+  );
 
   const togglePassageSelect = useCallback((passageId, checked) => {
     setSelectedPassageIds((prev) =>
@@ -849,7 +872,7 @@ const QuestionLibraryLessonPage = () => {
           ) : (
             <>
               <LibraryFilterPanel
-                hint={`${standaloneQuestions.length} سؤال مستقل · ${passages.length} قطعة · اضغط على البطاقة للتحديد`}
+                hint={`${standaloneQuestions.length} سؤال مستقل · ${passages.length} قطعة · تحديد سؤال من قطعة يحدد كل أسئلة القطعة`}
               >
                 <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3}>
                   <InputGroup>

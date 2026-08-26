@@ -181,6 +181,9 @@ const SignUp = () => {
   const [gradeId, setGradeId] = useState("");
   const [courseGroupId, setCourseGroupId] = useState("");
   const [requiresGroupSelection, setRequiresGroupSelection] = useState(false);
+  const [selfRegistrationEnabled, setSelfRegistrationEnabled] = useState(true);
+  const [registrationBlockedMessage, setRegistrationBlockedMessage] = useState("");
+  const [registrationSettingsLoaded, setRegistrationSettingsLoaded] = useState(false);
   const [singleDeviceMode, setSingleDeviceMode] = useState(false);
   const [registrationGroups, setRegistrationGroups] = useState([]);
   const [groupsLoading, setGroupsLoading] = useState(false);
@@ -255,7 +258,10 @@ const SignUp = () => {
 
   useEffect(() => {
     const subdomain = resolveTenantSubdomain();
-    if (!subdomain) return;
+    if (!subdomain) {
+      setRegistrationSettingsLoaded(true);
+      return;
+    }
     fetchPublicRegistrationSettings(subdomain)
       .then((settings) => {
         setRequiresGroupSelection(
@@ -263,11 +269,19 @@ const SignUp = () => {
             Boolean(settings.requires_course_group_selection),
         );
         setSingleDeviceMode(isSingleDeviceLimit(settings));
+        setSelfRegistrationEnabled(settings.self_registration_enabled !== false);
+        setRegistrationBlockedMessage(
+          settings.message ||
+            "يتم إنشاء الحسابات بواسطة المدرس. سجّل الدخول برقم الطالب.",
+        );
       })
       .catch(() => {
         setRequiresGroupSelection(false);
         setSingleDeviceMode(false);
-      });
+        setSelfRegistrationEnabled(true);
+        setRegistrationBlockedMessage("");
+      })
+      .finally(() => setRegistrationSettingsLoaded(true));
   }, []);
 
   useEffect(() => {
@@ -413,7 +427,13 @@ const SignUp = () => {
       }, 1900);
     } catch (err) {
       console.error(err);
-      if (err.response?.data?.message === "Phone number already registered") {
+      if (err.response?.data?.code === "SELF_REGISTRATION_DISABLED") {
+        toast.error(
+          err.response?.data?.message ||
+            "يتم إنشاء الحسابات بواسطة المدرس. تواصل مع مدرسك للحصول على رقم الطالب.",
+        );
+        navigate(loginPath, { replace: true });
+      } else if (err.response?.data?.message === "Phone number already registered") {
         onOpen(); // فتح المودال
       } else {
         toast.error(
@@ -706,7 +726,11 @@ const SignUp = () => {
       overflow="hidden"
     >
       {hasTenantNavbar ? (
-        <TenantPublicNavbarShell variant="auth" loginHref={loginPath} />
+        <TenantPublicNavbarShell
+          variant="auth"
+          loginHref={loginPath}
+          showSignup={selfRegistrationEnabled}
+        />
       ) : (
       <header className="fixed top-0 right-0 left-0 z-50 border-b border-slate-200/70 bg-white/70 shadow-[0_12px_32px_rgb(15,23,42,0.06)] backdrop-blur-2xl backdrop-saturate-150 dark:border-slate-800 dark:bg-slate-900/70">
         <div className="mx-auto flex h-[4.65rem] max-w-[1200px] items-center justify-between gap-3 px-4 md:px-6 lg:px-8">
@@ -808,6 +832,25 @@ const SignUp = () => {
         zIndex="1"
       >
         <Box w="full" p={{ base: 6, sm: 8, lg: 10 }}>
+          {registrationSettingsLoaded && !selfRegistrationEnabled ? (
+            <VStack spacing={5} align="stretch" textAlign="center" py={6}>
+              <Text fontSize="xl" fontWeight="bold" color={headingColor}>
+                التسجيل الذاتي غير متاح
+              </Text>
+              <Text fontSize="sm" color={subtextColor} lineHeight="tall">
+                {registrationBlockedMessage}
+              </Text>
+              <Button
+                colorScheme="blue"
+                size="lg"
+                borderRadius="xl"
+                onClick={() => navigate(loginPath)}
+              >
+                الانتقال لتسجيل الدخول برقم الطالب
+              </Button>
+            </VStack>
+          ) : (
+            <>
           {/* التابات — مؤشر الخطوات المحسّن */}
           <Box
             mb={8}
@@ -998,6 +1041,8 @@ const SignUp = () => {
               </Box>
             </Text>
           </Box>
+            </>
+          )}
         </Box>
       </Box>
 

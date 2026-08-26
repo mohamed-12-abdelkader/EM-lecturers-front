@@ -7,6 +7,7 @@ import {
   fetchPlatformPublicCourses,
   readCachedTenantPublic,
 } from "../../api/tenantPublicApi";
+import { fetchPublicRegistrationSettings } from "../../api/courseGroupsApi";
 import FreeLecturePlayerModal from "./components/FreeLecturePlayerModal";
 import TenantProHero from "./components/landing/TenantProHero";
 import TenantProBentoWall from "./components/landing/TenantProBentoWall";
@@ -157,6 +158,16 @@ export default function TenantPublicLanding({ subdomain }) {
     staleTime: 5 * 60_000,
     gcTime: 30 * 60_000,
   });
+
+  const { data: registrationSettings } = useQuery({
+    queryKey: ["tenant-registration-settings", subdomain],
+    queryFn: () => fetchPublicRegistrationSettings(subdomain),
+    enabled: platformQueryEnabled,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+  });
+
+  const selfRegistrationEnabled = registrationSettings?.self_registration_enabled !== false;
 
   const payload = data?.data;
   const tenant = payload?.tenant;
@@ -389,7 +400,7 @@ export default function TenantPublicLanding({ subdomain }) {
   ];
 
   const loginHref = "/login";
-  const signupHref = "/signup";
+  const signupHref = selfRegistrationEnabled ? "/signup" : null;
   const joinHref = socialLinks.whatsapp || socialLinks.telegram || "#contact";
   const whatsappHref = socialLinks.whatsapp;
 
@@ -467,7 +478,8 @@ export default function TenantPublicLanding({ subdomain }) {
         specialty={specialty}
         tenantAvatar={tenant.avatar_url}
         loginHref={loginHref}
-        signupHref={signupHref}
+        signupHref={signupHref || "/signup"}
+        showSignup={selfRegistrationEnabled}
         isDarkMode={isDarkMode}
         onToggleTheme={toggleTheme}
         isMobileMenuOpen={isMobileMenuOpen}
@@ -496,14 +508,14 @@ export default function TenantPublicLanding({ subdomain }) {
           teacherName={teacherName}
           bioText={bioText}
           services={displayServices}
-          signupHref={signupHref}
+          signupHref={signupHref || loginHref}
           teacherImageUrl={teacherPortraitUrl}
         />
 
         <TenantProHowItWorks
           teacherName={teacherName}
           specialty={specialty}
-          signupHref={signupHref}
+          signupHref={signupHref || loginHref}
         />
 
         {showFreeLectures ? (
@@ -521,13 +533,17 @@ export default function TenantPublicLanding({ subdomain }) {
             loading={coursesLoading}
             fallbackImage={courseFallbackImage}
             loginHref={loginHref}
-            signupHref={signupHref}
+            signupHref={signupHref || loginHref}
           />
         ) : null}
 
         <TenantProReviews testimonials={displayTestimonials} />
 
-        <TenantProCta signupHref={signupHref} loginHref={loginHref} />
+        <TenantProCta
+          signupHref={signupHref || loginHref}
+          loginHref={loginHref}
+          hideSignup={!selfRegistrationEnabled}
+        />
       </main>
 
       <TenantProFooter
@@ -536,6 +552,7 @@ export default function TenantPublicLanding({ subdomain }) {
         bioSnippet={bioSnippet + bioSuffix}
         loginHref={loginHref}
         signupHref={signupHref}
+        showSignup={selfRegistrationEnabled}
         joinHref={joinHref}
         contact={socialLinks}
         quickLinks={footerQuickLinks}

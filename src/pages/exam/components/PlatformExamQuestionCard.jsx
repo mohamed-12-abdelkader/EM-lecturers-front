@@ -34,6 +34,7 @@ import { AiFillCheckCircle } from "react-icons/ai";
 
 import { MdCheck, MdZoomIn } from "react-icons/md";
 
+import { examQuestionTextSx } from "../../../components/question/FormattedQuestionText";
 import { renderFormattedExamText } from "../../../utils/renderFormattedExamText";
 
 
@@ -380,11 +381,17 @@ function TextChoiceRow({
 
           fontSize="sm"
 
-          fontWeight={isSelected || isCorrect ? "semibold" : "normal"}
+          fontWeight={isSelected || isCorrect ? "semibold" : "500"}
 
           color={mode === "teacher" && isCorrect ? "green.800" : textColor}
 
-          lineHeight="1.6"
+          lineHeight="1.75"
+
+          sx={examQuestionTextSx}
+
+          className="exam-q-text"
+
+          data-exam-q-text=""
 
         >
 
@@ -522,7 +529,7 @@ function ImageChoiceCell({
 
       {text && !isImageOnly && (
 
-        <Text fontSize="xs" mb={1.5} pr={8} lineHeight="1.5" noOfLines={2}>
+        <Text fontSize="xs" mb={1.5} pr={8} lineHeight="1.6" noOfLines={2} sx={examQuestionTextSx} className="exam-q-text" data-exam-q-text="">
 
           {renderFormattedExamText(text)}
 
@@ -605,6 +612,8 @@ function ChoicesSection({
   pendingCorrect,
 
   onZoomImage,
+
+  tourTargetId,
 
 }) {
 
@@ -726,7 +735,7 @@ function ChoicesSection({
 
   return (
 
-    <Box mt={4}>
+    <Box mt={4} data-tour-id={tourTargetId}>
 
       <Text fontSize="xs" fontWeight="semibold" color={muted} mb={2}>
 
@@ -964,7 +973,7 @@ export function PlatformExamStudentCard({
 
           <Box mb={hasImage && !isImageQuestion ? 3 : 0} borderRightWidth="3px" borderColor="blue.400" pr={3}>
 
-            <Text fontSize={{ base: "sm", md: "md" }} fontWeight="semibold" color={textColor} lineHeight="1.75">
+            <Text fontSize={{ base: "sm", md: "md" }} fontWeight="semibold" color={textColor} lineHeight="1.9" sx={examQuestionTextSx} className="exam-q-text" data-exam-q-text="">
 
               {renderFormattedExamText(question.text)}
 
@@ -1038,6 +1047,8 @@ export function PlatformExamTeacherCard({
 
   actions,
 
+  isTourTarget = false,
+
 }) {
 
   const cardBg = useColorModeValue("white", "gray.800");
@@ -1064,7 +1075,7 @@ export function PlatformExamTeacherCard({
 
   return (
 
-    <Box bg={cardBg} borderRadius="lg" borderWidth="1px" borderColor={border} overflow="hidden" boxShadow="sm" h="full">
+    <Box data-tour-id={isTourTarget ? "exam-question-card" : undefined} bg={cardBg} borderRadius="lg" borderWidth="1px" borderColor={border} overflow="hidden" boxShadow="sm" h="full">
 
       <Box h="2px" bg={accentBar} />
 
@@ -1134,7 +1145,7 @@ export function PlatformExamTeacherCard({
 
           <Box mb={hasImage && !isImageQuestion ? 2 : 0} borderRightWidth="3px" borderColor="blue.400" pr={2}>
 
-            <Text fontSize="sm" fontWeight="medium" color={textColor} lineHeight="1.7">
+            <Text fontSize="sm" fontWeight="500" color={textColor} lineHeight="1.9" sx={examQuestionTextSx} className="exam-q-text" data-exam-q-text="">
 
               {renderFormattedExamText(question.text)}
 
@@ -1183,6 +1194,8 @@ export function PlatformExamTeacherCard({
           onSetCorrect={onSetCorrect}
 
           onZoomImage={onZoomImage}
+
+          tourTargetId={isTourTarget ? "exam-question-choices" : undefined}
 
         />
 

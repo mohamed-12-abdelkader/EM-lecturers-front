@@ -284,13 +284,151 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
-export default function TeacherExamTour({ isOpen, hasQuestions, onClose }) {
+function buildPlatformExamTourSteps({ hasQuestions = false } = {}) {
+  const steps = [
+    {
+      targetId: null,
+      title: "مرحباً في إدارة الامتحان",
+      description:
+        "جولة سريعة لأدوات المدرس هنا: استخراج الأسئلة بالذكاء الاصطناعي، درجات الطلاب، تقرير الأسئلة، وتعديل الإجابات الصحيحة. تظهر فقط عند الضغط على «جولة الإدارة».",
+    },
+    {
+      targetId: "platform-exam-hero",
+      title: "رأس صفحة الامتحان",
+      description:
+        "يعرض عنوان الامتحان وعدد الأسئلة. من هنا تدير المحتوى وتصل لأدوات الإضافة والمتابعة.",
+      onEnter: () => closeAllTeacherExamTourModals(),
+    },
+    {
+      targetId: "platform-exam-ai",
+      title: "زر «استخراج بالذكاء الاصطناعي»",
+      description:
+        "يرفع ملف PDF أو صوراً ويستخرج الأسئلة تلقائياً، ثم تراجعها قبل استيرادها للامتحان.",
+      cardPlacement: "below-target",
+      onEnter: () => closeAllTeacherExamTourModals(),
+    },
+    {
+      targetId: "exam-ai-modal",
+      title: "نافذة الاستخراج الذكي",
+      description:
+        "ارفع الملف، شغّل الاستخراج، راجع الأسئلة وعدّلها إن لزم، ثم استوردها. هذا أسرع طريقة لبناء بنك أسئلة الامتحان.",
+      onEnter: () => openAiExtractForTour(),
+      onLeave: () => closeAiExtractForTour(),
+      enterDelay: 580,
+    },
+    {
+      targetId: "platform-exam-grades",
+      title: "زر «عرض درجات الطلاب»",
+      description:
+        "يفتح قائمة تسليمات الطلاب: الدرجة، النسبة، ورقم المحاولة — مع بحث بالاسم أو رقم الطالب.",
+      cardPlacement: "below-target",
+      onEnter: () => closeAllTeacherExamTourModals(),
+    },
+    {
+      targetId: "platform-exam-report",
+      title: "زر «تقرير الأسئلة»",
+      description:
+        "ينقلك لصفحة تحليل الأسئلة: الأكثر خطأً، توزيع الإجابات، ومؤشرات الصعوبة لمراجعة نقاط الضعف.",
+      cardPlacement: "below-target",
+    },
+  ];
+
+  if (hasQuestions) {
+    steps.push(
+      {
+        targetId: "exam-question-card",
+        title: "بطاقة السؤال",
+        description:
+          "كل سؤال يعرض النص أو الصورة والاختيارات. اضغط اختياراً لتحديده كإجابة صحيحة (يظهر بالأخضر).",
+        cardPlacement: "above-target",
+        onEnter: () => closeAllTeacherExamTourModals(),
+        enterDelay: 420,
+      },
+      {
+        targetId: "exam-question-choices",
+        title: "تحديد الإجابة الصحيحة",
+        description:
+          "اضغط على أي اختيار ليصبح الإجابة الصحيحة قبل أن يحل الطلاب الامتحان.",
+        cardPlacement: "above-target",
+        enterDelay: 420,
+      },
+      {
+        targetId: "exam-question-add-image",
+        title: "زر صورة السؤال",
+        description:
+          "يرفع أو يحدّث صورة توضيحية للسؤال (معادلة، مخطط، مسألة مكتوبة).",
+        cardPlacement: "below-target",
+      },
+      {
+        targetId: "exam-question-edit",
+        title: "زر تعديل السؤال",
+        description: "يفتح نافذة لتعديل نص السؤال والاختيارات مع معاينة فورية للرموز الرياضية.",
+        cardPlacement: "below-target",
+      },
+      {
+        targetId: "exam-edit-modal",
+        title: "نافذة تعديل السؤال",
+        description:
+          "عدّل النص والاختيارات (تدعم LaTeX والرموز) ثم احفظ. التغييرات تظهر فوراً في القائمة.",
+        onEnter: () => openEditQuestionForTour(),
+        onLeave: () => closeEditQuestionForTour(),
+        enterDelay: 580,
+      },
+      {
+        targetId: "exam-question-delete",
+        title: "زر حذف السؤال",
+        description: "يحذف السؤال من الامتحان بعد تأكيد — استخدمه بحذر.",
+        cardPlacement: "below-target",
+        onEnter: () => closeAllTeacherExamTourModals(),
+      },
+      {
+        targetId: "exam-delete-modal",
+        title: "نافذة تأكيد الحذف",
+        description:
+          "«تأكيد الحذف» يزيل السؤال نهائياً، و«إلغاء» يغلق النافذة دون تغيير.",
+        onEnter: () => openDeleteQuestionForTour(),
+        onLeave: () => closeDeleteQuestionForTour(),
+        enterDelay: 580,
+      },
+    );
+  } else {
+    steps.push({
+      targetId: "platform-exam-empty",
+      title: "لا توجد أسئلة بعد",
+      description:
+        "ابدأ بإضافة أسئلة عبر «استخراج بالذكاء الاصطناعي»، أو من صفحة تفاصيل الكورس (تبويب الامتحانات).",
+      cardPlacement: "above-target",
+      onEnter: () => closeAllTeacherExamTourModals(),
+    });
+  }
+
+  steps.push({
+    targetId: "platform-exam-tour-btn",
+    title: "إعادة الجولة",
+    description:
+      "يمكنك إعادة هذه الجولة في أي وقت من زر «جولة الإدارة» أعلى الصفحة.",
+    cardPlacement: "below-target",
+    onEnter: () => closeAllTeacherExamTourModals(),
+  });
+
+  return steps;
+}
+
+export default function TeacherExamTour({
+  isOpen,
+  hasQuestions,
+  onClose,
+  variant = "comprehensive",
+}) {
   const [stepIndex, setStepIndex] = useState(0);
   const [spotlight, setSpotlight] = useState(null);
 
   const tourSteps = useMemo(
-    () => buildTeacherExamTourSteps({ hasQuestions }),
-    [hasQuestions],
+    () =>
+      variant === "platform"
+        ? buildPlatformExamTourSteps({ hasQuestions })
+        : buildTeacherExamTourSteps({ hasQuestions }),
+    [hasQuestions, variant],
   );
 
   const cardBg = useColorModeValue("white", "gray.800");

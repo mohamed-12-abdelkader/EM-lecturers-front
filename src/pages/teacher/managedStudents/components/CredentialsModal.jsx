@@ -43,7 +43,9 @@ const CredentialsModal = ({
   if (!credentials) return null;
 
   const studentCode = formatStudentCode(credentials.student_code);
-  const showCodeOnly = codeOnlyLogin || credentials.login_with_code_only || !credentials.temporary_password;
+  const showCodeOnly =
+    credentials.login_with_code_only === true ||
+    (Boolean(codeOnlyLogin) && !credentials.temporary_password);
 
   const copyText = showCodeOnly
     ? [studentCode, subdomain].filter(Boolean).join("\n")

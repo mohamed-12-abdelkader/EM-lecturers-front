@@ -88,6 +88,14 @@ export async function deleteManagedStudent(studentId) {
   return unwrap(data, "فشل حذف الطالب");
 }
 
+export async function deleteAllManagedStudents() {
+  const { data } = await baseUrl.delete(`${API}/all`, {
+    headers: authHeaders("application/json"),
+    data: { confirm: "DELETE_ALL_STUDENTS" },
+  });
+  return unwrap(data, "فشل حذف كل الطلاب");
+}
+
 export async function updateManagedStudentGroup(studentId, groupId) {
   const { data } = await baseUrl.patch(
     `${API}/${studentId}/group`,
@@ -102,6 +110,22 @@ export async function resetManagedStudentPassword(studentId, payload = {}) {
     headers: authHeaders("application/json"),
   });
   return unwrap(data, "فشل إعادة تعيين كلمة المرور");
+}
+
+/** المدرس يكتب كلمة المرور بنفسه — بدون توليد عشوائي */
+export async function changeManagedStudentPassword(studentId, newPassword) {
+  const password = String(newPassword || "").trim();
+  if (password.length < 6) {
+    const err = new Error("كلمة المرور يجب ألا تقل عن 6 أحرف");
+    err.response = { data: { message: err.message } };
+    throw err;
+  }
+  const { data } = await baseUrl.post(
+    `${API}/${studentId}/change-password`,
+    { new_password: password },
+    { headers: authHeaders("application/json") },
+  );
+  return unwrap(data, "فشل تغيير كلمة المرور");
 }
 
 export async function updateManagedStudentStatus(studentId, accountStatus) {

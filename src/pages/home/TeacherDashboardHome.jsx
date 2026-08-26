@@ -75,7 +75,7 @@ import {
   FaFire,
   FaCompass,
 } from "react-icons/fa";
-import { MdAssignment, MdQuiz } from "react-icons/md";
+import { MdAssignment, MdQuiz, MdLibraryBooks } from "react-icons/md";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import baseUrl from "../../api/baseUrl";
@@ -571,6 +571,14 @@ const TeacherDashboardHome = () => {
       link: "/center-mgmt",
     },
     {
+      id: 12,
+      title: "مكتبة الأسئلة",
+      description: "أسئلتك الخاصة وقطع القراءة",
+      icon: MdLibraryBooks,
+      color: "orange",
+      link: "/QuestionLibraryPage",
+    },
+    {
       id: 1,
       title: "بنك الأسئلة",
       description: "اضافة اسئلة جديدة",
@@ -636,14 +644,14 @@ const TeacherDashboardHome = () => {
     },
   ];
 
-  // كورسات المدرس مع كاش
+  // كورسات المدرس مع كاش — لا يُعاد الجلب تلقائياً عند الرجوع للصفحة
   const {
     data: courses = [],
     isLoading: loading,
     error: coursesError,
     refetch: refetchCourses,
   } = useQuery({
-    queryKey: ["teacherCourses"],
+    queryKey: ["teacherCourses", user?.id],
     queryFn: async () => {
       if (!token) throw new Error("No token found");
       const response = await baseUrl.get("api/course/my-courses", {
@@ -652,15 +660,17 @@ const TeacherDashboardHome = () => {
       return response.data.courses || [];
     },
     enabled: !!token,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
     retry: 1,
   });
 
-  // الصفوف مع كاش
+  // الصفوف مع كاش طويل (نادراً ما تتغير)
   const { data: grades = [] } = useQuery({
-    queryKey: ["teacherGrades"],
+    queryKey: ["teacherGrades", user?.id],
     queryFn: async () => {
       const response = await baseUrl.get("api/teacher/grades", {
         headers: { Authorization: `Bearer ${token}` },
@@ -668,9 +678,11 @@ const TeacherDashboardHome = () => {
       return response.data.grades || [];
     },
     enabled: !!token,
-    staleTime: 30 * 60 * 1000,
-    gcTime: 60 * 60 * 1000,
+    staleTime: 60 * 60 * 1000,
+    gcTime: 2 * 60 * 60 * 1000,
     refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 
   // المواد والمجموعات مع كاش
@@ -678,7 +690,7 @@ const TeacherDashboardHome = () => {
     data: subjects = [],
     refetch: refetchSubjects,
   } = useQuery({
-    queryKey: ["teacherSubjects"],
+    queryKey: ["teacherSubjects", user?.id],
     queryFn: async () => {
       const response = await baseUrl.get("/api/teacher/package-subjects/groups", {
         headers: { Authorization: `Bearer ${token}` },
@@ -686,9 +698,11 @@ const TeacherDashboardHome = () => {
       return response.data.subjects || [];
     },
     enabled: !!token,
-    staleTime: 5 * 60 * 1000,
-    gcTime: 30 * 60 * 1000,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
     retry: 1,
   });
 
@@ -1228,6 +1242,7 @@ const TeacherDashboardHome = () => {
                   fontWeight="700"
                   cursor="pointer"
                   onClick={handleRefreshDashboard}
+                  isLoading={alertRefreshing}
                   _hover={{ bg: "whiteAlpha.200" }}
                   flex={{ base: 1, sm: "initial" }}
                 >

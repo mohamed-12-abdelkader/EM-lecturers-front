@@ -1,3 +1,7 @@
+import { PER_LECTURE_ACCESS_MODES, resolveLectureAccessMode } from "../api/courseAccessApi";
+
+export { resolveLectureAccessMode, PER_LECTURE_ACCESS_MODES };
+
 export const ACCESS_STATUS_META = {
   open: {
     label: "مفتوح",
@@ -65,7 +69,7 @@ export function getLectureLockMessage(lecture) {
     return "يجب الاشتراك في الكورس للوصول إلى هذه المحاضرة.";
   }
   if (status === "group_restricted") {
-    return "هذه المحاضرة مخصصة لمجموعات أخرى ولا تظهر ضمن مجموعتك الحالية.";
+    return "أدخل كود التفعيل لفتح محتوى هذه المحاضرة، أو تأكد أنك ضمن إحدى المجموعات المسموحة.";
   }
   return "أكمل كل واجبات المحاضرات السابقة بنجاح لفتح هذا المحتوى.";
 }
@@ -96,13 +100,46 @@ export function fromDateTimeLocalValue(value) {
   return date.toISOString();
 }
 
+/** تسميات أوضاع الوصول لكل محاضرة */
+export const PER_LECTURE_ACCESS_MODE_LABELS = {
+  open: "مفتوحة للكل",
+  activation_code: "مقفولة بكود للجميع",
+  groups: "مجموعات محددة (+ كود للباقي)",
+};
+
+export const PER_LECTURE_ACCESS_MODE_HINTS = {
+  open: "كل المشتركين في الكورس يفتحونها فوراً",
+  activation_code: "كل الطلاب يحتاجون كود تفعيل لفتح المحتوى",
+  groups:
+    "أعضاء المجموعات المحددة يدخلون مباشرة — باقي الطلاب يرونها مقفولة ويحتاجون كوداً",
+};
+
+/** @deprecated استخدم PER_LECTURE_ACCESS_MODE_LABELS */
 export const LECTURE_ACCESS_MODE_LABELS = {
-  always_open: "مفتوح دائماً",
-  time_limited: "محدد بموعد",
-  activation_code: "كود تفعيل",
+  ...PER_LECTURE_ACCESS_MODE_LABELS,
+  always_open: PER_LECTURE_ACCESS_MODE_LABELS.open,
+  time_limited: "محدد بموعد (قديم)",
+  per_lecture: "حسب كل محاضرة",
 };
 
 export const ASSIGNMENT_MODE_LABELS = {
   lecture_based: "واجبات على مستوى المحاضرة",
   course_based: "واجبات على مستوى الكورس",
 };
+
+export function getLectureAccessModeLabel(modeOrLecture) {
+  const mode = resolveLectureAccessMode(modeOrLecture);
+  return PER_LECTURE_ACCESS_MODE_LABELS[mode] || PER_LECTURE_ACCESS_MODE_LABELS.open;
+}
+
+/** هل وضع الوصول يدعم أكواد التفعيل (مغلقة أو مجموعات) */
+export function lectureSupportsActivationCodes(lectureOrMode) {
+  if (lectureOrMode && typeof lectureOrMode === "object") {
+    if (lectureOrMode.supports_activation_codes === true) return true;
+  }
+  const mode = resolveLectureAccessMode(lectureOrMode);
+  return (
+    mode === PER_LECTURE_ACCESS_MODES.activation_code ||
+    mode === PER_LECTURE_ACCESS_MODES.groups
+  );
+}
