@@ -72,7 +72,7 @@ const TeacherCode = () => {
                   </div>
                   <div style="margin-top: 20px;">
                     <p style="font-size: 13px; font-weight: bold; color: #4a5568; display: flex; justify-content: center; align-items: center; gap: 4px;">
-                      01286525940 | 01111272393
+                      01132176865 | 01111272393 | 01132176849
                     </p>
                   </div>
                 </div>`
