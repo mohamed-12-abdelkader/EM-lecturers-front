@@ -90,6 +90,7 @@ import {
   downloadFile,
   formatFileSize,
   apiErrorMessage,
+  resolveTeacherFileUrl,
 } from "../../api/teacherMyFilesApi";
 
 const CATEGORY_SCHEMES = [
@@ -1128,7 +1129,7 @@ function FileGridCard({ file, onOpen, onDownload, onEdit, onDelete, isOpening, d
       >
         {showThumb ? (
           <Image
-            src={file.fileUrl}
+            src={resolveTeacherFileUrl(file.fileUrl)}
             alt={file.name}
             maxH="100px"
             maxW="100%"

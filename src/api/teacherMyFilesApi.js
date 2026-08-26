@@ -208,12 +208,12 @@ export function normalizeFilePreview(raw) {
 export function resolveTeacherFileUrl(pathOrUrl) {
   if (!pathOrUrl) return "";
   if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
-  const path = pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
+  const normalizedPath = pathOrUrl.startsWith("/") ? pathOrUrl : `/${pathOrUrl}`;
   if (typeof window !== "undefined" && useDevViteProxy()) {
-    return `${window.location.origin}${path}`;
+    return `${window.location.origin}${normalizedPath}`;
   }
   const origin = getApiOrigin();
-  return origin ? `${origin}${path}` : path;
+  return origin ? `${origin}${normalizedPath}` : normalizedPath;
 }
 
 // ── Categories ──

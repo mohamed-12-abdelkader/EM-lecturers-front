@@ -30,6 +30,7 @@ export function normalizeCourseFile(raw) {
   return {
     id,
     courseId: raw.courseId ?? raw.course_id ?? null,
+    lectureId: raw.lectureId ?? raw.lecture_id ?? null,
     teacherId: raw.teacherId ?? raw.teacher_id ?? null,
     title: raw.title || raw.name || "",
     description: raw.description || "",
@@ -104,6 +105,37 @@ export function courseFilesApiError(err, fallback = "حدث خطأ غير متو
   }
 
   return message || err?.message || fallback;
+}
+
+export async function getLectureFiles(lectureId) {
+  const { data } = await baseUrl.get(`/api/course/lecture/${lectureId}/files`);
+  return extractFilesList(data)
+    .map(normalizeCourseFile)
+    .filter(Boolean)
+    .sort((a, b) => {
+      const ta = new Date(a.createdAt || 0).getTime();
+      const tb = new Date(b.createdAt || 0).getTime();
+      return tb - ta;
+    });
+}
+
+export async function uploadLectureFile(lectureId, { file, title, name, description }, onUploadProgress) {
+  const form = new FormData();
+  form.append("file", file);
+  const displayTitle = String(title || name || "").trim();
+  if (displayTitle) form.append("title", displayTitle);
+  if (description) form.append("description", String(description).trim());
+
+  const { data } = await baseUrl.post(`/api/course/lecture/${lectureId}/files`, form, {
+    onUploadProgress: onUploadProgress
+      ? (event) => {
+          if (event.total) {
+            onUploadProgress(Math.round((event.loaded / event.total) * 100), event);
+          }
+        }
+      : undefined,
+  });
+  return normalizeCourseFile(extractFilePayload(data));
 }
 
 export async function getCourseFiles(courseId) {

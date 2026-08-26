@@ -26,9 +26,20 @@ import {
   FaClock,
   FaKey,
   FaChartBar,
+  FaFilePdf,
 } from "react-icons/fa";
 import baseUrl from "../../../api/baseUrl";
 import { Link } from "react-router-dom";
+import {
+  buildCourseFileViewPath,
+  courseFilesApiError,
+  formatCourseFileSize,
+  getCourseFileDisplayName,
+} from "../../../api/courseFilesApi";
+import { useLectureFileMutations, useLectureFiles } from "../../../Hooks/course/useCourseFiles";
+import DeleteCourseFileModal from "./DeleteCourseFileModal";
+import EditCourseFileModal from "./EditCourseFileModal";
+import UploadCourseFileModal from "./UploadCourseFileModal";
 import { buildExamReportPath } from "../../exam/utils/examReportUtils";
 import {
   crBtnSecondary,
@@ -60,6 +71,75 @@ import LectureActivateCodeForm, { LectureActivationTimer } from "./LectureActiva
 import LectureActivationCodesModal from "./LectureActivationCodesModal";
 
 const EASE = [0.22, 1, 0.36, 1];
+
+function normalizeLectureFile(file) {
+  if (!file || typeof file !== "object") return null;
+  return {
+    id: file.id,
+    courseId: file.courseId ?? file.course_id ?? null,
+    title: file.title || file.filename || file.name || "",
+    description: file.description || "",
+    originalName: file.originalName ?? file.original_name ?? file.filename ?? "",
+    fileSize: file.fileSize ?? file.file_size ?? 0,
+    createdAt: file.createdAt ?? file.created_at ?? file.uploaded_at ?? null,
+  };
+}
+
+function LecturePdfRow({ file, courseId, canManage, onEdit, onDelete }) {
+  const name = getCourseFileDisplayName(file);
+  const sizeLabel = formatCourseFileSize(file.fileSize);
+  const viewPath = buildCourseFileViewPath(courseId, file);
+
+  return (
+    <div
+      className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 transition-colors hover:border-purple-300 sm:flex-row sm:items-center sm:gap-3 sm:px-3.5 sm:py-2.5 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-purple-700"
+      dir="rtl"
+    >
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500 text-white">
+          <FaFilePdf className="text-sm" />
+        </div>
+        <div className="min-w-0 text-right">
+          <p className={`truncate ${lcBodySm} font-bold text-slate-800 dark:text-slate-100`}>{name}</p>
+          {sizeLabel ? <p className={`mt-0.5 ${lcLabel}`}>{sizeLabel}</p> : null}
+        </div>
+      </div>
+      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+        {viewPath ? (
+          <Link
+            to={viewPath}
+            className={`${crBtnSecondary} w-full !border-purple-200 !text-purple-600 hover:!bg-purple-50 sm:w-auto dark:!border-purple-800 dark:!text-purple-300`}
+          >
+            <FaEye />
+            عرض PDF
+          </Link>
+        ) : null}
+        {canManage ? (
+          <>
+            <button
+              type="button"
+              aria-label={`تعديل ${name}`}
+              className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-lg border border-slate-200 px-3 text-blue-600 hover:bg-blue-50 sm:h-auto sm:w-auto dark:border-slate-700 dark:hover:bg-blue-950/40"
+              onClick={() => onEdit(file)}
+            >
+              <FaEdit className="text-xs" />
+              <span className="ms-1.5 text-xs font-bold sm:hidden">تعديل</span>
+            </button>
+            <button
+              type="button"
+              aria-label={`حذف ${name}`}
+              className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-lg px-3 text-red-500 hover:bg-red-50 sm:h-auto sm:w-auto dark:hover:bg-red-950/40"
+              onClick={() => onDelete(file)}
+            >
+              <FaTrash className="text-xs" />
+              <span className="ms-1.5 text-xs font-bold sm:hidden">حذف</span>
+            </button>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 function getExamStatus(exam) {
   if (!exam) return null;
@@ -316,6 +396,8 @@ function AssignmentRow({
 const LectureCard = ({
   lecture,
   lectureIndex = 0,
+  courseId,
+  canManageCourseFiles = false,
   hideLectureAssignments = false,
   onRefreshCourse,
   isTourTarget = false,
@@ -334,13 +416,109 @@ const LectureCard = ({
 }) => {
   const toast = useToast();
   const codesModal = useDisclosure();
+  const uploadPdfModal = useDisclosure();
   const [expanded, setExpanded] = React.useState(false);
+  const [editFileTarget, setEditFileTarget] = React.useState(null);
+  const [deleteFileTarget, setDeleteFileTarget] = React.useState(null);
   const [visibilityLoading, setVisibilityLoading] = React.useState(false);
   const [isVisible, setIsVisible] = React.useState(lecture.is_visible ?? true);
   const [lectureExam, setLectureExam] = React.useState(null);
   const [examLoading, setExamLoading] = React.useState(false);
   const canManage = isTeacher || isAdmin;
   const lectureAccessMode = resolveLectureAccessMode(lecture);
+  const canManageFiles = canManageCourseFiles || canManage;
+  const resolvedCourseId = courseId ?? lecture.course_id ?? lecture.courseId;
+
+  const initialLectureFiles = React.useMemo(
+    () => (lecture.files || []).map(normalizeLectureFile).filter(Boolean),
+    [lecture.files],
+  );
+
+  const { data: lectureFiles = initialLectureFiles, refetch: refetchLectureFiles } = useLectureFiles(
+    lecture.id,
+    {
+      enabled: expanded && Boolean(lecture.id),
+      placeholderData: initialLectureFiles,
+    },
+  );
+
+  const { uploadMutation, updateMutation, deleteMutation } = useLectureFileMutations(
+    lecture.id,
+    resolvedCourseId,
+  );
+
+  const refreshLectureFiles = async () => {
+    await refetchLectureFiles();
+    onRefreshCourse?.();
+  };
+
+  const handleUploadPdf = async (payload) => {
+    try {
+      await uploadMutation.mutateAsync(payload);
+      toast({
+        title: "تم رفع الملف بنجاح",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+      uploadPdfModal.onClose();
+      await refreshLectureFiles();
+    } catch (err) {
+      toast({
+        title: "تعذّر رفع الملف",
+        description: courseFilesApiError(err),
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleEditPdf = async (payload) => {
+    if (!editFileTarget) return;
+    try {
+      await updateMutation.mutateAsync({ fileId: editFileTarget.id, ...payload });
+      toast({
+        title: "تم تحديث الملف بنجاح",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+      setEditFileTarget(null);
+      await refreshLectureFiles();
+    } catch (err) {
+      toast({
+        title: "تعذّر تحديث الملف",
+        description: courseFilesApiError(err),
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleDeletePdf = async () => {
+    if (!deleteFileTarget) return;
+    try {
+      await deleteMutation.mutateAsync(deleteFileTarget.id);
+      toast({
+        title: "تم حذف الملف بنجاح",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+      setDeleteFileTarget(null);
+      await refreshLectureFiles();
+    } catch (err) {
+      toast({
+        title: "تعذّر حذف الملف",
+        description: courseFilesApiError(err),
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
 
   const handleToggleVisibility = async (e) => {
     e.stopPropagation();
@@ -419,6 +597,7 @@ const LectureCard = ({
 
   const progress = lecture.progress;
   const videosCount = progress?.total_videos ?? lecture.videos?.length ?? 0;
+  const filesCount = lectureFiles.length;
   const watchedVideos = progress?.watched_videos ?? lecture.videos?.filter((v) => v.is_watched).length ?? 0;
 
   const assignments = getLectureAssignments(
@@ -554,6 +733,10 @@ const LectureCard = ({
                 <span className="inline-flex items-center gap-1.5">
                   <FaVideo className="text-[10px] text-blue-500" />
                   {videosCount} فيديو
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <FaFilePdf className="text-[10px] text-purple-500" />
+                  {filesCount} PDF
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                   <FaTasks className="text-[10px] text-orange-500" />
@@ -707,13 +890,58 @@ const LectureCard = ({
                       </p>
                     ) : (
                       <div className="grid grid-cols-1 gap-2.5">
-                        {lecture.videos.map((video, index) => (
+                        {(lecture.videos || []).map((video, index) => (
                           <VideoRow
                             key={video.id}
                             video={video}
                             index={index}
                             canManage={canManage}
                             handleDeleteVideo={handleDeleteVideo}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </section>
+
+                  <section
+                    className="space-y-3"
+                    data-tour-id={isTourTarget ? "course-lecture-files" : undefined}
+                  >
+                    <SectionHeading
+                      icon={FaFilePdf}
+                      label="ملفات PDF"
+                      count={filesCount}
+                      accent="orange"
+                      action={
+                        canManageFiles ? (
+                          <button
+                            type="button"
+                            className={`${crBtnSecondary} w-full !border-purple-200 !px-3.5 !py-2.5 !text-xs !text-purple-700 hover:!bg-purple-50 sm:w-auto sm:!py-2 dark:!border-purple-800 dark:!text-purple-300`}
+                            onClick={uploadPdfModal.onOpen}
+                            data-tour-id={isTourTarget ? "course-lecture-add-file" : undefined}
+                          >
+                            <FaPlus />
+                            إضافة PDF
+                          </button>
+                        ) : null
+                      }
+                    />
+                    {filesCount === 0 ? (
+                      <p className={`rounded-2xl border border-dashed border-slate-300 px-3 py-6 text-center ${lcLabel} dark:border-slate-700`}>
+                        {canManageFiles
+                          ? "لم تُضف ملفات PDF بعد — اضغط «إضافة PDF»"
+                          : "لا توجد ملفات PDF في هذه المحاضرة بعد"}
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-2.5">
+                        {lectureFiles.map((file) => (
+                          <LecturePdfRow
+                            key={file.id}
+                            file={file}
+                            courseId={resolvedCourseId}
+                            canManage={canManageFiles}
+                            onEdit={setEditFileTarget}
+                            onDelete={setDeleteFileTarget}
                           />
                         ))}
                       </div>
@@ -808,6 +1036,29 @@ const LectureCard = ({
           onCodesModalClosed?.();
         }}
         lecture={lecture}
+      />
+
+      <UploadCourseFileModal
+        isOpen={uploadPdfModal.isOpen}
+        onClose={() => !uploadMutation.isPending && uploadPdfModal.onClose()}
+        onSubmit={handleUploadPdf}
+        loading={uploadMutation.isPending}
+      />
+
+      <EditCourseFileModal
+        isOpen={Boolean(editFileTarget)}
+        onClose={() => !updateMutation.isPending && setEditFileTarget(null)}
+        file={editFileTarget}
+        onSubmit={handleEditPdf}
+        loading={updateMutation.isPending}
+      />
+
+      <DeleteCourseFileModal
+        isOpen={Boolean(deleteFileTarget)}
+        onClose={() => setDeleteFileTarget(null)}
+        file={deleteFileTarget}
+        onConfirm={handleDeletePdf}
+        loading={deleteMutation.isPending}
       />
     </motion.article>
   );

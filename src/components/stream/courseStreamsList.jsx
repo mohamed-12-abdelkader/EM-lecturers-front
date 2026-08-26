@@ -1,7 +1,6 @@
 import {
   Box,
   Flex,
-  Link,
   Text,
   Badge,
   IconButton,
@@ -22,7 +21,6 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import {
   FaPlay,
-  FaExternalLinkAlt,
   FaTimesCircle,
   FaEdit,
   FaTrash,
@@ -38,6 +36,7 @@ import {
 import { useState } from "react";
 import { toast } from "react-toastify";
 import baseUrl from "../../api/baseUrl";
+import MeetingRecordingPlayerModal from "./MeetingRecordingPlayerModal";
 import CourseFormModal, {
   CourseModalFieldCard,
   CourseModalFieldLabel,
@@ -88,6 +87,7 @@ function StreamRow({
   onEdit,
   onDelete,
   onDownload,
+  onWatchRecording,
 }) {
   const meta = STATUS_META[stream.status] || STATUS_META.ended;
   const isLive = stream.status === "started";
@@ -187,18 +187,16 @@ function StreamRow({
 
           {isEnded && stream.egress_url && (
             <Button
-              as={Link}
-              href={stream.egress_url}
-              isExternal
-              leftIcon={<Icon as={FaExternalLinkAlt} boxSize={3} />}
+              leftIcon={<Icon as={FaPlay} boxSize={3} />}
               variant="outline"
               colorScheme="blue"
               size="sm"
               borderRadius="lg"
               fontWeight="700"
               flex={{ base: 1, md: "initial" }}
+              onClick={() => onWatchRecording(stream)}
             >
-              التسجيل
+              مشاهدة التسجيل
             </Button>
           )}
 
@@ -281,6 +279,11 @@ const CourseStreamsList = ({ courseId, onCreateClick }) => {
   const [newTitle, setNewTitle] = useState("");
   const [deletingStream, setDeletingStream] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
+  const [recordingModal, setRecordingModal] = useState({
+    open: false,
+    url: "",
+    title: "",
+  });
   const [savingEdit, setSavingEdit] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -436,6 +439,13 @@ const CourseStreamsList = ({ courseId, onCreateClick }) => {
                 }}
                 onDelete={setDeletingStream}
                 onDownload={handleDownload}
+                onWatchRecording={(s) =>
+                  setRecordingModal({
+                    open: true,
+                    url: s.egress_url,
+                    title: s.title || "تسجيل المحاضرة",
+                  })
+                }
               />
             ))}
           </VStack>
@@ -521,6 +531,13 @@ const CourseStreamsList = ({ courseId, onCreateClick }) => {
           </Text>
         </Box>
       </CourseFormModal>
+
+      <MeetingRecordingPlayerModal
+        isOpen={recordingModal.open}
+        onClose={() => setRecordingModal({ open: false, url: "", title: "" })}
+        videoUrl={recordingModal.url}
+        title={recordingModal.title}
+      />
     </Box>
   );
 };

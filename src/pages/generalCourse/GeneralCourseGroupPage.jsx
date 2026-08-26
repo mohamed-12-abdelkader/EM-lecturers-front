@@ -56,6 +56,7 @@ import {
   FaSave,
 } from "react-icons/fa";
 import baseUrl from "../../api/baseUrl";
+import MeetingRecordingPlayerModal from "../../components/stream/MeetingRecordingPlayerModal";
 
 const STREAM_REDIRECT_URL = import.meta.env.VITE_STREAM_REDIRECT_URL || "";
 
@@ -131,6 +132,11 @@ export default function GeneralCourseGroupPage() {
   const [savingMeetingId, setSavingMeetingId] = useState(null);
   const [deletingMeetingId, setDeletingMeetingId] = useState(null);
   const [deleteMeetingTarget, setDeleteMeetingTarget] = useState(null);
+  const [recordingModal, setRecordingModal] = useState({
+    open: false,
+    url: "",
+    title: "",
+  });
 
   const getToken = () => localStorage.getItem("token");
 
@@ -1118,16 +1124,19 @@ export default function GeneralCourseGroupPage() {
                               )}
                               {m.status === "ended" && m.egress_url && (
                                 <Button
-                                  as="a"
-                                  href={m.egress_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
                                   size="sm"
                                   variant="outline"
                                   borderColor={brandBlue}
                                   color={brandBlue}
                                   _hover={{ bg: primaryBg }}
-                                  leftIcon={<Icon as={FaExternalLinkAlt} />}
+                                  leftIcon={<Icon as={FaPlay} />}
+                                  onClick={() =>
+                                    setRecordingModal({
+                                      open: true,
+                                      url: m.egress_url,
+                                      title: m.title || "تسجيل المحاضرة",
+                                    })
+                                  }
                                 >
                                   مشاهدة التسجيل
                                 </Button>
@@ -1492,6 +1501,13 @@ export default function GeneralCourseGroupPage() {
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      <MeetingRecordingPlayerModal
+        isOpen={recordingModal.open}
+        onClose={() => setRecordingModal({ open: false, url: "", title: "" })}
+        videoUrl={recordingModal.url}
+        title={recordingModal.title}
+      />
     </Box>
   );
 }

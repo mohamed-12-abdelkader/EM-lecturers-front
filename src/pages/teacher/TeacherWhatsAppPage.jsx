@@ -160,9 +160,19 @@ export default function TeacherWhatsAppPage() {
     try {
       const session = await getTeacherWaSession(slug);
       setQrModal({ open: true, session, loading: false });
-    } catch {
+    } catch (err) {
       setQrModal({ open: false, session: null, loading: false });
-      toast({ title: "تعذّر جلب رمز QR", status: "error" });
+      toast({
+        title: "تعذّر جلب رمز QR",
+        description:
+          err?.response?.data?.message ||
+          err?.response?.data?.errors ||
+          err?.message ||
+          "تحقق من بوابة واتساب وسجل الجلسة",
+        status: "error",
+        duration: 8000,
+        isClosable: true,
+      });
     }
   };
 

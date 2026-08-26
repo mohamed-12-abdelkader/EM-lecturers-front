@@ -28,9 +28,6 @@ const LecturesTab = ({
   handleAddVideo,
   handleEditVideo,
   handleDeleteVideo,
-  handleAddFile,
-  handleEditFile,
-  handleDeleteFile,
   setExamModal,
   setDeleteExamDialog,
   examActionLoading,
@@ -49,6 +46,7 @@ const LecturesTab = ({
   accessSettingsLoading,
   openCodesLectureId = null,
   onCodesModalClosed,
+  canManageCourseFiles = false,
 }) => (
   <VStack spacing={{ base: 4, md: 5 }} align="stretch" dir="rtl" className={lcRoot}>
     <Flex
@@ -118,6 +116,8 @@ const LecturesTab = ({
             key={lecture.id}
             lecture={lecture}
             lectureIndex={index}
+            courseId={courseId}
+            canManageCourseFiles={canManageCourseFiles}
             hideLectureAssignments={isCourseBasedAssignments}
             onRefreshCourse={onRefreshCourse}
             isTourTarget={
@@ -130,9 +130,6 @@ const LecturesTab = ({
             handleAddVideo={handleAddVideo}
             handleEditVideo={handleEditVideo}
             handleDeleteVideo={handleDeleteVideo}
-            handleAddFile={handleAddFile}
-            handleEditFile={handleEditFile}
-            handleDeleteFile={handleDeleteFile}
             setExamModal={setExamModal}
             setDeleteExamDialog={setDeleteExamDialog}
             examActionLoading={examActionLoading}
