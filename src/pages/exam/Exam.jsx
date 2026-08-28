@@ -28,7 +28,6 @@ import LectureExamStudentQuestionCard from "./components/LectureExamStudentQuest
 import ExamAttemptResultScreen from "./components/ExamAttemptResultScreen";
 import {
   buildExamSubmitAnswers,
-  submitExamKeepalive,
   normalizeExamQuestionsFromApi,
 } from "../../utils/examFlowUtils";
 import { normalizeExamAttemptResult } from "../../utils/examAttemptResultUtils";
@@ -82,8 +81,6 @@ const Exam = () => {
   const [imageUploadLoading, setImageUploadLoading] = useState(false);
   const [aiExtractionModalOpen, setAiExtractionModalOpen] = useState(false);
   const [examTourOpen, setExamTourOpen] = useState(false);
-  const [refreshWarningOpen, setRefreshWarningOpen] = useState(false);
-  const [refreshSubmitting, setRefreshSubmitting] = useState(false);
   const [blockedAttemptResult, setBlockedAttemptResult] = useState(null);
   const [questionsLoadError, setQuestionsLoadError] = useState(null);
   const questionImageInputRef = useRef(null);
@@ -94,9 +91,6 @@ const Exam = () => {
   const attemptIdRef = useRef(attemptId);
   const submitResultRef = useRef(submitResult);
   const submitLoadingRef = useRef(submitLoading);
-  const examStartedRef = useRef(examStarted);
-  const blurTimeoutRef = useRef(null);
-  const allowUnloadRef = useRef(false);
 
   const token = localStorage.getItem("token");
   const authHeaders = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
@@ -130,10 +124,6 @@ const Exam = () => {
   useEffect(() => {
     submitLoadingRef.current = submitLoading;
   }, [submitLoading]);
-
-  useEffect(() => {
-    examStartedRef.current = examStarted;
-  }, [examStarted]);
 
   const applyStudentSession = (data = {}) => {
     const exam = data.exam || {};
@@ -570,25 +560,11 @@ const Exam = () => {
           description: `الدرجة: ${result.totalGrade}/${result.maxGrade}`,
           status: "success",
         });
-      } else if (source !== "unload") {
-        toast({
-          title: "تم تسليم الامتحان تلقائياً",
-          description: "تم إنهاء المحاولة لأنك غادرت صفحة الامتحان.",
-          status: "warning",
-          duration: 5000,
-          isClosable: true,
-        });
       }
     } catch (err) {
       console.error("Error submitting exam:", err);
       const errorMessage = err?.response?.data?.message || "حدث خطأ غير متوقع";
-      if (source === "unload") {
-        submitExamKeepalive({
-          examId,
-          attemptId: attemptIdRef.current,
-          answers: answersArr,
-        });
-      } else if (!autoSubmit) {
+      if (!autoSubmit) {
         toast({ title: "فشل تسليم الامتحان", description: errorMessage, status: "error" });
       }
     } finally {
@@ -635,88 +611,6 @@ const Exam = () => {
       }
     };
   }, [remainingSeconds, submitResult, submitLoading, handleSubmitExam, toast]);
-
-  const triggerKeepaliveSubmit = useCallback(() => {
-    if (!examId || !attemptIdRef.current || submitResultRef.current || submitInFlightRef.current) {
-      return;
-    }
-    submitInFlightRef.current = true;
-    submitExamKeepalive({
-      examId,
-      attemptId: attemptIdRef.current,
-      answers: buildExamSubmitAnswers(studentAnswersRef.current),
-    });
-  }, [examId]);
-
-  const handleConfirmPageRefresh = useCallback(async () => {
-    setRefreshSubmitting(true);
-    allowUnloadRef.current = true;
-    try {
-      await handleSubmitExam(true, "refresh");
-    } catch {
-      triggerKeepaliveSubmit();
-    } finally {
-      setRefreshSubmitting(false);
-      setRefreshWarningOpen(false);
-      window.location.reload();
-    }
-  }, [handleSubmitExam, triggerKeepaliveSubmit]);
-
-  useEffect(() => {
-    if (!isStudentView || !examStarted || submitResult) return undefined;
-
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        handleSubmitExam(true, "visibility");
-      }
-    };
-
-    const handleWindowBlur = () => {
-      if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
-      blurTimeoutRef.current = setTimeout(() => {
-        if (!examStartedRef.current || submitResultRef.current || document.hidden) return;
-        if (!document.hasFocus()) {
-          handleSubmitExam(true, "blur");
-        }
-      }, 250);
-    };
-
-    const handleBeforeUnload = (event) => {
-      if (allowUnloadRef.current || submitResultRef.current) return;
-      event.preventDefault();
-      event.returnValue = "لو حدّثت الصفحة سيتم تسليم الامتحان تلقائياً.";
-      return event.returnValue;
-    };
-
-    const handlePageHide = () => {
-      if (allowUnloadRef.current || submitResultRef.current) return;
-      triggerKeepaliveSubmit();
-    };
-
-    const handleRefreshShortcut = (event) => {
-      const key = String(event.key || "").toLowerCase();
-      const isRefreshShortcut =
-        key === "f5" || ((event.ctrlKey || event.metaKey) && key === "r");
-      if (!isRefreshShortcut) return;
-      event.preventDefault();
-      setRefreshWarningOpen(true);
-    };
-
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    window.addEventListener("blur", handleWindowBlur);
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    window.addEventListener("pagehide", handlePageHide);
-    window.addEventListener("keydown", handleRefreshShortcut);
-
-    return () => {
-      if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      window.removeEventListener("blur", handleWindowBlur);
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      window.removeEventListener("pagehide", handlePageHide);
-      window.removeEventListener("keydown", handleRefreshShortcut);
-    };
-  }, [isStudentView, examStarted, submitResult, handleSubmitExam, triggerKeepaliveSubmit]);
 
   // للطالب: شاشة البدء أو التحميل قبل بدء المحاولة
   const studentPageBg = useColorModeValue("gray.100", "gray.900");
@@ -1418,53 +1312,6 @@ const Exam = () => {
         />
       )}
 
-      {isStudentView && examStarted && !submitResult && (
-        <Modal
-          isOpen={refreshWarningOpen}
-          onClose={() => !refreshSubmitting && setRefreshWarningOpen(false)}
-          isCentered
-          closeOnOverlayClick={!refreshSubmitting}
-          closeOnEsc={!refreshSubmitting}
-        >
-          <ModalOverlay bg="blackAlpha.700" backdropFilter="blur(4px)" />
-          <ModalContent mx={4} borderRadius="2xl" dir="rtl">
-            <ModalHeader pb={2}>تحذير قبل تحديث الصفحة</ModalHeader>
-            <ModalCloseButton isDisabled={refreshSubmitting} />
-            <ModalBody>
-              <VStack align="stretch" spacing={4}>
-                <Alert status="warning" borderRadius="xl">
-                  <AlertIcon />
-                  <Box>
-                    <Text fontWeight="bold" mb={1}>
-                      لو حدّثت الصفحة سيتم تسليم الامتحان فوراً
-                    </Text>
-                    <Text fontSize="sm" lineHeight="1.8">
-                      سيتم إرسال إجاباتك الحالية تلقائياً ولن تستطيع متابعة المحاولة بعد التحديث.
-                    </Text>
-                  </Box>
-                </Alert>
-              </VStack>
-            </ModalBody>
-            <ModalFooter gap={2}>
-              <Button
-                variant="ghost"
-                onClick={() => setRefreshWarningOpen(false)}
-                isDisabled={refreshSubmitting}
-              >
-                البقاء في الامتحان
-              </Button>
-              <Button
-                colorScheme="red"
-                onClick={handleConfirmPageRefresh}
-                isLoading={refreshSubmitting}
-                loadingText="جاري التسليم..."
-              >
-                تحديث الصفحة وتسليم الامتحان
-              </Button>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
-      )}
     </Box>
   );
 };
