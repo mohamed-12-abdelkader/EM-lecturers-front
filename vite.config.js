@@ -50,6 +50,10 @@ function devServiceWorkerKillSwitch() {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const isProd = mode === "production";
+  const appBuildId =
+    env.VITE_APP_BUILD_ID ||
+    process.env.GITHUB_SHA?.slice(0, 12) ||
+    `${Date.now().toString(36)}`;
   const proxyTarget = (
     env.VITE_API_PROXY_TARGET ||
     env.VITE_API_BASE_URL ||
@@ -57,6 +61,9 @@ export default defineConfig(({ mode }) => {
   ).replace(/\/$/, "");
 
   return {
+    define: {
+      __APP_BUILD_ID__: JSON.stringify(appBuildId),
+    },
     server: {
       port: 3000,
       host: true,
@@ -81,11 +88,6 @@ export default defineConfig(({ mode }) => {
           target: proxyTarget,
           changeOrigin: true,
           ws: true,
-          secure: false,
-        },
-        "/uploads": {
-          target: proxyTarget,
-          changeOrigin: true,
           secure: false,
         },
         "/storage": {

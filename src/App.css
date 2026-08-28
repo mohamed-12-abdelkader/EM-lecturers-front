@@ -8,55 +8,32 @@ body {
 .cardddd {
   width: 100 !important;
 }
-.header2 {
-  background-image: url(../public/hero-bg.png);
-  background-position: center;
-  background-size: cover;
-  background-repeat: no-repeat;
-}
-.book {
-  background-image: url(../public/banner-item-01.jpg);
-  background-position: center;
-  background-size: cover;
-  background-repeat: no-repeat;
-  border-radius: 10px;
-}
 .code {
   position: relative;
   border-radius: 10px;
-  overflow: hidden; /* لإخفاء أي شيء خارج الحدود */
-
-  /* الخلفية */
-  &::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 70%;
-    height: 70%;
-    background-image: url(../public/next\ logo.png);
-    background-position: center;
-    background-size: contain; /* لضمان تناسب الخلفية مع حجم العنصر */
-    background-repeat: no-repeat;
-    background-color: rgba(255, 255, 255, 0.3); /* زيادة الشفافية */
-    z-index: 0;
-  }
-
-  /* منع التأثير على المحتوى داخل العنصر */
-  & > * {
-    position: relative;
-    z-index: 2; /* رفع النصوص والعناصر فوق الخلفية */
-  }
+  overflow: hidden;
 }
 
-/* المحتوى */
-
-.month-content {
-  background-image: url(../public/start3.png);
+.code::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 70%;
+  height: 70%;
+  background-image: url("/next logo.png");
   background-position: center;
-  background-size: cover;
+  background-size: contain;
   background-repeat: no-repeat;
+  background-color: rgba(255, 255, 255, 0.3);
+  z-index: 0;
 }
+
+.code > * {
+  position: relative;
+  z-index: 2;
+}
+
 .hover-effect {
   transition: transform 0.3s ease-in-out;
 }
@@ -123,7 +100,7 @@ body {
   cursor: pointer;
   transition: 0.3s;
   display: flex;
-  align-items: end;
+  align-items: flex-end;
   text-decoration: none;
 }
 
@@ -134,7 +111,7 @@ body {
 }
 
 .links-container div h5 {
-  font: size 25px;
+  font-size: 25px;
   margin-right: 15px;
   text-decoration: none !important;
 }
@@ -355,10 +332,6 @@ body {
 .dotted-background {
   background-image: radial-gradient(white 15%, transparent 20%);
   background-size: 20px 20px;
-}
-
-.section-one {
-  background-image: url(../public/cb538a60-0865-4d86-8f2a-f7884951d90e.jpeg);
 }
 
 div::-webkit-scrollbar {

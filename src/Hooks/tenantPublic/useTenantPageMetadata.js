@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchTenantPageMetadata } from "../../api/tenantPublicApi";
 import { applyPageMetadata, buildTenantSeoMeta, isCompanyBrandingTitle } from "../../utils/tenantSeo";
+import { applyTenantPwaManifest } from "../../utils/tenantPwaManifest";
 
 /** عناوين عامة للشركة — نتجاهلها لو رجعت من الـ API بدل بيانات المدرس */
 function isCompanyBrandingMeta(meta) {
@@ -147,18 +148,13 @@ export function useTenantPageMetadata(subdomain, page = "home", slug, fallback) 
   useEffect(() => {
     if (!subdomain || !resolvedMeta) return undefined;
     applyPageMetadata(resolvedMeta);
-    // مزامنة مانيفست PWA مع اسم/لوجو المنصة
-    import("../../utils/tenantPwaManifest")
-      .then(({ applyTenantPwaManifest }) =>
-        applyTenantPwaManifest({
-          subdomain,
-          name: resolvedMeta.siteName || resolvedMeta.title,
-          description: resolvedMeta.description,
-          iconUrl: resolvedMeta.favicon || resolvedMeta.appleTouchIcon,
-          themeColor: resolvedMeta.themeColor,
-        }),
-      )
-      .catch(() => null);
+    applyTenantPwaManifest({
+      subdomain,
+      name: resolvedMeta.siteName || resolvedMeta.title,
+      description: resolvedMeta.description,
+      iconUrl: resolvedMeta.favicon || resolvedMeta.appleTouchIcon,
+      themeColor: resolvedMeta.themeColor,
+    });
     return undefined;
   }, [subdomain, resolvedMeta]);
 
