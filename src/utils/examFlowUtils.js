@@ -153,6 +153,38 @@ export function normalizeExamQuestionsFromApi(questionsArray) {
     .filter((item) => item && (item.id != null || item.text || item.image));
 }
 
+/** استخراج معرّف المحاولة من صيغ API مختلفة (camelCase / snake_case / nested) */
+export function extractExamAttemptId(source = {}) {
+  if (!source || typeof source !== "object") return null;
+
+  const attempt = source.attempt;
+  const hasStartPayload =
+    Array.isArray(source.questions) ||
+    source.examTitle != null ||
+    source.durationMinutes != null ||
+    source.timeLimitMinutes != null;
+
+  const candidates = [
+    source.attemptId,
+    source.attempt_id,
+    attempt?.attemptId,
+    attempt?.attempt_id,
+    attempt?.id,
+  ];
+
+  if (!attempt && hasStartPayload) {
+    candidates.push(source.id);
+  }
+
+  for (const value of candidates) {
+    if (value == null || value === "") continue;
+    const num = Number(value);
+    if (Number.isFinite(num) && num > 0) return num;
+  }
+
+  return null;
+}
+
 export function submitExamKeepalive({ examId, attemptId, answers = [] }) {
   if (typeof window === "undefined" || !examId || !attemptId) return;
 

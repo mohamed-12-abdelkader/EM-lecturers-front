@@ -29,6 +29,7 @@ import ExamAttemptResultScreen from "./components/ExamAttemptResultScreen";
 import {
   buildExamSubmitAnswers,
   normalizeExamQuestionsFromApi,
+  extractExamAttemptId,
 } from "../../utils/examFlowUtils";
 import { normalizeExamAttemptResult } from "../../utils/examAttemptResultUtils";
 import TeacherExamTour from "../../components/onboarding/TeacherExamTour";
@@ -125,11 +126,20 @@ const Exam = () => {
     submitLoadingRef.current = submitLoading;
   }, [submitLoading]);
 
+  const commitAttemptId = useCallback((value) => {
+    const num = Number(value);
+    const validId = Number.isFinite(num) && num > 0 ? num : null;
+    setAttemptId(validId);
+    attemptIdRef.current = validId;
+    return validId;
+  }, []);
+
   const applyStudentSession = (data = {}) => {
     const exam = data.exam || {};
     const attempt = data.attempt || null;
     const rawQuestions = data.questions ?? [];
-    const shouldRequireStart = Boolean(data.requiresStart) && !attempt && !data.attemptId;
+    const resolvedAttemptId = extractExamAttemptId(data);
+    const shouldRequireStart = !resolvedAttemptId || Boolean(data.requiresStart);
 
     const examTitle = exam.title ?? data.examTitle ?? "";
     const durationMinutes =
@@ -150,9 +160,9 @@ const Exam = () => {
       durationMinutes: durationMinutes ?? 0,
       questionsCount,
     });
-    setAttemptId(attempt?.attemptId ?? attempt?.id ?? data.attemptId ?? null);
+    commitAttemptId(resolvedAttemptId);
 
-    if (rawQuestions.length > 0 && !shouldRequireStart) {
+    if (rawQuestions.length > 0 && resolvedAttemptId && !shouldRequireStart) {
       const normalizedQuestions = normalizeExamQuestionsFromApi(rawQuestions);
       setQuestions(normalizedQuestions);
       setExamStarted(true);
@@ -173,7 +183,7 @@ const Exam = () => {
         data.remainingSeconds ??
         (durationMinutes != null && durationMinutes > 0 ? durationMinutes * 60 : null);
       setRemainingSeconds(remaining);
-    } else if (!shouldRequireStart && (attempt || data.attemptId)) {
+    } else if (resolvedAttemptId && !shouldRequireStart) {
       setExamStarted(true);
       if (!rawQuestions.length) {
         setQuestionsLoadError(
@@ -182,6 +192,27 @@ const Exam = () => {
       }
     }
   };
+
+  const ensureAttemptIdBeforeSubmit = useCallback(async () => {
+    const current = attemptIdRef.current;
+    if (current && Number.isFinite(Number(current)) && Number(current) > 0) {
+      return Number(current);
+    }
+
+    try {
+      const token = localStorage.getItem("token");
+      const headers = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+      const startRes = await baseUrl.post(`/api/exams/${examId}/start`, {}, headers);
+      let resolved = extractExamAttemptId(startRes.data || {});
+      if (!resolved) {
+        const getRes = await baseUrl.get(`/api/exams/${examId}`, headers);
+        resolved = extractExamAttemptId(getRes.data || {});
+      }
+      return commitAttemptId(resolved);
+    } catch {
+      return null;
+    }
+  }, [examId, commitAttemptId]);
 
   const loadExamSession = async () => {
     setSessionLoading(true);
@@ -274,6 +305,10 @@ const Exam = () => {
         ...sessionPayload,
         questions: rawQuestions,
       });
+
+      if (!extractExamAttemptId(sessionPayload)) {
+        throw new Error("لم يتم إنشاء محاولة للامتحان. حاول مرة أخرى.");
+      }
 
       if (!rawQuestions.length) {
         throw new Error("لم يتم تحميل أسئلة الامتحان");
@@ -516,9 +551,9 @@ const Exam = () => {
 
   // للطالب: تسليم الامتحان — نفس الطريقة في التطبيق المرجعي (نفس الـ endpoint ونفس صيغة الإجابات)
   const handleSubmitExam = useCallback(async (autoSubmit = false, source = "manual") => {
-    if (!examId || !attemptIdRef.current) {
+    if (!examId) {
       if (!autoSubmit) {
-        toast({ title: "خطأ", description: "لا توجد محاولة نشطة لتسليمها", status: "error" });
+        toast({ title: "خطأ", description: "معرّف الامتحان غير متاح", status: "error" });
       }
       return;
     }
@@ -539,9 +574,21 @@ const Exam = () => {
     const answersArr = buildExamSubmitAnswers(studentAnswersRef.current);
 
     try {
+      const activeAttemptId = await ensureAttemptIdBeforeSubmit();
+      if (!activeAttemptId) {
+        if (!autoSubmit) {
+          toast({
+            title: "فشل تسليم الامتحان",
+            description: "لا توجد محاولة نشطة. أعد بدء الامتحان ثم حاول مرة أخرى.",
+            status: "error",
+          });
+        }
+        return;
+      }
+
       const res = await baseUrl.post(
         `/api/exams/${examId}/submit`,
-        { attemptId: attemptIdRef.current, answers: answersArr },
+        { attemptId: activeAttemptId, answers: answersArr },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -571,7 +618,7 @@ const Exam = () => {
       setSubmitLoading(false);
       submitInFlightRef.current = false;
     }
-  }, [examId, toast]);
+  }, [examId, toast, ensureAttemptIdBeforeSubmit]);
 
   useEffect(() => {
     if (timerIntervalRef.current) {
