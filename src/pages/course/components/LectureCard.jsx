@@ -490,7 +490,6 @@ const LectureCard = ({
   const [visibilityLoading, setVisibilityLoading] = React.useState(false);
   const [isVisible, setIsVisible] = React.useState(lecture.is_visible ?? true);
   const [lectureExam, setLectureExam] = React.useState(null);
-  const [examLoading, setExamLoading] = React.useState(false);
   const canManage = isTeacher || isAdmin;
   const lectureAccessMode = resolveLectureAccessMode(lecture);
   const canManageFiles = canManageCourseFiles || canManage;
@@ -611,32 +610,15 @@ const LectureCard = ({
     }
   };
 
-  const fetchLectureExam = async () => {
-    if (!lecture.id) return;
-    setExamLoading(true);
-    try {
-      const token = localStorage.getItem("token");
-      const response = await baseUrl.get(`/api/course/lecture/${lecture.id}/exam`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setLectureExam(response.data.exam || response.data);
-    } catch {
-      setLectureExam(null);
-    } finally {
-      setExamLoading(false);
-    }
-  };
-
   React.useEffect(() => {
-    if (canManage) {
-      const existing = getLectureAssignments(lecture);
-      if (existing.length > 0) {
-        setLectureExam(existing[0]);
-      } else if (lecture.exam) {
-        setLectureExam(lecture.exam);
-      } else {
-        fetchLectureExam();
-      }
+    if (!canManage) return;
+    const existing = getLectureAssignments(lecture);
+    if (existing.length > 0) {
+      setLectureExam(existing[0]);
+    } else if (lecture.exam) {
+      setLectureExam(lecture.exam);
+    } else {
+      setLectureExam(null);
     }
   }, [lecture.id, lecture.exam, lecture.assignments, lecture.exams, canManage]);
 
@@ -1067,11 +1049,7 @@ const LectureCard = ({
                           ) : null
                         }
                       />
-                      {examLoading && canManage && !hasAssignments ? (
-                        <p className={`rounded-xl border border-dashed border-orange-200 bg-white/70 px-3 py-5 text-center ${lcLabel} dark:border-orange-900 dark:bg-slate-950/40`}>
-                          جاري تحميل الواجبات...
-                        </p>
-                      ) : hasAssignments ? (
+                      {hasAssignments ? (
                         <div className="grid grid-cols-1 gap-2.5">
                           {assignments.map((assignment) => (
                             <AssignmentRow

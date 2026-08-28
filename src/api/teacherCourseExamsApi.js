@@ -1,6 +1,6 @@
 import baseUrl from "./baseUrl";
 
-const API_PATH = "/api/teacher/course-exams";
+const API_PATH = "/api/exams/teacher";
 
 function authHeaders(token) {
   return token ? { Authorization: `Bearer ${token}` } : {};

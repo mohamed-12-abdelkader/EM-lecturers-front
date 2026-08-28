@@ -132,6 +132,10 @@ import { useCourseAssignments, courseAssignmentsQueryKey } from "../../Hooks/cou
 import { createCourseExam as postCourseExam, PER_LECTURE_ACCESS_MODES, resolveLectureAccessMode } from "../../api/courseAccessApi";
 import { PER_LECTURE_ACCESS_MODE_LABELS, PER_LECTURE_ACCESS_MODE_HINTS, toDateTimeLocalValue, lectureSupportsActivationCodes } from "../../utils/lectureAccessUtils";
 import { parseCourseExamsResponse } from "../../utils/courseLevelExamUtils";
+import {
+  fetchCourseExams as getCourseExams,
+  fetchStudentCourseExams,
+} from "../../api/courseExamsApi";
 import { useTeacherCourseGroups } from "../../Hooks/course/useCourseGroups";
 import CourseAssignmentsTab from "./components/CourseAssignmentsTab";
 import CourseAssignmentReportsPanel from "./components/CourseAssignmentReportsPanel";
@@ -976,20 +980,10 @@ const CourseDetailsPage = () => {
         setCourseExamsLoading(true);
         setCourseExamsError(null);
         // استخدام endpoint مختلف للطلاب مع timestamp لمنع الـ caching
-        const baseEndpoint =
-          isAdmin || isTeacher
-            ? `api/exams/course/${id}`
-            : `api/exams/course/${id}/student`;
-        const endpoint = `${baseEndpoint}?_t=${Date.now()}`;
-        const response = await baseUrl.get(endpoint, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Cache-Control": "no-cache",
-            Pragma: "no-cache",
-          },
-        });
-
-        setCourseExams(parseCourseExamsResponse(response?.data));
+        const exams = isAdmin || isTeacher
+          ? await getCourseExams(id, token)
+          : await fetchStudentCourseExams(id, token);
+        setCourseExams(exams);
         setCourseExamsError(null);
       } catch (error) {
         if (!(error.response?.status === 403 && !isAdmin && !isTeacher)) {
@@ -1040,20 +1034,10 @@ const CourseDetailsPage = () => {
       setCourseExamsLoading(true);
       setCourseExamsError(null);
       // استخدام endpoint مختلف للطلاب مع timestamp لمنع الـ caching
-      const baseEndpoint =
-        isAdmin || isTeacher
-          ? `api/exams/course/${id}`
-          : `api/exams/course/${id}/student`;
-      const endpoint = `${baseEndpoint}?_t=${Date.now()}`;
-      const response = await baseUrl.get(endpoint, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Cache-Control": "no-cache",
-          Pragma: "no-cache",
-        },
-      });
-
-      setCourseExams(parseCourseExamsResponse(response?.data));
+      const exams = isAdmin || isTeacher
+        ? await getCourseExams(id, token)
+        : await fetchStudentCourseExams(id, token);
+      setCourseExams(exams);
       setCourseExamsError(null);
     } catch (error) {
       if (!(error.response?.status === 403 && !isAdmin && !isTeacher)) {
@@ -1230,22 +1214,6 @@ const CourseDetailsPage = () => {
       window.removeEventListener(TOUR_CLOSE_COURSE_ASSIGNMENT_MODAL, closeCourseAssignment);
     };
   }, [fetchActivationCodes]);
-
-  // دالة جلب امتحان المحاضرة
-  const fetchLectureExam = async (lectureId) => {
-    try {
-      const response = await baseUrl.get(
-        `/api/course/lecture/${lectureId}/exam`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      return response.data;
-    } catch (error) {
-      console.log("Error fetching lecture exam:", error);
-      return null;
-    }
-  };
 
   // Colors for light and dark mode
   const pageBg = useColorModeValue("gray.50", "gray.900");
