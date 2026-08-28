@@ -15,6 +15,7 @@ import {
   ModalBody,
   ModalContent,
   ModalOverlay,
+  Progress,
   SimpleGrid,
   Text,
   VStack,
@@ -25,15 +26,19 @@ import {
   FiArrowRight,
   FiCheckCircle,
   FiChevronDown,
+  FiHelpCircle,
+  FiTrendingUp,
+  FiUsers,
   FiXCircle,
 } from "react-icons/fi";
-import { MdSort } from "react-icons/md";
+import { MdSort, MdOutlineAssignment } from "react-icons/md";
 import { Link, Navigate, useLocation, useParams } from "react-router-dom";
 import {
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -55,9 +60,12 @@ import {
 import { renderFormattedExamText } from "../../utils/renderFormattedExamText";
 
 const NAVY = "#0E4C92";
+const NAVY_DEEP = "#082B57";
 const ORANGE = "#DD6B20";
-const GREEN = "#16A34A";
+const GREEN = "#059669";
+const GREEN_SOFT = "#10B981";
 const RED = "#DC2626";
+const RED_SOFT = "#F87171";
 const AMBER = "#D97706";
 const SLATE = "#94A3B8";
 
@@ -84,31 +92,68 @@ function questionDifficulty(wrongCount, totalStudents) {
   return { label: "سهل", color: "green" };
 }
 
-function StatCard({ label, value, accent, hint }) {
+function StatCard({ label, value, accent = NAVY, hint, icon: StatIcon }) {
   const cardBg = useColorModeValue("white", "gray.900");
-  const border = useColorModeValue("gray.200", "gray.700");
   const muted = useColorModeValue("gray.500", "gray.400");
+  const borderColor = useColorModeValue("blackAlpha.100", "whiteAlpha.200");
+  const soft = useColorModeValue(`${accent}14`, "whiteAlpha.100");
 
   return (
     <Box
       bg={cardBg}
       borderWidth="1px"
-      borderColor={border}
-      borderRadius="xl"
+      borderColor={borderColor}
+      borderRadius="2xl"
       p={4}
-      textAlign="center"
+      position="relative"
+      overflow="hidden"
+      boxShadow="sm"
+      transition="transform 0.15s ease, box-shadow 0.15s ease"
+      _hover={{ transform: "translateY(-2px)", boxShadow: "md" }}
     >
-      <Text fontSize="xs" color={muted} mb={1}>
-        {label}
-      </Text>
-      <Text fontSize="2xl" fontWeight="bold" color={accent || "inherit"}>
-        {value}
-      </Text>
-      {hint ? (
-        <Text fontSize="xs" color={muted} mt={1}>
-          {hint}
-        </Text>
-      ) : null}
+      <Box
+        position="absolute"
+        insetInlineStart={0}
+        top={0}
+        bottom={0}
+        w="4px"
+        bg={accent}
+      />
+      <Flex align="flex-start" justify="space-between" gap={3}>
+        <Box minW={0}>
+          <Text fontSize="xs" fontWeight="semibold" color={muted} mb={1.5}>
+            {label}
+          </Text>
+          <Text
+            fontSize={{ base: "2xl", md: "3xl" }}
+            fontWeight="black"
+            color={accent}
+            lineHeight="1"
+            letterSpacing="-0.03em"
+          >
+            {value}
+          </Text>
+          {hint ? (
+            <Text fontSize="xs" color={muted} mt={2} noOfLines={1}>
+              {hint}
+            </Text>
+          ) : null}
+        </Box>
+        {StatIcon ? (
+          <Flex
+            w="42px"
+            h="42px"
+            borderRadius="xl"
+            align="center"
+            justify="center"
+            bg={soft}
+            color={accent}
+            flexShrink={0}
+          >
+            <Icon as={StatIcon} boxSize={5} />
+          </Flex>
+        ) : null}
+      </Flex>
     </Box>
   );
 }
@@ -116,45 +161,85 @@ function StatCard({ label, value, accent, hint }) {
 function ChartTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   const preview = payload[0]?.payload?.preview;
+  const total = payload.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
+
   return (
     <Box
       bg="white"
       color="gray.800"
       borderWidth="1px"
       borderColor="gray.200"
-      borderRadius="lg"
-      px={3}
-      py={2}
-      boxShadow="lg"
+      borderRadius="xl"
+      px={3.5}
+      py={3}
+      boxShadow="xl"
       fontSize="xs"
       dir="rtl"
-      maxW="240px"
+      maxW="260px"
     >
-      <Text fontWeight="bold" mb={0.5}>
+      <Text fontWeight="black" fontSize="sm" mb={0.5} color={NAVY}>
         {label}
       </Text>
       {preview ? (
-        <Text color="gray.500" mb={1} noOfLines={2}>
+        <Text color="gray.500" mb={2} noOfLines={2} lineHeight="1.5">
           {preview}
         </Text>
       ) : null}
-      {payload.map((item) => (
-        <Flex key={item.dataKey} justify="space-between" gap={4}>
-          <Text color="gray.500">{item.name}</Text>
-          <Text fontWeight="semibold">{item.value}</Text>
-        </Flex>
-      ))}
+      <VStack align="stretch" spacing={1.5}>
+        {payload.map((item) => (
+          <Flex key={item.dataKey} justify="space-between" gap={5} align="center">
+            <HStack spacing={1.5}>
+              <Box w="8px" h="8px" borderRadius="full" bg={item.color || item.fill} />
+              <Text color="gray.600">{item.name}</Text>
+            </HStack>
+            <Text fontWeight="bold">{item.value}</Text>
+          </Flex>
+        ))}
+      </VStack>
+      {total > 0 ? (
+        <Text mt={2} pt={2} borderTopWidth="1px" borderColor="gray.100" color="gray.500">
+          الإجمالي: <Text as="span" fontWeight="bold" color="gray.800">{total}</Text>
+        </Text>
+      ) : null}
+    </Box>
+  );
+}
+
+function PieTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const item = payload[0]?.payload;
+  if (!item) return null;
+  return (
+    <Box
+      bg="white"
+      borderWidth="1px"
+      borderColor="gray.200"
+      borderRadius="xl"
+      px={3}
+      py={2.5}
+      boxShadow="xl"
+      fontSize="xs"
+      dir="rtl"
+    >
+      <HStack spacing={2}>
+        <Box w="10px" h="10px" borderRadius="full" bg={item.color} />
+        <Text fontWeight="bold">{item.name}</Text>
+      </HStack>
+      <Text mt={1} color="gray.600">
+        {item.value} إجابة · {item.percent}%
+      </Text>
     </Box>
   );
 }
 
 function ReportCharts({ overall, questions }) {
   const cardBg = useColorModeValue("white", "gray.900");
-  const border = useColorModeValue("gray.200", "gray.700");
+  const border = useColorModeValue("blackAlpha.100", "whiteAlpha.200");
   const muted = useColorModeValue("gray.500", "gray.400");
   const titleColor = useColorModeValue("gray.900", "white");
   const grid = useColorModeValue("#E2E8F0", "#334155");
-  const tick = useColorModeValue("#64748B", "#94A3B8");
+  const tick = useColorModeValue("#475569", "#94A3B8");
+  const panelSoft = useColorModeValue("#F8FAFC", "whiteAlpha.50");
 
   const pieData = useMemo(() => {
     const correct = Number(overall.totalCorrect ?? 0);
@@ -163,36 +248,45 @@ function ReportCharts({ overall, questions }) {
       overall.totalUnanswered ??
         questions.reduce((sum, q) => sum + (q.unansweredCount ?? 0), 0),
     );
+    const total = correct + wrong + unanswered;
     return [
       { name: "صحيح", value: correct, color: GREEN },
       { name: "خطأ", value: wrong, color: RED },
       { name: "بدون إجابة", value: unanswered, color: AMBER },
-    ].filter((item) => item.value > 0);
+    ]
+      .filter((item) => item.value > 0)
+      .map((item) => ({
+        ...item,
+        percent: total > 0 ? Math.round((item.value / total) * 100) : 0,
+      }));
   }, [overall, questions]);
 
   const barData = useMemo(
     () =>
       questions.map((question, index) => {
+        const correct = question.correctCount ?? 0;
+        const wrong = question.wrongCount ?? 0;
+        const unanswered = question.unansweredCount ?? 0;
         const total =
-          question.statistics?.totalStudents ??
-          (question.correctCount ?? 0) + (question.wrongCount ?? 0);
+          question.statistics?.totalStudents ?? correct + wrong + unanswered;
         return {
           name: `س ${question.displayNumber ?? index + 1}`,
-          preview: stripQuestionPreview(question.questionText, 36),
-          صحيح: question.correctCount ?? 0,
-          خطأ: question.wrongCount ?? 0,
-          "بدون إجابة": question.unansweredCount ?? 0,
+          preview: stripQuestionPreview(question.questionText, 48),
+          صحيح: correct,
+          خطأ: wrong,
+          "بدون إجابة": unanswered,
           total,
+          successRate: total > 0 ? Math.round((correct / total) * 100) : 0,
         };
       }),
     [questions],
   );
 
   const pieTotal = pieData.reduce((sum, item) => sum + item.value, 0);
-  const chartHeight = Math.max(260, barData.length * 38);
+  const chartHeight = Math.min(520, Math.max(300, barData.length * 44));
 
   return (
-    <SimpleGrid columns={{ base: 1, lg: 5 }} spacing={4} alignItems="stretch">
+    <SimpleGrid columns={{ base: 1, lg: 5 }} spacing={5} alignItems="stretch">
       <Box
         gridColumn={{ lg: "span 2" }}
         bg={cardBg}
@@ -200,75 +294,101 @@ function ReportCharts({ overall, questions }) {
         borderColor={border}
         borderRadius="2xl"
         p={{ base: 4, md: 5 }}
+        boxShadow="sm"
       >
-        <Heading size="sm" color={titleColor} mb={1}>
-          توزيع الإجابات
-        </Heading>
-        <Text fontSize="xs" color={muted} mb={3}>
-          نظرة سريعة على الصحيح والخطأ وبدون إجابة
-        </Text>
+        <Flex justify="space-between" align="flex-start" mb={1} gap={3}>
+          <Box>
+            <Heading size="sm" color={titleColor}>
+              توزيع الإجابات
+            </Heading>
+            <Text fontSize="xs" color={muted} mt={1}>
+              نسبة الصحيح والخطأ وبدون إجابة على مستوى الامتحان
+            </Text>
+          </Box>
+          <Badge colorScheme="blue" variant="subtle" borderRadius="full" px={2.5}>
+            إجمالي {pieTotal}
+          </Badge>
+        </Flex>
+
         {pieTotal === 0 ? (
-          <Flex h="220px" align="center" justify="center">
+          <Flex h="260px" align="center" justify="center" bg={panelSoft} borderRadius="xl" mt={4}>
             <Text fontSize="sm" color={muted}>
               لا توجد إجابات بعد
             </Text>
           </Flex>
         ) : (
-          <Box position="relative" h="220px" dir="ltr">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={62}
-                  outerRadius={88}
-                  paddingAngle={3}
-                  stroke="none"
+          <>
+            <Box position="relative" h={{ base: "240px", md: "260px" }} dir="ltr" mt={2}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={70}
+                    outerRadius={100}
+                    paddingAngle={4}
+                    stroke="#fff"
+                    strokeWidth={3}
+                  >
+                    {pieData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
+                    <LabelList
+                      dataKey="percent"
+                      position="outside"
+                      formatter={(v) => `${v}%`}
+                      style={{ fontSize: 11, fontWeight: 700, fill: tick }}
+                    />
+                  </Pie>
+                  <Tooltip content={<PieTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+              <VStack
+                position="absolute"
+                top="50%"
+                left="50%"
+                transform="translate(-50%, -50%)"
+                spacing={0}
+                pointerEvents="none"
+              >
+                <Text fontSize="3xl" fontWeight="black" color={titleColor} lineHeight="1">
+                  {pieTotal}
+                </Text>
+                <Text fontSize="xs" fontWeight="semibold" color={muted}>
+                  إجابة
+                </Text>
+              </VStack>
+            </Box>
+
+            <SimpleGrid columns={pieData.length} spacing={2} mt={1}>
+              {pieData.map((item) => (
+                <Box
+                  key={item.name}
+                  bg={panelSoft}
+                  borderRadius="xl"
+                  px={3}
+                  py={2.5}
+                  textAlign="center"
+                  borderTopWidth="3px"
+                  borderTopColor={item.color}
                 >
-                  {pieData.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(value, name) => [`${value}`, name]}
-                  contentStyle={{
-                    borderRadius: 12,
-                    border: "1px solid #E2E8F0",
-                    fontSize: 12,
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            <VStack
-              position="absolute"
-              top="50%"
-              left="50%"
-              transform="translate(-50%, -50%)"
-              spacing={0}
-              pointerEvents="none"
-            >
-              <Text fontSize="2xl" fontWeight="black" color={titleColor} lineHeight="1">
-                {pieTotal}
-              </Text>
-              <Text fontSize="xs" color={muted}>
-                إجابة
-              </Text>
-            </VStack>
-          </Box>
+                  <Text fontSize="lg" fontWeight="black" color={item.color} lineHeight="1">
+                    {item.percent}%
+                  </Text>
+                  <Text fontSize="xs" color={muted} mt={1} fontWeight="semibold">
+                    {item.name}
+                  </Text>
+                  <Text fontSize="xs" color={muted}>
+                    {item.value}
+                  </Text>
+                </Box>
+              ))}
+            </SimpleGrid>
+          </>
         )}
-        <HStack spacing={4} justify="center" flexWrap="wrap" mt={1}>
-          {pieData.map((item) => (
-            <HStack key={item.name} spacing={1.5}>
-              <Box w="8px" h="8px" borderRadius="full" bg={item.color} />
-              <Text fontSize="xs" color={muted}>
-                {item.name} ({item.value})
-              </Text>
-            </HStack>
-          ))}
-        </HStack>
       </Box>
 
       <Box
@@ -278,48 +398,106 @@ function ReportCharts({ overall, questions }) {
         borderColor={border}
         borderRadius="2xl"
         p={{ base: 4, md: 5 }}
+        boxShadow="sm"
       >
-        <Heading size="sm" color={titleColor} mb={1}>
-          صعوبة الأسئلة
-        </Heading>
-        <Text fontSize="xs" color={muted} mb={3}>
-          مقارنة الصحيح والخطأ لكل سؤال حسب الترتيب الحالي
-        </Text>
+        <Flex justify="space-between" align="flex-start" mb={1} gap={3} flexWrap="wrap">
+          <Box>
+            <Heading size="sm" color={titleColor}>
+              أداء الأسئلة بالتفصيل
+            </Heading>
+            <Text fontSize="xs" color={muted} mt={1}>
+              شريط مكدّس يوضح الصحيح والخطأ وبدون إجابة لكل سؤال
+            </Text>
+          </Box>
+          <HStack spacing={3} fontSize="xs" color={muted} flexWrap="wrap">
+            <HStack spacing={1}>
+              <Box w="10px" h="10px" borderRadius="sm" bg={GREEN} />
+              <Text>صحيح</Text>
+            </HStack>
+            <HStack spacing={1}>
+              <Box w="10px" h="10px" borderRadius="sm" bg={RED} />
+              <Text>خطأ</Text>
+            </HStack>
+            <HStack spacing={1}>
+              <Box w="10px" h="10px" borderRadius="sm" bg={SLATE} />
+              <Text>بدون إجابة</Text>
+            </HStack>
+          </HStack>
+        </Flex>
+
         {barData.length === 0 ? (
-          <Flex h="220px" align="center" justify="center">
+          <Flex h="260px" align="center" justify="center" bg={panelSoft} borderRadius="xl" mt={4}>
             <Text fontSize="sm" color={muted}>
               لا توجد أسئلة لعرضها
             </Text>
           </Flex>
         ) : (
-          <Box h={`${chartHeight}px`} maxH="420px" dir="ltr">
+          <Box
+            h={`${chartHeight}px`}
+            maxH="520px"
+            mt={3}
+            dir="ltr"
+            bg={panelSoft}
+            borderRadius="xl"
+            px={2}
+            py={3}
+          >
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={barData}
                 layout="vertical"
-                margin={{ top: 4, right: 8, left: 8, bottom: 4 }}
-                barCategoryGap={10}
+                margin={{ top: 8, right: 28, left: 4, bottom: 8 }}
+                barCategoryGap="18%"
+                barSize={18}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke={grid} horizontal={false} />
-                <XAxis type="number" tick={{ fill: tick, fontSize: 11 }} allowDecimals={false} />
+                <CartesianGrid strokeDasharray="4 6" stroke={grid} horizontal={false} />
+                <XAxis
+                  type="number"
+                  tick={{ fill: tick, fontSize: 11, fontWeight: 600 }}
+                  allowDecimals={false}
+                  axisLine={{ stroke: grid }}
+                  tickLine={false}
+                />
                 <YAxis
                   type="category"
                   dataKey="name"
-                  width={42}
-                  tick={{ fill: tick, fontSize: 11 }}
+                  width={48}
+                  tick={{ fill: tick, fontSize: 12, fontWeight: 700 }}
+                  axisLine={false}
+                  tickLine={false}
                 />
                 <Tooltip
                   content={<ChartTooltip />}
-                  cursor={{ fill: "rgba(14, 76, 146, 0.06)" }}
+                  cursor={{ fill: "rgba(14, 76, 146, 0.08)" }}
                 />
-                <Bar dataKey="صحيح" stackId="answers" fill={GREEN} radius={[0, 0, 0, 0]} />
-                <Bar dataKey="خطأ" stackId="answers" fill={RED} />
+                <Bar dataKey="صحيح" stackId="answers" fill={GREEN} radius={[4, 0, 0, 4]}>
+                  {barData.map((entry) => (
+                    <Cell
+                      key={`ok-${entry.name}`}
+                      fill={entry.successRate >= 70 ? GREEN_SOFT : GREEN}
+                    />
+                  ))}
+                </Bar>
+                <Bar dataKey="خطأ" stackId="answers" fill={RED}>
+                  {barData.map((entry) => (
+                    <Cell
+                      key={`bad-${entry.name}`}
+                      fill={entry.خطأ > entry.صحيح ? RED_SOFT : RED}
+                    />
+                  ))}
+                </Bar>
                 <Bar
                   dataKey="بدون إجابة"
                   stackId="answers"
                   fill={SLATE}
-                  radius={[0, 6, 6, 0]}
-                />
+                  radius={[0, 4, 4, 0]}
+                >
+                  <LabelList
+                    dataKey="total"
+                    position="right"
+                    style={{ fontSize: 11, fontWeight: 700, fill: tick }}
+                  />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </Box>
@@ -355,7 +533,7 @@ function StudentList({ title, students, variant, showAnswer = false }) {
       bg={panelBg}
       borderWidth="1px"
       borderColor={panelBorder}
-      borderRadius="lg"
+      borderRadius="xl"
       overflow="hidden"
       h="full"
     >
@@ -363,7 +541,7 @@ function StudentList({ title, students, variant, showAnswer = false }) {
         as={hasStudents ? "button" : "div"}
         type={hasStudents ? "button" : undefined}
         w="full"
-        px={3}
+        px={3.5}
         py={3}
         align="center"
         justify="space-between"
@@ -384,9 +562,10 @@ function StudentList({ title, students, variant, showAnswer = false }) {
           </Text>
           <Badge
             colorScheme={isCorrect ? "green" : "red"}
-            variant="subtle"
+            variant="solid"
             borderRadius="full"
             px={2}
+            fontSize="xs"
           >
             {students.length}
           </Badge>
@@ -423,7 +602,7 @@ function StudentList({ title, students, variant, showAnswer = false }) {
                     direction={{ base: "column", sm: "row" }}
                     gap={2}
                     bg={cardBg}
-                    borderRadius="md"
+                    borderRadius="lg"
                     px={3}
                     py={2.5}
                     fontSize="sm"
@@ -439,6 +618,7 @@ function StudentList({ title, students, variant, showAnswer = false }) {
                         variant="subtle"
                         whiteSpace="normal"
                         textAlign="center"
+                        borderRadius="md"
                       >
                         {unanswered
                           ? "لم يُجِب"
@@ -461,10 +641,10 @@ function StudentList({ title, students, variant, showAnswer = false }) {
 
 function QuestionReportCard({ question, index, displayNumber, onZoomImage }) {
   const cardBg = useColorModeValue("white", "gray.900");
-  const border = useColorModeValue("gray.200", "gray.700");
+  const border = useColorModeValue("blackAlpha.100", "whiteAlpha.200");
   const muted = useColorModeValue("gray.500", "gray.400");
   const textColor = useColorModeValue("gray.800", "white");
-  const trackBg = useColorModeValue("gray.100", "whiteAlpha.200");
+  const headerBg = useColorModeValue("gray.50", "whiteAlpha.50");
   const correctBg = useColorModeValue("green.50", "whiteAlpha.100");
   const correctBorder = useColorModeValue("green.200", "green.700");
 
@@ -489,12 +669,16 @@ function QuestionReportCard({ question, index, displayNumber, onZoomImage }) {
       bg={cardBg}
       borderWidth="1px"
       borderColor={border}
-      borderRadius="xl"
+      borderRadius="2xl"
       overflow="hidden"
+      boxShadow="sm"
+      transition="box-shadow 0.15s ease"
+      _hover={{ boxShadow: "md" }}
     >
       <Flex
         px={4}
-        py={3}
+        py={3.5}
+        bg={headerBg}
         borderBottomWidth="1px"
         borderColor={border}
         justify="space-between"
@@ -502,31 +686,46 @@ function QuestionReportCard({ question, index, displayNumber, onZoomImage }) {
         gap={3}
         flexWrap="wrap"
       >
-        <HStack spacing={2}>
-          <Badge colorScheme="blue" borderRadius="md">
+        <HStack spacing={2} flexWrap="wrap">
+          <Badge
+            bg={NAVY}
+            color="white"
+            borderRadius="lg"
+            px={2.5}
+            py={1}
+            fontSize="xs"
+          >
             سؤال {displayNumber ?? index + 1}
           </Badge>
-          <Badge colorScheme={difficulty.color} variant="subtle">
+          <Badge colorScheme={difficulty.color} variant="subtle" borderRadius="full">
             {difficulty.label}
           </Badge>
           {wrongCount > 0 && (
-            <Badge colorScheme="orange" variant="subtle">
+            <Badge colorScheme="orange" variant="subtle" borderRadius="full">
               {wrongCount} خطأ
             </Badge>
           )}
         </HStack>
         <HStack spacing={3} fontSize="sm" flexWrap="wrap">
           <Text color={muted}>طلاب: {totalStudents}</Text>
-          <Text color="green.500">صحيح: {correctCount}</Text>
-          <Text color="red.500">خطأ: {wrongCount}</Text>
+          <Text color="green.500" fontWeight="semibold">
+            صحيح: {correctCount}
+          </Text>
+          <Text color="red.500" fontWeight="semibold">
+            خطأ: {wrongCount}
+          </Text>
           {unansweredCount > 0 && (
-            <Text color="orange.500">بدون إجابة: {unansweredCount}</Text>
+            <Text color="orange.500" fontWeight="semibold">
+              بدون إجابة: {unansweredCount}
+            </Text>
           )}
           {totalStudents > 0 && (
             <Badge
               colorScheme={
                 correctRate >= 70 ? "green" : correctRate >= 40 ? "yellow" : "red"
               }
+              borderRadius="full"
+              px={2.5}
             >
               {correctRate}% صح
             </Badge>
@@ -537,24 +736,44 @@ function QuestionReportCard({ question, index, displayNumber, onZoomImage }) {
       <Box px={4} py={4}>
         {totalStudents > 0 && (
           <Box mb={4}>
-            <Flex h="8px" bg={trackBg} borderRadius="full" overflow="hidden">
-              <Box w={`${correctRate}%`} bg={GREEN} />
+            <Flex justify="space-between" mb={1.5} fontSize="xs" color={muted}>
+              <Text>توزيع الإجابات</Text>
+              <Text fontWeight="bold">{correctRate}% نجاح</Text>
+            </Flex>
+            <Flex h="10px" bg="blackAlpha.100" borderRadius="full" overflow="hidden">
+              <Box w={`${correctRate}%`} bg={GREEN} transition="width 0.3s ease" />
               <Box w={`${wrongRate}%`} bg={RED} />
               <Box w={`${unansweredRate}%`} bg={SLATE} />
             </Flex>
           </Box>
         )}
 
-        <Box fontSize="sm" lineHeight="1.9" color={textColor} mb={question.questionImage ? 3 : 0}>
+        <Box
+          fontSize="sm"
+          lineHeight="1.9"
+          color={textColor}
+          mb={question.questionImage ? 3 : 0}
+        >
           {renderFormattedExamText(question.questionText || "")}
         </Box>
 
         {question.questionImage && (
-          <Box mb={4} cursor="pointer" onClick={() => onZoomImage(question.questionImage)}>
+          <Box
+            mb={4}
+            cursor="zoom-in"
+            onClick={() => onZoomImage(question.questionImage)}
+            borderRadius="xl"
+            overflow="hidden"
+            borderWidth="1px"
+            borderColor={border}
+            bg="blackAlpha.50"
+            p={2}
+          >
             <Image
               src={question.questionImage}
               alt={`صورة السؤال ${displayNumber ?? index + 1}`}
               maxH="240px"
+              mx="auto"
               borderRadius="lg"
               objectFit="contain"
             />
@@ -564,17 +783,17 @@ function QuestionReportCard({ question, index, displayNumber, onZoomImage }) {
         {(question.correctAnswer || question.correctAnswerText) && (
           <Box
             mb={4}
-            px={3}
-            py={2.5}
-            borderRadius="lg"
+            px={3.5}
+            py={3}
+            borderRadius="xl"
             bg={correctBg}
             borderWidth="1px"
             borderColor={correctBorder}
           >
-            <Text fontSize="xs" color={muted} mb={1}>
+            <Text fontSize="xs" color={muted} mb={1} fontWeight="semibold">
               الإجابة الصحيحة
             </Text>
-            <Text fontSize="sm" fontWeight="semibold" color={textColor}>
+            <Text fontSize="sm" fontWeight="bold" color={textColor}>
               {formatAnswerLabel(question.correctAnswer, question.correctAnswerText)}
             </Text>
           </Box>
@@ -595,7 +814,7 @@ function QuestionReportCard({ question, index, displayNumber, onZoomImage }) {
         </SimpleGrid>
 
         {wrongStudents.length > 0 && (
-          <Text fontSize="xs" color={muted} mt={2} textAlign="center">
+          <Text fontSize="xs" color={muted} mt={2.5} textAlign="center">
             اضغط على القسم لعرض من أخطأ وماذا اختار (آخر محاولة لكل طالب)
           </Text>
         )}
@@ -621,9 +840,9 @@ export default function ExamReportPage() {
   const [imageZoomSrc, setImageZoomSrc] = useState(null);
   const [sortDir, setSortDir] = useState("most-errors");
 
-  const pageBg = useColorModeValue("#F4F7FB", "gray.950");
+  const pageBg = useColorModeValue("#EEF3F9", "gray.950");
   const cardBg = useColorModeValue("white", "gray.900");
-  const border = useColorModeValue("gray.200", "gray.700");
+  const border = useColorModeValue("blackAlpha.100", "whiteAlpha.200");
   const muted = useColorModeValue("gray.500", "gray.400");
   const titleColor = useColorModeValue("gray.900", "white");
   const warnBg = useColorModeValue("orange.50", "whiteAlpha.100");
@@ -746,62 +965,113 @@ export default function ExamReportPage() {
             alignSelf="flex-start"
             leftIcon={<Icon as={FiArrowRight} />}
             color={muted}
-            _hover={{ color: titleColor }}
+            _hover={{ color: titleColor, bg: "blackAlpha.50" }}
           >
             العودة للامتحان
           </Button>
 
           <Box
-            bg={cardBg}
-            borderWidth="1px"
-            borderColor={border}
             borderRadius="2xl"
             overflow="hidden"
+            boxShadow="lg"
+            bg={`linear-gradient(125deg, ${NAVY_DEEP} 0%, ${NAVY} 55%, #1A6BB8 100%)`}
+            color="white"
+            position="relative"
           >
-            <Box h="3px" bgGradient={`linear(to-l, ${NAVY}, ${ORANGE})`} />
-            <Box p={{ base: 5, md: 6 }}>
-              <Text fontSize="xs" fontWeight="semibold" color={muted} mb={1}>
-                {kind === "course-level" ? "تقرير الامتحان الشامل" : "تقرير الواجب / امتحان المحاضرة"}
-              </Text>
-              <Heading size="lg" color={titleColor} mb={2}>
+            <Box
+              position="absolute"
+              inset={0}
+              opacity={0.18}
+              pointerEvents="none"
+              backgroundImage="radial-gradient(circle at 20% 20%, white 0, transparent 45%), radial-gradient(circle at 90% 10%, #F6AD55 0, transparent 35%)"
+            />
+            <Box position="relative" p={{ base: 5, md: 7 }}>
+              <HStack spacing={2} mb={3} flexWrap="wrap">
+                <Badge bg="whiteAlpha.200" color="white" borderRadius="full" px={3}>
+                  {kind === "course-level"
+                    ? "تقرير الامتحان الشامل"
+                    : "تقرير الواجب / امتحان المحاضرة"}
+                </Badge>
+                <Badge bg={ORANGE} color="white" borderRadius="full" px={3}>
+                  آخر محاولة لكل طالب
+                </Badge>
+              </HStack>
+
+              <Heading
+                size={{ base: "md", md: "lg" }}
+                mb={3}
+                letterSpacing="-0.02em"
+                lineHeight="1.35"
+              >
                 {reportExam.title || "امتحان"}
               </Heading>
-              <HStack spacing={4} flexWrap="wrap" fontSize="sm" color={muted}>
+
+              <HStack spacing={3} flexWrap="wrap" fontSize="sm" opacity={0.92}>
                 {reportExam.courseTitle && <Text>الكورس: {reportExam.courseTitle}</Text>}
                 {reportExam.lectureTitle && <Text>المحاضرة: {reportExam.lectureTitle}</Text>}
                 {reportExam.scope && (
-                  <Badge colorScheme={reportExam.scope === "lecture" ? "purple" : "orange"} variant="subtle">
+                  <Badge bg="whiteAlpha.250" color="white" borderRadius="full">
                     {reportExam.scope === "lecture" ? "محاضرة" : "واجب كورس"}
                   </Badge>
                 )}
                 {reportExam.type && (
-                  <Badge colorScheme="blue" variant="subtle">
+                  <Badge bg="whiteAlpha.250" color="white" borderRadius="full">
                     {reportExam.type === "exam" ? "امتحان" : "واجب"}
                   </Badge>
                 )}
-                <Text>عدد الأسئلة: {reportExam.questionsCount ?? overall.totalQuestions ?? 0}</Text>
-                <Text color="blue.500">آخر محاولة لكل طالب</Text>
+                <Text>
+                  عدد الأسئلة: {reportExam.questionsCount ?? overall.totalQuestions ?? 0}
+                </Text>
               </HStack>
+
+              {displayedQuestions.length > 0 && (
+                <Box mt={5} maxW="420px">
+                  <Flex justify="space-between" mb={1.5} fontSize="xs" opacity={0.9}>
+                    <Text>نسبة الصحة العامة</Text>
+                    <Text fontWeight="bold">{accuracy}%</Text>
+                  </Flex>
+                  <Progress
+                    value={accuracy}
+                    size="sm"
+                    borderRadius="full"
+                    bg="whiteAlpha.300"
+                    sx={{
+                      "& > div": {
+                        background: `linear-gradient(90deg, ${ORANGE}, #F6E05E)`,
+                      },
+                    }}
+                  />
+                </Box>
+              )}
             </Box>
           </Box>
 
           {displayedQuestions.length > 0 && (
-            <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
-              <StatCard label="عدد الطلاب" value={overall.totalStudents ?? 0} />
+            <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4}>
+              <StatCard
+                label="عدد الطلاب"
+                value={overall.totalStudents ?? 0}
+                accent={NAVY}
+                icon={FiUsers}
+              />
               <StatCard
                 label="عدد الأسئلة"
                 value={overall.totalQuestions ?? displayedQuestions.length}
+                accent="#1D4ED8"
+                icon={MdOutlineAssignment}
               />
               <StatCard
                 label="نسبة الصحة"
                 value={`${accuracy}%`}
-                accent="green.500"
+                accent={GREEN}
                 hint={`${overall.totalCorrect ?? 0} إجابة صحيحة`}
+                icon={FiTrendingUp}
               />
               <StatCard
                 label="إجابات خاطئة"
                 value={overall.totalWrong ?? 0}
-                accent="red.500"
+                accent={RED}
+                icon={FiHelpCircle}
               />
             </SimpleGrid>
           )}
@@ -815,17 +1085,33 @@ export default function ExamReportPage() {
               bg={warnBg}
               borderWidth="1px"
               borderColor={warnBorder}
-              borderRadius="xl"
-              p={4}
+              borderRadius="2xl"
+              p={{ base: 4, md: 5 }}
+              boxShadow="sm"
             >
-              <HStack spacing={2} mb={3}>
-                <Icon as={FiAlertCircle} color="orange.500" />
-                <Heading size="sm" color={titleColor}>
-                  أكثر الأسئلة إثارة للمشاكل
-                </Heading>
+              <HStack spacing={2} mb={4}>
+                <Flex
+                  w="36px"
+                  h="36px"
+                  borderRadius="lg"
+                  align="center"
+                  justify="center"
+                  bg="orange.100"
+                  color="orange.600"
+                >
+                  <Icon as={FiAlertCircle} boxSize={5} />
+                </Flex>
+                <Box>
+                  <Heading size="sm" color={titleColor}>
+                    أكثر الأسئلة إثارة للمشاكل
+                  </Heading>
+                  <Text fontSize="xs" color={muted}>
+                    ركّز عليها في المراجعة القادمة
+                  </Text>
+                </Box>
               </HStack>
-              <VStack align="stretch" spacing={2}>
-                {problematic.map((item) => (
+              <VStack align="stretch" spacing={2.5}>
+                {problematic.map((item, idx) => (
                   <Flex
                     key={item.questionId}
                     justify="space-between"
@@ -833,12 +1119,24 @@ export default function ExamReportPage() {
                     gap={3}
                     fontSize="sm"
                     flexWrap="wrap"
+                    bg={cardBg}
+                    borderRadius="xl"
+                    px={3.5}
+                    py={3}
+                    borderWidth="1px"
+                    borderColor={border}
                   >
-                    <Text noOfLines={1} flex={1} minW={0}>
-                      {renderFormattedExamText(item.questionText || "")}
-                    </Text>
-                    <Badge colorScheme="red" variant="subtle">
-                      {item.wrongAnswers ?? item.wrongCount ?? 0} خطأ ({item.wrongPercentage ?? 0}%)
+                    <HStack spacing={3} minW={0} flex={1}>
+                      <Badge colorScheme="orange" borderRadius="full">
+                        #{idx + 1}
+                      </Badge>
+                      <Text noOfLines={1} flex={1} minW={0} fontWeight="medium">
+                        {renderFormattedExamText(item.questionText || "")}
+                      </Text>
+                    </HStack>
+                    <Badge colorScheme="red" variant="solid" borderRadius="full" px={3}>
+                      {item.wrongAnswers ?? item.wrongCount ?? 0} خطأ (
+                      {item.wrongPercentage ?? 0}%)
                     </Badge>
                   </Flex>
                 ))}
@@ -851,11 +1149,14 @@ export default function ExamReportPage() {
               bg={cardBg}
               borderWidth="1px"
               borderColor={border}
-              borderRadius="xl"
-              p={8}
+              borderRadius="2xl"
+              p={10}
               textAlign="center"
+              boxShadow="sm"
             >
-              <Text color={muted}>لا توجد بيانات في التقرير بعد — لم يُسلِّم أي طالب المحاولة.</Text>
+              <Text color={muted}>
+                لا توجد بيانات في التقرير بعد — لم يُسلِّم أي طالب المحاولة.
+              </Text>
             </Box>
           ) : (
             <VStack spacing={4} align="stretch">
@@ -864,6 +1165,13 @@ export default function ExamReportPage() {
                 align={{ base: "stretch", md: "center" }}
                 gap={3}
                 direction={{ base: "column", md: "row" }}
+                bg={cardBg}
+                borderWidth="1px"
+                borderColor={border}
+                borderRadius="2xl"
+                px={{ base: 4, md: 5 }}
+                py={4}
+                boxShadow="sm"
               >
                 <Box>
                   <Heading size="sm" color={titleColor}>

@@ -131,6 +131,7 @@ import { useCourseAccessSettings } from "../../Hooks/course/useCourseAccessSetti
 import { useCourseAssignments, courseAssignmentsQueryKey } from "../../Hooks/course/useCourseAssignments";
 import { createCourseExam as postCourseExam, PER_LECTURE_ACCESS_MODES, resolveLectureAccessMode } from "../../api/courseAccessApi";
 import { PER_LECTURE_ACCESS_MODE_LABELS, PER_LECTURE_ACCESS_MODE_HINTS, toDateTimeLocalValue, lectureSupportsActivationCodes } from "../../utils/lectureAccessUtils";
+import { parseCourseExamsResponse } from "../../utils/courseLevelExamUtils";
 import { useTeacherCourseGroups } from "../../Hooks/course/useCourseGroups";
 import CourseAssignmentsTab from "./components/CourseAssignmentsTab";
 import CourseAssignmentReportsPanel from "./components/CourseAssignmentReportsPanel";
@@ -977,7 +978,7 @@ const CourseDetailsPage = () => {
         // استخدام endpoint مختلف للطلاب مع timestamp لمنع الـ caching
         const baseEndpoint =
           isAdmin || isTeacher
-            ? `api/course/${id}/course-exams`
+            ? `api/exams/course/${id}`
             : `api/exams/course/${id}/student`;
         const endpoint = `${baseEndpoint}?_t=${Date.now()}`;
         const response = await baseUrl.get(endpoint, {
@@ -988,35 +989,8 @@ const CourseDetailsPage = () => {
           },
         });
 
-        // التحقق من وجود البيانات في response.data
-        const responseData = response?.data;
-
-        // معالجة البيانات - التحقق من جميع الحالات الممكنة
-        let examsData = null;
-
-        if (responseData) {
-          // الحالة 1: البيانات في responseData.exams
-          if (
-            responseData.exams !== undefined &&
-            responseData.exams !== null &&
-            Array.isArray(responseData.exams)
-          ) {
-            examsData = responseData.exams;
-          }
-          // الحالة 2: البيانات مصفوفة مباشرة
-          else if (Array.isArray(responseData)) {
-            examsData = responseData;
-          }
-        }
-
-        // تعيين البيانات في state
-        if (examsData && Array.isArray(examsData)) {
-          setCourseExams(examsData);
-          setCourseExamsError(null);
-        } else {
-          setCourseExams([]);
-          setCourseExamsError(null);
-        }
+        setCourseExams(parseCourseExamsResponse(response?.data));
+        setCourseExamsError(null);
       } catch (error) {
         if (!(error.response?.status === 403 && !isAdmin && !isTeacher)) {
           console.error("Error fetching course exams:", error);
@@ -1068,7 +1042,7 @@ const CourseDetailsPage = () => {
       // استخدام endpoint مختلف للطلاب مع timestamp لمنع الـ caching
       const baseEndpoint =
         isAdmin || isTeacher
-          ? `api/course/${id}/course-exams`
+          ? `api/exams/course/${id}`
           : `api/exams/course/${id}/student`;
       const endpoint = `${baseEndpoint}?_t=${Date.now()}`;
       const response = await baseUrl.get(endpoint, {
@@ -1079,35 +1053,8 @@ const CourseDetailsPage = () => {
         },
       });
 
-      // التحقق من وجود البيانات في response.data
-      const responseData = response?.data;
-
-      // معالجة البيانات - التحقق من جميع الحالات الممكنة
-      let examsData = null;
-
-      if (responseData) {
-        // الحالة 1: البيانات في responseData.exams
-        if (
-          responseData.exams !== undefined &&
-          responseData.exams !== null &&
-          Array.isArray(responseData.exams)
-        ) {
-          examsData = responseData.exams;
-        }
-        // الحالة 2: البيانات مصفوفة مباشرة
-        else if (Array.isArray(responseData)) {
-          examsData = responseData;
-        }
-      }
-
-      // تعيين البيانات في state
-      if (examsData && Array.isArray(examsData)) {
-        setCourseExams(examsData);
-        setCourseExamsError(null);
-      } else {
-        setCourseExams([]);
-        setCourseExamsError(null);
-      }
+      setCourseExams(parseCourseExamsResponse(response?.data));
+      setCourseExamsError(null);
     } catch (error) {
       if (!(error.response?.status === 403 && !isAdmin && !isTeacher)) {
         console.error("Error refreshing course exams:", error);

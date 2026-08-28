@@ -92,11 +92,11 @@ function LecturePdfRow({ file, courseId, canManage, onEdit, onDelete }) {
 
   return (
     <div
-      className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 transition-colors hover:border-purple-300 sm:flex-row sm:items-center sm:gap-3 sm:px-3.5 sm:py-2.5 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-purple-700"
+      className="flex flex-col gap-3 rounded-xl border border-violet-100 bg-white p-3 transition-colors hover:border-violet-300 sm:flex-row sm:items-center sm:gap-3 sm:px-3.5 sm:py-2.5 dark:border-violet-900/50 dark:bg-slate-900 dark:hover:border-violet-700"
       dir="rtl"
     >
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-500 text-white">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white shadow-sm">
           <FaFilePdf className="text-sm" />
         </div>
         <div className="min-w-0 text-right">
@@ -108,10 +108,10 @@ function LecturePdfRow({ file, courseId, canManage, onEdit, onDelete }) {
         {viewPath ? (
           <Link
             to={viewPath}
-            className={`${crBtnSecondary} w-full !border-purple-200 !text-purple-600 hover:!bg-purple-50 sm:w-auto dark:!border-purple-800 dark:!text-purple-300`}
+            className={`${crBtnSecondary} w-full !border-violet-200 !text-violet-700 hover:!bg-violet-50 sm:w-auto dark:!border-violet-800 dark:!text-violet-300`}
           >
             <FaEye />
-            عرض PDF
+            عرض الملف
           </Link>
         ) : null}
         {canManage ? (
@@ -192,31 +192,98 @@ function ProgressRing({ percent }) {
   );
 }
 
-/** عنوان قسم داخل جسم المحاضرة (الفيديوهات / الواجبات) */
-function SectionHeading({ icon: IconComp, label, count, accent, action }) {
+/** عنوان قسم داخل جسم المحاضرة (الفيديوهات / الملفات / الواجبات) */
+function SectionHeading({ icon: IconComp, label, count, accent = "blue", hint, action }) {
+  const tones = {
+    blue: {
+      icon: "bg-blue-500 shadow-[0_6px_14px_rgba(59,130,246,0.28)]",
+      badge: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
+    },
+    purple: {
+      icon: "bg-violet-600 shadow-[0_6px_14px_rgba(124,58,237,0.28)]",
+      badge: "bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300",
+    },
+    orange: {
+      icon: "bg-orange-500 shadow-[0_6px_14px_rgba(249,115,22,0.28)]",
+      badge: "bg-orange-50 text-orange-700 dark:bg-orange-950/50 dark:text-orange-300",
+    },
+  };
+  const tone = tones[accent] || tones.blue;
+
   return (
     <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-2.5">
+      <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
         <div
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white sm:h-9 sm:w-9 ${
-            accent === "orange" ? "bg-orange-500" : "bg-blue-500"
-          }`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white sm:h-10 sm:w-10 ${tone.icon}`}
         >
-          <IconComp className="text-xs sm:text-sm" />
+          <IconComp className="text-sm" />
         </div>
-        <h4 className={`${lcTitleSm} !text-sm sm:!text-base`}>{label}</h4>
-        <span
-          className={`rounded-full px-2 py-0.5 sm:px-2.5 ${lcBadge} ${
-            accent === "orange"
-              ? "bg-orange-50 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400"
-              : "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400"
-          }`}
-        >
-          {count}
-        </span>
+        <div className="min-w-0 text-right">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className={`${lcTitleSm} !text-sm sm:!text-base`}>{label}</h4>
+            <span className={`rounded-full px-2.5 py-0.5 ${lcBadge} ${tone.badge}`}>
+              {count}
+            </span>
+          </div>
+          {hint ? <p className={`mt-0.5 ${lcCaption}`}>{hint}</p> : null}
+        </div>
       </div>
       {action ? <div className="w-full sm:w-auto">{action}</div> : null}
     </div>
+  );
+}
+
+/** لوحة قسم بمحتوى واضح داخل المحاضرة */
+function ContentSection({ accent = "blue", children, className = "", ...rest }) {
+  const tones = {
+    blue: "border-blue-200/80 bg-gradient-to-b from-blue-50/90 to-white dark:border-blue-900/60 dark:from-blue-950/30 dark:to-slate-900",
+    purple:
+      "border-violet-200/80 bg-gradient-to-b from-violet-50/90 to-white dark:border-violet-900/60 dark:from-violet-950/30 dark:to-slate-900",
+    orange:
+      "border-orange-200/80 bg-gradient-to-b from-orange-50/90 to-white dark:border-orange-900/60 dark:from-orange-950/30 dark:to-slate-900",
+  };
+  const bar = {
+    blue: "bg-blue-500",
+    purple: "bg-violet-600",
+    orange: "bg-orange-500",
+  };
+
+  return (
+    <section
+      className={`relative overflow-hidden rounded-2xl border p-3.5 sm:p-4 ${tones[accent] || tones.blue} ${className}`}
+      {...rest}
+    >
+      <span
+        className={`absolute inset-y-3 start-0 w-1 rounded-full ${bar[accent] || bar.blue}`}
+        aria-hidden
+      />
+      <div className="space-y-3 ps-2 sm:ps-3">{children}</div>
+    </section>
+  );
+}
+
+/** شريحة ملخص عنصر داخل الهيدر */
+function ContentChip({ icon: IconComp, label, count, tone = "blue", active = true }) {
+  const tones = {
+    blue: active
+      ? "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300"
+      : "border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400",
+    purple: active
+      ? "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300"
+      : "border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400",
+    orange: active
+      ? "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-300"
+      : "border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400",
+  };
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold sm:text-xs ${tones[tone]}`}
+    >
+      <IconComp className="text-[10px]" />
+      <span>{count}</span>
+      <span className="opacity-80">{label}</span>
+    </span>
   );
 }
 
@@ -728,20 +795,29 @@ const LectureCard = ({
               {lectureDescription && (
                 <p className={`mt-1 line-clamp-2 sm:mt-1.5 ${lcBody}`}>{lectureDescription}</p>
               )}
-              {/* ملخص المحتوى */}
-              <div className={`mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 ${lcCaption}`}>
-                <span className="inline-flex items-center gap-1.5">
-                  <FaVideo className="text-[10px] text-blue-500" />
-                  {videosCount} فيديو
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <FaFilePdf className="text-[10px] text-purple-500" />
-                  {filesCount} PDF
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <FaTasks className="text-[10px] text-orange-500" />
-                  {hideLectureAssignments ? "واجبات الكورس" : `${assignmentsCount} واجب`}
-                </span>
+              {/* ملخص عناصر المحاضرة */}
+              <div className="mt-2.5 flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <ContentChip
+                  icon={FaVideo}
+                  label="فيديو"
+                  count={videosCount}
+                  tone="blue"
+                  active={videosCount > 0}
+                />
+                <ContentChip
+                  icon={FaFilePdf}
+                  label="ملف"
+                  count={filesCount}
+                  tone="purple"
+                  active={filesCount > 0}
+                />
+                <ContentChip
+                  icon={FaTasks}
+                  label={hideLectureAssignments ? "واجبات الكورس" : "واجب"}
+                  count={hideLectureAssignments ? "—" : assignmentsCount}
+                  tone="orange"
+                  active={!hideLectureAssignments && assignmentsCount > 0}
+                />
               </div>
 
               {/* زر فتح / إغلاق المحاضرة */}
@@ -859,10 +935,14 @@ const LectureCard = ({
                   )}
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-4">
+                  <p className={`${lcCaption} px-0.5`}>
+                    عناصر المحاضرة: فيديوهات · ملفات · واجبات
+                  </p>
+
                   {/* الفيديوهات */}
-                  <section
-                    className="space-y-3"
+                  <ContentSection
+                    accent="blue"
                     data-tour-id={isTourTarget ? "course-lecture-videos" : undefined}
                   >
                     <SectionHeading
@@ -870,6 +950,7 @@ const LectureCard = ({
                       label="الفيديوهات"
                       count={videosCount}
                       accent="blue"
+                      hint="شاهد دروس المحاضرة بالترتيب"
                       action={
                         canManage ? (
                           <button
@@ -885,8 +966,10 @@ const LectureCard = ({
                       }
                     />
                     {videosCount === 0 ? (
-                      <p className={`rounded-2xl border border-dashed border-slate-300 px-3 py-6 text-center ${lcLabel} dark:border-slate-700`}>
-                        {canManage ? "لم تُضف فيديوهات بعد — ابدأ بإضافة أول فيديو" : "لا توجد فيديوهات في هذه المحاضرة بعد"}
+                      <p className={`rounded-xl border border-dashed border-blue-200 bg-white/70 px-3 py-5 text-center ${lcLabel} dark:border-blue-900 dark:bg-slate-950/40`}>
+                        {canManage
+                          ? "لم تُضف فيديوهات بعد — ابدأ بإضافة أول فيديو"
+                          : "لا توجد فيديوهات في هذه المحاضرة بعد"}
                       </p>
                     ) : (
                       <div className="grid grid-cols-1 gap-2.5">
@@ -901,36 +984,38 @@ const LectureCard = ({
                         ))}
                       </div>
                     )}
-                  </section>
+                  </ContentSection>
 
-                  <section
-                    className="space-y-3"
+                  {/* الملفات */}
+                  <ContentSection
+                    accent="purple"
                     data-tour-id={isTourTarget ? "course-lecture-files" : undefined}
                   >
                     <SectionHeading
                       icon={FaFilePdf}
-                      label="ملفات PDF"
+                      label="الملفات"
                       count={filesCount}
-                      accent="orange"
+                      accent="purple"
+                      hint="ملفات PDF ومرفقات المحاضرة"
                       action={
                         canManageFiles ? (
                           <button
                             type="button"
-                            className={`${crBtnSecondary} w-full !border-purple-200 !px-3.5 !py-2.5 !text-xs !text-purple-700 hover:!bg-purple-50 sm:w-auto sm:!py-2 dark:!border-purple-800 dark:!text-purple-300`}
+                            className={`${crBtnSecondary} w-full !border-violet-200 !px-3.5 !py-2.5 !text-xs !text-violet-700 hover:!bg-violet-50 sm:w-auto sm:!py-2 dark:!border-violet-800 dark:!text-violet-300`}
                             onClick={uploadPdfModal.onOpen}
                             data-tour-id={isTourTarget ? "course-lecture-add-file" : undefined}
                           >
                             <FaPlus />
-                            إضافة PDF
+                            إضافة ملف
                           </button>
                         ) : null
                       }
                     />
                     {filesCount === 0 ? (
-                      <p className={`rounded-2xl border border-dashed border-slate-300 px-3 py-6 text-center ${lcLabel} dark:border-slate-700`}>
+                      <p className={`rounded-xl border border-dashed border-violet-200 bg-white/70 px-3 py-5 text-center ${lcLabel} dark:border-violet-900 dark:bg-slate-950/40`}>
                         {canManageFiles
-                          ? "لم تُضف ملفات PDF بعد — اضغط «إضافة PDF»"
-                          : "لا توجد ملفات PDF في هذه المحاضرة بعد"}
+                          ? "لم تُضف ملفات بعد — اضغط «إضافة ملف»"
+                          : "لا توجد ملفات في هذه المحاضرة بعد"}
                       </p>
                     ) : (
                       <div className="grid grid-cols-1 gap-2.5">
@@ -946,12 +1031,12 @@ const LectureCard = ({
                         ))}
                       </div>
                     )}
-                  </section>
+                  </ContentSection>
 
                   {/* الواجبات */}
                   {!hideLectureAssignments && (canManage || hasAssignments) && (
-                    <section
-                      className="space-y-3"
+                    <ContentSection
+                      accent="orange"
                       data-tour-id={isTourTarget ? "course-lecture-assignments" : undefined}
                     >
                       <SectionHeading
@@ -959,6 +1044,7 @@ const LectureCard = ({
                         label="الواجبات"
                         count={assignmentsCount}
                         accent="orange"
+                        hint="تمارين واختبارات خاصة بهذه المحاضرة"
                         action={
                           canManage ? (
                             <button
@@ -982,7 +1068,7 @@ const LectureCard = ({
                         }
                       />
                       {examLoading && canManage && !hasAssignments ? (
-                        <p className={`rounded-2xl border border-dashed border-slate-300 px-3 py-6 text-center ${lcLabel} dark:border-slate-700`}>
+                        <p className={`rounded-xl border border-dashed border-orange-200 bg-white/70 px-3 py-5 text-center ${lcLabel} dark:border-orange-900 dark:bg-slate-950/40`}>
                           جاري تحميل الواجبات...
                         </p>
                       ) : hasAssignments ? (
@@ -1001,12 +1087,12 @@ const LectureCard = ({
                         </div>
                       ) : (
                         canManage && (
-                          <p className={`rounded-2xl border border-dashed border-slate-300 px-3 py-6 text-center ${lcLabel} dark:border-slate-700`}>
+                          <p className={`rounded-xl border border-dashed border-orange-200 bg-white/70 px-3 py-5 text-center ${lcLabel} dark:border-orange-900 dark:bg-slate-950/40`}>
                             لم يُنشأ أي واجب بعد — يمكنك إضافة أكثر من واجب لنفس المحاضرة
                           </p>
                         )
                       )}
-                    </section>
+                    </ContentSection>
                   )}
 
                   {/* Footer meta */}
