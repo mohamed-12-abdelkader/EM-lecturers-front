@@ -17,10 +17,13 @@ import {
   parseDateSafe,
   toDateTimeLocalValue,
 } from "../../../utils/courseLevelExamUtils";
+import { getQuestionDisplayModeLabel, QUESTION_DISPLAY_MODES, normalizeQuestionDisplayMode } from "../../../utils/examFlowUtils";
+import QuestionDisplayModeFields from "../../../components/exam/QuestionDisplayModeFields";
 
 const initialExamFormState = {
   title: "",
   questions_count: "",
+  question_display_mode: QUESTION_DISPLAY_MODES.ORDERED,
   duration_minutes: "",
   is_visible_to_students: true,
   visibility_end_date: "",
@@ -72,6 +75,9 @@ const buildExamPayload = (payload) => {
   // تحويل الحقول إلى camelCase أو snake_case حسب ما يدعمه API
   if (payload.title !== undefined) jsonPayload.title = payload.title;
   if (payload.questions_count !== undefined) jsonPayload.questionsCount = payload.questions_count;
+  if (payload.question_display_mode !== undefined) {
+    jsonPayload.questionDisplayMode = normalizeQuestionDisplayMode(payload.question_display_mode);
+  }
   if (payload.duration_minutes !== undefined) jsonPayload.durationMinutes = payload.duration_minutes;
   if (payload.is_visible_to_students !== undefined) jsonPayload.isVisibleToStudents = payload.is_visible_to_students;
   if (payload.visibility_end_date !== undefined && payload.visibility_end_date !== "") {
@@ -194,6 +200,12 @@ const ExamCard = ({
   const stats = [
     { label: "سؤال", value: exam.questions_count ?? "—", icon: FaBookOpen, color: "blue.500" },
     { label: "دقيقة", value: exam.duration_minutes ?? "—", icon: FaClock, color: "orange.500" },
+    {
+      label: "عرض الأسئلة",
+      value: getQuestionDisplayModeLabel(exam.question_display_mode),
+      icon: FaCog,
+      color: "purple.500",
+    },
     {
       label: "محاولات",
       value: formatAttemptLimitLabel(exam, { isTeacher }),
@@ -580,6 +592,7 @@ const CourseExamsTab = ({
       const normalizedPayload = normalizeExamPayload({
         title: form.title.trim(),
         questions_count: form.questions_count,
+        question_display_mode: form.question_display_mode,
         duration_minutes: form.duration_minutes,
         is_visible_to_students: form.is_visible_to_students,
         visibility_end_date: fromDateTimeLocalValue(form.visibility_end_date),
@@ -620,6 +633,8 @@ const CourseExamsTab = ({
     const [formData, setFormData] = useState({
       title: exam?.title || "",
       questions_count: exam?.questions_count?.toString() || "",
+      question_display_mode:
+        exam?.question_display_mode || QUESTION_DISPLAY_MODES.ORDERED,
       duration_minutes: exam?.duration_minutes?.toString() || "",
       is_visible_to_students: exam?.is_visible_to_students ?? true,
       visibility_end_date: toDateTimeLocalValue(exam?.visibility_end_date),
@@ -634,6 +649,8 @@ const CourseExamsTab = ({
         setFormData({
           title: exam.title || "",
           questions_count: exam.questions_count?.toString() || "",
+          question_display_mode:
+            exam.question_display_mode || QUESTION_DISPLAY_MODES.ORDERED,
           duration_minutes: exam.duration_minutes?.toString() || "",
           is_visible_to_students: exam.is_visible_to_students ?? true,
           visibility_end_date: toDateTimeLocalValue(exam.visibility_end_date),
@@ -848,6 +865,17 @@ const CourseExamsTab = ({
                         </FormControl>
                       )}
                     </SimpleGrid>
+
+                    <QuestionDisplayModeFields
+                      value={formData.question_display_mode}
+                      onChange={(value) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          question_display_mode: value,
+                        }))
+                      }
+                      questionsCount={formData.questions_count}
+                    />
                   </VStack>
                 </Box>
 
@@ -1454,6 +1482,14 @@ const CourseExamsTab = ({
                         />
                       </FormControl>
                     </SimpleGrid>
+
+                    <QuestionDisplayModeFields
+                      value={form.question_display_mode}
+                      onChange={(value) =>
+                        setForm((f) => ({ ...f, question_display_mode: value }))
+                      }
+                      questionsCount={form.questions_count}
+                    />
                   </VStack>
                 </ExamModalSection>
 

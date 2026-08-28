@@ -15,15 +15,23 @@ import {
 } from 'react-icons/fa';
 import { BiSearch } from "react-icons/bi";
 import {
-  PlatformExamStudentCard,
   PlatformExamTeacherCard,
   formatAnswerLabel,
-  isImageUrl,
 } from "./components/PlatformExamQuestionCard";
 import AiQuestionExtractionModal from "./components/AiQuestionExtractionModal";
 import { SubmissionCard } from "./components/ExamSubmissionsView";
 import FormattedQuestionText from "../../components/question/FormattedQuestionText";
 import { MdArrowBack } from "react-icons/md";
+import ExamReadyScreen from "./components/ExamReadyScreen";
+import ExamStudentProgress from "./components/ExamStudentProgress";
+import LectureExamStudentQuestionCard from "./components/LectureExamStudentQuestionCard";
+import ExamAttemptResultScreen from "./components/ExamAttemptResultScreen";
+import {
+  buildExamSubmitAnswers,
+  submitExamKeepalive,
+  normalizeExamQuestionsFromApi,
+} from "../../utils/examFlowUtils";
+import { normalizeExamAttemptResult } from "../../utils/examAttemptResultUtils";
 import TeacherExamTour from "../../components/onboarding/TeacherExamTour";
 import {
   TOUR_CLOSE_AI,
@@ -61,6 +69,10 @@ const Exam = () => {
   // للطالب: بدء الامتحان عبر POST /api/exams/:examId/start
   const [examStarted, setExamStarted] = useState(false);
   const [startLoading, setStartLoading] = useState(false);
+  const [sessionLoading, setSessionLoading] = useState(false);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
+  const [requiresStart, setRequiresStart] = useState(false);
+  const [examSessionData, setExamSessionData] = useState(null);
   const [attemptId, setAttemptId] = useState(null);
   const [examMeta, setExamMeta] = useState(null); // { examTitle, durationMinutes, questionsCount, startedAt }
   const [remainingSeconds, setRemainingSeconds] = useState(null); // عد تنازلي من duration*60 (مثل التطبيق المرجعي)
@@ -70,9 +82,21 @@ const Exam = () => {
   const [imageUploadLoading, setImageUploadLoading] = useState(false);
   const [aiExtractionModalOpen, setAiExtractionModalOpen] = useState(false);
   const [examTourOpen, setExamTourOpen] = useState(false);
+  const [refreshWarningOpen, setRefreshWarningOpen] = useState(false);
+  const [refreshSubmitting, setRefreshSubmitting] = useState(false);
+  const [blockedAttemptResult, setBlockedAttemptResult] = useState(null);
+  const [questionsLoadError, setQuestionsLoadError] = useState(null);
   const questionImageInputRef = useRef(null);
   const timerIntervalRef = useRef(null);
   const timerExpiredRef = useRef(false);
+  const submitInFlightRef = useRef(false);
+  const studentAnswersRef = useRef(studentAnswers);
+  const attemptIdRef = useRef(attemptId);
+  const submitResultRef = useRef(submitResult);
+  const submitLoadingRef = useRef(submitLoading);
+  const examStartedRef = useRef(examStarted);
+  const blurTimeoutRef = useRef(null);
+  const allowUnloadRef = useRef(false);
 
   const token = localStorage.getItem("token");
   const authHeaders = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
@@ -88,53 +112,126 @@ const Exam = () => {
     // eslint-disable-next-line
   }, [examId, isTeacher, isAdmin]);
 
-  // للطالب: بدء الامتحان تلقائياً عند الدخول (مثل التطبيق المرجعي)
+  // للطالب: تحميل جلسة الامتحان عبر GET /api/exams/:examId
   const isStudentView = !isTeacher && !isAdmin && student;
+
   useEffect(() => {
-    if (!isStudentView || !examId || examStarted || startLoading) return;
-    handleStartExam();
+    studentAnswersRef.current = studentAnswers;
+  }, [studentAnswers]);
+
+  useEffect(() => {
+    attemptIdRef.current = attemptId;
+  }, [attemptId]);
+
+  useEffect(() => {
+    submitResultRef.current = submitResult;
+  }, [submitResult]);
+
+  useEffect(() => {
+    submitLoadingRef.current = submitLoading;
+  }, [submitLoading]);
+
+  useEffect(() => {
+    examStartedRef.current = examStarted;
+  }, [examStarted]);
+
+  const applyStudentSession = (data = {}) => {
+    const exam = data.exam || {};
+    const attempt = data.attempt || null;
+    const rawQuestions = data.questions ?? [];
+    const shouldRequireStart = Boolean(data.requiresStart) && !attempt && !data.attemptId;
+
+    const examTitle = exam.title ?? data.examTitle ?? "";
+    const durationMinutes =
+      exam.durationMinutes ??
+      exam.duration ??
+      data.durationMinutes ??
+      null;
+    const questionsCount =
+      exam.questionsCount ??
+      exam.questions_count ??
+      data.questionsCount ??
+      rawQuestions.length;
+
+    setRequiresStart(shouldRequireStart);
+    setExamSessionData({
+      title: examTitle,
+      duration: durationMinutes ?? 0,
+      durationMinutes: durationMinutes ?? 0,
+      questionsCount,
+    });
+    setAttemptId(attempt?.attemptId ?? attempt?.id ?? data.attemptId ?? null);
+
+    if (rawQuestions.length > 0 && !shouldRequireStart) {
+      const normalizedQuestions = normalizeExamQuestionsFromApi(rawQuestions);
+      setQuestions(normalizedQuestions);
+      setExamStarted(true);
+      setQuestionsLoadError(null);
+      setExamMeta({
+        examTitle,
+        durationMinutes: durationMinutes ?? 0,
+        questionsCount: questionsCount || normalizedQuestions.length,
+        startedAt:
+          attempt?.startedAt ??
+          attempt?.attemptStartTime ??
+          data.startedAt ??
+          null,
+      });
+
+      const remaining =
+        attempt?.remainingSeconds ??
+        data.remainingSeconds ??
+        (durationMinutes != null && durationMinutes > 0 ? durationMinutes * 60 : null);
+      setRemainingSeconds(remaining);
+    } else if (!shouldRequireStart && (attempt || data.attemptId)) {
+      setExamStarted(true);
+      if (!rawQuestions.length) {
+        setQuestionsLoadError(
+          "لم يتم تحميل أسئلة الامتحان. جاري إعادة المحاولة..."
+        );
+      }
+    }
+  };
+
+  const loadExamSession = async () => {
+    setSessionLoading(true);
+    setError(null);
+    try {
+      const res = await baseUrl.get(`/api/exams/${examId}`, authHeaders);
+      const data = res.data || {};
+
+      if (["hidden", "not_open_yet", "closed"].includes(data.status)) {
+        setError(data.message || "الامتحان غير متاح حالياً");
+        return;
+      }
+
+      if (data.status === "already_submitted") {
+        const normalized = normalizeExamAttemptResult(data);
+        if (normalized) {
+          setBlockedAttemptResult(normalized);
+          setError(null);
+          return;
+        }
+        setError(data.message || "لقد أنهيت هذا الامتحان مسبقاً");
+        return;
+      }
+
+      applyStudentSession(data);
+    } catch (err) {
+      console.error(err);
+      const msg = err.response?.data?.message || "حدث خطأ أثناء تحميل الامتحان";
+      setError(msg);
+    } finally {
+      setSessionLoading(false);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isStudentView || !examId) return;
+    loadExamSession();
     // eslint-disable-next-line
   }, [examId, isStudentView]);
-
-  // مؤقت عد تنازلي (بالضبط كالتطبيق المرجعي): يُنقص كل ثانية، وعند الصفر تسليم تلقائي
-  useEffect(() => {
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
-    if (remainingSeconds === null || remainingSeconds <= 0 || submitResult) {
-      timerExpiredRef.current = false;
-      if (remainingSeconds !== null && remainingSeconds <= 0 && !submitResult && !submitLoading) {
-        timerExpiredRef.current = true;
-        toast({ title: "انتهى الوقت!", description: "يتم تسليم الامتحان تلقائياً.", status: "warning" });
-        handleSubmitExam(true);
-      }
-      return;
-    }
-    timerIntervalRef.current = setInterval(() => {
-      setRemainingSeconds((prev) => {
-        if (prev === null || prev <= 0) {
-          if (prev !== null && prev <= 0 && !timerExpiredRef.current && !submitLoading && !submitResult) {
-            timerExpiredRef.current = true;
-            if (timerIntervalRef.current) {
-              clearInterval(timerIntervalRef.current);
-              timerIntervalRef.current = null;
-            }
-            toast({ title: "انتهى الوقت!", description: "يتم تسليم الامتحان تلقائياً.", status: "warning" });
-            handleSubmitExam(true);
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-        timerIntervalRef.current = null;
-      }
-    };
-  }, [remainingSeconds, submitResult, submitLoading]);
 
   const fetchQuestions = async () => {
     try {
@@ -156,7 +253,7 @@ const Exam = () => {
         });
       }
 
-      fetchedQuestions = normalizeQuestionsFromApi(fetchedQuestions);
+      fetchedQuestions = normalizeExamQuestionsFromApi(fetchedQuestions);
       setQuestions(fetchedQuestions);
     } catch (err) {
       console.error(err);
@@ -166,106 +263,52 @@ const Exam = () => {
     }
   };
 
-  /** تطبيع أسئلة API: optionA..D، questionImage، correctAnswer، اختيارات صور */
-  function normalizeQuestionsFromApi(fetchedQuestions) {
-    const list = Array.isArray(fetchedQuestions) ? fetchedQuestions : [];
-    const letterKeys = ["A", "B", "C", "D"];
-
-    return list.map((q) => {
-      const hasFlatOptions =
-        q.type != null || q.questionText != null || q.optionA != null || q.optionB != null;
-
-      if (hasFlatOptions) {
-        const correctLetter = String(q.correctAnswer || "").toUpperCase();
-        const choices = letterKeys.map((letter, idx) => {
-          const raw = q[`option${letter}`];
-          const val = raw != null ? String(raw).trim() : "";
-          const img = isImageUrl(val);
-          return {
-            id: idx + 1,
-            letter,
-            text: img ? "" : val,
-            image: img ? val : null,
-            isImageOnly: img,
-            is_correct: letter === correctLetter,
-          };
-        });
-
-        return {
-          id: q.id,
-          text: q.questionText != null ? String(q.questionText) : "",
-          image: q.questionImage ?? q.image ?? null,
-          type: q.type || null,
-          grade: q.grade ?? 1,
-          correctAnswer: correctLetter,
-          choices,
-        };
-      }
-
-      const choices = (q.choices || []).map((c, idx) => {
-        const letter = c.letter || letterKeys[idx] || String.fromCharCode(65 + idx);
-        const rawText = c.text != null ? String(c.text).trim() : "";
-        const img = c.image || (isImageUrl(rawText) ? rawText : null);
-        return {
-          id: c.id ?? idx + 1,
-          letter,
-          text: img && isImageUrl(rawText) ? "" : rawText,
-          image: img,
-          isImageOnly: Boolean(img && !rawText),
-          is_correct: Boolean(c.is_correct),
-        };
-      });
-
-      return {
-        id: q.id,
-        text: q.text ?? q.questionText ?? "",
-        image: q.image ?? q.questionImage ?? null,
-        type: q.type ?? null,
-        grade: q.grade ?? 1,
-        correctAnswer: q.correctAnswer ?? null,
-        choices,
-      };
-    });
-  }
-
-  // للطالب: بدء الامتحان POST /api/exams/:examId/start (كالتطبيق المرجعي: تعيين المؤقت وتهيئة الإجابات)
   const handleStartExam = async () => {
     setStartLoading(true);
+    setQuestionsLoading(true);
     setError(null);
     try {
-      const res = await baseUrl.post(
-        `/api/exams/${examId}/start`,
-        {},
-        authHeaders
-      );
-      const data = res.data || {};
-      const exam = data.exam || {};
-      setAttemptId(data.attemptId ?? null);
-      setExamMeta({
-        examTitle: data.examTitle ?? exam.title ?? "",
-        durationMinutes: data.durationMinutes ?? exam.durationMinutes ?? 0,
-        questionsCount: data.questionsCount ?? exam.questionsCount ?? (data.questions?.length ?? 0),
-        startedAt: data.startedAt ?? new Date().toISOString(),
+      const startRes = await baseUrl.post(`/api/exams/${examId}/start`, {}, authHeaders);
+      const startData = startRes.data || {};
+      let rawQuestions = startData.questions ?? [];
+      let sessionPayload = { ...startData, requiresStart: false };
+
+      if (!rawQuestions.length) {
+        const getRes = await baseUrl.get(`/api/exams/${examId}`, authHeaders);
+        const getData = getRes.data || {};
+        rawQuestions = getData.questions ?? [];
+        sessionPayload = { ...getData, requiresStart: false, questions: rawQuestions };
+      }
+
+      applyStudentSession({
+        ...sessionPayload,
+        questions: rawQuestions,
       });
-      const rawQuestions = data.questions ?? [];
-      setQuestions(normalizeQuestionsFromApi(rawQuestions));
-      setExamStarted(true);
+
+      if (!rawQuestions.length) {
+        throw new Error("لم يتم تحميل أسئلة الامتحان");
+      }
+
+      setQuestionsLoadError(null);
       setCurrent(0);
       setStudentAnswers({});
-      const durationMin = data.durationMinutes ?? exam.durationMinutes;
-      if (durationMin != null && durationMin > 0) {
-        setRemainingSeconds(durationMin * 60);
-      } else {
-        setRemainingSeconds(null);
-      }
+      setRequiresStart(false);
       toast({ title: "تم بدء الامتحان", status: "success" });
     } catch (err) {
       console.error(err);
-      const msg = err.response?.data?.message || "حدث خطأ أثناء بدء الامتحان";
+      const responseData = err.response?.data || {};
+      const normalized = normalizeExamAttemptResult(responseData);
+      if (normalized) {
+        setBlockedAttemptResult(normalized);
+        setError(null);
+        return;
+      }
+      const msg = responseData.message || err.message || "حدث خطأ أثناء بدء الامتحان";
       setError(msg);
       toast({ title: msg, status: "error" });
     } finally {
       setStartLoading(false);
+      setQuestionsLoading(false);
     }
   };
 
@@ -482,30 +525,33 @@ const Exam = () => {
   };
 
   // للطالب: تسليم الامتحان — نفس الطريقة في التطبيق المرجعي (نفس الـ endpoint ونفس صيغة الإجابات)
-  const handleSubmitExam = useCallback(async (autoSubmit = false) => {
-    if (!examId || !attemptId) {
-      toast({ title: "خطأ", description: "لا توجد محاولة نشطة لتسليمها", status: "error" });
+  const handleSubmitExam = useCallback(async (autoSubmit = false, source = "manual") => {
+    if (!examId || !attemptIdRef.current) {
+      if (!autoSubmit) {
+        toast({ title: "خطأ", description: "لا توجد محاولة نشطة لتسليمها", status: "error" });
+      }
       return;
     }
-    if (submitLoading || submitResult) return;
+    if (submitLoadingRef.current || submitResultRef.current || submitInFlightRef.current) return;
+
     const token = localStorage.getItem("token");
     if (!token) {
-      toast({ title: "يجب تسجيل الدخول لتسليم الامتحان", status: "error" });
+      if (!autoSubmit) {
+        toast({ title: "يجب تسجيل الدخول لتسليم الامتحان", status: "error" });
+      }
       return;
     }
 
+    submitInFlightRef.current = true;
     setSubmitLoading(true);
     timerExpiredRef.current = autoSubmit;
 
-    try {
-      const answersArr = Object.entries(studentAnswers).map(([questionId, selectedAnswer]) => ({
-        questionId: Number(questionId),
-        selectedAnswer,
-      }));
+    const answersArr = buildExamSubmitAnswers(studentAnswersRef.current);
 
+    try {
       const res = await baseUrl.post(
         `/api/exams/${examId}/submit`,
-        { attemptId, answers: answersArr },
+        { attemptId: attemptIdRef.current, answers: answersArr },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -524,20 +570,197 @@ const Exam = () => {
           description: `الدرجة: ${result.totalGrade}/${result.maxGrade}`,
           status: "success",
         });
+      } else if (source !== "unload") {
+        toast({
+          title: "تم تسليم الامتحان تلقائياً",
+          description: "تم إنهاء المحاولة لأنك غادرت صفحة الامتحان.",
+          status: "warning",
+          duration: 5000,
+          isClosable: true,
+        });
       }
     } catch (err) {
       console.error("Error submitting exam:", err);
       const errorMessage = err?.response?.data?.message || "حدث خطأ غير متوقع";
-      if (!autoSubmit) {
+      if (source === "unload") {
+        submitExamKeepalive({
+          examId,
+          attemptId: attemptIdRef.current,
+          answers: answersArr,
+        });
+      } else if (!autoSubmit) {
         toast({ title: "فشل تسليم الامتحان", description: errorMessage, status: "error" });
       }
     } finally {
       setSubmitLoading(false);
+      submitInFlightRef.current = false;
     }
-  }, [examId, attemptId, studentAnswers, submitLoading, submitResult]);
+  }, [examId, toast]);
 
-  // للطالب: أثناء التحميل أو قبل بدء الامتحان نعرض التحميل أو الخطأ (بدء تلقائي)
-  if (isStudentView && !examStarted) {
+  useEffect(() => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+    if (remainingSeconds === null || remainingSeconds <= 0 || submitResult) {
+      timerExpiredRef.current = false;
+      if (remainingSeconds !== null && remainingSeconds <= 0 && !submitResult && !submitLoading) {
+        timerExpiredRef.current = true;
+        toast({ title: "انتهى الوقت!", description: "يتم تسليم الامتحان تلقائياً.", status: "warning" });
+        handleSubmitExam(true, "timer");
+      }
+      return undefined;
+    }
+    timerIntervalRef.current = setInterval(() => {
+      setRemainingSeconds((prev) => {
+        if (prev === null || prev <= 0) {
+          if (prev !== null && prev <= 0 && !timerExpiredRef.current && !submitLoadingRef.current && !submitResultRef.current) {
+            timerExpiredRef.current = true;
+            if (timerIntervalRef.current) {
+              clearInterval(timerIntervalRef.current);
+              timerIntervalRef.current = null;
+            }
+            toast({ title: "انتهى الوقت!", description: "يتم تسليم الامتحان تلقائياً.", status: "warning" });
+            handleSubmitExam(true, "timer");
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+    };
+  }, [remainingSeconds, submitResult, submitLoading, handleSubmitExam, toast]);
+
+  const triggerKeepaliveSubmit = useCallback(() => {
+    if (!examId || !attemptIdRef.current || submitResultRef.current || submitInFlightRef.current) {
+      return;
+    }
+    submitInFlightRef.current = true;
+    submitExamKeepalive({
+      examId,
+      attemptId: attemptIdRef.current,
+      answers: buildExamSubmitAnswers(studentAnswersRef.current),
+    });
+  }, [examId]);
+
+  const handleConfirmPageRefresh = useCallback(async () => {
+    setRefreshSubmitting(true);
+    allowUnloadRef.current = true;
+    try {
+      await handleSubmitExam(true, "refresh");
+    } catch {
+      triggerKeepaliveSubmit();
+    } finally {
+      setRefreshSubmitting(false);
+      setRefreshWarningOpen(false);
+      window.location.reload();
+    }
+  }, [handleSubmitExam, triggerKeepaliveSubmit]);
+
+  useEffect(() => {
+    if (!isStudentView || !examStarted || submitResult) return undefined;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        handleSubmitExam(true, "visibility");
+      }
+    };
+
+    const handleWindowBlur = () => {
+      if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = setTimeout(() => {
+        if (!examStartedRef.current || submitResultRef.current || document.hidden) return;
+        if (!document.hasFocus()) {
+          handleSubmitExam(true, "blur");
+        }
+      }, 250);
+    };
+
+    const handleBeforeUnload = (event) => {
+      if (allowUnloadRef.current || submitResultRef.current) return;
+      event.preventDefault();
+      event.returnValue = "لو حدّثت الصفحة سيتم تسليم الامتحان تلقائياً.";
+      return event.returnValue;
+    };
+
+    const handlePageHide = () => {
+      if (allowUnloadRef.current || submitResultRef.current) return;
+      triggerKeepaliveSubmit();
+    };
+
+    const handleRefreshShortcut = (event) => {
+      const key = String(event.key || "").toLowerCase();
+      const isRefreshShortcut =
+        key === "f5" || ((event.ctrlKey || event.metaKey) && key === "r");
+      if (!isRefreshShortcut) return;
+      event.preventDefault();
+      setRefreshWarningOpen(true);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("blur", handleWindowBlur);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("pagehide", handlePageHide);
+    window.addEventListener("keydown", handleRefreshShortcut);
+
+    return () => {
+      if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("blur", handleWindowBlur);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("pagehide", handlePageHide);
+      window.removeEventListener("keydown", handleRefreshShortcut);
+    };
+  }, [isStudentView, examStarted, submitResult, handleSubmitExam, triggerKeepaliveSubmit]);
+
+  // للطالب: شاشة البدء أو التحميل قبل بدء المحاولة
+  const studentPageBg = useColorModeValue("gray.100", "gray.900");
+  const studentCardBg = useColorModeValue("white", "gray.800");
+  const studentCardBorder = useColorModeValue("gray.200", "gray.600");
+  const studentHeadingColor = useColorModeValue("gray.800", "white");
+  const studentSubtextColor = useColorModeValue("gray.600", "gray.300");
+
+  if (isStudentView && blockedAttemptResult) {
+    return (
+      <>
+        <ExamAttemptResultScreen
+          result={blockedAttemptResult}
+          examTitle={examSessionData?.title || examMeta?.examTitle}
+          pageBg={studentPageBg}
+          onBack={() => navigate(-1)}
+          onZoomImage={(src) => {
+            setImageModalSrc(src);
+            setImageModalOpen(true);
+          }}
+        />
+        <Modal isOpen={imageModalOpen} onClose={() => setImageModalOpen(false)} size="full" isCentered>
+          <ModalOverlay bg="blackAlpha.800" />
+          <ModalContent bg="transparent" boxShadow="none" maxW="100vw">
+            <ModalBody display="flex" alignItems="center" justifyContent="center" p={4}>
+              {imageModalSrc && (
+                <Image
+                  src={imageModalSrc}
+                  alt="تكبير"
+                  maxH="90vh"
+                  maxW="100%"
+                  objectFit="contain"
+                  borderRadius="md"
+                  onClick={() => setImageModalOpen(false)}
+                />
+              )}
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      </>
+    );
+  }
+
+  if (isStudentView && (!examStarted || requiresStart)) {
     if (error) {
       return (
         <Box maxW="2xl" mx="auto" py={10} px={4} className="mt-[80px]">
@@ -551,7 +774,23 @@ const Exam = () => {
         </Box>
       );
     }
-    return <BrandLoadingScreen />;
+
+    if (sessionLoading || questionsLoading) {
+      return <BrandLoadingScreen />;
+    }
+
+    return (
+      <ExamReadyScreen
+        examData={examSessionData}
+        startingAttempt={startLoading}
+        onStart={handleStartExam}
+        pageBg={studentPageBg}
+        cardBg={studentCardBg}
+        cardBorder={studentCardBorder}
+        headingColor={studentHeadingColor}
+        subtextColor={studentSubtextColor}
+      />
+    );
   }
 
   if (loading) {
@@ -614,35 +853,55 @@ const Exam = () => {
       </style>
       {/* هيدر الطالب: زر رجوع + عنوان + مؤقت (مثل التطبيق المرجعي) */}
       {isStudentView && (
-        <HStack
-          mb={4}
-          p={3}
-          borderRadius="xl"
+        <Box
+          position="sticky"
+          top="80px"
+          zIndex={20}
+          mb={5}
+          p={{ base: 3, md: 4 }}
+          borderRadius="2xl"
           borderWidth="1px"
           borderColor={teacherCardBorder}
           bg={studentHeaderBg}
-          shadow="sm"
-          spacing={3}
-          align="center"
+          boxShadow="md"
         >
-          <IconButton
-            aria-label="العودة"
-            icon={<MdArrowBack />}
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate(-1)}
-          />
-          <VStack align="stretch" flex={1} spacing={0}>
-            <Text fontWeight="bold" fontSize="lg" noOfLines={1}>
-              {examMeta?.examTitle || "الامتحان الشامل"}
-            </Text>
-            {remainingSeconds !== null && (
-              <Text fontSize="sm" fontWeight="600" color="blue.600">
-                {formatRemainingTime(remainingSeconds)}
+          <HStack spacing={3} align="center" mb={3}>
+            <IconButton
+              aria-label="العودة"
+              icon={<MdArrowBack />}
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate(-1)}
+              isDisabled={submitLoading}
+            />
+            <VStack align="stretch" flex={1} spacing={0}>
+              <Text fontWeight="bold" fontSize={{ base: "md", md: "lg" }} noOfLines={1}>
+                {examMeta?.examTitle || examSessionData?.title || "امتحان المحاضرة"}
               </Text>
+              <Text fontSize="xs" color="gray.500">
+                {questions.length} سؤال • لا تغادر الصفحة أثناء الامتحان
+              </Text>
+            </VStack>
+            {remainingSeconds !== null && (
+              <Badge
+                px={3}
+                py={2}
+                borderRadius="xl"
+                fontSize="sm"
+                fontFamily="mono"
+                colorScheme={remainingSeconds < 300 ? "red" : "blue"}
+              >
+                {formatRemainingTime(remainingSeconds)}
+              </Badge>
             )}
-          </VStack>
-        </HStack>
+          </HStack>
+          <Alert status="warning" borderRadius="xl" py={2} px={3}>
+            <AlertIcon boxSize={4} />
+            <Text fontSize="xs" lineHeight="1.7">
+              أي محاولة للخروج أو فتح تبويب آخر أو تحديث الصفحة ستؤدي إلى تسليم الامتحان فوراً.
+            </Text>
+          </Alert>
+        </Box>
       )}
       {/* هيدر المدرس: عنوان + إحصائيات + زر التبديل */}
       {!isStudentView && (isTeacher || isAdmin) && (
@@ -828,248 +1087,114 @@ const Exam = () => {
             <>
               {/* عرض النتيجة إذا تم التسليم (بنفس تصميم التطبيق المرجعي) */}
               {submitResult ? (
-                <Box
-                  p={6}
-                  borderRadius="2xl"
-                  borderWidth="1px"
-                  borderColor="gray.200"
-                  bg="white"
-                  boxShadow="lg"
-                >
-                  <VStack spacing={6} align="stretch">
-                    <VStack spacing={3}>
-                      <FaCheckCircle size={48} color="#10B981" />
-                      <Heading size="lg" color="gray.800">تم تسليم الامتحان</Heading>
-                    </VStack>
-                    <VStack spacing={1}>
-                      <Text fontSize="4xl" fontWeight="bold" color="blue.600">
-                        {submitResult.totalGrade}
-                      </Text>
-                      <Text fontSize="lg" color="gray.600">من {submitResult.maxGrade}</Text>
-                    </VStack>
-                    <HStack spacing={4} justify="center" w="full">
-                      <Box flex={1} p={4} borderRadius="xl" bg="green.50" borderWidth="1px" borderColor="green.200" textAlign="center">
-                        <FaCheckCircle size={24} color="#10B981" style={{ margin: "0 auto 8px" }} />
-                        <Text fontSize="2xl" fontWeight="bold" color="gray.800">
-                          {submitResult.correctCount ?? (questions.length - (submitResult.wrongQuestions?.length ?? 0))}
-                        </Text>
-                        <Text fontSize="sm" color="gray.600">صحيح</Text>
-                      </Box>
-                      <Box flex={1} p={4} borderRadius="xl" bg="red.50" borderWidth="1px" borderColor="red.200" textAlign="center">
-                        <FaTimesCircle size={24} color="#DC2626" style={{ margin: "0 auto 8px" }} />
-                        <Text fontSize="2xl" fontWeight="bold" color="gray.800">
-                          {submitResult.wrongCount ?? (submitResult.wrongQuestions?.length ?? 0)}
-                        </Text>
-                        <Text fontSize="sm" color="gray.600">خاطئ</Text>
-                      </Box>
-                    </HStack>
-                    {submitResult.wrongQuestions && submitResult.wrongQuestions.length > 0 && (
-                      <VStack align="stretch" spacing={4}>
-                        <Text fontWeight="600" fontSize="lg" color="gray.800">
-                          الأسئلة الخاطئة ({submitResult.wrongQuestions.length})
-                        </Text>
-                        {submitResult.wrongQuestions.map((wq, idx) => {
-                          const getAnswerText = (answer) => {
-                            if (!answer) return "—";
-                            const key = `option${String(answer).toUpperCase()}`;
-                            const val = wq[key] ?? wq[`option${answer}`];
-                            if (val != null) return formatAnswerLabel(val);
-                            if (answer === "A") return formatAnswerLabel(wq.optionA);
-                            if (answer === "B") return formatAnswerLabel(wq.optionB);
-                            if (answer === "C") return formatAnswerLabel(wq.optionC);
-                            if (answer === "D") return formatAnswerLabel(wq.optionD);
-                            return "—";
-                          };
-                          const getAnswerImage = (answer) => {
-                            if (!answer) return null;
-                            const key = `option${String(answer).toUpperCase()}`;
-                            const val = wq[key] ?? wq[`option${answer}`];
-                            return val && isImageUrl(val) ? val : null;
-                          };
-                          const yourLetter = wq.yourAnswer;
-                          const correctLetter = wq.correctAnswer;
-                          const yourText = yourLetter != null ? getAnswerText(yourLetter) : (wq.yourChoice?.text || "لم تجب");
-                          const correctText = correctLetter != null ? getAnswerText(correctLetter) : (wq.correctChoice?.text || "—");
-                          const yourImg = yourLetter != null ? getAnswerImage(yourLetter) : null;
-                          const correctImg = correctLetter != null ? getAnswerImage(correctLetter) : null;
-                          return (
-                            <Box
-                              key={wq.questionId}
-                              p={4}
-                              borderRadius="xl"
-                              borderWidth="1px"
-                              borderColor="gray.200"
-                              bg="gray.50"
-                            >
-                              <Text fontWeight="600" color="gray.800" mb={2}>سؤال {idx + 1}</Text>
-                              {wq.questionText && (
-                                <FormattedQuestionText
-                                  value={wq.questionText}
-                                  fontSize="md"
-                                  color="gray.700"
-                                  mb={3}
-                                  lineHeight="1.85"
-                                />
-                              )}
-                              {wq.questionImage && (
-                                <Box mb={3} cursor="pointer" onClick={() => { setImageModalSrc(wq.questionImage); setImageModalOpen(true); }}>
-                                  <Image src={wq.questionImage} alt="السؤال" maxH="200px" borderRadius="md" objectFit="contain" />
-                                </Box>
-                              )}
-                              <VStack align="stretch" spacing={2}>
-                                <HStack spacing={0} align="start" flexWrap="wrap">
-                                  <AiOutlineCloseCircle color="#DC2626" size={16} style={{ marginTop: 4, flexShrink: 0 }} />
-                                  <Box flex={1}>
-                                    <Text fontSize="sm" color="red.600" mb={1}>
-                                      إجابتك{yourLetter ? ` (${yourLetter})` : ""}:
-                                    </Text>
-                                    <FormattedQuestionText
-                                      value={yourText}
-                                      fontSize="sm"
-                                      color="red.600"
-                                      lineHeight="1.75"
-                                    />
-                                    {yourImg && (
-                                      <Image src={yourImg} mt={2} maxH="120px" objectFit="contain" borderRadius="md" cursor="pointer" onClick={() => { setImageModalSrc(yourImg); setImageModalOpen(true); }} />
-                                    )}
-                                  </Box>
-                                </HStack>
-                                <HStack spacing={0} align="start" flexWrap="wrap">
-                                  <AiOutlineCheckCircle color="#16A34A" size={16} style={{ marginTop: 4, flexShrink: 0 }} />
-                                  <Box flex={1}>
-                                    <Text fontSize="sm" color="green.600" mb={1}>
-                                      الصحيحة{correctLetter ? ` (${correctLetter})` : ""}:
-                                    </Text>
-                                    <FormattedQuestionText
-                                      value={correctText}
-                                      fontSize="sm"
-                                      color="green.600"
-                                      lineHeight="1.75"
-                                    />
-                                    {correctImg && (
-                                      <Image src={correctImg} mt={2} maxH="120px" objectFit="contain" borderRadius="md" cursor="pointer" onClick={() => { setImageModalSrc(correctImg); setImageModalOpen(true); }} />
-                                    )}
-                                  </Box>
-                                </HStack>
-                              </VStack>
-                            </Box>
-                          );
-                        })}
-                      </VStack>
+                <ExamAttemptResultScreen
+                  result={normalizeExamAttemptResult(submitResult)}
+                  examTitle={examMeta?.examTitle || examSessionData?.title}
+                  pageBg={pageBg}
+                  onBack={() => navigate(-1)}
+                  onZoomImage={(src) => {
+                    setImageModalSrc(src);
+                    setImageModalOpen(true);
+                  }}
+                />
+              ) : questions.length === 0 ? (
+                <Center py={16}>
+                  <VStack spacing={4} px={4}>
+                    {questionsLoading ? (
+                      <>
+                        <Spinner size="lg" color="blue.500" />
+                        <Text color="gray.500">جاري تحميل الأسئلة...</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Alert status="error" borderRadius="xl" w="full">
+                          <AlertIcon />
+                          <Text fontSize="sm">
+                            {questionsLoadError || error || "لم يتم تحميل أسئلة الامتحان."}
+                          </Text>
+                        </Alert>
+                        <Button
+                          colorScheme="blue"
+                          onClick={handleStartExam}
+                          isLoading={startLoading || questionsLoading}
+                          borderRadius="lg"
+                        >
+                          إعادة تحميل الأسئلة
+                        </Button>
+                      </>
                     )}
-                    <Button colorScheme="blue" w="full" size="lg" leftIcon={<MdArrowBack />} onClick={() => navigate(-1)}>
-                      العودة للكورس
-                    </Button>
                   </VStack>
-                </Box>
+                </Center>
               ) : (
                 <>
-                  {/* بطاقة التقدم (مثل التطبيق المرجعي) */}
-                  {questions.length > 0 && (
-                    <Box mb={5}>
-                      <Flex align="center" justify="space-between" mb={3} gap={3} flexWrap="wrap">
-                        <Text fontSize="sm" fontWeight="semibold" color="gray.700">
-                          السؤال {current + 1} من {questions.length}
-                        </Text>
-                        <Text fontSize="xs" color="gray.500">
-                          {Object.keys(studentAnswers).length} / {questions.length} تمت الإجابة
-                        </Text>
-                      </Flex>
-                      <Box w="full" h="1.5" bg="gray.100" borderRadius="full" overflow="hidden" mb={3}>
-                        <Box
-                          h="full"
-                          bg="blue.500"
-                          borderRadius="full"
-                          w={`${questions.length ? (Object.keys(studentAnswers).length / questions.length) * 100 : 0}%`}
-                          transition="width 0.35s ease"
-                        />
-                      </Box>
-                      <Flex gap={1.5} flexWrap="wrap" justify="center" mb={4}>
-                        {questions.map((q, i) => {
-                          const answered = Boolean(studentAnswers[q.id]);
-                          const isCurrent = i === current;
-                          return (
-                            <Box
-                              key={q.id}
-                              as="button"
-                              type="button"
-                              w={9}
-                              h={9}
-                              borderRadius="lg"
-                              fontSize="xs"
-                              fontWeight="bold"
-                              borderWidth="2px"
-                              borderColor={isCurrent ? "blue.500" : answered ? "green.300" : "gray.200"}
-                              bg={isCurrent ? "blue.500" : answered ? "green.50" : "white"}
-                              color={isCurrent ? "white" : answered ? "green.700" : "gray.500"}
-                              cursor="pointer"
-                              transition="all 0.15s"
-                              _hover={{ borderColor: "blue.300", transform: "scale(1.05)" }}
-                              onClick={() => goToQuestion(i)}
-                            >
-                              {i + 1}
-                            </Box>
-                          );
-                        })}
-                      </Flex>
-                    </Box>
-                  )}
+                  <ExamStudentProgress
+                    remainingSeconds={remainingSeconds}
+                    answeredCount={Object.keys(studentAnswers).length}
+                    totalQuestions={questions.length}
+                    questions={questions}
+                    currentQuestionIndex={current}
+                    studentAnswers={studentAnswers}
+                    showPagination
+                    hasActiveAttempt={examStarted}
+                    onGoToQuestion={goToQuestion}
+                  />
 
-                  {questions.length > 0 && (
-                    <Box mb={5}>
-                      <PlatformExamStudentCard
-                        key={questions[current].id}
-                        question={questions[current]}
-                        questionIndex={current}
-                        totalQuestions={questions.length}
-                        selectedLetter={studentAnswers[questions[current].id]}
-                        onSelectLetter={handleStudentChoice}
-                        onZoomImage={(src) => { setImageModalSrc(src); setImageModalOpen(true); }}
-                      />
-                    </Box>
-                  )}
+                  <Box mb={5}>
+                    <LectureExamStudentQuestionCard
+                      key={questions[current].id}
+                      question={questions[current]}
+                      questionIndex={current}
+                      totalQuestions={questions.length}
+                      selectedLetter={studentAnswers[questions[current].id]}
+                      onSelectLetter={handleStudentChoice}
+                      onZoomImage={(src) => { setImageModalSrc(src); setImageModalOpen(true); }}
+                    />
+                  </Box>
 
-                  {/* أزرار التنقل والتسليم (السابق | تسليم | التالي) */}
-                  {questions.length > 0 && (
-                    <HStack spacing={3} w="full" flexWrap="wrap">
+                  <HStack spacing={3} w="full" flexWrap="wrap">
+                    <Button
+                      flex={1}
+                      minW="100px"
+                      size="lg"
+                      variant="outline"
+                      borderColor="gray.300"
+                      leftIcon={<FaChevronRight />}
+                      onClick={() => goToQuestion(current - 1)}
+                      isDisabled={current === 0 || submitLoading}
+                      borderRadius="xl"
+                    >
+                      السابق
+                    </Button>
+                    {Object.keys(studentAnswers).length === questions.length ? (
                       <Button
                         flex={1}
-                        minW="100px"
-                        variant="outline"
-                        borderColor="gray.300"
-                        leftIcon={<FaChevronRight />}
-                        onClick={() => goToQuestion(current - 1)}
-                        isDisabled={current === 0}
+                        minW="140px"
+                        size="lg"
+                        colorScheme="green"
+                        leftIcon={<FaCheckCircle />}
+                        isLoading={submitLoading}
+                        onClick={() => handleSubmitExam(false)}
+                        borderRadius="xl"
                       >
-                        السابق
+                        تسليم الامتحان
                       </Button>
-                      {Object.keys(studentAnswers).length === questions.length ? (
-                        <Button
-                          flex={1}
-                          minW="140px"
-                          colorScheme="green"
-                          leftIcon={<FaCheckCircle />}
-                          isLoading={submitLoading}
-                          onClick={handleSubmitExam}
-                        >
-                          تسليم الامتحان
-                        </Button>
-                      ) : (
-                        <Box flex={1} minW="140px" />
-                      )}
-                      <Button
-                        flex={1}
-                        minW="100px"
-                        variant="outline"
-                        borderColor="gray.300"
-                        rightIcon={<FaChevronLeft />}
-                        onClick={() => goToQuestion(current + 1)}
-                        isDisabled={current === questions.length - 1}
-                      >
-                        {current === questions.length - 1 ? "آخر سؤال" : "التالي"}
-                      </Button>
-                    </HStack>
-                  )}
+                    ) : (
+                      <Box flex={1} minW="140px" />
+                    )}
+                    <Button
+                      flex={1}
+                      minW="100px"
+                      size="lg"
+                      variant="outline"
+                      borderColor="gray.300"
+                      rightIcon={<FaChevronLeft />}
+                      onClick={() => goToQuestion(current + 1)}
+                      isDisabled={current === questions.length - 1 || submitLoading}
+                      borderRadius="xl"
+                    >
+                      {current === questions.length - 1 ? "آخر سؤال" : "التالي"}
+                    </Button>
+                  </HStack>
                 </>
               )}
             </>
@@ -1291,6 +1416,54 @@ const Exam = () => {
           variant="platform"
           onClose={() => setExamTourOpen(false)}
         />
+      )}
+
+      {isStudentView && examStarted && !submitResult && (
+        <Modal
+          isOpen={refreshWarningOpen}
+          onClose={() => !refreshSubmitting && setRefreshWarningOpen(false)}
+          isCentered
+          closeOnOverlayClick={!refreshSubmitting}
+          closeOnEsc={!refreshSubmitting}
+        >
+          <ModalOverlay bg="blackAlpha.700" backdropFilter="blur(4px)" />
+          <ModalContent mx={4} borderRadius="2xl" dir="rtl">
+            <ModalHeader pb={2}>تحذير قبل تحديث الصفحة</ModalHeader>
+            <ModalCloseButton isDisabled={refreshSubmitting} />
+            <ModalBody>
+              <VStack align="stretch" spacing={4}>
+                <Alert status="warning" borderRadius="xl">
+                  <AlertIcon />
+                  <Box>
+                    <Text fontWeight="bold" mb={1}>
+                      لو حدّثت الصفحة سيتم تسليم الامتحان فوراً
+                    </Text>
+                    <Text fontSize="sm" lineHeight="1.8">
+                      سيتم إرسال إجاباتك الحالية تلقائياً ولن تستطيع متابعة المحاولة بعد التحديث.
+                    </Text>
+                  </Box>
+                </Alert>
+              </VStack>
+            </ModalBody>
+            <ModalFooter gap={2}>
+              <Button
+                variant="ghost"
+                onClick={() => setRefreshWarningOpen(false)}
+                isDisabled={refreshSubmitting}
+              >
+                البقاء في الامتحان
+              </Button>
+              <Button
+                colorScheme="red"
+                onClick={handleConfirmPageRefresh}
+                isLoading={refreshSubmitting}
+                loadingText="جاري التسليم..."
+              >
+                تحديث الصفحة وتسليم الامتحان
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
       )}
     </Box>
   );

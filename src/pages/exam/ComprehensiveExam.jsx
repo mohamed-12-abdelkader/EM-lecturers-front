@@ -82,6 +82,9 @@ import baseUrl from "../../api/baseUrl";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import { useParams, useNavigate } from "react-router-dom";
 import UserType from "../../Hooks/auth/userType";
+import { normalizeSingleExamQuestion } from "../../utils/examFlowUtils";
+import { normalizeExamAttemptResult } from "../../utils/examAttemptResultUtils";
+import ExamAttemptResultScreen from "./components/ExamAttemptResultScreen";
 
 const ComprehensiveExam = () => {
   const { id } = useParams();
@@ -121,6 +124,9 @@ const ComprehensiveExam = () => {
   const [attemptHistory, setAttemptHistory] = useState([]);
   const [feedback, setFeedback] = useState(null);
   const [startingAttempt, setStartingAttempt] = useState(false);
+  const [questionsLoadError, setQuestionsLoadError] = useState(null);
+  const [questionsReloading, setQuestionsReloading] = useState(false);
+  const [blockedAttemptResult, setBlockedAttemptResult] = useState(null);
   // State لإضافة الأسئلة كصور
   const [addImageModal, setAddImageModal] = useState({ open: false });
   const [selectedImages, setSelectedImages] = useState([]);
@@ -200,6 +206,12 @@ const ComprehensiveExam = () => {
 
   // استخدام useRef لتتبع الـ ID السابق
   const prevExamIdRef = useRef(null);
+  const questionsRef = useRef([]);
+  const questionsAutoRetryRef = useRef(false);
+
+  useEffect(() => {
+    questionsRef.current = questions;
+  }, [questions]);
 
   useEffect(() => {
     if (id) {
@@ -220,6 +232,9 @@ const ComprehensiveExam = () => {
         setGradesData(null);
         setShowGrades(false);
         setGradesError(null);
+        setQuestionsLoadError(null);
+        setBlockedAttemptResult(null);
+        questionsAutoRetryRef.current = false;
       }
 
       // تحديث الـ ref
@@ -263,15 +278,34 @@ const ComprehensiveExam = () => {
     }
   }, [currentAttempt, student, isTeacher, isAdmin]);
 
-  // دالة لترتيب الأسئلة عشوائياً
-  const shuffleArray = (array) => {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  useEffect(() => {
+    if (
+      !student ||
+      isTeacher ||
+      isAdmin ||
+      !currentAttempt ||
+      questions.length > 0 ||
+      loading ||
+      questionsReloading ||
+      blockedAttemptResult ||
+      questionsAutoRetryRef.current
+    ) {
+      return;
     }
-    return shuffled;
-  };
+
+    questionsAutoRetryRef.current = true;
+    reloadQuestionsForAttempt();
+  }, [
+    student,
+    isTeacher,
+    isAdmin,
+    currentAttempt,
+    questions.length,
+    loading,
+    questionsReloading,
+    blockedAttemptResult,
+    reloadQuestionsForAttempt,
+  ]);
 
   /**
    * تسوية مصفوفة الأسئلة من الـ API:
@@ -288,13 +322,13 @@ const ComprehensiveExam = () => {
             type: "passage_sub",
             passage: q.passage,
             sub_question: {
-              id: sq.id,
-              text: sq.text || null,
-              image: sq.image || null,
+              id: sq.id ?? sq.questionId,
+              text: sq.text || sq.questionText || null,
+              image: sq.image || sq.questionImage || null,
               grade: sq.grade ?? 1,
               choices: Array.isArray(sq.choices)
-                ? sq.choices.map((c) => ({
-                    id: c.id,
+                ? sq.choices.map((c, idx) => ({
+                    id: c.id ?? idx + 1,
                     text: c.text || "",
                     image: c.image || c.image_url || null,
                     is_correct: c.is_correct || false,
@@ -304,27 +338,75 @@ const ComprehensiveExam = () => {
             grade: q.grade,
           });
         }
-      } else if (q.id != null) {
-        // سؤال عادي
-        result.push({
-          id: q.id,
-          text: q.text || null,
-          image: q.image || null,
-          grade: q.grade ?? 1,
-          passage: q.passage || null,
-          choices: Array.isArray(q.choices)
-            ? q.choices.map((c) => ({
-                id: c.id,
-                text: c.text || "",
-                image: c.image || c.image_url || null,
-                is_correct: c.is_correct || false,
-              }))
-            : [],
-        });
+      } else {
+        const normalized = normalizeSingleExamQuestion(q);
+        if (normalized && (normalized.id != null || normalized.text || normalized.image)) {
+          result.push(normalized);
+        }
       }
     }
     return result;
   };
+
+  const reloadQuestionsForAttempt = useCallback(async () => {
+    if (!id) return false;
+
+    setQuestionsReloading(true);
+    setQuestionsLoadError(null);
+    try {
+      const token = localStorage.getItem("token");
+      const authConfig = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+
+      const startRes = await baseUrl.post(`/api/exams/${id}/start`, {}, authConfig);
+      const startData = startRes.data || {};
+      let rawQuestions = startData.questions ?? [];
+
+      if (!rawQuestions.length) {
+        const getRes = await baseUrl.get(`/api/exams/${id}`, authConfig);
+        const getData = getRes.data || {};
+        rawQuestions = getData.questions ?? [];
+        if (getData.attempt) {
+          const remaining =
+            getData.attempt.remainingSeconds ??
+            (getData.exam?.duration != null ? getData.exam.duration * 60 : null);
+          setCurrentAttempt({
+            ...getData.attempt,
+            remainingSeconds: remaining ?? getData.attempt.remainingSeconds,
+          });
+          setRemainingSeconds(remaining ?? getData.attempt.remainingSeconds ?? null);
+        }
+      }
+
+      const formattedQuestions = normalizeQuestions(rawQuestions);
+      if (!formattedQuestions.length) {
+        const message =
+          rawQuestions.length > 0
+            ? "تعذر عرض أسئلة الامتحان (صيغة غير مدعومة). تواصل مع المدرس."
+            : "لم يتم تحميل أسئلة الامتحان. تأكد من اتصال الشبكة وحاول مرة أخرى.";
+        setQuestionsLoadError(message);
+        return false;
+      }
+
+      setQuestions(formattedQuestions);
+      setQuestionsLoadError(null);
+      setExamStatus("ready");
+      return true;
+    } catch (err) {
+      const responseData = err.response?.data || {};
+      const normalized = normalizeExamAttemptResult(responseData);
+      if (normalized) {
+        setBlockedAttemptResult(normalized);
+        setQuestionsLoadError(null);
+        return false;
+      }
+      const message =
+        responseData.message || "حدث خطأ أثناء تحميل أسئلة الامتحان";
+      setQuestionsLoadError(message);
+      return false;
+    } finally {
+      setQuestionsReloading(false);
+    }
+  }, [id]);
 
   // جلب بيانات الامتحان
   const fetchExamData = async () => {
@@ -424,35 +506,45 @@ const ComprehensiveExam = () => {
           await fetchQuestionsForTeacher();
         }
       } else {
-        // للطلاب: نعرض الأسئلة فقط عند وجود محاولة نشطة (حتى يظهر زر "بدء الامتحان" والمؤقت)
-        let questionsFound = false;
+        // للطلاب: الأسئلة تُعرض فقط مع محاولة نشطة من GET /api/exams/:id
+        const rawQuestions = Array.isArray(data.questions) ? data.questions : [];
 
-        if (
-          data.attempt &&
-          data.questions &&
-          Array.isArray(data.questions) &&
-          data.questions.length > 0
-        ) {
-          const formattedQuestions = normalizeQuestions(data.questions);
-          setQuestions(formattedQuestions);
-          questionsFound = true;
-        }
-
-        if (!questionsFound) {
-          if (data.status === "ready" && data.attempt) {
-            await fetchQuestionsForStudent();
-          } else if (data.feedback && data.feedback.wrongQuestions) {
-            // إذا كان هناك feedback، نستخدم الأسئلة من هناك
-            const questionsFromFeedback = data.feedback.wrongQuestions.map(
-              (wq) => ({
-                id: wq.questionId,
-                text: wq.questionText,
-                image: wq.questionImage || null,
-                choices: [], // سيتم ملؤها لاحقاً
-              })
+        if (rawQuestions.length > 0) {
+          const formattedQuestions = normalizeQuestions(rawQuestions);
+          if (formattedQuestions.length > 0) {
+            setQuestions(formattedQuestions);
+            setQuestionsLoadError(null);
+          } else if (!data.attempt) {
+            setQuestions([]);
+            setQuestionsLoadError(
+              "تعذر قراءة أسئلة الامتحان من الخادم. حاول إعادة التحميل."
             );
-            setQuestions(questionsFromFeedback);
+          } else if (questionsRef.current.length === 0) {
+            setQuestionsLoadError(
+              "تعذر قراءة أسئلة الامتحان من الخادم. حاول إعادة التحميل."
+            );
           }
+        } else if (data.feedback && data.feedback.wrongQuestions) {
+          const questionsFromFeedback = data.feedback.wrongQuestions.map(
+            (wq) => ({
+              id: wq.questionId,
+              text: wq.questionText,
+              image: wq.questionImage || null,
+              choices: [],
+            })
+          );
+          setQuestions(questionsFromFeedback);
+          setQuestionsLoadError(null);
+        } else if (data.attempt) {
+          // محاولة نشطة لكن GET لم يُرجع أسئلة — لا نمسح الأسئلة المحمّلة مسبقاً
+          if (questionsRef.current.length === 0) {
+            setQuestionsLoadError(
+              "لم يتم تحميل أسئلة الامتحان. اضغط إعادة المحاولة لإعادة التحميل."
+            );
+          }
+        } else {
+          setQuestions([]);
+          setQuestionsLoadError(null);
         }
       }
 
@@ -532,23 +624,7 @@ const ComprehensiveExam = () => {
     }
   };
 
-  // جلب الأسئلة للطالب
-  const fetchQuestionsForStudent = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const res = await baseUrl.get(
-        `/api/questions/lecture-exam/${id}/details`,
-        token ? { headers: { Authorization: `Bearer ${token}` } } : {}
-      );
-      const questionsData = res.data.questions || [];
-      const normalized = normalizeQuestions(questionsData);
-      setQuestions(shuffleArray(normalized));
-    } catch (err) {
-      console.error("Error fetching questions for student:", err);
-    }
-  };
-
-  // بدء محاولة جديدة — تهيئة المؤقت من remainingSeconds أو من exam.duration / timeLimitMinutes
+  // بدء محاولة جديدة — الأسئلة من POST /api/exams/:id/start (أو GET بعدها)
   const startAttempt = async () => {
     setStartingAttempt(true);
     try {
@@ -559,24 +635,63 @@ const ComprehensiveExam = () => {
         token ? { headers: { Authorization: `Bearer ${token}` } } : {}
       );
 
-      const attemptData = res.data;
+      const attemptData = res.data || {};
+      let rawQuestions = attemptData.questions ?? [];
+      let sessionData = attemptData;
+
+      if (!rawQuestions.length) {
+        const getRes = await baseUrl.get(
+          `/api/exams/${id}`,
+          token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+        );
+        sessionData = getRes.data || {};
+        rawQuestions = sessionData.questions ?? [];
+        if (sessionData.exam) setExamData(sessionData.exam);
+      }
+
       const durationMinutes =
         attemptData.timeLimitMinutes ??
+        attemptData.durationMinutes ??
         attemptData.duration ??
+        sessionData.exam?.timeLimitMinutes ??
+        sessionData.exam?.durationMinutes ??
+        sessionData.exam?.duration ??
         examData?.timeLimitMinutes ??
         examData?.duration;
+      const attempt = sessionData.attempt || attemptData.attempt || attemptData;
       const initialSeconds =
+        attempt?.remainingSeconds ??
         attemptData.remainingSeconds ??
         (durationMinutes ? durationMinutes * 60 : null);
 
       setCurrentAttempt({
-        ...attemptData,
-        remainingSeconds: initialSeconds ?? attemptData.remainingSeconds,
+        ...attempt,
+        remainingSeconds: initialSeconds ?? attempt?.remainingSeconds,
       });
-      setRemainingSeconds(initialSeconds ?? attemptData.remainingSeconds ?? null);
+      setRemainingSeconds(initialSeconds ?? attempt?.remainingSeconds ?? null);
       setExamStatus("ready");
 
-      await fetchQuestionsForStudent();
+      const formattedQuestions = normalizeQuestions(rawQuestions);
+      if (!formattedQuestions.length) {
+        const message =
+          rawQuestions.length > 0
+            ? "تعذر عرض أسئلة الامتحان (صيغة غير مدعومة). تواصل مع المدرس."
+            : "لم يتم تحميل أسئلة الامتحان. تأكد من اتصال الشبكة وحاول مرة أخرى.";
+        setQuestionsLoadError(message);
+        toast({
+          title: "لم يتم تحميل أسئلة الامتحان",
+          description: message,
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+        return;
+      }
+
+      setQuestions(formattedQuestions);
+      setQuestionsLoadError(null);
+      setCurrentQuestionIndex(0);
+      setStudentAnswers({});
 
       toast({
         title: "تم بدء المحاولة بنجاح",
@@ -590,9 +705,18 @@ const ComprehensiveExam = () => {
       });
     } catch (err) {
       console.error("Error starting attempt:", err);
+      const responseData = err.response?.data || {};
+      const normalized = normalizeExamAttemptResult(responseData);
+      if (normalized) {
+        setBlockedAttemptResult(normalized);
+        setQuestionsLoadError(null);
+        return;
+      }
+      const message = responseData.message || "حدث خطأ غير متوقع";
+      setQuestionsLoadError(message);
       toast({
         title: "فشل بدء المحاولة",
-        description: err.response?.data?.message || "حدث خطأ غير متوقع",
+        description: message,
         status: "error",
         duration: 3000,
         isClosable: true,
@@ -1502,6 +1626,21 @@ const ComprehensiveExam = () => {
 
   // عرض الحالات المختلفة للطلاب
   if (student && !isTeacher && !isAdmin) {
+    if (blockedAttemptResult) {
+      return (
+        <ExamAttemptResultScreen
+          result={blockedAttemptResult}
+          examTitle={examData?.title}
+          pageBg={pageBg}
+          onBack={() => navigate(-1)}
+          onZoomImage={(src) => {
+            setImageZoomSrc(src);
+            setImageZoomOpen(true);
+          }}
+        />
+      );
+    }
+
     if (examStatus === "hidden") {
       return (
         <Box minH="100vh" bg={pageBg} pt="100px" pb={10} dir="rtl">
@@ -1856,7 +1995,7 @@ const ComprehensiveExam = () => {
               spacing={{ base: 4, sm: 5, md: 6 }}
               mb={{ base: 4, sm: 5, md: 6 }}
             >
-              {student && !submitResult && (
+              {student && !submitResult && questions.length > 0 && (
                 <Text
                   color={subtextColor}
                   textAlign="center"
@@ -1883,6 +2022,37 @@ const ComprehensiveExam = () => {
                     setImageZoomOpen(true);
                   }}
                 />
+              ) : questions.length === 0 ? (
+                <Center py={12}>
+                  <VStack spacing={4} px={4}>
+                    {questionsReloading || (currentAttempt && !questionsLoadError) ? (
+                      <>
+                        <Spinner size="lg" color="blue.500" />
+                        <Text color={subtextColor} textAlign="center">
+                          جاري تحميل الأسئلة...
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Alert status="error" borderRadius="xl" w="full">
+                          <AlertIcon />
+                          <Text fontSize="sm">
+                            {questionsLoadError ||
+                              "لم يتم تحميل أسئلة الامتحان. حاول إعادة التحميل."}
+                          </Text>
+                        </Alert>
+                        <Button
+                          colorScheme="blue"
+                          onClick={reloadQuestionsForAttempt}
+                          isLoading={questionsReloading}
+                          borderRadius="lg"
+                        >
+                          إعادة تحميل الأسئلة
+                        </Button>
+                      </>
+                    )}
+                  </VStack>
+                </Center>
               ) : (
                 <>
                   {questions.length > 0 &&

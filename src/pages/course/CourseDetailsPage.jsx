@@ -133,6 +133,12 @@ import { createCourseExam as postCourseExam, PER_LECTURE_ACCESS_MODES, resolveLe
 import { PER_LECTURE_ACCESS_MODE_LABELS, PER_LECTURE_ACCESS_MODE_HINTS, toDateTimeLocalValue, lectureSupportsActivationCodes } from "../../utils/lectureAccessUtils";
 import { parseCourseExamsResponse } from "../../utils/courseLevelExamUtils";
 import {
+  buildLectureExamCreatePayload,
+  buildLectureExamUpdatePayload,
+  QUESTION_DISPLAY_MODES,
+} from "../../utils/examFlowUtils";
+import QuestionDisplayModeFields from "../../components/exam/QuestionDisplayModeFields";
+import {
   fetchCourseExams as getCourseExams,
   fetchStudentCourseExams,
   courseExamsErrorMessage,
@@ -1594,29 +1600,22 @@ const CourseDetailsPage = () => {
       });
       return;
     }
+    if (!data.questions_count || Number(data.questions_count) <= 0) {
+      toast({
+        title: "عدد الأسئلة مطلوب",
+        description: "حدد عدد الأسئلة المعروضة للطالب",
+        status: "error",
+        duration: 4000,
+        isClosable: true,
+      });
+      return;
+    }
     try {
       setExamActionLoading(true);
 
-      const examData = {
-        title: data.title,
-        type: data.type || "assignment",
-        total_grade: data.total_grade,
-        duration: data.duration,
-        is_visible: data.is_visible ?? true,
-        // الواجبات تقفل المحاضرة التالية افتراضياً
-        lock_next_lectures: data.lock_next_lectures ?? true,
-        show_answers_immediately: data.show_answers_immediately,
-        show_answers_after_hours: data.show_answers_after_hours,
-      };
+      const examData = buildLectureExamCreatePayload(lectureId, data);
 
-      if (data.show_at) {
-        examData.show_at = new Date(data.show_at).toISOString();
-      }
-      if (data.hide_at) {
-        examData.hide_at = new Date(data.hide_at).toISOString();
-      }
-
-      await baseUrl.post(`/api/course/lecture/${lectureId}/exam`, examData, {
+      await baseUrl.post("/api/exams", examData, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -1688,27 +1687,20 @@ const CourseDetailsPage = () => {
   };
 
   const updateExam = async (examId, data) => {
+    if (!data.questions_count || Number(data.questions_count) <= 0) {
+      toast({
+        title: "عدد الأسئلة مطلوب",
+        description: "حدد عدد الأسئلة المعروضة للطالب",
+        status: "error",
+        duration: 4000,
+        isClosable: true,
+      });
+      return;
+    }
     try {
       setExamActionLoading(true);
 
-      const examData = {
-        title: data.title,
-        total_grade: data.total_grade,
-        duration: data.duration,
-        is_visible: data.is_visible,
-        lock_next_lectures: data.lock_next_lectures,
-        show_answers_immediately: data.show_answers_immediately,
-        show_answers_after_hours: data.show_answers_after_hours,
-      };
-      if (data.type) examData.type = data.type;
-
-      // إضافة التواريخ إذا تم تحديدها
-      if (data.show_at) {
-        examData.show_at = new Date(data.show_at).toISOString();
-      }
-      if (data.hide_at) {
-        examData.hide_at = new Date(data.hide_at).toISOString();
-      }
+      const examData = buildLectureExamUpdatePayload(data);
 
       await baseUrl.patch(`api/course/lecture/exam/${examId}`, examData, {
         headers: { Authorization: `Bearer ${token}` },
@@ -1852,6 +1844,14 @@ const CourseDetailsPage = () => {
     const [formData, setFormData] = useState({
       title: data?.title || "",
       type: data?.type || "assignment",
+      questions_count:
+        data?.questions_count?.toString() ||
+        data?.questionsCount?.toString() ||
+        "",
+      question_display_mode:
+        data?.question_display_mode ||
+        data?.questionDisplayMode ||
+        QUESTION_DISPLAY_MODES.ORDERED,
       total_grade: data?.total_grade ?? 20,
       duration: data?.duration || 60,
       is_visible: data?.is_visible ?? true,
@@ -1867,6 +1867,14 @@ const CourseDetailsPage = () => {
         setFormData({
           title: data.title || "",
           type: data.type || "assignment",
+          questions_count:
+            data.questions_count?.toString() ||
+            data.questionsCount?.toString() ||
+            "",
+          question_display_mode:
+            data.question_display_mode ||
+            data.questionDisplayMode ||
+            QUESTION_DISPLAY_MODES.ORDERED,
           total_grade: data.total_grade ?? 20,
           duration: data.duration || 60,
           is_visible: data.is_visible ?? true,
@@ -1880,6 +1888,8 @@ const CourseDetailsPage = () => {
         setFormData({
           title: "",
           type: "assignment",
+          questions_count: "",
+          question_display_mode: QUESTION_DISPLAY_MODES.ORDERED,
           total_grade: 20,
           duration: 60,
           is_visible: true,
@@ -1894,6 +1904,19 @@ const CourseDetailsPage = () => {
 
     const handleSubmit = (e) => {
       e.preventDefault();
+      if (
+        (type === "add" || type === "edit") &&
+        (!formData.questions_count || Number(formData.questions_count) <= 0)
+      ) {
+        toast({
+          title: "عدد الأسئلة مطلوب",
+          description: "حدد عدد الأسئلة المعروضة للطالب",
+          status: "error",
+          duration: 4000,
+          isClosable: true,
+        });
+        return;
+      }
       if (type === "edit") onSubmit(data.id, formData);
       else onSubmit(formData);
     };
@@ -2029,6 +2052,67 @@ const CourseDetailsPage = () => {
                       size="lg"
                     />
                   </FormControl>
+                </Box>
+
+                {/* عدد الأسئلة وطريقة العرض */}
+                <Box
+                  p={5}
+                  bg={cardBg}
+                  borderRadius="xl"
+                  borderWidth="1px"
+                  borderColor={cardBorder}
+                >
+                  <VStack spacing={4} align="stretch">
+                    <FormControl isRequired={type === "add"}>
+                      <FormLabel
+                        display="flex"
+                        alignItems="center"
+                        gap={3}
+                        fontWeight="600"
+                        color={labelColor}
+                        fontSize="md"
+                        mb={3}
+                      >
+                        <Box
+                          p={2}
+                          bg="purple.50"
+                          borderRadius="lg"
+                          _dark={{ bg: "purple.900" }}
+                        >
+                          <Icon as={FaBookOpen} color="purple.500" boxSize={4} />
+                        </Box>
+                        عدد الأسئلة المعروضة للطالب
+                      </FormLabel>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={formData.questions_count}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            questions_count: e.target.value,
+                          })
+                        }
+                        placeholder="20"
+                        isDisabled={loading}
+                        borderRadius="lg"
+                        borderWidth="1px"
+                        borderColor={cardBorder}
+                        size="lg"
+                      />
+                    </FormControl>
+
+                    <QuestionDisplayModeFields
+                      value={formData.question_display_mode}
+                      onChange={(value) =>
+                        setFormData({
+                          ...formData,
+                          question_display_mode: value,
+                        })
+                      }
+                      questionsCount={formData.questions_count}
+                    />
+                  </VStack>
                 </Box>
 
                 {/* الدرجة الكلية ومدة الامتحان */}

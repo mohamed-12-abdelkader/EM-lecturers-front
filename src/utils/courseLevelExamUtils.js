@@ -16,6 +16,10 @@ export function normalizeCourseLevelExam(raw = {}) {
     title: raw.title ?? "",
     duration_minutes: raw.duration_minutes ?? raw.durationMinutes ?? null,
     questions_count: raw.questions_count ?? raw.questionsCount ?? null,
+    question_display_mode:
+      raw.question_display_mode ??
+      raw.questionDisplayMode ??
+      "ordered",
     is_visible_to_students:
       raw.is_visible_to_students ?? raw.isVisibleToStudents ?? true,
     visibility_end_date:
