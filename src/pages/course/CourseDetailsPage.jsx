@@ -135,6 +135,7 @@ import { parseCourseExamsResponse } from "../../utils/courseLevelExamUtils";
 import {
   fetchCourseExams as getCourseExams,
   fetchStudentCourseExams,
+  courseExamsErrorMessage,
 } from "../../api/courseExamsApi";
 import { useTeacherCourseGroups } from "../../Hooks/course/useCourseGroups";
 import CourseAssignmentsTab from "./components/CourseAssignmentsTab";
@@ -992,7 +993,7 @@ const CourseDetailsPage = () => {
         // التحقق من نوع الخطأ
         if (error.response) {
           const status = error.response.status;
-          const errorMessage = error.response?.data?.message || error.message;
+          const errorMessage = courseExamsErrorMessage(error);
 
           // إذا كان الخطأ 403 (Forbidden)، قد يكون بسبب الصلاحيات
           if (status === 403) {
@@ -1008,15 +1009,11 @@ const CourseDetailsPage = () => {
               setCourseExams([]);
             }
           } else {
-            setCourseExamsError(
-              errorMessage || "حدث خطأ في تحميل الامتحانات الشاملة",
-            );
+            setCourseExamsError(errorMessage);
             setCourseExams([]);
           }
         } else {
-          setCourseExamsError(
-            error.message || "حدث خطأ في تحميل الامتحانات الشاملة",
-          );
+          setCourseExamsError(courseExamsErrorMessage(error));
           setCourseExams([]);
         }
       } finally {
@@ -1046,7 +1043,7 @@ const CourseDetailsPage = () => {
       // التحقق من نوع الخطأ
       if (error.response) {
         const status = error.response.status;
-        const errorMessage = error.response?.data?.message || error.message;
+        const errorMessage = courseExamsErrorMessage(error);
 
         // إذا كان الخطأ 403 (Forbidden)، قد يكون بسبب الصلاحيات
         if (status === 403) {
@@ -1062,15 +1059,11 @@ const CourseDetailsPage = () => {
             setCourseExams([]);
           }
         } else {
-          setCourseExamsError(
-            errorMessage || "حدث خطأ في تحميل الامتحانات الشاملة",
-          );
+          setCourseExamsError(errorMessage);
           setCourseExams([]);
         }
       } else {
-        setCourseExamsError(
-          error.message || "حدث خطأ في تحميل الامتحانات الشاملة",
-        );
+        setCourseExamsError(courseExamsErrorMessage(error));
         setCourseExams([]);
       }
     } finally {
