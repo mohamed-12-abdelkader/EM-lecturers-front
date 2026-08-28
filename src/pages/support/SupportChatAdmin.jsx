@@ -77,7 +77,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/ar';
 import { toast } from 'react-toastify';
 import baseUrl from '../../api/baseUrl';
-import { getSocketEndpoint } from '../../utils/socketEndpoint';
+import { getSocketEndpoint, getSocketClientOptions } from '../../utils/socketEndpoint';
 
 dayjs.extend(relativeTime);
 dayjs.locale('ar');
@@ -145,13 +145,9 @@ const SupportChatAdmin = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    const socket = io(socketEndpoint, {
-      path: '/socket.io',
-      withCredentials: true,
+    const socket = io(socketEndpoint, getSocketClientOptions({
       auth: { token },
-      transports: ['websocket'],
-      reconnection: true,
-    });
+    }));
 
     socketRef.current = socket;
 

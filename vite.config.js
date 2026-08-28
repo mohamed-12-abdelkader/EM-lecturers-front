@@ -89,6 +89,15 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           ws: true,
           secure: false,
+          configure: (proxy) => {
+            proxy.on("proxyReq", (proxyReq, req) => {
+              const host = String(req.headers.host || "").toLowerCase();
+              const tenantMatch = host.match(/^([a-z0-9-]+)\.localhost(?::\d+)?$/);
+              if (tenantMatch?.[1]) {
+                proxyReq.setHeader("X-Tenant-Subdomain", tenantMatch[1]);
+              }
+            });
+          },
         },
         "/storage": {
           target: proxyTarget,

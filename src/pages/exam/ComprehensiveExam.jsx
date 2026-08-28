@@ -278,35 +278,6 @@ const ComprehensiveExam = () => {
     }
   }, [currentAttempt, student, isTeacher, isAdmin]);
 
-  useEffect(() => {
-    if (
-      !student ||
-      isTeacher ||
-      isAdmin ||
-      !currentAttempt ||
-      questions.length > 0 ||
-      loading ||
-      questionsReloading ||
-      blockedAttemptResult ||
-      questionsAutoRetryRef.current
-    ) {
-      return;
-    }
-
-    questionsAutoRetryRef.current = true;
-    reloadQuestionsForAttempt();
-  }, [
-    student,
-    isTeacher,
-    isAdmin,
-    currentAttempt,
-    questions.length,
-    loading,
-    questionsReloading,
-    blockedAttemptResult,
-    reloadQuestionsForAttempt,
-  ]);
-
   /**
    * تسوية مصفوفة الأسئلة من الـ API:
    * - تدعم صيغة sub_questions القديمة (type: "passage")
@@ -407,6 +378,35 @@ const ComprehensiveExam = () => {
       setQuestionsReloading(false);
     }
   }, [id]);
+
+  useEffect(() => {
+    if (
+      !student ||
+      isTeacher ||
+      isAdmin ||
+      !currentAttempt ||
+      questions.length > 0 ||
+      loading ||
+      questionsReloading ||
+      blockedAttemptResult ||
+      questionsAutoRetryRef.current
+    ) {
+      return;
+    }
+
+    questionsAutoRetryRef.current = true;
+    reloadQuestionsForAttempt();
+  }, [
+    student,
+    isTeacher,
+    isAdmin,
+    currentAttempt,
+    questions.length,
+    loading,
+    questionsReloading,
+    blockedAttemptResult,
+    reloadQuestionsForAttempt,
+  ]);
 
   // جلب بيانات الامتحان
   const fetchExamData = async () => {

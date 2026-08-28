@@ -42,7 +42,7 @@ import {
   FaMinus,
 } from "react-icons/fa";
 import baseUrl from "../../api/baseUrl";
-import { getSocketEndpoint } from "../../utils/socketEndpoint";
+import { getSocketEndpoint, getSocketClientOptions } from "../../utils/socketEndpoint";
 import { io } from 'socket.io-client';
 
 const ChallengeEMAcademy = () => {
@@ -222,15 +222,11 @@ const ChallengeEMAcademy = () => {
   // Setup WebSocket for real-time updates
   useEffect(() => {
     const tokenOnly = (localStorage.getItem('Authorization') || '').replace(/^Bearer\s+/i, '') || localStorage.getItem('token');
-    const socket = io(getSocketEndpoint(), {
-      path: '/socket.io',
-      withCredentials: true,
+    const socket = io(getSocketEndpoint(), getSocketClientOptions({
       auth: tokenOnly ? { token: tokenOnly } : {},
-      transports: ['websocket'],
-      reconnection: true,
       reconnectionDelay: 1000,
       reconnectionAttempts: 5,
-    });
+    }));
 
     socketRef.current = socket;
 

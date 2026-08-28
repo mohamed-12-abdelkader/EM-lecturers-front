@@ -17,7 +17,7 @@ import {
 import { io } from 'socket.io-client';
 import dayjs from 'dayjs';
 import baseUrl from '../../api/baseUrl';
-import { getSocketEndpoint } from '../../utils/socketEndpoint';
+import { getSocketEndpoint, getSocketClientOptions } from '../../utils/socketEndpoint';
 import UserType from '../../Hooks/auth/userType';
 
 
@@ -1312,14 +1312,10 @@ const TeacherChat = () => {
     // Connect socket once — لا يُعاد الاتصال عند تبديل المحادثة
     useEffect(() => {
         const tokenOnly = (localStorage.getItem('Authorization') || '').replace(/^Bearer\s+/i, '') || localStorage.getItem('token');
-        const s = io(socketEndpoint, {
-            path: '/socket.io',
-            withCredentials: true,
+        const s = io(socketEndpoint, getSocketClientOptions({
             auth: tokenOnly ? { token: tokenOnly } : {},
-            transports: ['websocket', 'polling'],
-            reconnection: true,
             reconnectionAttempts: 12,
-        });
+        }));
         socketRef.current = s;
 
         const onConnect = () => {

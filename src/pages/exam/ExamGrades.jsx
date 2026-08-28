@@ -37,6 +37,15 @@ import {
 import { Link } from "react-router-dom";
 import baseUrl from "../../api/baseUrl";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
+import { buildExamManagePath } from "./utils/examReportUtils";
+
+function resolveExamPageFromType(examType) {
+  const type = String(examType || "").toLowerCase();
+  if (type === "comprehensive" || type === "course" || type === "course_exam") {
+    return "course-level";
+  }
+  return "lecture";
+}
 
 const FILTERS = [
   { id: "all", label: "الكل" },
@@ -644,10 +653,9 @@ function ExamCard({
   const hoverShadow = useColorModeValue("0 14px 32px rgba(37,99,235,0.1)", "lg");
   const progressTrack = useColorModeValue("gray.100", "gray.800");
 
-  const examUrl =
-    exam.exam_type === "course"
-      ? `/exam/${exam.exam_id}`
-      : `/ComprehensiveExam/${exam.exam_id}`;
+  const examUrl = buildExamManagePath(exam.exam_id, {
+    from: resolveExamPageFromType(exam.exam_type),
+  });
 
   const body = (
     <Box
