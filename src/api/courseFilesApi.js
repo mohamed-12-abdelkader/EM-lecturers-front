@@ -1,4 +1,11 @@
 import baseUrl from "./baseUrl";
+import { getApiOrigin, getResolvedApiTarget, useDevViteProxy } from "./apiConfig";
+import { readAuthToken } from "../utils/authStorage";
+import {
+  getTenantSubdomain,
+  resolveLoginTenantSubdomain,
+} from "../utils/tenantHost";
+import { getAuthScopeSubdomain } from "../utils/tenantAuthStorage";
 
 /** يطابق الحد الافتراضي في الـBackend (`COURSE_PDF_MAX_FILE_SIZE_MB`) */
 export const COURSE_PDF_MAX_FILE_SIZE_MB = 50;
@@ -191,38 +198,164 @@ export async function deleteCourseFile(fileId) {
   return data;
 }
 
+function bytesLookLikePdf(bytes) {
+  if (!bytes?.length) return false;
+  const magic = new TextDecoder().decode(bytes.slice(0, 5));
+  return magic.startsWith("%PDF");
+}
+
+function blobFromBytes(bytes) {
+  if (!bytesLookLikePdf(bytes)) {
+    let message = "الملف المستلم ليس PDF صالحاً";
+    try {
+      const json = JSON.parse(new TextDecoder().decode(bytes));
+      if (json?.message) message = json.message;
+    } catch {
+      // not JSON
+    }
+    const error = new Error(message);
+    error.response = { status: 502, data: { message } };
+    throw error;
+  }
+  return new Blob([bytes], { type: "application/pdf" });
+}
+
+function isApiBackedViewUrl(url) {
+  if (!url || typeof url !== "string") return false;
+  const trimmed = url.trim();
+  if (trimmed.startsWith("/api/")) return true;
+  try {
+    const parsed = new URL(trimmed, window.location.origin);
+    return (
+      parsed.origin === window.location.origin &&
+      parsed.pathname.startsWith("/api/")
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function resolveCourseFileDirectViewUrl(fileId) {
+  const { data } = await baseUrl.post(
+    `/api/course-files/${fileId}/view`,
+    {},
+    {
+      headers: {
+        Accept: "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      params: { client: "app", format: "json" },
+    },
+  );
+  return data?.data?.signedViewUrl || null;
+}
+
+async function fetchCourseFilePdfFromDirectUrl(signedViewUrl) {
+  const absolute = /^https?:\/\//i.test(signedViewUrl)
+    ? signedViewUrl
+    : `${window.location.origin}${signedViewUrl.startsWith("/") ? "" : "/"}${signedViewUrl}`;
+
+  const response = await fetch(absolute, {
+    credentials: "omit",
+    redirect: "follow",
+  });
+
+  if (!response.ok) {
+    const error = new Error(`تعذّر جلب الملف (${response.status})`);
+    error.response = { status: response.status, data: { message: error.message } };
+    throw error;
+  }
+
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  return blobFromBytes(bytes);
+}
+
+function getCourseFileStreamBaseUrl() {
+  if (useDevViteProxy()) {
+    return getResolvedApiTarget();
+  }
+  return getApiOrigin() || getResolvedApiTarget() || window.location.origin;
+}
+
+function buildCourseFileViewAuthHeaders(accept = "application/octet-stream") {
+  const headers = {
+    Accept: accept,
+    "X-Requested-With": "XMLHttpRequest",
+    "Content-Type": "application/json",
+  };
+  const token = readAuthToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const tenant =
+    getTenantSubdomain() || getAuthScopeSubdomain() || resolveLoginTenantSubdomain();
+  if (tenant) headers["X-Tenant-Subdomain"] = tenant;
+  return headers;
+}
+
+async function streamCourseFilePdfViaApi(fileId) {
+  const apiBase = getCourseFileStreamBaseUrl().replace(/\/$/, "");
+  const url = `${apiBase}/api/course-files/${fileId}/view?client=app`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: buildCourseFileViewAuthHeaders(),
+    body: "{}",
+    credentials: "omit",
+    redirect: "follow",
+  });
+
+  if (!response.ok) {
+    let payload = { message: `تعذّر تحميل الملف (${response.status})` };
+    try {
+      payload = await response.json();
+    } catch {
+      // keep default message
+    }
+    const error = new Error(
+      payload.message || payload.msg || payload.error || "تعذّر تحميل الملف",
+    );
+    error.response = { status: response.status, data: payload };
+    throw error;
+  }
+
+  const contentType = String(response.headers.get("content-type") || "");
+  const bytes = new Uint8Array(await response.arrayBuffer());
+
+  if (contentType.includes("application/json")) {
+    const json = JSON.parse(new TextDecoder().decode(bytes));
+    const error = new Error(json.message || "تعذّر تحميل الملف");
+    error.response = { status: response.status, data: json };
+    throw error;
+  }
+
+  return blobFromBytes(bytes);
+}
+
 /**
  * يجلب محتوى PDF بعد التحقق من الصلاحيات.
  * يُستخدم داخل العارض فقط — لا يُحفظ الرابط ولا الـBlob بشكل دائم.
  */
 export async function getCourseFileView(fileId) {
-  try {
-    const response = await baseUrl.post(
-      `/api/course-files/${fileId}/view`,
-      {},
-      {
-        responseType: "arraybuffer",
-        maxRedirects: 0,
-        headers: {
-          Accept: "application/octet-stream",
-          "X-Requested-With": "XMLHttpRequest",
-        },
-        params: { client: "app" },
-      },
-    );
-
-    const buffer = response.data;
-    const bytes = buffer instanceof ArrayBuffer ? new Uint8Array(buffer) : new Uint8Array(buffer?.data || buffer || []);
-    const contentType = String(response.headers?.["content-type"] || "");
-
-    if (contentType.includes("application/json")) {
-      const json = JSON.parse(new TextDecoder().decode(bytes));
-      const error = new Error(json.message || "تعذّر تحميل الملف");
-      error.response = { status: response.status, data: json };
-      throw error;
+  // في التطوير مع Vite proxy: البث المباشر عبر :8000 — الـproxy يقطع الملفات الكبيرة
+  if (!useDevViteProxy()) {
+    try {
+      const signedViewUrl = await resolveCourseFileDirectViewUrl(fileId);
+      if (signedViewUrl && !isApiBackedViewUrl(signedViewUrl)) {
+        try {
+          return await fetchCourseFilePdfFromDirectUrl(signedViewUrl);
+        } catch {
+          // الرابط الموقّع (CDN) فشل — نجرّب البث عبر API
+        }
+      }
+    } catch (err) {
+      const status = err?.response?.status;
+      if (status === 401 || status === 403 || status === 404) {
+        throw err;
+      }
     }
+  }
 
-    return new Blob([bytes], { type: "application/pdf" });
+  try {
+    return await streamCourseFilePdfViaApi(fileId);
   } catch (err) {
     const data = err?.response?.data;
     if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {

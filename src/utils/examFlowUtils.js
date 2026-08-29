@@ -154,35 +154,72 @@ export function normalizeExamQuestionsFromApi(questionsArray) {
 }
 
 /** استخراج معرّف المحاولة من صيغ API مختلفة (camelCase / snake_case / nested) */
-export function extractExamAttemptId(source = {}) {
-  if (!source || typeof source !== "object") return null;
+export function toPositiveAttemptId(value) {
+  if (value == null || value === "") return null;
+  const num = Number(value);
+  return Number.isFinite(num) && num > 0 ? num : null;
+}
 
-  const attempt = source.attempt;
-  const hasStartPayload =
+function collectAttemptIds(source, depth = 0, bucket = []) {
+  if (!source || typeof source !== "object" || depth > 3) return bucket;
+
+  const push = (value) => {
+    const id = toPositiveAttemptId(value);
+    if (id != null) bucket.push(id);
+  };
+
+  push(source.attemptId);
+  push(source.attempt_id);
+  push(source.attemptID);
+  push(source.activeAttemptId);
+  push(source.active_attempt_id);
+
+  const looksLikeAttemptStart =
     Array.isArray(source.questions) ||
     source.examTitle != null ||
     source.durationMinutes != null ||
-    source.timeLimitMinutes != null;
+    source.timeLimitMinutes != null ||
+    source.startedAt != null ||
+    source.remainingSeconds != null;
 
-  const candidates = [
-    source.attemptId,
-    source.attempt_id,
-    attempt?.attemptId,
-    attempt?.attempt_id,
-    attempt?.id,
+  if (looksLikeAttemptStart && source.attempt == null) {
+    push(source.id);
+  }
+
+  const attemptLike = [
+    source.attempt,
+    source.currentAttempt,
+    source.examAttempt,
+    source.latestAttempt,
+    source.activeAttempt,
   ];
-
-  if (!attempt && hasStartPayload) {
-    candidates.push(source.id);
+  for (const attempt of attemptLike) {
+    if (!attempt || typeof attempt !== "object") continue;
+    push(attempt.attemptId);
+    push(attempt.attempt_id);
+    push(attempt.attemptID);
+    push(attempt.id);
   }
 
-  for (const value of candidates) {
-    if (value == null || value === "") continue;
-    const num = Number(value);
-    if (Number.isFinite(num) && num > 0) return num;
+  const nested = [source.data, source.result, source.payload, source.session];
+  for (const node of nested) {
+    if (node && typeof node === "object") {
+      collectAttemptIds(node, depth + 1, bucket);
+    }
   }
 
-  return null;
+  return bucket;
+}
+
+export function extractExamAttemptId(source = {}, examId = null) {
+  if (!source || typeof source !== "object") return null;
+
+  const ids = [...new Set(collectAttemptIds(source))];
+  if (!ids.length) return null;
+
+  const examNum = toPositiveAttemptId(examId);
+  const notExamId = examNum != null ? ids.filter((id) => id !== examNum) : ids;
+  return notExamId[0] ?? null;
 }
 
 export function submitExamKeepalive({ examId, attemptId, answers = [] }) {
@@ -205,7 +242,7 @@ export function submitExamKeepalive({ examId, attemptId, answers = [] }) {
     fetch(url, {
       method: "POST",
       headers,
-      body: JSON.stringify({ attemptId, answers }),
+      body: JSON.stringify({ attemptId, attempt_id: attemptId, answers }),
       keepalive: true,
     }).catch(() => {});
   } catch {

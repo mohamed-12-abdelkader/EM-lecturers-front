@@ -59,8 +59,10 @@ export default defineConfig(({ mode }) => {
     env.VITE_API_BASE_URL ||
     (isProd ? "https://api.em-online.online/" : "http://localhost:8000")
   ).replace(/\/$/, "");
+  const isCapacitorBuild = env.CAPACITOR_BUILD === "true";
 
   return {
+    base: isCapacitorBuild ? "./" : "/",
     define: {
       __APP_BUILD_ID__: JSON.stringify(appBuildId),
     },
@@ -73,9 +75,16 @@ export default defineConfig(({ mode }) => {
           target: proxyTarget,
           changeOrigin: true,
           secure: false,
+          timeout: 0,
+          proxyTimeout: 0,
           configure: (proxy) => {
-            proxy.on("proxyReq", (proxyReq) => {
+            proxy.on("proxyReq", (proxyReq, req) => {
               proxyReq.setHeader("ngrok-skip-browser-warning", "1");
+              const host = String(req.headers.host || "").toLowerCase();
+              const tenantMatch = host.match(/^([a-z0-9-]+)\.localhost(?::\d+)?$/);
+              if (tenantMatch?.[1] && !proxyReq.getHeader("X-Tenant-Subdomain")) {
+                proxyReq.setHeader("X-Tenant-Subdomain", tenantMatch[1]);
+              }
             });
           },
         },

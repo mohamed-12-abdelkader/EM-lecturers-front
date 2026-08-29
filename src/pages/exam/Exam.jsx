@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Box, VStack, Heading, Text, Spinner, Center, RadioGroup, Radio, Stack,
   Alert, AlertIcon, IconButton, HStack, useToast, Modal, ModalOverlay,
@@ -11,15 +11,18 @@ import { useParams, useNavigate } from "react-router-dom";
 import UserType from "../../Hooks/auth/userType";
 import {
   FaBookOpen, FaCheckCircle, FaChevronLeft, FaChevronRight,
-  FaUser, FaTimesCircle, FaImage, FaChartBar, FaCompass
+  FaUser, FaTimesCircle, FaImage, FaChartBar, FaCompass, FaFilePdf
 } from 'react-icons/fa';
 import { BiSearch } from "react-icons/bi";
+import { FiDownload } from "react-icons/fi";
 import {
   PlatformExamTeacherCard,
   formatAnswerLabel,
 } from "./components/PlatformExamQuestionCard";
 import AiQuestionExtractionModal from "./components/AiQuestionExtractionModal";
 import { SubmissionCard } from "./components/ExamSubmissionsView";
+import { downloadExamGradesExcel, downloadExamGradesPdf } from "./utils/examSubmissionUtils";
+import { PaginationBar } from "../centerMgmt/components/UiBits";
 import FormattedQuestionText from "../../components/question/FormattedQuestionText";
 import { MdArrowBack } from "react-icons/md";
 import ExamReadyScreen from "./components/ExamReadyScreen";
@@ -30,6 +33,7 @@ import {
   buildExamSubmitAnswers,
   normalizeExamQuestionsFromApi,
   extractExamAttemptId,
+  toPositiveAttemptId,
 } from "../../utils/examFlowUtils";
 import { normalizeExamAttemptResult } from "../../utils/examAttemptResultUtils";
 import TeacherExamTour from "../../components/onboarding/TeacherExamTour";
@@ -42,6 +46,65 @@ import {
   TOUR_OPEN_DELETE,
   TOUR_OPEN_EDIT,
 } from "../../utils/teacherExamTour";
+
+const GRADES_PAGE_SIZE = 20;
+
+function examAttemptStorageKey(examId) {
+  let uid = "u";
+  try {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    uid = user.id || user.user_id || user.student_id || "u";
+  } catch {
+    // keep fallback
+  }
+  return `em-lecture-exam-attempt:${uid}:${examId}`;
+}
+
+function readPersistedAttemptId(examId) {
+  if (!examId || typeof window === "undefined") return null;
+  const key = examAttemptStorageKey(examId);
+  try {
+    return (
+      toPositiveAttemptId(sessionStorage.getItem(key)) ||
+      toPositiveAttemptId(localStorage.getItem(key))
+    );
+  } catch {
+    return null;
+  }
+}
+
+function persistAttemptId(examId, attemptId) {
+  const id = toPositiveAttemptId(attemptId);
+  if (!examId || !id || typeof window === "undefined") return;
+  const key = examAttemptStorageKey(examId);
+  const value = String(id);
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // ignore quota
+  }
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // ignore quota
+  }
+}
+
+function clearPersistedAttemptId(examId) {
+  if (!examId || typeof window === "undefined") return;
+  const key = examAttemptStorageKey(examId);
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
 const Exam = () => {
   const { examId } = useParams();
   const navigate = useNavigate();
@@ -65,6 +128,8 @@ const Exam = () => {
   const [gradesLoading, setGradesLoading] = useState(false);
   const [gradesData, setGradesData] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [gradesCurrentPage, setGradesCurrentPage] = useState(1);
+  const [isExportingGradesPdf, setIsExportingGradesPdf] = useState(false);
 
   // للطالب: بدء الامتحان عبر POST /api/exams/:examId/start
   const [examStarted, setExamStarted] = useState(false);
@@ -73,7 +138,7 @@ const Exam = () => {
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [requiresStart, setRequiresStart] = useState(false);
   const [examSessionData, setExamSessionData] = useState(null);
-  const [attemptId, setAttemptId] = useState(null);
+  const [attemptId, setAttemptId] = useState(() => readPersistedAttemptId(examId));
   const [examMeta, setExamMeta] = useState(null); // { examTitle, durationMinutes, questionsCount, startedAt }
   const [remainingSeconds, setRemainingSeconds] = useState(null); // عد تنازلي من duration*60 (مثل التطبيق المرجعي)
   const [imageModalOpen, setImageModalOpen] = useState(false);
@@ -126,19 +191,42 @@ const Exam = () => {
     submitLoadingRef.current = submitLoading;
   }, [submitLoading]);
 
-  const commitAttemptId = useCallback((value) => {
-    const num = Number(value);
-    const validId = Number.isFinite(num) && num > 0 ? num : null;
+  const commitAttemptId = useCallback((value, { allowClear = false } = {}) => {
+    const validId = toPositiveAttemptId(value);
+    if (!validId) {
+      if (!allowClear) {
+        const fallback =
+          toPositiveAttemptId(attemptIdRef.current) || readPersistedAttemptId(examId);
+        if (fallback) {
+          setAttemptId(fallback);
+          attemptIdRef.current = fallback;
+          persistAttemptId(examId, fallback);
+          return fallback;
+        }
+        return null;
+      }
+      setAttemptId(null);
+      attemptIdRef.current = null;
+      return null;
+    }
     setAttemptId(validId);
     attemptIdRef.current = validId;
+    persistAttemptId(examId, validId);
     return validId;
-  }, []);
+  }, [examId]);
+
+  useEffect(() => {
+    if (toPositiveAttemptId(attemptId) || !examId) return;
+    const persisted = readPersistedAttemptId(examId);
+    if (persisted) commitAttemptId(persisted);
+  }, [examId, attemptId, commitAttemptId]);
 
   const applyStudentSession = (data = {}) => {
     const exam = data.exam || {};
     const attempt = data.attempt || null;
     const rawQuestions = data.questions ?? [];
-    const resolvedAttemptId = extractExamAttemptId(data);
+    const resolvedAttemptId =
+      extractExamAttemptId(data, examId) || readPersistedAttemptId(examId);
     const shouldRequireStart = !resolvedAttemptId || Boolean(data.requiresStart);
 
     const examTitle = exam.title ?? data.examTitle ?? "";
@@ -194,24 +282,47 @@ const Exam = () => {
   };
 
   const ensureAttemptIdBeforeSubmit = useCallback(async () => {
-    const current = attemptIdRef.current;
-    if (current && Number.isFinite(Number(current)) && Number(current) > 0) {
-      return Number(current);
+    const existing =
+      toPositiveAttemptId(attemptIdRef.current) || readPersistedAttemptId(examId);
+    if (existing) {
+      return commitAttemptId(existing);
+    }
+
+    const token = localStorage.getItem("token");
+    const headers = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+    const fromPayload = (payload) => extractExamAttemptId(payload, examId);
+
+    const tryGet = async () => {
+      const getRes = await baseUrl.get(`/api/exams/${examId}`, headers);
+      return fromPayload(getRes.data || {});
+    };
+
+    try {
+      const fromGet = await tryGet();
+      if (fromGet) return commitAttemptId(fromGet);
+    } catch (err) {
+      const fromErr = fromPayload(err?.response?.data || {});
+      if (fromErr) return commitAttemptId(fromErr);
     }
 
     try {
-      const token = localStorage.getItem("token");
-      const headers = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
       const startRes = await baseUrl.post(`/api/exams/${examId}/start`, {}, headers);
-      let resolved = extractExamAttemptId(startRes.data || {});
-      if (!resolved) {
-        const getRes = await baseUrl.get(`/api/exams/${examId}`, headers);
-        resolved = extractExamAttemptId(getRes.data || {});
+      const fromStart = fromPayload(startRes.data || {});
+      if (fromStart) return commitAttemptId(fromStart);
+      const fromGet = await tryGet();
+      if (fromGet) return commitAttemptId(fromGet);
+    } catch (err) {
+      const fromErr = fromPayload(err?.response?.data || {});
+      if (fromErr) return commitAttemptId(fromErr);
+      try {
+        const fromGet = await tryGet();
+        if (fromGet) return commitAttemptId(fromGet);
+      } catch {
+        // ignore
       }
-      return commitAttemptId(resolved);
-    } catch {
-      return null;
     }
+
+    return null;
   }, [examId, commitAttemptId]);
 
   const loadExamSession = async () => {
@@ -306,7 +417,7 @@ const Exam = () => {
         questions: rawQuestions,
       });
 
-      if (!extractExamAttemptId(sessionPayload)) {
+      if (!extractExamAttemptId(sessionPayload, examId)) {
         throw new Error("لم يتم إنشاء محاولة للامتحان. حاول مرة أخرى.");
       }
 
@@ -348,6 +459,113 @@ const Exam = () => {
       toast({ title: "فشل جلب الدرجات", status: "error" });
     } finally {
       setGradesLoading(false);
+    }
+  };
+
+  const filteredGrades = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    return gradesData.filter((submission) => {
+      if (!term) return true;
+      return (
+        (submission.name && submission.name.toLowerCase().includes(term)) ||
+        (submission.student_id != null && String(submission.student_id).includes(term)) ||
+        (submission.submission_id != null && String(submission.submission_id).includes(term)) ||
+        (submission.attempt_number != null && String(submission.attempt_number).includes(term)) ||
+        (submission.email && submission.email.toLowerCase().includes(term)) ||
+        (submission.phone && submission.phone.includes(term))
+      );
+    });
+  }, [gradesData, searchTerm]);
+
+  const gradesTotalPages = Math.max(1, Math.ceil(filteredGrades.length / GRADES_PAGE_SIZE));
+
+  const paginatedGrades = useMemo(() => {
+    const start = (gradesCurrentPage - 1) * GRADES_PAGE_SIZE;
+    return filteredGrades.slice(start, start + GRADES_PAGE_SIZE);
+  }, [filteredGrades, gradesCurrentPage]);
+
+  const gradesPageRangeStart =
+    filteredGrades.length === 0 ? 0 : (gradesCurrentPage - 1) * GRADES_PAGE_SIZE + 1;
+  const gradesPageRangeEnd = Math.min(gradesCurrentPage * GRADES_PAGE_SIZE, filteredGrades.length);
+
+  useEffect(() => {
+    setGradesCurrentPage(1);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    if (gradesCurrentPage > gradesTotalPages) {
+      setGradesCurrentPage(gradesTotalPages);
+    }
+  }, [gradesCurrentPage, gradesTotalPages]);
+
+  const handleExportGrades = () => {
+    if (!filteredGrades.length) {
+      toast({
+        title: "لا توجد درجات للتصدير",
+        description: "غيّر البحث ثم حاول مرة أخرى.",
+        status: "warning",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    const exported = downloadExamGradesExcel(filteredGrades, {
+      filename: `exam-grades-${new Date().toISOString().slice(0, 10)}.csv`,
+    });
+
+    if (exported) {
+      toast({
+        title: "تم تصدير الدرجات",
+        description: `تم تنزيل ${filteredGrades.length} طالب بدون تفاصيل الأسئلة الخاطئة.`,
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const gradesExportTitle =
+    examMeta?.examTitle || examSessionData?.title || "درجات الطلاب في الامتحان";
+
+  const handleExportGradesPdf = async () => {
+    if (!filteredGrades.length) {
+      toast({
+        title: "لا توجد درجات للتصدير",
+        description: "غيّر البحث ثم حاول مرة أخرى.",
+        status: "warning",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    setIsExportingGradesPdf(true);
+    try {
+      const exported = await downloadExamGradesPdf(filteredGrades, {
+        title: gradesExportTitle,
+        filename: `exam-grades-${new Date().toISOString().slice(0, 10)}.pdf`,
+      });
+
+      if (exported) {
+        toast({
+          title: "تم تصدير PDF",
+          description: `تم تنزيل ${filteredGrades.length} طالب في جدول PDF.`,
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    } catch (exportError) {
+      toast({
+        title: "تعذر تصدير PDF",
+        description: exportError?.message || "حاول مرة أخرى.",
+        status: "error",
+        duration: 4000,
+        isClosable: true,
+      });
+    } finally {
+      setIsExportingGradesPdf(false);
     }
   };
 
@@ -574,7 +792,7 @@ const Exam = () => {
     const answersArr = buildExamSubmitAnswers(studentAnswersRef.current);
 
     try {
-      const activeAttemptId = await ensureAttemptIdBeforeSubmit();
+      const activeAttemptId = toPositiveAttemptId(await ensureAttemptIdBeforeSubmit());
       if (!activeAttemptId) {
         if (!autoSubmit) {
           toast({
@@ -586,15 +804,45 @@ const Exam = () => {
         return;
       }
 
-      const res = await baseUrl.post(
-        `/api/exams/${examId}/submit`,
-        { attemptId: activeAttemptId, answers: answersArr },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const postSubmit = (id) =>
+        baseUrl.post(
+          `/api/exams/${examId}/submit`,
+          { attemptId: id, attempt_id: id, answers: answersArr },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            params: { attemptId: id, attempt_id: id },
+          }
+        );
+
+      let res;
+      try {
+        res = await postSubmit(activeAttemptId);
+      } catch (firstErr) {
+        const firstMsg = String(firstErr?.response?.data?.message || "");
+        const missingAttempt =
+          /attemptid is required/i.test(firstMsg) ||
+          /attempt_id is required/i.test(firstMsg);
+
+        if (!missingAttempt) throw firstErr;
+
+        const recovered =
+          toPositiveAttemptId(extractExamAttemptId(firstErr?.response?.data || {}, examId)) ||
+          toPositiveAttemptId(await ensureAttemptIdBeforeSubmit());
+
+        if (!recovered) throw firstErr;
+        commitAttemptId(recovered);
+        res = await postSubmit(recovered);
+      }
 
       const result = res.data;
       setSubmitResult(result);
       setRemainingSeconds(null);
+      clearPersistedAttemptId(examId);
+      commitAttemptId(null, { allowClear: true });
 
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
@@ -618,7 +866,7 @@ const Exam = () => {
       setSubmitLoading(false);
       submitInFlightRef.current = false;
     }
-  }, [examId, toast, ensureAttemptIdBeforeSubmit]);
+  }, [examId, toast, ensureAttemptIdBeforeSubmit, commitAttemptId]);
 
   useEffect(() => {
     if (timerIntervalRef.current) {
@@ -948,17 +1196,46 @@ const Exam = () => {
             <Heading textAlign={{ base: "center", sm: "start" }} color="blue.600" fontSize={{ base: "xl", sm: "2xl", md: "3xl" }}>
               درجات الطلاب في الامتحان
             </Heading>
-            <Button
-              colorScheme="blue"
-              size={{ base: "sm", md: "md" }}
-              leftIcon={<FaChartBar />}
-              onClick={() => navigate(`/exam/${examId}/report`)}
-              borderRadius="xl"
-              fontWeight="600"
-              alignSelf={{ base: "center", sm: "auto" }}
-            >
-              تقرير الأسئلة
-            </Button>
+            <HStack spacing={2} flexWrap="wrap" justify={{ base: "center", sm: "flex-end" }}>
+              {gradesData.length > 0 && (
+                <>
+                  <Button
+                    colorScheme="green"
+                    variant="outline"
+                    size={{ base: "sm", md: "md" }}
+                    leftIcon={<FiDownload />}
+                    onClick={handleExportGrades}
+                    borderRadius="xl"
+                    fontWeight="600"
+                  >
+                    تصدير Excel
+                  </Button>
+                  <Button
+                    colorScheme="red"
+                    variant="outline"
+                    size={{ base: "sm", md: "md" }}
+                    leftIcon={<FaFilePdf />}
+                    onClick={handleExportGradesPdf}
+                    isLoading={isExportingGradesPdf}
+                    loadingText="جاري التصدير..."
+                    borderRadius="xl"
+                    fontWeight="600"
+                  >
+                    تصدير PDF
+                  </Button>
+                </>
+              )}
+              <Button
+                colorScheme="blue"
+                size={{ base: "sm", md: "md" }}
+                leftIcon={<FaChartBar />}
+                onClick={() => navigate(`/exam/${examId}/report`)}
+                borderRadius="xl"
+                fontWeight="600"
+              >
+                تقرير الأسئلة
+              </Button>
+            </HStack>
           </Flex>
           <Box w="full" maxW={{ base: "100%", sm: "400px" }} mx="auto" mb={{ base: 4, md: 6 }}>
             <InputGroup size="lg">
@@ -988,37 +1265,34 @@ const Exam = () => {
               </Text>
             </Center>
           ) : (
-            (() => {
-              const filtered = gradesData.filter(s => {
-                const term = searchTerm.trim().toLowerCase();
-                if (!term) return true;
-                return (
-                  (s.name && s.name.toLowerCase().includes(term)) ||
-                  (s.student_id != null && String(s.student_id).includes(term)) ||
-                  (s.submission_id != null && String(s.submission_id).includes(term)) ||
-                  (s.attempt_number != null && String(s.attempt_number).includes(term)) ||
-                  (s.email && s.email.toLowerCase().includes(term)) ||
-                  (s.phone && s.phone.includes(term))
-                );
-              });
-              return (
-                <VStack spacing={{ base: 4, md: 5 }} align="stretch">
-                  {filtered.length === 0 ? (
-                    <Center py={8}>
-                      <Text color="gray.500" fontSize="md">لا توجد نتائج مطابقة للبحث</Text>
-                    </Center>
-                  ) : (
-                    filtered.map((s, idx) => (
-                      <SubmissionCard
-                        key={s.submission_id ?? idx}
-                        submission={s}
-                        index={idx}
-                      />
-                    ))
+            <VStack spacing={{ base: 4, md: 5 }} align="stretch">
+              {filteredGrades.length === 0 ? (
+                <Center py={8}>
+                  <Text color="gray.500" fontSize="md">لا توجد نتائج مطابقة للبحث</Text>
+                </Center>
+              ) : (
+                <>
+                  {filteredGrades.length > GRADES_PAGE_SIZE && (
+                    <Text fontSize="sm" color="gray.500" textAlign="center">
+                      عرض {gradesPageRangeStart}–{gradesPageRangeEnd} من {filteredGrades.length} طالب
+                    </Text>
                   )}
-                </VStack>
-              );
-            })()
+                  {paginatedGrades.map((submission, idx) => (
+                    <SubmissionCard
+                      key={submission.submission_id ?? `${gradesCurrentPage}-${idx}`}
+                      submission={submission}
+                      index={(gradesCurrentPage - 1) * GRADES_PAGE_SIZE + idx}
+                    />
+                  ))}
+                  <PaginationBar
+                    page={gradesCurrentPage}
+                    totalPages={gradesTotalPages}
+                    onPrev={() => setGradesCurrentPage((page) => Math.max(1, page - 1))}
+                    onNext={() => setGradesCurrentPage((page) => Math.min(gradesTotalPages, page + 1))}
+                  />
+                </>
+              )}
+            </VStack>
           )}
         </Box>
       ) : (

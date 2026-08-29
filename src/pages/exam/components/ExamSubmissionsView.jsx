@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Badge,
@@ -22,39 +22,31 @@ import {
   Alert,
   AlertIcon,
   useColorModeValue,
+  useToast,
 } from "@chakra-ui/react";
 import {
   AiOutlineCheckCircle,
   AiOutlineCloseCircle,
 } from "react-icons/ai";
-import { FiChevronDown, FiArrowRight, FiSearch, FiAward } from "react-icons/fi";
-import { FaChartBar } from "react-icons/fa";
+import { FiChevronDown, FiArrowRight, FiSearch, FiAward, FiDownload } from "react-icons/fi";
+import { FaChartBar, FaFilePdf } from "react-icons/fa";
+import { PaginationBar } from "../../centerMgmt/components/UiBits";
 import { ExamQuestionImage } from "./ExamQuestionDisplay";
 import { renderFormattedExamText } from "../../../utils/renderFormattedExamText";
 import {
   getWrongQuestions,
   getWrongQuestionsCount,
+  resolveSubmissionOutcome,
+  downloadExamGradesExcel,
+  downloadExamGradesPdf,
 } from "../utils/examSubmissionUtils";
+
+const PAGE_SIZE = 20;
 
 const FONT = "'Noto Sans Arabic', 'Noto Naskh Arabic', Tahoma, sans-serif";
 const NAVY = "#0E4C92";
 const GREEN = "#16A34A";
 const RED = "#DC2626";
-
-function resolveSubmissionOutcome(submission) {
-  const obtained = Number(submission?.obtained_grade ?? submission?.obtainedGrade ?? 0);
-  const total = Number(submission?.total_grade ?? submission?.totalGrade ?? 0);
-  const percentage =
-    submission?.percentage != null
-      ? Math.round(Number(submission.percentage))
-      : total > 0
-        ? Math.round((obtained / total) * 100)
-        : 0;
-  const passed =
-    submission?.passed != null ? Boolean(submission.passed) : percentage >= 50;
-
-  return { obtained, total, percentage, passed };
-}
 
 function studentInitials(name) {
   const parts = String(name || "طالب")
@@ -542,9 +534,13 @@ export default function ExamSubmissionsView({
   onRetry,
   onReport,
   onZoomImage,
+  examTitle = "درجات الطلاب في الامتحان",
 }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const toast = useToast();
 
   const pageBg = useColorModeValue("#F4F7FB", "gray.950");
   const cardBg = useColorModeValue("white", "gray.900");
@@ -583,6 +579,94 @@ export default function ExamSubmissionsView({
       );
     });
   }, [submissions, outcomes, query, statusFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedFiltered = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, currentPage]);
+
+  const pageRangeStart = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const pageRangeEnd = Math.min(currentPage * PAGE_SIZE, filtered.length);
+
+  const handleExportGrades = () => {
+    if (!filtered.length) {
+      toast({
+        title: "لا توجد درجات للتصدير",
+        description: "غيّر البحث أو الفلتر ثم حاول مرة أخرى.",
+        status: "warning",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    const exported = downloadExamGradesExcel(filtered, {
+      filename: `exam-grades-${new Date().toISOString().slice(0, 10)}.csv`,
+    });
+
+    if (exported) {
+      toast({
+        title: "تم تصدير الدرجات",
+        description: `تم تنزيل ${filtered.length} طالب بدون تفاصيل الأسئلة الخاطئة.`,
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (!filtered.length) {
+      toast({
+        title: "لا توجد درجات للتصدير",
+        description: "غيّر البحث أو الفلتر ثم حاول مرة أخرى.",
+        status: "warning",
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    setIsExportingPdf(true);
+    try {
+      const exported = await downloadExamGradesPdf(filtered, {
+        title: examTitle,
+        filename: `exam-grades-${new Date().toISOString().slice(0, 10)}.pdf`,
+      });
+
+      if (exported) {
+        toast({
+          title: "تم تصدير PDF",
+          description: `تم تنزيل ${filtered.length} طالب (كل الطلاب وليس الصفحة الحالية فقط).`,
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+        });
+      }
+    } catch (exportError) {
+      toast({
+        title: "تعذر تصدير PDF",
+        description: exportError?.message || "حاول مرة أخرى.",
+        status: "error",
+        duration: 4000,
+        isClosable: true,
+      });
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   return (
     <Box
@@ -629,19 +713,46 @@ export default function ExamSubmissionsView({
                 <Heading size="lg" color={heading} fontFamily={FONT} fontWeight="800">
                   درجات الطلاب في الامتحان
                 </Heading>
-                {typeof onReport === "function" && (
-                  <Button
-                    size="sm"
-                    colorScheme="blue"
-                    leftIcon={<Icon as={FaChartBar} />}
-                    rightIcon={<Icon as={FiArrowRight} />}
-                    onClick={onReport}
-                    flexShrink={0}
-                    fontFamily={FONT}
-                  >
-                    تقرير الأسئلة
-                  </Button>
-                )}
+                <HStack spacing={2} flexShrink={0} flexWrap="wrap">
+                  {submissions.length > 0 && (
+                    <>
+                      <Button
+                        size="sm"
+                        colorScheme="green"
+                        variant="outline"
+                        leftIcon={<Icon as={FiDownload} />}
+                        onClick={handleExportGrades}
+                        fontFamily={FONT}
+                      >
+                        تصدير Excel
+                      </Button>
+                      <Button
+                        size="sm"
+                        colorScheme="red"
+                        variant="outline"
+                        leftIcon={<Icon as={FaFilePdf} />}
+                        onClick={handleExportPdf}
+                        isLoading={isExportingPdf}
+                        loadingText="جاري التصدير..."
+                        fontFamily={FONT}
+                      >
+                        تصدير PDF
+                      </Button>
+                    </>
+                  )}
+                  {typeof onReport === "function" && (
+                    <Button
+                      size="sm"
+                      colorScheme="blue"
+                      leftIcon={<Icon as={FaChartBar} />}
+                      rightIcon={<Icon as={FiArrowRight} />}
+                      onClick={onReport}
+                      fontFamily={FONT}
+                    >
+                      تقرير الأسئلة
+                    </Button>
+                  )}
+                </HStack>
               </Flex>
 
               {submissions.length > 0 && (
@@ -770,14 +881,27 @@ export default function ExamSubmissionsView({
                   <Text color={muted}>لا توجد نتائج مطابقة للبحث أو التصفية.</Text>
                 </Box>
               ) : (
-                filtered.map((submission, idx) => (
-                  <SubmissionCard
-                    key={submission.submission_id || idx}
-                    submission={submission}
-                    index={submissions.indexOf(submission)}
-                    onZoomImage={onZoomImage}
+                <>
+                  {filtered.length > PAGE_SIZE && (
+                    <Text fontSize="sm" color={muted} textAlign="center">
+                      عرض {pageRangeStart}–{pageRangeEnd} من {filtered.length} طالب
+                    </Text>
+                  )}
+                  {paginatedFiltered.map((submission, idx) => (
+                    <SubmissionCard
+                      key={submission.submission_id || `${currentPage}-${idx}`}
+                      submission={submission}
+                      index={submissions.indexOf(submission)}
+                      onZoomImage={onZoomImage}
+                    />
+                  ))}
+                  <PaginationBar
+                    page={currentPage}
+                    totalPages={totalPages}
+                    onPrev={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    onNext={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
                   />
-                ))
+                </>
               )}
             </VStack>
           ) : (
