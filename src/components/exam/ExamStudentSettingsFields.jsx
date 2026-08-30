@@ -3,7 +3,6 @@ import {
   Box,
   FormControl,
   FormLabel,
-  HStack,
   Input,
   Radio,
   RadioGroup,
@@ -63,6 +62,41 @@ export function flagsFromAnswersReleaseMode(mode, extras = {}) {
 }
 
 /**
+ * Native datetime-local is clipped or zero-height in Firefox when Chakra
+ * sets a fixed height/line-height inside an RTL overflow:hidden modal.
+ */
+function DateTimeLocalInput({ value, onChange, isDisabled }) {
+  const scheme = useColorModeValue("light", "dark");
+  return (
+    <Box w="full" dir="ltr">
+      <Input
+        type="datetime-local"
+        value={value || ""}
+        onChange={onChange}
+        isDisabled={isDisabled}
+        w="full"
+        maxW="100%"
+        dir="ltr"
+        textAlign="left"
+        borderRadius="lg"
+        h="auto"
+        minH="44px"
+        py={2}
+        lineHeight="normal"
+        fontSize="md"
+        sx={{
+          display: "block",
+          boxSizing: "border-box",
+          colorScheme: scheme,
+          WebkitAppearance: "auto",
+          MozAppearance: "auto",
+        }}
+      />
+    </Box>
+  );
+}
+
+/**
  * Show date, expire date, and answer-release radios shared by lecture/course exam create forms.
  */
 export default function ExamStudentSettingsFields({
@@ -82,45 +116,55 @@ export default function ExamStudentSettingsFields({
   const patch = (partial) => onPatch(partial);
 
   return (
-    <VStack spacing={4} align="stretch">
-      <Box p={5} bg={cardBg} borderRadius="xl" borderWidth="1px" borderColor={cardBorder}>
-        <HStack spacing={6} align="flex-start" flexDir={{ base: "column", md: "row" }}>
-          <FormControl flex={1} w="full">
+    <VStack spacing={4} align="stretch" w="full" flexShrink={0}>
+      <Box
+        p={5}
+        bg={cardBg}
+        borderRadius="xl"
+        borderWidth="1px"
+        borderColor={cardBorder}
+        w="full"
+        flexShrink={0}
+      >
+        <VStack spacing={4} align="stretch">
+          <FormControl w="full">
             <FormLabel fontWeight="600" color={labelColor}>
               تاريخ الظهور للطلاب
             </FormLabel>
-            <Input
-              type="datetime-local"
-              value={formData[showField] || ""}
+            <DateTimeLocalInput
+              value={formData[showField]}
               onChange={(e) => patch({ [showField]: e.target.value })}
               isDisabled={loading}
-              borderRadius="lg"
-              size="lg"
             />
             <Text fontSize="xs" color="gray.500" mt={1}>
               قبل هذا الموعد الامتحان لا يظهر للطلاب.
             </Text>
           </FormControl>
-          <FormControl flex={1} w="full">
+          <FormControl w="full">
             <FormLabel fontWeight="600" color={labelColor}>
               تاريخ انتهاء الامتحان
             </FormLabel>
-            <Input
-              type="datetime-local"
-              value={formData[expireField] || ""}
+            <DateTimeLocalInput
+              value={formData[expireField]}
               onChange={(e) => patch({ [expireField]: e.target.value })}
               isDisabled={loading}
-              borderRadius="lg"
-              size="lg"
             />
             <Text fontSize="xs" color="gray.500" mt={1}>
               بعد الانتهاء يبقى ظاهراً ولا يمكن دخوله.
             </Text>
           </FormControl>
-        </HStack>
+        </VStack>
       </Box>
 
-      <Box p={5} bg={cardBg} borderRadius="xl" borderWidth="1px" borderColor={cardBorder}>
+      <Box
+        p={5}
+        bg={cardBg}
+        borderRadius="xl"
+        borderWidth="1px"
+        borderColor={cardBorder}
+        w="full"
+        flexShrink={0}
+      >
         <Text fontSize="md" fontWeight="600" color={labelColor} mb={1}>
           إظهار الإجابات للطلاب
         </Text>
@@ -174,12 +218,10 @@ export default function ExamStudentSettingsFields({
         {mode === ANSWERS_RELEASE_MODES.SCHEDULED && (
           <FormControl mt={4} isRequired>
             <FormLabel fontWeight="600">موعد إظهار الإجابات</FormLabel>
-            <Input
-              type="datetime-local"
-              value={formData[scheduledField] || ""}
+            <DateTimeLocalInput
+              value={formData[scheduledField]}
               onChange={(e) => patch({ [scheduledField]: e.target.value })}
               isDisabled={loading}
-              borderRadius="lg"
             />
           </FormControl>
         )}

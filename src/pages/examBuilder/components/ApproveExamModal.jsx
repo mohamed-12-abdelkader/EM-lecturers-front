@@ -145,11 +145,21 @@ export default function ApproveExamModal({
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="xl" isCentered scrollBehavior="inside">
       <ModalOverlay />
-      <ModalContent borderRadius="xl" dir="rtl">
-        <ModalHeader fontSize="md">اعتماد {questionCount} سؤال</ModalHeader>
+      <ModalContent
+        borderRadius="xl"
+        dir="rtl"
+        display="flex"
+        flexDirection="column"
+        h={{ base: "100dvh", md: "90vh" }}
+        maxH={{ base: "100dvh", md: "90vh" }}
+        overflow="hidden"
+      >
+        <ModalHeader fontSize="md" flexShrink={0}>
+          اعتماد {questionCount} سؤال
+        </ModalHeader>
         <ModalCloseButton />
-        <ModalBody>
-          <VStack align="stretch" spacing={4}>
+        <ModalBody flex="1" minH={0} overflowY="auto" overscrollBehavior="contain">
+          <VStack align="stretch" spacing={4} sx={{ "& > *": { flexShrink: 0 } }}>
             <BoxNote bg={noteBg}>
               اختر اعتماد الأسئلة فقط، أو إنشاء امتحان جديد وربط الأسئلة به تلقائياً.
             </BoxNote>
@@ -287,7 +297,7 @@ export default function ApproveExamModal({
             )}
           </VStack>
         </ModalBody>
-        <ModalFooter gap={2}>
+        <ModalFooter gap={2} flexShrink={0}>
           <Button variant="ghost" onClick={onClose}>
             إلغاء
           </Button>

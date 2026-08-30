@@ -745,7 +745,7 @@ const CourseExamsTab = ({
           overflow="hidden"
           dir="rtl"
           maxH={{ base: "100dvh", sm: "90vh" }}
-          h={{ base: "100dvh", sm: "auto" }}
+          h={{ base: "100dvh", sm: "90vh" }}
           display="flex"
           flexDirection="column"
         >
@@ -791,7 +791,7 @@ const CourseExamsTab = ({
             }}
           >
             <ModalBody flex="1" minH={0} overflowY="auto" overscrollBehavior="contain" py={5}>
-              <VStack spacing={{ base: 4, md: 5 }} align="stretch">
+              <VStack spacing={{ base: 4, md: 5 }} align="stretch" sx={{ "& > *": { flexShrink: 0 } }}>
                 <Box
                   borderWidth="1px"
                   borderColor={sectionBorder}
@@ -1359,7 +1359,7 @@ const CourseExamsTab = ({
           overflow="hidden"
           dir="rtl"
           maxH={{ base: "100dvh", sm: "90vh" }}
-          h={{ base: "100dvh", sm: "auto" }}
+          h={{ base: "100dvh", sm: "90vh" }}
           display="flex"
           flexDirection="column"
         >
@@ -1421,7 +1421,7 @@ const CourseExamsTab = ({
               overflowY="auto"
               overscrollBehavior="contain"
                 >
-              <VStack spacing={4} align="stretch">
+              <VStack spacing={4} align="stretch" sx={{ "& > *": { flexShrink: 0 } }}>
                 <ExamModalSection icon={FaRegFileAlt} title="المعلومات الأساسية" accent="blue">
                   <VStack spacing={4} align="stretch">
                     <FormControl isRequired>

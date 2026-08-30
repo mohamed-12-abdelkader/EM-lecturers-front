@@ -1950,7 +1950,8 @@ const CourseDetailsPage = () => {
           borderColor={cardBorder}
           boxShadow="xl"
           mx={{ base: 0, md: 4 }}
-          maxH={{ base: "100vh", md: "92vh" }}
+          h={{ base: "100dvh", md: "92vh" }}
+          maxH={{ base: "100dvh", md: "92vh" }}
           display="flex"
           flexDirection="column"
         >
@@ -2014,8 +2015,11 @@ const CourseDetailsPage = () => {
               flex="1"
               minH={0}
               overflowY="auto"
+              overflowX="hidden"
+              overscrollBehavior="contain"
+              sx={{ WebkitOverflowScrolling: "touch" }}
             >
-              <VStack spacing={4} align="stretch">
+              <VStack spacing={4} align="stretch" sx={{ "& > *": { flexShrink: 0 } }}>
                 {/* عنوان الامتحان */}
                 <Box
                   p={5}
