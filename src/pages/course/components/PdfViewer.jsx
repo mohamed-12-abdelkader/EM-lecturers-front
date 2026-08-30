@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Box, Button, Center, Flex, Spinner, Text, useColorModeValue } from "@chakra-ui/react";
-import { courseFilesApiError } from "../../../api/courseFilesApi";
-import { useCourseFileView } from "../../../Hooks/course/useCourseFiles";
+import { courseFilesApiError, buildCourseFileViewApiUrl, getCourseFileViewHeaders } from "../../../api/courseFilesApi";
 import FileScrollPanel from "./FileScrollPanel";
 import PdfViewerToolbar from "./PdfViewerToolbar";
 
@@ -80,10 +79,7 @@ function LazyPdfPage({ pdf, pageNumber, scale, rootRef }) {
 }
 
 export default function PdfViewer({ fileId, fileName, onRetry }) {
-  const { data: blob, isLoading: isFetching, isError, error, refetch } = useCourseFileView(fileId, {
-    enabled: Boolean(fileId),
-  });
-
+  const [reloadToken, setReloadToken] = useState(0);
   const [pdf, setPdf] = useState(null);
   const [numPages, setNumPages] = useState(0);
   const [page, setPage] = useState(1);
@@ -108,7 +104,7 @@ export default function PdfViewer({ fileId, fileName, onRetry }) {
     let loadingTask = null;
 
     (async () => {
-      if (!blob) {
+      if (!fileId) {
         setPdf(null);
         return;
       }
@@ -119,26 +115,13 @@ export default function PdfViewer({ fileId, fileName, onRetry }) {
 
       try {
         const pdfjs = await loadPdfJs();
-        const data = new Uint8Array(await blob.arrayBuffer());
-        const magic = new TextDecoder().decode(data.slice(0, 5));
-        if (!magic.startsWith("%PDF")) {
-          let message = "الملف المستلم ليس PDF صالحاً";
-          try {
-            const json = JSON.parse(new TextDecoder().decode(data));
-            if (json?.message) message = json.message;
-          } catch {
-            // not a JSON error payload
-          }
-          throw new Error(message);
-        }
-
         loadingTask = pdfjs.getDocument({
-          data,
+          url: `${buildCourseFileViewApiUrl(fileId)}?client=app`,
+          httpHeaders: getCourseFileViewHeaders(),
+          withCredentials: false,
           cMapUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/cmaps/`,
           cMapPacked: true,
           standardFontDataUrl: `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/standard_fonts/`,
-          disableRange: true,
-          disableStream: true,
         });
         const doc = await loadingTask.promise;
         if (cancelled) {
@@ -152,7 +135,7 @@ export default function PdfViewer({ fileId, fileName, onRetry }) {
         setPageInput("1");
       } catch (err) {
         if (!cancelled) {
-          setParseError(err?.message || "تعذّر عرض ملف PDF");
+          setParseError(courseFilesApiError(err, err?.message || "تعذّر عرض ملف PDF"));
         }
       } finally {
         if (!cancelled) setParsing(false);
@@ -168,7 +151,7 @@ export default function PdfViewer({ fileId, fileName, onRetry }) {
         loadingTask?.destroy?.();
       }
     };
-  }, [blob]);
+  }, [fileId, reloadToken]);
 
   const recalcFitScale = useCallback(async () => {
     if (!pdf || !scrollRef.current) return;
@@ -274,8 +257,8 @@ export default function PdfViewer({ fileId, fileName, onRetry }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [fitScale, page, scrollToPage]);
 
-  const loading = isFetching || parsing || (Boolean(blob) && !pdf && !parseError);
-  const loadError = isError ? courseFilesApiError(error, "تعذّر تحميل الملف") : parseError;
+  const loading = parsing || (!pdf && !parseError);
+  const loadError = parseError;
 
   if (loading) {
     return (
@@ -303,7 +286,8 @@ export default function PdfViewer({ fileId, fileName, onRetry }) {
             borderRadius="xl"
             onClick={() => {
               onRetry?.();
-              refetch();
+              setParseError(null);
+              setReloadToken((n) => n + 1);
             }}
           >
             إعادة المحاولة
