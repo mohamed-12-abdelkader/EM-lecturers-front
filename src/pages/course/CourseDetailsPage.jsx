@@ -138,6 +138,10 @@ import {
   QUESTION_DISPLAY_MODES,
 } from "../../utils/examFlowUtils";
 import QuestionDisplayModeFields from "../../components/exam/QuestionDisplayModeFields";
+import ExamStudentSettingsFields, {
+  inferAnswersReleaseMode,
+} from "../../components/exam/ExamStudentSettingsFields";
+import { toDateTimeLocalValue as toExamDateTimeLocal } from "../../utils/courseLevelExamUtils";
 import {
   fetchCourseExams as getCourseExams,
   fetchStudentCourseExams,
@@ -1855,11 +1859,13 @@ const CourseDetailsPage = () => {
       total_grade: data?.total_grade ?? 20,
       duration: data?.duration || 60,
       is_visible: data?.is_visible ?? true,
-      show_at: data?.show_at || "",
-      hide_at: data?.hide_at || "",
+      show_at: toExamDateTimeLocal(data?.show_at) || "",
+      hide_at: toExamDateTimeLocal(data?.hide_at) || "",
       lock_next_lectures: courseLevel ? false : (data?.lock_next_lectures ?? true),
+      answers_release_mode: inferAnswersReleaseMode(data || {}),
       show_answers_immediately: data?.show_answers_immediately ?? false,
       show_answers_after_hours: data?.show_answers_after_hours || 24,
+      answers_release_date: toExamDateTimeLocal(data?.answers_release_date) || "",
     });
 
     useEffect(() => {
@@ -1878,11 +1884,13 @@ const CourseDetailsPage = () => {
           total_grade: data.total_grade ?? 20,
           duration: data.duration || 60,
           is_visible: data.is_visible ?? true,
-          show_at: data.show_at || "",
-          hide_at: data.hide_at || "",
+          show_at: toExamDateTimeLocal(data.show_at) || "",
+          hide_at: toExamDateTimeLocal(data.hide_at) || "",
           lock_next_lectures: courseLevel ? false : (data.lock_next_lectures ?? true),
+          answers_release_mode: inferAnswersReleaseMode(data),
           show_answers_immediately: data.show_answers_immediately ?? false,
           show_answers_after_hours: data.show_answers_after_hours || 24,
+          answers_release_date: toExamDateTimeLocal(data.answers_release_date) || "",
         });
       } else {
         setFormData({
@@ -1896,8 +1904,10 @@ const CourseDetailsPage = () => {
           show_at: "",
           hide_at: "",
           lock_next_lectures: courseLevel ? false : true,
+          answers_release_mode: "immediate",
           show_answers_immediately: false,
           show_answers_after_hours: 24,
+          answers_release_date: "",
         });
       }
     }, [data, isOpen, courseLevel]);
@@ -2215,232 +2225,11 @@ const CourseDetailsPage = () => {
                   </HStack>
                 </Box>
 
-                {/* تواريخ الظهور والإخفاء */}
-                <Box
-                  p={5}
-                  bg={cardBg}
-                  borderRadius="xl"
-                  borderWidth="1px"
-                  borderColor={cardBorder}
-                >
-                  <HStack spacing={6} align="flex-start" flexDir={{ base: "column", md: "row" }}>
-                    <FormControl flex={1} w="full">
-                      <FormLabel
-                        display="flex"
-                        alignItems="center"
-                        gap={3}
-                        fontWeight="600"
-                        color={labelColor}
-                        fontSize="md"
-                        mb={3}
-                      >
-                        <Box
-                          p={2}
-                          bg="blue.50"
-                          borderRadius="lg"
-                          _dark={{ bg: "blue.900" }}
-                        >
-                          <Icon
-                            as={FaCalendarAlt}
-                            color="blue.500"
-                            boxSize={4}
-                          />
-                        </Box>
-                        تاريخ الظهور
-                      </FormLabel>
-                      <Input
-                        type="datetime-local"
-                        value={formData.show_at}
-                        onChange={(e) =>
-                          setFormData({ ...formData, show_at: e.target.value })
-                        }
-                        isDisabled={loading}
-                        borderRadius="lg"
-                        borderWidth="1px"
-                        borderColor={cardBorder}
-                        _focus={{
-                          borderColor: "blue.500",
-                          boxShadow: "0 0 0 2px rgba(66, 153, 225, 0.3)",
-                          outline: "none",
-                        }}
-                        size="lg"
-                      />
-                    </FormControl>
-                    <FormControl flex={1} w="full">
-                      <FormLabel
-                        display="flex"
-                        alignItems="center"
-                        gap={3}
-                        fontWeight="600"
-                        color={labelColor}
-                        fontSize="md"
-                        mb={3}
-                      >
-                        <Box
-                          p={2}
-                          bg="orange.50"
-                          borderRadius="lg"
-                          _dark={{ bg: "orange.900" }}
-                        >
-                          <Icon
-                            as={FaCalendarAlt}
-                            color="orange.500"
-                            boxSize={4}
-                          />
-                        </Box>
-                        تاريخ الإخفاء
-                      </FormLabel>
-                      <Input
-                        type="datetime-local"
-                        value={formData.hide_at}
-                        onChange={(e) =>
-                          setFormData({ ...formData, hide_at: e.target.value })
-                        }
-                        isDisabled={loading}
-                        borderRadius="lg"
-                        borderWidth="1px"
-                        borderColor={cardBorder}
-                        _focus={{
-                          borderColor: "orange.500",
-                          boxShadow: "0 0 0 2px rgba(237, 137, 54, 0.3)",
-                          outline: "none",
-                        }}
-                        size="lg"
-                      />
-                    </FormControl>
-                  </HStack>
-                </Box>
-
-                {/* إعدادات الإجابات */}
-                <Box
-                  p={5}
-                  bg={cardBg}
-                  borderRadius="xl"
-                  borderWidth="1px"
-                  borderColor={cardBorder}
-                >
-                  <HStack spacing={3} mb={4}>
-                    <Box
-                      p={2}
-                      bg="blue.50"
-                      borderRadius="lg"
-                      _dark={{ bg: "blue.900" }}
-                    >
-                      <Icon as={FaLightbulb} color="blue.500" boxSize={5} />
-                    </Box>
-                    <VStack align="start" spacing={0}>
-                      <Text fontSize="md" fontWeight="600" color={labelColor}>
-                        إعدادات عرض الإجابات
-                      </Text>
-                      <Text
-                        fontSize="sm"
-                        color="gray.500"
-                        _dark={{ color: "gray.400" }}
-                      >
-                        تحكم في كيفية ومتى يتم عرض الإجابات للطلاب
-                      </Text>
-                    </VStack>
-                  </HStack>
-                  <VStack spacing={4} align="stretch">
-                    <Box
-                      p={4}
-                      bg={modalBg}
-                      borderRadius="lg"
-                      borderWidth="1px"
-                      borderColor={cardBorder}
-                    >
-                      <HStack justify="space-between" align="center">
-                        <VStack align="start" spacing={0}>
-                          <Text
-                            fontWeight="600"
-                            color={labelColor}
-                            fontSize="md"
-                          >
-                            إظهار الإجابات فوراً
-                          </Text>
-                          <Text
-                            fontSize="sm"
-                            color="gray.500"
-                            _dark={{ color: "gray.400" }}
-                          >
-                            عرض الإجابات مباشرة بعد انتهاء الامتحان
-                          </Text>
-                        </VStack>
-                        <Switch
-                          isChecked={formData.show_answers_immediately}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              show_answers_immediately: e.target.checked,
-                            })
-                          }
-                          colorScheme="blue"
-                          size="lg"
-                          isDisabled={loading}
-                        />
-                      </HStack>
-                    </Box>
-                    {!formData.show_answers_immediately && (
-                      <Box
-                        p={4}
-                        bg={modalBg}
-                        borderRadius="lg"
-                        borderWidth="1px"
-                        borderColor={cardBorder}
-                      >
-                        <FormControl>
-                          <FormLabel
-                            display="flex"
-                            alignItems="center"
-                            gap={3}
-                            fontWeight="600"
-                            color={labelColor}
-                            fontSize="md"
-                            mb={2}
-                          >
-                            <Box
-                              p={2}
-                              bg="orange.50"
-                              borderRadius="lg"
-                              _dark={{ bg: "orange.900" }}
-                            >
-                              <Icon
-                                as={FaClock}
-                                color="orange.500"
-                                boxSize={4}
-                              />
-                            </Box>
-                            إظهار الإجابات بعد (ساعات)
-                          </FormLabel>
-                          <Input
-                            type="number"
-                            value={formData.show_answers_after_hours}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                show_answers_after_hours:
-                                  parseInt(e.target.value) || 24,
-                              })
-                            }
-                            placeholder="24"
-                            min={1}
-                            max={168}
-                            isDisabled={loading}
-                            borderRadius="lg"
-                            borderWidth="1px"
-                            borderColor={cardBorder}
-                            _focus={{
-                              borderColor: "orange.500",
-                              boxShadow: "0 0 0 2px rgba(237, 137, 54, 0.3)",
-                              outline: "none",
-                            }}
-                            size="lg"
-                          />
-                        </FormControl>
-                      </Box>
-                    )}
-                  </VStack>
-                </Box>
+                <ExamStudentSettingsFields
+                  formData={formData}
+                  loading={loading}
+                  onPatch={(partial) => setFormData((prev) => ({ ...prev, ...partial }))}
+                />
 
                 {/* إعدادات إضافية */}
                 <Box
