@@ -62,4 +62,13 @@ export async function deleteTeacherLibraryLesson(lessonId) {
   await baseUrl.delete(`${API}/lesson/${lessonId}`, { headers: authHeaders() });
 }
 
+export async function bulkCreateTeacherLibraryQuestions({ lessonId, bulkText }) {
+  const { data } = await baseUrl.post(
+    `${API}/bulk`,
+    { lesson_id: Number(lessonId), bulk_text: String(bulkText || "").trim() },
+    { headers: { ...authHeaders(), "Content-Type": "application/json" } },
+  );
+  return data;
+}
+
 export { API as TEACHER_LIBRARY_API, apiError as teacherLibraryApiError };

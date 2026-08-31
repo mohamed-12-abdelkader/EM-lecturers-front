@@ -64,6 +64,7 @@ import {
   fetchCourseLevelExamsForLibrary,
   teacherLibraryExamErrorMessage,
 } from "../../api/teacherLibraryExamApi";
+import { bulkCreateTeacherLibraryQuestions } from "../../api/teacherQuestionLibraryApi";
 import {
   useInvalidateTeacherQuestionBank,
   useTeacherLibraryLessonContent,
@@ -510,12 +511,21 @@ const QuestionLibraryLessonPage = () => {
     if (!selectedLesson || !bulkText.trim()) return;
     setIsAddingBulk(true);
     try {
-      await baseUrl.post(
-        `${API}/bulk`,
-        { lesson_id: selectedLesson.id, bulk_text: bulkText },
-        { headers: authHeaders() },
-      );
-      toast({ title: "تم الإضافة", description: "تمت إضافة الأسئلة بنجاح", status: "success", duration: 2000, isClosable: true });
+      const data = await bulkCreateTeacherLibraryQuestions({
+        lessonId: selectedLesson.id,
+        bulkText,
+      });
+      const inserted = Number(data?.inserted ?? data?.data?.inserted ?? 0);
+      toast({
+        title: "تم الإضافة",
+        description:
+          inserted > 0
+            ? `تمت إضافة ${inserted} سؤال. حدّد الإجابة الصحيحة لاحقاً من البطاقة.`
+            : "تمت إضافة الأسئلة بنجاح",
+        status: "success",
+        duration: 3500,
+        isClosable: true,
+      });
       setBulkText("");
       onBulkClose();
       fetchLessonContent(selectedLesson.id);
@@ -836,6 +846,12 @@ const QuestionLibraryLessonPage = () => {
           <LibraryToolbar>
             <Button size="sm" colorScheme="blue" leftIcon={<FaPlus />} borderRadius="xl" onClick={openAddQuestion}>
               سؤال جديد
+            </Button>
+            <Button size="sm" colorScheme="teal" variant="outline" leftIcon={<FaListAlt />} borderRadius="xl" onClick={onBulkOpen}>
+              إضافة جماعية
+            </Button>
+            <Button size="sm" colorScheme="orange" variant="outline" leftIcon={<FaParagraph />} borderRadius="xl" onClick={onPassageOpen}>
+              قطعة قراءة
             </Button>
             <Button size="sm" colorScheme="orange" variant="outline" leftIcon={<FaUpload />} borderRadius="xl" onClick={onExtractOpen}>
               استخراج من ملف
@@ -1352,36 +1368,56 @@ const QuestionLibraryLessonPage = () => {
       </AlertDialog>
 
       {/* Bulk modal */}
-      <Modal isOpen={isBulkOpen} onClose={onBulkClose} size="lg" scrollBehavior="inside" isCentered>
+      <Modal isOpen={isBulkOpen} onClose={onBulkClose} size="xl" scrollBehavior="inside" isCentered>
         <ModalOverlay />
-        <ModalContent borderRadius="xl">
-          <ModalHeader fontSize="md">إضافة جماعية</ModalHeader>
+        <ModalContent {...libraryModalContentProps()}>
+          <ModalHeader fontSize="md">إضافة جماعية لأسئلة المكتبة</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            <Text fontSize="sm" color={muted} mb={3} lineHeight="1.7">
-              كل سؤال في كتلة منفصلة: السطر الأول نص السؤال، ثم 4 اختيارات (A) B) C) D)). افصل بين الأسئلة بسطر فارغ.
-            </Text>
-            <FormControl>
-              <FormLabel fontSize="sm">نص الأسئلة</FormLabel>
-              <Textarea
-                value={bulkText}
-                onChange={(e) => setBulkText(e.target.value)}
-                rows={12}
-                dir="rtl"
-                fontFamily="monospace"
+            <VStack align="stretch" spacing={3}>
+              <Box
+                p={3}
+                borderRadius="lg"
+                bg={filterInputBg}
+                borderWidth="1px"
+                borderColor={borderColor}
                 fontSize="sm"
-                placeholder={
-                  "ما وحدة قياس التيار؟\nA) فولت\nB) أمبير\nC) أوم\nD) واط\n\nما قانون أوم؟\nA) V=IR\nB) P=VI\nC) F=ma\nD) E=mc²"
-                }
-              />
-            </FormControl>
+                color={muted}
+                lineHeight="1.8"
+              >
+                <Text fontWeight="700" color={textColor} mb={1}>
+                  التنسيق: كل سؤال كتلة مفصولة بسطر فارغ
+                </Text>
+                <Text>
+                  السطر الأول نص السؤال، ثم أربعة اختيارات. الصيغ المدعومة للاختيار:{" "}
+                  <b dir="ltr">A) / A. / A: / A-</b>
+                </Text>
+                <Text mt={1}>
+                  نوع السؤال يُنشأ تلقائياً (اختياري). الإجابة الصحيحة تُحدَّد لاحقاً من بطاقة السؤال.
+                </Text>
+              </Box>
+              <FormControl>
+                <FormLabel fontSize="sm">نص الأسئلة (bulk_text)</FormLabel>
+                <Textarea
+                  value={bulkText}
+                  onChange={(e) => setBulkText(e.target.value)}
+                  rows={14}
+                  dir="rtl"
+                  fontFamily="monospace"
+                  fontSize="sm"
+                  placeholder={
+                    "ما المقصود بالتيار الكهربائي؟\nA) تدفق الشحنات\nB) قوة المغناطيس\nC) مقاومة الموصل\nD) فرق الجهد\n\nما وحدة قياس المقاومة؟\nA) فولت\nB) أمبير\nC) أوم\nD) واط"
+                  }
+                />
+              </FormControl>
+            </VStack>
           </ModalBody>
           <ModalFooter>
-            <Button variant="ghost" mr={2} onClick={onBulkClose}>
+            <Button variant="ghost" mr={2} onClick={() => { setBulkText(""); onBulkClose(); }}>
               إلغاء
             </Button>
-            <Button colorScheme="blue" onClick={addBulkQuestions} isLoading={isAddingBulk} isDisabled={!bulkText.trim()}>
-              إضافة
+            <Button colorScheme="teal" onClick={addBulkQuestions} isLoading={isAddingBulk} isDisabled={!bulkText.trim()}>
+              إضافة الأسئلة
             </Button>
           </ModalFooter>
         </ModalContent>
