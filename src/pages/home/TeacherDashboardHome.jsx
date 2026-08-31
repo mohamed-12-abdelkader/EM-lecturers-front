@@ -74,6 +74,7 @@ import {
   FaBuilding,
   FaFire,
   FaCompass,
+  FaTrashRestore,
 } from "react-icons/fa";
 import { MdAssignment, MdQuiz, MdLibraryBooks } from "react-icons/md";
 import { Link } from "react-router-dom";
@@ -633,6 +634,14 @@ const TeacherDashboardHome = () => {
       icon: FaFolderOpen,
       color: "orange",
       link: "/teacher-my-files",
+    },
+    {
+      id: 13,
+      title: "المحذوفات",
+      description: "استعادة المجموعات والملفات المحذوفة",
+      icon: FaTrashRestore,
+      color: "blue",
+      link: "/teacher-trash",
     },
     {
       id: 8,

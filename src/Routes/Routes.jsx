@@ -108,6 +108,7 @@ const ExamReportPage = lazyPage(() => import("../pages/exam/ExamReportPage"));
 const ExamGrades = lazyPage(() => import("../pages/exam/ExamGrades"));
 const TeacherAnalyticsIntelligence = lazyPage(() => import("../pages/analytics/TeacherAnalyticsIntelligence"));
 const TeacherMyFilesPage = lazyPage(() => import("../pages/myFiles/TeacherMyFilesPage"));
+const TeacherTrashPage = lazyPage(() => import("../pages/teacher/TeacherTrashPage"));
 const TeacherCourseGroupsPage = lazyPage(() => import("../pages/teacher/CourseGroupsPage"));
 const TeacherAssignmentsPage = lazyPage(() => import("../pages/assignments/TeacherAssignmentsPage"));
 const TeacherCourseExamsPage = lazyPage(() => import("../pages/exams/TeacherCourseExamsPage"));
@@ -649,6 +650,14 @@ const AppRouter = () => {
             element={
               <ProtectedRoute auth={isTeacher}>
                 <TeacherInvoicesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="teacher-trash"
+            element={
+              <ProtectedRoute auth={isTeacher || isAcademyTeacher || isAdmin}>
+                <TeacherTrashPage />
               </ProtectedRoute>
             }
           />

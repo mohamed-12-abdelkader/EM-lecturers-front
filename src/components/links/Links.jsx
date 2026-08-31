@@ -21,6 +21,7 @@ import {
   MdDescription,
   MdBusiness,
   MdGroups,
+  MdRestoreFromTrash,
 } from "react-icons/md";
 import { FaAndroid, FaRobot, FaFolderOpen, FaWhatsapp } from "react-icons/fa";
 import { Link, useLocation } from "react-router-dom";
@@ -238,6 +239,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
         { to: "/platform-students", Icon: MdPeople, label: "كل الطلاب" },
         { to: "/teacher-students", Icon: MdPeople, label: "طلاب الكورسات" },
         { to: "/teacher-invoices", Icon: MdDescription, label: "فواتير الاشتراك" },
+        { to: "/teacher-trash", Icon: MdRestoreFromTrash, label: "المحذوفات" },
       ],
     },
   ];
@@ -294,6 +296,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
         { to: "/teacher-exams", Icon: MdQuiz, label: "الامتحانات" },
         { to: "/teacher-assignments", Icon: MdAssignment, label: "الواجبات" },
         { to: "/teacher-my-files", Icon: FaFolderOpen, label: "ملفاتي" },
+        { to: "/teacher-trash", Icon: MdRestoreFromTrash, label: "المحذوفات" },
       ],
     },
   ];

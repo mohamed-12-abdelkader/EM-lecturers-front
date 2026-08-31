@@ -23,6 +23,7 @@ import {
 } from "@chakra-ui/react";
 import ScrollToTop from "../../components/scollToTop/ScrollToTop";
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 /** الاسم ثلاثي عربي: ثلاث كلمات بحروف عربية فقط */
 function validateArabicTripleName(value) {
@@ -56,7 +57,7 @@ import {
 } from "react-icons/fi";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
-import { FaMoon, FaSun, FaBars, FaTimes } from "react-icons/fa";
+import { FaMoon, FaSun, FaBars, FaTimes, FaWhatsapp } from "react-icons/fa";
 
 import "react-toastify/dist/ReactToastify.css";
 import baseUrl from "../../api/baseUrl";
@@ -79,6 +80,75 @@ import {
   withTenantQuery,
 } from "../../utils/tenantHost";
 import { TenantPublicNavbarShell } from "../tenantPublic/components/TenantPublicNavbar";
+import { fetchTenantPublic } from "../../api/tenantPublicApi";
+
+const SUPPORT_WHATSAPP_E164 = "201111272393";
+
+function stripArabicMarks(text) {
+  return String(text || "")
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function collectErrorTexts(err) {
+  const data = err?.response?.data || {};
+  const chunks = [
+    data.message,
+    data.msg,
+    data.error,
+    data.detail,
+    data.data?.message,
+    data.data?.msg,
+    err?.message,
+  ];
+  const errors = data.errors || data.details;
+  if (typeof errors === "string") chunks.push(errors);
+  if (Array.isArray(errors)) chunks.push(...errors);
+  if (errors && typeof errors === "object" && !Array.isArray(errors)) {
+    Object.values(errors).forEach((value) => {
+      if (Array.isArray(value)) chunks.push(...value);
+      else chunks.push(value);
+    });
+  }
+  return chunks.filter(Boolean).map(stripArabicMarks);
+}
+
+function isPhoneAlreadyRegisteredError(err) {
+  const data = err?.response?.data || {};
+  const code = String(data.code || data.error_code || "").toLowerCase();
+  if (
+    ["phone_exists", "phone_already_registered", "duplicate_phone", "phone_taken"].includes(
+      code
+    )
+  ) {
+    return true;
+  }
+
+  const texts = collectErrorTexts(err);
+  const combined = texts.join(" ");
+  return (
+    combined.includes("already registered") ||
+    combined.includes("already exists") ||
+    combined.includes("phone number exists") ||
+    ((combined.includes("duplicate") || combined.includes("unique")) &&
+      (combined.includes("phone") || combined.includes("هاتف") || combined.includes("رقم"))) ||
+    combined.includes("مستخدم من قبل") ||
+    combined.includes("مستخدم بالفعل") ||
+    combined.includes("مسجل مسبقا") ||
+    combined.includes("مسجل بالفعل") ||
+    combined.includes("رقم الهاتف مستخدم") ||
+    combined.includes("الرقم مستخدم") ||
+    combined.includes("رقم الهاتف مسجل")
+  );
+}
+
+function teacherPlatformLabel(name) {
+  const raw = String(name || "المدرس").trim();
+  if (!raw) return "مستر المدرس";
+  if (/^(مستر|أ[.\s]|ا\.|الاستاذ|الأستاذ)/i.test(raw)) return raw;
+  return `مستر ${raw}`;
+}
 
 const SignUp = () => {
   const navigate = useNavigate();
@@ -96,6 +166,19 @@ const SignUp = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [currentStep, setCurrentStep] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const { data: tenantPublic } = useQuery({
+    queryKey: ["tenant-public", tenantSubdomain],
+    queryFn: () => fetchTenantPublic(tenantSubdomain),
+    enabled: Boolean(tenantSubdomain),
+    staleTime: 60_000,
+  });
+  const teacherPlatformName = teacherPlatformLabel(
+    tenantPublic?.data?.teacher?.name || tenantPublic?.data?.tenant?.display_name
+  );
+  const supportWhatsAppHref = `https://wa.me/${SUPPORT_WHATSAPP_E164}?text=${encodeURIComponent(
+    `عايز اغير باسورد منصة ${teacherPlatformName}`
+  )}`;
 
   useEffect(() => {
     const resolved = ensureTenantAuthContext();
@@ -433,8 +516,9 @@ const SignUp = () => {
             "يتم إنشاء الحسابات بواسطة المدرس. تواصل مع مدرسك للحصول على رقم الطالب.",
         );
         navigate(loginPath, { replace: true });
-      } else if (err.response?.data?.message === "Phone number already registered") {
-        onOpen(); // فتح المودال
+      } else if (isPhoneAlreadyRegisteredError(err)) {
+        toast.dismiss();
+        onOpen();
       } else {
         toast.error(
           getAuthDeviceErrorMessage(err, err.response?.data?.message || "حدث خطأ أثناء إنشاء الحساب"),
@@ -1127,9 +1211,9 @@ const SignUp = () => {
       </Modal>
 
       {/* Modal for existing account */}
-      <Modal isOpen={isOpen} onClose={onClose} isCentered>
+      <Modal isOpen={isOpen} onClose={onClose} isCentered size="md">
         <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(10px)" />
-        <ModalContent mx={4} borderRadius="2xl" overflow="hidden">
+        <ModalContent mx={4} borderRadius="2xl" overflow="hidden" dir="rtl">
           <ModalHeader
             textAlign="center"
             bg="blue.50"
@@ -1149,58 +1233,50 @@ const SignUp = () => {
                 <Icon as={FiLogIn} w="30px" h="30px" color="white" />
               </Box>
               <Text fontSize="xl" fontWeight="bold" color={headingColor}>
-                لديك حساب بالفعل!
+                أنت ليك حساب قبل كده على المنصة
               </Text>
             </VStack>
           </ModalHeader>
 
-          <ModalBody py={8}>
+          <ModalBody py={6}>
             <VStack spacing={4} textAlign="center">
-              <Text fontSize="lg" color="gray.600">
-                رقم الهاتف <strong>{phone}</strong> مسجل مسبقاً في منصتنا
+              <Text fontSize="md" color={subtextColor} lineHeight="1.9">
+                اعمل تسجيل دخول بنفس رقم الهاتف وكلمة المرور اللي سجلت بيها مسبقاً.
               </Text>
-              <Text fontSize="md" color="gray.500">
-                يبدو أنك قمت بإنشاء حساب من قبل. قم بتسجيل الدخول باستخدام رقم
-                الهاتف وكلمة المرور
-              </Text>
+              {phone ? (
+                <Text fontSize="sm" color={headingColor} fontWeight="semibold">
+                  رقم الهاتف: {phone}
+                </Text>
+              ) : null}
 
               <Box
-                bg="blue.50"
-                borderRadius="lg"
+                bg="orange.50"
+                borderRadius="xl"
                 p={4}
                 border="1px solid"
-                borderColor="blue.200"
+                borderColor="orange.200"
                 w="full"
+                _dark={{ bg: "whiteAlpha.100", borderColor: "orange.700" }}
               >
-                <Text fontSize="sm" color="blue.700" fontWeight="medium">
-                  💡 تذكر كلمة المرور الخاصة بك؟ اضغط على "تسجيل الدخول"
-                  للمتابعة
+                <Text fontSize="sm" color="orange.800" lineHeight="1.9" _dark={{ color: "orange.200" }}>
+                  لو ناسي كلمة المرور، تواصل مع الدعم الفني عبر واتساب.
                 </Text>
               </Box>
             </VStack>
           </ModalBody>
 
-          <ModalFooter justifyContent="center" py={6}>
-            <HStack spacing={4} w="full" maxW="300px">
+          <ModalFooter py={5}>
+            <VStack spacing={3} w="full">
               <Button
-                variant="outline"
-                onClick={onClose}
-                flex={1}
-                borderRadius="xl"
-                borderColor="gray.300"
-                _hover={{ borderColor: "gray.400", bg: "gray.50" }}
-              >
-                إلغاء
-              </Button>
-              <Button
+                w="full"
                 bg="orange.500"
                 color="white"
                 _hover={{
                   bg: "orange.400",
                   boxShadow: "0 10px 25px rgba(237, 137, 54, 0.35)",
                 }}
-                flex={1}
                 borderRadius="xl"
+                size="lg"
                 leftIcon={<Icon as={FiLogIn} />}
                 onClick={() => {
                   onClose();
@@ -1210,7 +1286,23 @@ const SignUp = () => {
               >
                 تسجيل الدخول
               </Button>
-            </HStack>
+              <Button
+                as="a"
+                href={supportWhatsAppHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                w="full"
+                colorScheme="green"
+                borderRadius="xl"
+                size="lg"
+                leftIcon={<Icon as={FaWhatsapp} />}
+              >
+                واتساب الدعم الفني
+              </Button>
+              <Button variant="ghost" onClick={onClose} w="full" borderRadius="xl">
+                إلغاء
+              </Button>
+            </VStack>
           </ModalFooter>
         </ModalContent>
       </Modal>
