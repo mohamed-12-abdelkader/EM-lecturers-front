@@ -7,7 +7,7 @@ import {
 import { AiFillEdit, AiFillDelete, AiFillCheckCircle, AiOutlineCheckCircle, AiOutlineCloseCircle, AiFillStar, AiOutlineRobot } from "react-icons/ai";
 import baseUrl from "../../api/baseUrl";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import UserType from "../../Hooks/auth/userType";
 import {
   FaBookOpen, FaCheckCircle, FaChevronLeft, FaChevronRight,
@@ -35,7 +35,8 @@ import {
   extractExamAttemptId,
   toPositiveAttemptId,
 } from "../../utils/examFlowUtils";
-import { normalizeExamAttemptResult } from "../../utils/examAttemptResultUtils";
+import { fetchExamAttemptReport } from "../../api/courseExamsApi";
+import { normalizeExamAttemptResult, normalizeAttemptReport } from "../../utils/examAttemptResultUtils";
 import TeacherExamTour from "../../components/onboarding/TeacherExamTour";
 import {
   TOUR_CLOSE_AI,
@@ -108,6 +109,8 @@ function clearPersistedAttemptId(examId) {
 const Exam = () => {
   const { examId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const wantAttemptReport = searchParams.get("view") === "report";
   const [userData, isAdmin, isTeacher, student] = UserType();
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -328,16 +331,58 @@ const Exam = () => {
   const loadExamSession = async () => {
     setSessionLoading(true);
     setError(null);
+    const loadAttemptReport = async () => {
+      try {
+        const report = await fetchExamAttemptReport(examId, token);
+        const normalized = normalizeAttemptReport(report);
+        if (normalized && (normalized.attemptId != null || normalized.maxGrade > 0 || normalized.totalGrade != null)) {
+          setBlockedAttemptResult(normalized);
+          if (normalized.examTitle) {
+            setExamSessionData((prev) => ({
+              ...(prev || {}),
+              title: normalized.examTitle,
+            }));
+          }
+          setError(null);
+          return true;
+        }
+        return false;
+      } catch (err) {
+        const status = err?.response?.status;
+        const apiMsg = err?.response?.data?.message;
+        if (status === 404) {
+          setError("لا توجد محاولة مكتملة لعرض التقرير");
+        } else if (status === 403) {
+          setError("غير مسموح بعرض التقرير حالياً");
+        } else if (apiMsg) {
+          setError(apiMsg);
+        }
+        return false;
+      }
+    };
+
     try {
+      if (wantAttemptReport) {
+        const shown = await loadAttemptReport();
+        if (!shown) {
+          setError((prev) => prev || "لا يوجد تقرير متاح لهذه المحاولة");
+        }
+        return;
+      }
+
       const res = await baseUrl.get(`/api/exams/${examId}`, authHeaders);
       const data = res.data || {};
 
       if (["hidden", "not_open_yet", "closed"].includes(data.status)) {
+        const shown = await loadAttemptReport();
+        if (shown) return;
         setError(data.message || "الامتحان غير متاح حالياً");
         return;
       }
 
       if (data.status === "already_submitted") {
+        const shown = await loadAttemptReport();
+        if (shown) return;
         const normalized = normalizeExamAttemptResult(data);
         if (normalized) {
           setBlockedAttemptResult(normalized);
@@ -351,6 +396,8 @@ const Exam = () => {
       applyStudentSession(data);
     } catch (err) {
       console.error(err);
+      const shown = await loadAttemptReport();
+      if (shown) return;
       const msg = err.response?.data?.message || "حدث خطأ أثناء تحميل الامتحان";
       setError(msg);
     } finally {
@@ -360,10 +407,12 @@ const Exam = () => {
   };
 
   useEffect(() => {
-    if (!isStudentView || !examId) return;
+    if (isTeacher || isAdmin || !examId) return;
+    if (!student && !wantAttemptReport) return;
+    setBlockedAttemptResult(null);
     loadExamSession();
     // eslint-disable-next-line
-  }, [examId, isStudentView]);
+  }, [examId, student, wantAttemptReport, isTeacher, isAdmin]);
 
   const fetchQuestions = async () => {
     try {
@@ -914,7 +963,7 @@ const Exam = () => {
   const studentHeadingColor = useColorModeValue("gray.800", "white");
   const studentSubtextColor = useColorModeValue("gray.600", "gray.300");
 
-  if (isStudentView && blockedAttemptResult) {
+  if (!isTeacher && !isAdmin && blockedAttemptResult) {
     return (
       <>
         <ExamAttemptResultScreen
@@ -949,7 +998,7 @@ const Exam = () => {
     );
   }
 
-  if (isStudentView && (!examStarted || requiresStart)) {
+  if (!isTeacher && !isAdmin && (isStudentView || wantAttemptReport) && (!examStarted || requiresStart) && !blockedAttemptResult) {
     if (error) {
       return (
         <Box maxW="2xl" mx="auto" py={10} px={4} className="mt-[80px]">

@@ -41,10 +41,28 @@ export function getAnswerLetterLabel(letter) {
 
 export function getAnswersVisibilityInfo(result = {}) {
   if (result.showAnswers === false) {
+    const mode = String(result.answersReleaseMode || result.releaseReason || "").toLowerCase();
     if (result.answersVisibleAt) {
       return {
         colorScheme: "orange",
         text: `الإجابات ستظهر في ${formatExamDate(result.answersVisibleAt)}`,
+      };
+    }
+    if (mode === "after_end") {
+      return {
+        colorScheme: "orange",
+        text: result.examEndAt
+          ? `الإجابات ستظهر بعد انتهاء الامتحان (${formatExamDate(result.examEndAt)})`
+          : "الإجابات ستظهر بعد انتهاء الامتحان",
+      };
+    }
+    if (mode === "delayed_hours" || mode === "after_hours") {
+      const hours = Number(result.showAnswersAfterHours) || 0;
+      return {
+        colorScheme: "purple",
+        text: hours > 0
+          ? `الإجابات ستظهر بعد ${hours} ساعة من التسليم`
+          : "الإجابات ستظهر بعد ساعات من التسليم",
       };
     }
     return {
@@ -53,10 +71,26 @@ export function getAnswersVisibilityInfo(result = {}) {
     };
   }
 
-  if (result.releaseReason === "scheduled" && result.answersVisibleAt) {
+  if (result.releaseReason === "scheduled" || result.releaseReason === "scheduled_release") {
+    if (result.answersVisibleAt) {
+      return {
+        colorScheme: "blue",
+        text: `تم إظهار الإجابات حسب الموعد المحدد (${formatExamDate(result.answersVisibleAt)})`,
+      };
+    }
+  }
+
+  if (result.releaseReason === "after_end") {
     return {
-      colorScheme: "blue",
-      text: `تم جدولة عرض الإجابات في ${formatExamDate(result.answersVisibleAt)}`,
+      colorScheme: "green",
+      text: "انتهى الامتحان ويمكنك مراجعة إجاباتك",
+    };
+  }
+
+  if (result.releaseReason === "immediate") {
+    return {
+      colorScheme: "green",
+      text: "يمكنك مراجعة إجاباتك فوراً",
     };
   }
 
@@ -182,4 +216,57 @@ export function normalizeExamAttemptResult(source = {}) {
   }
 
   return null;
+}
+
+function localizeAttemptReportMessage(raw, payload = {}) {
+  const text = String(raw || "").trim();
+  const lower = text.toLowerCase();
+  if (!text) return null;
+  if (lower.includes("after the exam ends")) {
+    return payload.examEndAt
+      ? `الإجابات ستظهر بعد انتهاء الامتحان (${formatExamDate(payload.examEndAt)})`
+      : "الإجابات ستظهر بعد انتهاء الامتحان";
+  }
+  if (lower.includes("not enrolled")) return "غير مسجّل في هذا الكورس";
+  if (lower.includes("no completed attempt")) return "لا توجد محاولة مكتملة لهذا الامتحان";
+  return text;
+}
+
+/** GET /api/exams/:id/attempt-report */
+export function normalizeAttemptReport(raw = {}) {
+  const payload =
+    raw?.data && raw.exam == null && raw.attempt == null ? raw.data : raw;
+  if (!payload || typeof payload !== "object") return null;
+
+  const exam = payload.exam || {};
+  const attempt = payload.attempt || {};
+  const showAnswers = payload.showAnswers === true;
+  const wrongQuestions = showAnswers
+    ? normalizeWrongQuestions(payload.wrongQuestions)
+    : [];
+
+  const totalGrade = Number(attempt.totalGrade ?? payload.totalGrade ?? 0);
+  const maxGrade = Number(attempt.maxGrade ?? payload.maxGrade ?? 0);
+
+  return {
+    mode: showAnswers ? "report" : "blocked",
+    title: showAnswers ? "تقرير المحاولة" : "نتيجة الامتحان",
+    message: localizeAttemptReportMessage(payload.message, payload),
+    attemptId: attempt.attemptId ?? payload.attemptId ?? null,
+    attemptNumber: attempt.attemptNumber ?? null,
+    totalGrade,
+    maxGrade,
+    correctCount: attempt.correctCount ?? payload.correctCount ?? totalGrade,
+    wrongCount: attempt.wrongCount ?? payload.wrongCount ?? wrongQuestions.length,
+    startedAt: attempt.startedAt ?? null,
+    submittedAt: attempt.submittedAt ?? null,
+    showAnswers,
+    releaseReason: payload.releaseReason ?? null,
+    answersReleaseMode: payload.answersReleaseMode ?? null,
+    answersVisibleAt: payload.answersVisibleAt ?? null,
+    examEndAt: payload.examEndAt ?? null,
+    showAnswersAfterHours: payload.showAnswersAfterHours ?? 0,
+    examTitle: exam.title ?? null,
+    wrongQuestions,
+  };
 }

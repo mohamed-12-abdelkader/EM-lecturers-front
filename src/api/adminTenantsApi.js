@@ -2,6 +2,7 @@ import baseUrl from "./baseUrl";
 import { buildTenantPublicUrl } from "../utils/tenantHost";
 
 const ADMIN_TENANTS_API = "/api/admin/tenants";
+const SUPER_TENANTS_API = "/api/super/tenants";
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 200;
 
@@ -191,6 +192,41 @@ export async function patchAdminStudentPassword(tenantId, studentId, body, token
 
   if (!data?.success) {
     const err = new Error(data?.message || "فشل تغيير كلمة السر");
+    err.response = { data };
+    throw err;
+  }
+
+  return data;
+}
+
+/**
+ * POST /api/super/tenants — إنشاء منصة من لوحة الأدمن
+ * التسجيل العام /api/tenants/public/register مقفول (PUBLIC_SIGNUP_DISABLED)
+ */
+export async function createAdminTenant(payload, token) {
+  const { data } = await baseUrl.post(SUPER_TENANTS_API, payload, {
+    headers: adminHeaders(token, "application/json"),
+  });
+
+  if (data && data.success === false) {
+    const err = new Error(data?.message || "فشل إنشاء المنصة");
+    err.response = { data };
+    throw err;
+  }
+
+  return data;
+}
+
+/**
+ * POST /api/super/tenants — multipart (صور + حقول)
+ */
+export async function createAdminTenantMultipart(formData, token) {
+  const { data } = await baseUrl.post(SUPER_TENANTS_API, formData, {
+    headers: adminHeaders(token),
+  });
+
+  if (data && data.success === false) {
+    const err = new Error(data?.message || "فشل إنشاء المنصة");
     err.response = { data };
     throw err;
   }

@@ -26,7 +26,8 @@ export function normalizeCourseLevelExam(raw = {}) {
       raw.is_visible_to_students ?? raw.isVisibleToStudents ?? true,
     available_from: raw.available_from ?? raw.availableFrom ?? raw.show_at ?? raw.showAt ?? null,
     visibility_end_date:
-      raw.visibility_end_date ?? raw.visibilityEndDate ?? null,
+      raw.visibility_end_date ?? raw.visibilityEndDate ?? raw.examEndAt ?? raw.exam_end_at ?? null,
+    exam_end_at: raw.examEndAt ?? raw.exam_end_at ?? raw.visibility_end_date ?? raw.visibilityEndDate ?? null,
     availability_status: raw.availability_status ?? raw.availabilityStatus ?? null,
     can_start: raw.can_start ?? raw.canStart ?? raw.can_attempt ?? raw.canAttempt,
     show_answers_immediately:
@@ -42,6 +43,9 @@ export function normalizeCourseLevelExam(raw = {}) {
     can_attempt: raw.can_attempt ?? raw.canAttempt ?? true,
     attempts_remaining:
       raw.attempts_remaining ?? raw.attemptsRemaining ?? null,
+    show_answers: raw.show_answers ?? raw.showAnswers ?? null,
+    release_reason: raw.release_reason ?? raw.releaseReason ?? null,
+    attempt_report: raw.attempt_report ?? raw.attemptReport ?? null,
   };
 }
 
@@ -103,8 +107,15 @@ export function getAnswersVisibilityInfo(exam) {
   if (mode === "after_end") {
     return { label: "بعد انتهاء الامتحان", colorScheme: "orange" };
   }
-  if (mode === "after_hours") {
+  if (mode === "after_hours" || mode === "delayed_hours") {
     return { label: "بعد ساعات من التسليم", colorScheme: "purple" };
+  }
+  if (mode === "scheduled_release" || mode === "scheduled") {
+    const answersAt = parseDateSafe(data.answers_visible_at);
+    if (answersAt && new Date() >= answersAt) {
+      return { label: "الإجابات متاحة", colorScheme: "teal", date: answersAt };
+    }
+    return { label: "بموعد محدد", colorScheme: "purple", date: answersAt };
   }
 
   if (data.show_answers_immediately || mode === "immediate") {
@@ -142,15 +153,74 @@ export function formatAttemptLimitLabel(exam, { isTeacher = false } = {}) {
   return `${data.attempts_count || 0}/${data.attempt_limit} (${remaining} متبقية)`;
 }
 
+export function isCourseExamEnded(exam) {
+  const data = normalizeCourseLevelExam(exam);
+  if (!data) return false;
+  if (data.availability_status === "expired") return true;
+  const now = new Date();
+  const end =
+    parseDateSafe(data.exam_end_at) ||
+    parseDateSafe(data.visibility_end_date) ||
+    parseDateSafe(exam?.attempt_report?.examEndAt);
+  return Boolean(end && now >= end);
+}
+
+export function hasCompletedCourseExamAttempt(exam) {
+  const data = normalizeCourseLevelExam(exam);
+  if (!data) return false;
+  if (Number(data.attempts_count) > 0) return true;
+  if (data.last_attempt_number) return true;
+  const report = exam?.attempt_report;
+  return Boolean(report?.attempt?.attemptId || report?.attemptId);
+}
+
+export function areCourseExamAnswersReleased(exam) {
+  const data = normalizeCourseLevelExam(exam);
+  if (!data) return false;
+
+  if (data.show_answers === true || exam?.attempt_report?.showAnswers === true) {
+    return true;
+  }
+  if (data.show_answers === false || exam?.attempt_report?.showAnswers === false) {
+    return false;
+  }
+
+  const mode = String(data.answers_release_mode || "").toLowerCase();
+  if (mode === "after_end") return isCourseExamEnded(data);
+  if (
+    mode === "after_hours" ||
+    mode === "delayed_hours" ||
+    mode === "scheduled_release" ||
+    mode === "scheduled"
+  ) {
+    const scheduledAt = parseDateSafe(data.answers_visible_at);
+    return Boolean(scheduledAt && new Date() >= scheduledAt);
+  }
+  if (mode === "immediate") return true;
+  if (!mode && data.show_answers_immediately) return true;
+
+  const answersAt = parseDateSafe(data.answers_visible_at);
+  if (answersAt) return new Date() >= answersAt;
+  return false;
+}
+
 export function getStudentExamCta(exam) {
   const data = normalizeCourseLevelExam(exam);
   if (!data) return { label: "عرض الامتحان", disabled: true };
+
+  const ended = isCourseExamEnded(exam);
+  const hasAttempt = hasCompletedCourseExamAttempt(exam);
+  const answersOpen = areCourseExamAnswersReleased(exam);
+
+  if (hasAttempt && ended && answersOpen) {
+    return { label: "عرض التقرير", disabled: false, kind: "report" };
+  }
 
   if (!data.is_active) {
     return { label: "الامتحان غير نشط", disabled: true };
   }
 
-  if (data.availability_status === "expired") {
+  if (data.availability_status === "expired" || ended) {
     return { label: "انتهى — لا يمكن الدخول", disabled: true };
   }
 
@@ -165,6 +235,7 @@ export function getStudentExamCta(exam) {
     return {
       label: data.attempts_count > 0 ? "عرض آخر محاولة" : "غير متاح",
       disabled: data.attempts_count === 0,
+      kind: data.attempts_count > 0 ? "report" : undefined,
     };
   }
 

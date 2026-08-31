@@ -257,11 +257,15 @@ export default function ExamAttemptResultScreen({
               <Text fontSize="sm" color={muted}>
                 تاريخ التسليم: {formatExamDate(result?.submittedAt)}
               </Text>
-              {result?.attemptId && (
+              {result?.attemptNumber ? (
+                <Badge colorScheme="gray" borderRadius="full">
+                  المحاولة {result.attemptNumber}
+                </Badge>
+              ) : result?.attemptId ? (
                 <Badge colorScheme="gray" borderRadius="full">
                   محاولة #{result.attemptId}
                 </Badge>
-              )}
+              ) : null}
             </HStack>
 
             {visibilityInfo && (

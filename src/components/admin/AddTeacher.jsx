@@ -53,7 +53,7 @@ import {
 } from "react-icons/fa";
 import { useSearchParams, useLocation, useNavigate, Link as RouterLink } from "react-router-dom";
 import baseUrl from "../../api/baseUrl";
-import { fetchAdminTenantById, fetchAdminTenants, patchAdminTenant, patchAdminTenantMultipart } from "../../api/adminTenantsApi";
+import { fetchAdminTenantById, fetchAdminTenants, patchAdminTenant, patchAdminTenantMultipart, createAdminTenant, createAdminTenantMultipart } from "../../api/adminTenantsApi";
 import { compressImage, TENANT_MEDIA_COMPRESS } from "../../utils/compressImage";
 import { buildTenantPublicUrl } from "../../utils/tenantHost";
 
@@ -81,21 +81,6 @@ function defaultTenantHeaders() {
 
 function authHeader(token) {
   return { Authorization: `Bearer ${token}` };
-}
-
-function jsonSuperHeaders(token) {
-  return {
-    ...authHeader(token),
-    "Content-Type": "application/json",
-    ...defaultTenantHeaders(),
-  };
-}
-
-function multipartSuperHeaders(token) {
-  return {
-    ...authHeader(token),
-    ...defaultTenantHeaders(),
-  };
 }
 
 function publicCreateHeaders(contentType) {
@@ -1670,11 +1655,13 @@ const AddTeacher = ({ publicMode = false }) => {
           mediaFiles: uploadFiles,
           landingPayload,
         });
-        response = await baseUrl.post("/api/tenants/public/register", fd, {
-          headers: publicMode
-            ? publicCreateHeaders()
-            : multipartSuperHeaders(token),
-        });
+        if (publicMode) {
+          response = await baseUrl.post("/api/tenants/public/register", fd, {
+            headers: publicCreateHeaders(),
+          });
+        } else {
+          response = { data: await createAdminTenantMultipart(fd, token) };
+        }
       } else {
         const body = buildCreateTenantJsonBody({
           tenant,
@@ -1684,11 +1671,13 @@ const AddTeacher = ({ publicMode = false }) => {
           owner,
           landingPayload,
         });
-        response = await baseUrl.post("/api/tenants/public/register", body, {
-          headers: publicMode
-            ? publicCreateHeaders("application/json")
-            : jsonSuperHeaders(token),
-        });
+        if (publicMode) {
+          response = await baseUrl.post("/api/tenants/public/register", body, {
+            headers: publicCreateHeaders("application/json"),
+          });
+        } else {
+          response = { data: await createAdminTenant(body, token) };
+        }
       }
 
       const t = response.data?.data ?? response.data?.tenant;

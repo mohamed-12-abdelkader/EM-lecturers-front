@@ -362,14 +362,23 @@ const ExamCard = ({
 
       <Box px={4} pt={4} pb={3} mt="auto">
         {isTeacher || !studentCta.disabled ? (
-          <Link to={`/exam/${exam.id}`} style={{ display: "block", textDecoration: "none" }}>
+          <Link
+            to={
+              isTeacher
+                ? `/exam/${exam.id}`
+                : studentCta.kind === "report"
+                  ? `/exam/${exam.id}?view=report`
+                  : `/exam/${exam.id}`
+            }
+            style={{ display: "block", textDecoration: "none" }}
+          >
             <Button
               w="full"
-              colorScheme="blue"
+              colorScheme={studentCta.kind === "report" ? "teal" : "blue"}
               borderRadius="xl"
               fontWeight="700"
               size="md"
-              leftIcon={<Icon as={FaGraduationCap} />}
+              leftIcon={<Icon as={studentCta.kind === "report" ? FaChartBar : FaGraduationCap} />}
             >
               {isTeacher ? "إدارة الامتحان" : studentCta.label}
             </Button>
