@@ -277,11 +277,15 @@ function getCourseFileStreamBaseUrl() {
   return getApiOrigin() || getResolvedApiTarget() || window.location.origin;
 }
 
-function buildCourseFileViewAuthHeaders(accept = "application/octet-stream") {
+export function buildCourseFileViewApiUrl(fileId) {
+  const apiBase = getCourseFileStreamBaseUrl().replace(/\/$/, "");
+  return `${apiBase}/api/course-files/${fileId}/view`;
+}
+
+export function getCourseFileViewHeaders() {
   const headers = {
-    Accept: accept,
+    Accept: "application/pdf,application/octet-stream",
     "X-Requested-With": "XMLHttpRequest",
-    "Content-Type": "application/json",
   };
   const token = readAuthToken();
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -292,13 +296,11 @@ function buildCourseFileViewAuthHeaders(accept = "application/octet-stream") {
 }
 
 async function streamCourseFilePdfViaApi(fileId) {
-  const apiBase = getCourseFileStreamBaseUrl().replace(/\/$/, "");
-  const url = `${apiBase}/api/course-files/${fileId}/view?client=app`;
+  const url = `${buildCourseFileViewApiUrl(fileId)}?client=app`;
 
   const response = await fetch(url, {
-    method: "POST",
-    headers: buildCourseFileViewAuthHeaders(),
-    body: "{}",
+    method: "GET",
+    headers: getCourseFileViewHeaders(),
     credentials: "omit",
     redirect: "follow",
   });

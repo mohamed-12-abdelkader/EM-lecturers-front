@@ -31,6 +31,7 @@ export function buildLectureExamCreatePayload(lectureId, data) {
     duration: data.duration,
     isVisible: data.is_visible ?? true,
     lockNextLectures: data.lock_next_lectures ?? true,
+    answersReleaseMode: data.answers_release_mode || "immediate",
     showAnswersImmediately: data.show_answers_immediately ?? false,
   };
 
@@ -39,6 +40,10 @@ export function buildLectureExamCreatePayload(lectureId, data) {
   }
   if (data.show_at) payload.showAt = new Date(data.show_at).toISOString();
   if (data.hide_at) payload.hideAt = new Date(data.hide_at).toISOString();
+  if (data.answers_release_date) {
+    payload.answersReleaseDate = new Date(data.answers_release_date).toISOString();
+    payload.showAnswersLater = true;
+  }
 
   return payload;
 }
@@ -54,11 +59,15 @@ export function buildLectureExamUpdatePayload(data) {
     show_answers_after_hours: data.show_answers_after_hours,
     questions_count: Number(data.questions_count),
     question_display_mode: normalizeQuestionDisplayMode(data.question_display_mode),
+    answers_release_mode: data.answers_release_mode || "immediate",
   };
 
   if (data.type) payload.type = data.type;
   if (data.show_at) payload.show_at = new Date(data.show_at).toISOString();
   if (data.hide_at) payload.hide_at = new Date(data.hide_at).toISOString();
+  if (data.answers_release_date) {
+    payload.answers_release_date = new Date(data.answers_release_date).toISOString();
+  }
 
   return payload;
 }

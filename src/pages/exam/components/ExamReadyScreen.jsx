@@ -39,6 +39,7 @@ export default function ExamReadyScreen({
 
   const questionCount =
     examData?.questionsCount ??
+    examData?.configuredQuestionsCount ??
     examData?.totalQuestions ??
     examData?.questionCount ??
     null;

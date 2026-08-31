@@ -20,6 +20,11 @@ import {
   useColorModeValue,
 } from "@chakra-ui/react";
 import { fetchTeacherCourses, fetchCourseLectures } from "../../../api/teacherLectureExamsApi";
+import ExamStudentSettingsFields, {
+  inferAnswersReleaseMode,
+} from "../../../components/exam/ExamStudentSettingsFields";
+import QuestionDisplayModeFields from "../../../components/exam/QuestionDisplayModeFields";
+import { QUESTION_DISPLAY_MODES } from "../../../utils/examFlowUtils";
 
 export default function ApproveExamModal({
   isOpen,
@@ -35,6 +40,18 @@ export default function ApproveExamModal({
   const [lectureId, setLectureId] = useState("");
   const [duration, setDuration] = useState("60");
   const [totalGrade, setTotalGrade] = useState("100");
+  const [questionsCount, setQuestionsCount] = useState(String(questionCount || ""));
+  const [settings, setSettings] = useState({
+    show_at: "",
+    hide_at: "",
+    available_from: "",
+    visibility_end_date: "",
+    answers_release_mode: "immediate",
+    show_answers_immediately: true,
+    show_answers_after_hours: 24,
+    answers_visible_at: "",
+    question_display_mode: QUESTION_DISPLAY_MODES.ORDERED,
+  });
   const [courses, setCourses] = useState([]);
   const [lectures, setLectures] = useState([]);
   const [loadingLectures, setLoadingLectures] = useState(false);
@@ -48,7 +65,19 @@ export default function ApproveExamModal({
     setMode("only");
     setCourseId("");
     setLectureId("");
-  }, [isOpen, defaultTitle]);
+    setQuestionsCount(String(questionCount || ""));
+    setSettings({
+      show_at: "",
+      hide_at: "",
+      available_from: "",
+      visibility_end_date: "",
+      answers_release_mode: "immediate",
+      show_answers_immediately: true,
+      show_answers_after_hours: 24,
+      answers_visible_at: "",
+      question_display_mode: QUESTION_DISPLAY_MODES.ORDERED,
+    });
+  }, [isOpen, defaultTitle, questionCount]);
 
   useEffect(() => {
     if (!isOpen || !token) return;
@@ -74,19 +103,37 @@ export default function ApproveExamModal({
     if (mode === "only") {
       return { create_exam: false };
     }
+    const shared = {
+      title: title.trim() || undefined,
+      questions_count: Number(questionsCount) || questionCount || undefined,
+      question_display_mode: settings.question_display_mode,
+      answers_release_mode: settings.answers_release_mode || inferAnswersReleaseMode(settings),
+      show_answers_after_hours: Number(settings.show_answers_after_hours) || undefined,
+      answers_visible_at: settings.answers_visible_at
+        ? new Date(settings.answers_visible_at).toISOString()
+        : undefined,
+    };
     if (mode === "course") {
       return {
+        ...shared,
         course_id: Number(courseId),
-        title: title.trim() || undefined,
         duration_minutes: Number(duration) || 60,
+        available_from: settings.available_from
+          ? new Date(settings.available_from).toISOString()
+          : undefined,
+        visibility_end_date: settings.visibility_end_date
+          ? new Date(settings.visibility_end_date).toISOString()
+          : undefined,
       };
     }
     return {
+      ...shared,
       lecture_id: Number(lectureId),
-      title: title.trim() || undefined,
       type: "exam",
       duration: Number(duration) || 60,
       total_grade: Number(totalGrade) || 100,
+      show_at: settings.show_at ? new Date(settings.show_at).toISOString() : undefined,
+      hide_at: settings.hide_at ? new Date(settings.hide_at).toISOString() : undefined,
     };
   };
 
@@ -96,13 +143,23 @@ export default function ApproveExamModal({
     (mode === "lecture" && lectureId);
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="md" isCentered>
+    <Modal isOpen={isOpen} onClose={onClose} size="xl" isCentered scrollBehavior="inside">
       <ModalOverlay />
-      <ModalContent borderRadius="xl" dir="rtl">
-        <ModalHeader fontSize="md">اعتماد {questionCount} سؤال</ModalHeader>
+      <ModalContent
+        borderRadius="xl"
+        dir="rtl"
+        display="flex"
+        flexDirection="column"
+        h={{ base: "100dvh", md: "90vh" }}
+        maxH={{ base: "100dvh", md: "90vh" }}
+        overflow="hidden"
+      >
+        <ModalHeader fontSize="md" flexShrink={0}>
+          اعتماد {questionCount} سؤال
+        </ModalHeader>
         <ModalCloseButton />
-        <ModalBody>
-          <VStack align="stretch" spacing={4}>
+        <ModalBody flex="1" minH={0} overflowY="auto" overscrollBehavior="contain">
+          <VStack align="stretch" spacing={4} sx={{ "& > *": { flexShrink: 0 } }}>
             <BoxNote bg={noteBg}>
               اختر اعتماد الأسئلة فقط، أو إنشاء امتحان جديد وربط الأسئلة به تلقائياً.
             </BoxNote>
@@ -210,9 +267,37 @@ export default function ApproveExamModal({
                 </FormControl>
               </>
             )}
+            {mode !== "only" && (
+              <>
+                <FormControl>
+                  <FormLabel fontSize="sm">عدد الأسئلة المعروضة للطالب</FormLabel>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={questionsCount}
+                    onChange={(e) => setQuestionsCount(e.target.value)}
+                    borderRadius="lg"
+                  />
+                </FormControl>
+                <QuestionDisplayModeFields
+                  value={settings.question_display_mode}
+                  onChange={(value) =>
+                    setSettings((prev) => ({ ...prev, question_display_mode: value }))
+                  }
+                  questionsCount={questionsCount}
+                />
+                <ExamStudentSettingsFields
+                  formData={settings}
+                  showField={mode === "course" ? "available_from" : "show_at"}
+                  expireField={mode === "course" ? "visibility_end_date" : "hide_at"}
+                  scheduledField="answers_visible_at"
+                  onPatch={(partial) => setSettings((prev) => ({ ...prev, ...partial }))}
+                />
+              </>
+            )}
           </VStack>
         </ModalBody>
-        <ModalFooter gap={2}>
+        <ModalFooter gap={2} flexShrink={0}>
           <Button variant="ghost" onClick={onClose}>
             إلغاء
           </Button>

@@ -23,6 +23,9 @@ function getExamStatus(exam) {
   if (exam.in_progress || exam.is_started) {
     return { label: "قيد التنفيذ", tone: "active", cta: "متابعة الواجب", icon: FaPen };
   }
+  if (exam.availability_status === "expired" || exam.can_start === false) {
+    return { label: "انتهى — لا يمكن الدخول", tone: "closed", cta: "انتهى — لا يمكن الدخول", icon: FaPen };
+  }
   return { label: "لم يُبدأ", tone: "idle", cta: "ابدأ الواجب", icon: FaPen };
 }
 

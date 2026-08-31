@@ -1721,15 +1721,17 @@ const ComprehensiveExam = () => {
                 <AlertIcon />
                 <VStack spacing={2} align="start">
                   <Text fontWeight="bold" color={headingColor}>
-                    الامتحان مغلق
+                    انتهى الامتحان
                   </Text>
                   <Text color={subtextColor}>
-                    انتهت فترة الامتحان ولا يمكن بدء محاولات جديدة.
+                    الامتحان ما زال ظاهراً، لكن لا يمكن بدء محاولة جديدة بعد تاريخ الانتهاء.
                   </Text>
-                  {examData?.endWindow && (
+                  {(examData?.hideAt || examData?.expireAt || examData?.endWindow) && (
                     <Text fontSize="sm" color={subtextColor}>
-                      موعد الإغلاق:{" "}
-                      {new Date(examData.endWindow).toLocaleString("ar-EG")}
+                      موعد الانتهاء:{" "}
+                      {new Date(
+                        examData.hideAt || examData.expireAt || examData.endWindow
+                      ).toLocaleString("ar-EG")}
                     </Text>
                   )}
                 </VStack>

@@ -19,6 +19,9 @@ import {
 } from "../../../utils/courseLevelExamUtils";
 import { getQuestionDisplayModeLabel, QUESTION_DISPLAY_MODES, normalizeQuestionDisplayMode } from "../../../utils/examFlowUtils";
 import QuestionDisplayModeFields from "../../../components/exam/QuestionDisplayModeFields";
+import ExamStudentSettingsFields, {
+  inferAnswersReleaseMode,
+} from "../../../components/exam/ExamStudentSettingsFields";
 
 const initialExamFormState = {
   title: "",
@@ -26,19 +29,22 @@ const initialExamFormState = {
   question_display_mode: QUESTION_DISPLAY_MODES.ORDERED,
   duration_minutes: "",
   is_visible_to_students: true,
+  available_from: "",
   visibility_end_date: "",
+  answers_release_mode: "immediate",
   show_answers_immediately: true,
+  show_answers_after_hours: 24,
   answers_visible_at: "",
   is_active: true,
   attempt_limit: "",
 };
 
 const validateExamFlowSettings = (payload) => {
-  if (payload.is_visible_to_students === false && !payload.visibility_end_date) {
-    return "يرجى تحديد موعد انتهاء الظهور عند إخفاء الامتحان.";
+  if (payload.answers_release_mode === "scheduled" && !payload.answers_visible_at) {
+    return "يرجى تحديد موعد إظهار الإجابات.";
   }
-  if (payload.show_answers_immediately === false && !payload.answers_visible_at) {
-    return "يرجى تحديد موعد إظهار الإجابات عند تعطيل الإظهار الفوري.";
+  if (payload.answers_release_mode === "after_end" && !payload.visibility_end_date) {
+    return "حدد تاريخ انتهاء الامتحان لإظهار الإجابات بعده.";
   }
   return null;
 };
@@ -80,10 +86,17 @@ const buildExamPayload = (payload) => {
   }
   if (payload.duration_minutes !== undefined) jsonPayload.durationMinutes = payload.duration_minutes;
   if (payload.is_visible_to_students !== undefined) jsonPayload.isVisibleToStudents = payload.is_visible_to_students;
+  if (payload.available_from !== undefined && payload.available_from !== "") {
+    jsonPayload.availableFrom = payload.available_from;
+  }
   if (payload.visibility_end_date !== undefined && payload.visibility_end_date !== "") {
     jsonPayload.visibilityEndDate = payload.visibility_end_date;
   }
+  if (payload.answers_release_mode !== undefined) jsonPayload.answersReleaseMode = payload.answers_release_mode;
   if (payload.show_answers_immediately !== undefined) jsonPayload.showAnswersImmediately = payload.show_answers_immediately;
+  if (payload.show_answers_after_hours !== undefined) {
+    jsonPayload.showAnswersAfterHours = payload.show_answers_after_hours;
+  }
   if (payload.answers_visible_at !== undefined && payload.answers_visible_at !== "") {
     jsonPayload.answersVisibleAt = payload.answers_visible_at;
   }
@@ -348,19 +361,32 @@ const ExamCard = ({
       </Box>
 
       <Box px={4} pt={4} pb={3} mt="auto">
-        <Link to={`/exam/${exam.id}`} style={{ display: "block", textDecoration: "none" }}>
+        {isTeacher || !studentCta.disabled ? (
+          <Link to={`/exam/${exam.id}`} style={{ display: "block", textDecoration: "none" }}>
+            <Button
+              w="full"
+              colorScheme="blue"
+              borderRadius="xl"
+              fontWeight="700"
+              size="md"
+              leftIcon={<Icon as={FaGraduationCap} />}
+            >
+              {isTeacher ? "إدارة الامتحان" : studentCta.label}
+            </Button>
+          </Link>
+        ) : (
           <Button
             w="full"
-            colorScheme={isTeacher ? "blue" : studentCta.disabled ? "gray" : "blue"}
+            colorScheme="gray"
             borderRadius="xl"
             fontWeight="700"
             size="md"
             leftIcon={<Icon as={FaGraduationCap} />}
-            isDisabled={!isTeacher && studentCta.disabled}
+            isDisabled
           >
-            {isTeacher ? "إدارة الامتحان" : studentCta.label}
+            {studentCta.label}
           </Button>
-        </Link>
+        )}
 
         {isTeacher ? (
           <>
@@ -595,8 +621,11 @@ const CourseExamsTab = ({
         question_display_mode: form.question_display_mode,
         duration_minutes: form.duration_minutes,
         is_visible_to_students: form.is_visible_to_students,
+        available_from: fromDateTimeLocalValue(form.available_from),
         visibility_end_date: fromDateTimeLocalValue(form.visibility_end_date),
+        answers_release_mode: form.answers_release_mode,
         show_answers_immediately: form.show_answers_immediately,
+        show_answers_after_hours: form.show_answers_after_hours,
         answers_visible_at: fromDateTimeLocalValue(form.answers_visible_at),
         is_active: form.is_active,
         attempt_limit: form.attempt_limit,
@@ -637,8 +666,11 @@ const CourseExamsTab = ({
         exam?.question_display_mode || QUESTION_DISPLAY_MODES.ORDERED,
       duration_minutes: exam?.duration_minutes?.toString() || "",
       is_visible_to_students: exam?.is_visible_to_students ?? true,
+      available_from: toDateTimeLocalValue(exam?.available_from),
       visibility_end_date: toDateTimeLocalValue(exam?.visibility_end_date),
+      answers_release_mode: inferAnswersReleaseMode(exam || {}),
       show_answers_immediately: exam?.show_answers_immediately ?? true,
+      show_answers_after_hours: exam?.show_answers_after_hours || 24,
       answers_visible_at: toDateTimeLocalValue(exam?.answers_visible_at),
       is_active: exam?.is_active ?? true,
       attempt_limit: exam?.attempt_limit?.toString() || "",
@@ -653,8 +685,11 @@ const CourseExamsTab = ({
             exam.question_display_mode || QUESTION_DISPLAY_MODES.ORDERED,
           duration_minutes: exam.duration_minutes?.toString() || "",
           is_visible_to_students: exam.is_visible_to_students ?? true,
+          available_from: toDateTimeLocalValue(exam.available_from),
           visibility_end_date: toDateTimeLocalValue(exam.visibility_end_date),
+          answers_release_mode: inferAnswersReleaseMode(exam),
           show_answers_immediately: exam.show_answers_immediately ?? true,
+          show_answers_after_hours: exam.show_answers_after_hours || 24,
           answers_visible_at: toDateTimeLocalValue(exam.answers_visible_at),
           is_active: exam.is_active ?? true,
           attempt_limit: exam.attempt_limit?.toString() || "",
@@ -686,6 +721,7 @@ const CourseExamsTab = ({
       const normalizedPayload = normalizeExamPayload({
         ...formData,
         title: formData.title.trim(),
+        available_from: fromDateTimeLocalValue(formData.available_from),
         visibility_end_date: fromDateTimeLocalValue(formData.visibility_end_date),
         answers_visible_at: fromDateTimeLocalValue(formData.answers_visible_at),
       });
@@ -709,7 +745,7 @@ const CourseExamsTab = ({
           overflow="hidden"
           dir="rtl"
           maxH={{ base: "100dvh", sm: "90vh" }}
-          h={{ base: "100dvh", sm: "auto" }}
+          h={{ base: "100dvh", sm: "90vh" }}
           display="flex"
           flexDirection="column"
         >
@@ -755,7 +791,7 @@ const CourseExamsTab = ({
             }}
           >
             <ModalBody flex="1" minH={0} overflowY="auto" overscrollBehavior="contain" py={5}>
-              <VStack spacing={{ base: 4, md: 5 }} align="stretch">
+              <VStack spacing={{ base: 4, md: 5 }} align="stretch" sx={{ "& > *": { flexShrink: 0 } }}>
                 <Box
                   borderWidth="1px"
                   borderColor={sectionBorder}
@@ -844,26 +880,10 @@ const CourseExamsTab = ({
                             setFormData((prev) => ({
                               ...prev,
                               is_visible_to_students: e.target.checked,
-                              visibility_end_date: e.target.checked ? "" : prev.visibility_end_date,
                             }))
                           }
                         />
                       </FormControl>
-                      {!formData.is_visible_to_students && (
-                        <FormControl isRequired>
-                          <FormLabel>موعد انتهاء الظهور</FormLabel>
-                          <Input
-                            type="datetime-local"
-                            value={toDateTimeLocalValue(formData.visibility_end_date)}
-                            onChange={(e) =>
-                              setFormData((prev) => ({
-                                ...prev,
-                                visibility_end_date: fromDateTimeLocalValue(e.target.value),
-                              }))
-                            }
-                          />
-                        </FormControl>
-                      )}
                     </SimpleGrid>
 
                     <QuestionDisplayModeFields
@@ -876,51 +896,18 @@ const CourseExamsTab = ({
                       }
                       questionsCount={formData.questions_count}
                     />
+                    <ExamStudentSettingsFields
+                      formData={formData}
+                      showField="available_from"
+                      expireField="visibility_end_date"
+                      scheduledField="answers_visible_at"
+                      onPatch={(partial) =>
+                        setFormData((prev) => ({ ...prev, ...partial }))
+                      }
+                    />
                   </VStack>
                 </Box>
 
-
-                <Box
-                  className="modern-card"
-                  p={{ base: 3, md: 4 }}
-                  bg={sectionBg}
-                >
-                  <Heading size="sm" mb={3} color="gray.600">
-                    إعدادات عرض الإجابات
-                  </Heading>
-                  <VStack spacing={4} align="stretch">
-                    <FormControl display="flex" alignItems="center">
-                      <FormLabel mb="0">إظهار الإجابات فور التسليم</FormLabel>
-                      <Switch
-                        colorScheme="blue"
-                        isChecked={formData.show_answers_immediately}
-                        onChange={(e) =>
-                          setFormData((prev) => ({
-                            ...prev,
-                            show_answers_immediately: e.target.checked,
-                          }))
-                        }
-                      />
-                    </FormControl>
-                    {!formData.show_answers_immediately && (
-                      <FormControl isRequired>
-                        <FormLabel>موعد إظهار الإجابات</FormLabel>
-                        <Input
-                          type="datetime-local"
-                          value={toDateTimeLocalValue(formData.answers_visible_at)}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              answers_visible_at: fromDateTimeLocalValue(
-                                e.target.value
-                              ),
-                            }))
-                          }
-                        />
-                      </FormControl>
-                    )}
-                  </VStack>
-                </Box>
 
                 <Box
                   className="modern-card"
@@ -1372,7 +1359,7 @@ const CourseExamsTab = ({
           overflow="hidden"
           dir="rtl"
           maxH={{ base: "100dvh", sm: "90vh" }}
-          h={{ base: "100dvh", sm: "auto" }}
+          h={{ base: "100dvh", sm: "90vh" }}
           display="flex"
           flexDirection="column"
         >
@@ -1434,7 +1421,7 @@ const CourseExamsTab = ({
               overflowY="auto"
               overscrollBehavior="contain"
                 >
-              <VStack spacing={4} align="stretch">
+              <VStack spacing={4} align="stretch" sx={{ "& > *": { flexShrink: 0 } }}>
                 <ExamModalSection icon={FaRegFileAlt} title="المعلومات الأساسية" accent="blue">
                   <VStack spacing={4} align="stretch">
                     <FormControl isRequired>
@@ -1497,65 +1484,23 @@ const CourseExamsTab = ({
                   <VStack spacing={3} align="stretch">
                     <ExamSwitchRow
                       label="إظهار الامتحان للطلاب"
-                      hint="الطلاب يشوفوا الامتحان فور إنشائه"
-                          colorScheme="green"
-                          isChecked={form.is_visible_to_students}
-                          onChange={(e) =>
-                            setForm((f) => ({
-                              ...f,
-                              is_visible_to_students: e.target.checked,
-                              visibility_end_date: e.target.checked ? "" : f.visibility_end_date,
-                            }))
-                          }
-                        />
-                      {!form.is_visible_to_students && (
-                        <FormControl isRequired>
-                        <FormLabel fontSize="sm" fontWeight="600">
-                          موعد انتهاء الظهور
-                        </FormLabel>
-                          <Input
-                            type="datetime-local"
-                            value={toDateTimeLocalValue(form.visibility_end_date)}
-                            onChange={(e) =>
-                              setForm((f) => ({
-                                ...f,
-                                visibility_end_date: fromDateTimeLocalValue(e.target.value),
-                              }))
-                            }
-                          borderRadius="lg"
-                          />
-                        </FormControl>
-                      )}
-                    <ExamSwitchRow
-                      label="إظهار الإجابات فور التسليم"
-                      hint="لو اتقفل، حدد موعد إظهار الإجابات"
-                        colorScheme="blue"
-                        isChecked={form.show_answers_immediately}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            show_answers_immediately: e.target.checked,
-                          }))
-                        }
-                      />
-                    {!form.show_answers_immediately && (
-                      <FormControl isRequired>
-                        <FormLabel fontSize="sm" fontWeight="600">
-                          موعد إظهار الإجابات
-                        </FormLabel>
-                        <Input
-                          type="datetime-local"
-                          value={toDateTimeLocalValue(form.answers_visible_at)}
-                          onChange={(e) =>
-                            setForm((f) => ({
-                              ...f,
-                              answers_visible_at: fromDateTimeLocalValue(e.target.value),
-                            }))
-                          }
-                          borderRadius="lg"
-                        />
-                      </FormControl>
-                    )}
+                      hint="إذا أُخفي، الطلاب لا يرونه حتى لو اكتملت الأسئلة"
+                      colorScheme="green"
+                      isChecked={form.is_visible_to_students}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          is_visible_to_students: e.target.checked,
+                        }))
+                      }
+                    />
+                    <ExamStudentSettingsFields
+                      formData={form}
+                      showField="available_from"
+                      expireField="visibility_end_date"
+                      scheduledField="answers_visible_at"
+                      onPatch={(partial) => setForm((f) => ({ ...f, ...partial }))}
+                    />
                   </VStack>
                 </ExamModalSection>
 
