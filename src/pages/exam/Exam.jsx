@@ -50,15 +50,151 @@ import {
 
 const GRADES_PAGE_SIZE = 20;
 
-function examAttemptStorageKey(examId) {
-  let uid = "u";
+function currentUserStorageId() {
   try {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    uid = user.id || user.user_id || user.student_id || "u";
+    return user.id || user.user_id || user.student_id || "u";
   } catch {
-    // keep fallback
+    return "u";
   }
-  return `em-lecture-exam-attempt:${uid}:${examId}`;
+}
+
+function examAttemptStorageKey(examId) {
+  return `em-lecture-exam-attempt:${currentUserStorageId()}:${examId}`;
+}
+
+function examProgressStorageKey(examId, attemptId) {
+  return `em-lecture-exam-progress:${currentUserStorageId()}:${examId}:${attemptId}`;
+}
+
+function parseDateMs(value) {
+  if (value == null || value === "") return null;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const ms = new Date(value).getTime();
+  return Number.isNaN(ms) ? null : ms;
+}
+
+function remainingFromEndsAt(endsAt) {
+  const ms = Number(endsAt);
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  return Math.max(0, Math.ceil((ms - Date.now()) / 1000));
+}
+
+function resolveExamEndsAt({ startedAt, durationMinutes, localEndsAt, apiRemainingSeconds }) {
+  const candidates = [];
+  const startMs = parseDateMs(startedAt);
+  const durationMs =
+    durationMinutes != null && Number(durationMinutes) > 0
+      ? Number(durationMinutes) * 60 * 1000
+      : null;
+
+  if (startMs && durationMs) candidates.push(startMs + durationMs);
+
+  const local = Number(localEndsAt);
+  if (Number.isFinite(local) && local > 0) candidates.push(local);
+
+  if (!candidates.length && apiRemainingSeconds != null && Number.isFinite(Number(apiRemainingSeconds))) {
+    candidates.push(Date.now() + Math.max(0, Number(apiRemainingSeconds)) * 1000);
+  }
+  if (!candidates.length && durationMs) {
+    candidates.push(Date.now() + durationMs);
+  }
+
+  return candidates.length ? Math.min(...candidates) : null;
+}
+
+function normalizeAnswerMap(source) {
+  if (!source) return {};
+  if (Array.isArray(source)) {
+    const map = {};
+    for (const item of source) {
+      if (!item || typeof item !== "object") continue;
+      const qid = item.questionId ?? item.question_id ?? item.id;
+      const ans = item.selectedAnswer ?? item.selected_answer ?? item.answer ?? item.choice;
+      if (qid == null || ans == null || ans === "") continue;
+      map[String(qid)] = String(ans).toUpperCase();
+    }
+    return map;
+  }
+  if (typeof source === "object") {
+    const map = {};
+    for (const [qid, ans] of Object.entries(source)) {
+      if (ans == null || ans === "") continue;
+      if (typeof ans === "object") {
+        const letter = ans.selectedAnswer ?? ans.selected_answer ?? ans.answer ?? ans.choice;
+        if (letter != null && letter !== "") map[String(qid)] = String(letter).toUpperCase();
+        continue;
+      }
+      map[String(qid)] = String(ans).toUpperCase();
+    }
+    return map;
+  }
+  return {};
+}
+
+function extractInProgressAnswers(data = {}) {
+  const attempt = data.attempt && typeof data.attempt === "object" ? data.attempt : {};
+  return {
+    ...normalizeAnswerMap(data.answers),
+    ...normalizeAnswerMap(data.studentAnswers),
+    ...normalizeAnswerMap(attempt.answers),
+    ...normalizeAnswerMap(attempt.studentAnswers),
+  };
+}
+
+function readExamProgress(examId, attemptId) {
+  const id = toPositiveAttemptId(attemptId);
+  if (!examId || !id || typeof window === "undefined") return null;
+  const key = examProgressStorageKey(examId, id);
+  try {
+    const raw = localStorage.getItem(key) || sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeExamProgress(examId, attemptId, payload = {}) {
+  const id = toPositiveAttemptId(attemptId);
+  if (!examId || !id || typeof window === "undefined") return;
+  const key = examProgressStorageKey(examId, id);
+  const value = JSON.stringify({
+    attemptId: id,
+    answers: payload.answers && typeof payload.answers === "object" ? payload.answers : {},
+    current: Number.isInteger(payload.current) ? payload.current : 0,
+    endsAt: payload.endsAt ?? null,
+    startedAt: payload.startedAt ?? null,
+    savedAt: Date.now(),
+  });
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // ignore quota
+  }
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    // ignore quota
+  }
+}
+
+function clearExamProgress(examId, attemptId) {
+  const id = toPositiveAttemptId(attemptId);
+  if (!examId || !id || typeof window === "undefined") return;
+  const key = examProgressStorageKey(examId, id);
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
 }
 
 function readPersistedAttemptId(examId) {
@@ -144,6 +280,7 @@ const Exam = () => {
   const [attemptId, setAttemptId] = useState(() => readPersistedAttemptId(examId));
   const [examMeta, setExamMeta] = useState(null); // { examTitle, durationMinutes, questionsCount, startedAt }
   const [remainingSeconds, setRemainingSeconds] = useState(null); // عد تنازلي من duration*60 (مثل التطبيق المرجعي)
+  const [examEndsAt, setExamEndsAt] = useState(null);
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [imageModalSrc, setImageModalSrc] = useState(null);
   const [imageUploadQuestionId, setImageUploadQuestionId] = useState(null);
@@ -160,6 +297,8 @@ const Exam = () => {
   const attemptIdRef = useRef(attemptId);
   const submitResultRef = useRef(submitResult);
   const submitLoadingRef = useRef(submitLoading);
+  const currentRef = useRef(current);
+  const examEndsAtRef = useRef(examEndsAt);
 
   const token = localStorage.getItem("token");
   const authHeaders = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
@@ -193,6 +332,14 @@ const Exam = () => {
   useEffect(() => {
     submitLoadingRef.current = submitLoading;
   }, [submitLoading]);
+
+  useEffect(() => {
+    currentRef.current = current;
+  }, [current]);
+
+  useEffect(() => {
+    examEndsAtRef.current = examEndsAt;
+  }, [examEndsAt]);
 
   const commitAttemptId = useCallback((value, { allowClear = false } = {}) => {
     const validId = toPositiveAttemptId(value);
@@ -230,7 +377,12 @@ const Exam = () => {
     const rawQuestions = data.questions ?? [];
     const resolvedAttemptId =
       extractExamAttemptId(data, examId) || readPersistedAttemptId(examId);
-    const shouldRequireStart = !resolvedAttemptId || Boolean(data.requiresStart);
+    const localProgress = readExamProgress(examId, resolvedAttemptId);
+    const hasLocalProgress = Boolean(
+      localProgress?.endsAt ||
+      (localProgress?.answers && Object.keys(localProgress.answers).length > 0),
+    );
+    const shouldRequireStart = !resolvedAttemptId;
 
     const examTitle = exam.title ?? data.examTitle ?? "";
     const durationMinutes =
@@ -255,32 +407,70 @@ const Exam = () => {
 
     if (rawQuestions.length > 0 && resolvedAttemptId && !shouldRequireStart) {
       const normalizedQuestions = normalizeExamQuestionsFromApi(rawQuestions);
+      const startedAt =
+        attempt?.startedAt ??
+        attempt?.attemptStartTime ??
+        data.startedAt ??
+        localProgress?.startedAt ??
+        null;
+      const restoredAnswers = {
+        ...extractInProgressAnswers(data),
+        ...normalizeAnswerMap(localProgress?.answers),
+      };
+      const endsAt = resolveExamEndsAt({
+        startedAt,
+        durationMinutes,
+        localEndsAt: localProgress?.endsAt,
+        apiRemainingSeconds: attempt?.remainingSeconds ?? data.remainingSeconds,
+      });
+      const remaining = remainingFromEndsAt(endsAt);
+      let resumeIndex = Number(localProgress?.current);
+      if (!Number.isInteger(resumeIndex) || resumeIndex < 0 || resumeIndex >= normalizedQuestions.length) {
+        const firstOpen = normalizedQuestions.findIndex((q) => {
+          const ans = restoredAnswers[q.id] ?? restoredAnswers[String(q.id)];
+          return ans == null || ans === "";
+        });
+        resumeIndex = firstOpen >= 0 ? firstOpen : 0;
+      }
+      timerExpiredRef.current = false;
+
       setQuestions(normalizedQuestions);
       setExamStarted(true);
+      setRequiresStart(false);
       setQuestionsLoadError(null);
       setExamMeta({
         examTitle,
         durationMinutes: durationMinutes ?? 0,
         questionsCount: questionsCount || normalizedQuestions.length,
-        startedAt:
-          attempt?.startedAt ??
-          attempt?.attemptStartTime ??
-          data.startedAt ??
-          null,
+        startedAt,
       });
-
-      const remaining =
-        attempt?.remainingSeconds ??
-        data.remainingSeconds ??
-        (durationMinutes != null && durationMinutes > 0 ? durationMinutes * 60 : null);
+      setStudentAnswers(restoredAnswers);
+      studentAnswersRef.current = restoredAnswers;
+      setCurrent(resumeIndex);
+      currentRef.current = resumeIndex;
+      examEndsAtRef.current = endsAt;
+      setExamEndsAt(endsAt);
       setRemainingSeconds(remaining);
+      writeExamProgress(examId, resolvedAttemptId, {
+        answers: restoredAnswers,
+        current: resumeIndex,
+        endsAt,
+        startedAt,
+      });
     } else if (resolvedAttemptId && !shouldRequireStart) {
       setExamStarted(true);
+      setRequiresStart(false);
       if (!rawQuestions.length) {
         setQuestionsLoadError(
           "لم يتم تحميل أسئلة الامتحان. جاري إعادة المحاولة..."
         );
       }
+    } else if (!hasLocalProgress) {
+      setExamStarted(false);
+      setStudentAnswers({});
+      setCurrent(0);
+      setExamEndsAt(null);
+      setRemainingSeconds(null);
     }
   };
 
@@ -327,6 +517,53 @@ const Exam = () => {
 
     return null;
   }, [examId, commitAttemptId]);
+
+  const hydrateExamSessionForResume = async (data = {}) => {
+    const resumeAttemptId =
+      extractExamAttemptId(data, examId) || readPersistedAttemptId(examId);
+    const localProgress = readExamProgress(examId, resumeAttemptId);
+    const shouldResume =
+      Boolean(resumeAttemptId) &&
+      data.status !== "already_submitted" &&
+      (
+        Boolean(localProgress?.endsAt) ||
+        Boolean(localProgress?.answers && Object.keys(localProgress.answers).length > 0) ||
+        Boolean(data.attempt) ||
+        Boolean(extractExamAttemptId(data, examId))
+      );
+
+    if (!shouldResume) return data;
+
+    let next = { ...data, requiresStart: false };
+    let rawQuestions = next.questions ?? [];
+    if (rawQuestions.length) return next;
+
+    try {
+      const startRes = await baseUrl.post(`/api/exams/${examId}/start`, {}, authHeaders);
+      const startData = startRes.data || {};
+      rawQuestions = startData.questions ?? [];
+      next = { ...next, ...startData, questions: rawQuestions, requiresStart: false };
+    } catch (resumeErr) {
+      const errData = resumeErr?.response?.data || {};
+      rawQuestions = errData.questions ?? [];
+      next = { ...next, ...errData, questions: rawQuestions, requiresStart: false };
+    }
+
+    if (rawQuestions.length) return next;
+
+    try {
+      const getRes = await baseUrl.get(`/api/exams/${examId}`, authHeaders);
+      const getData = getRes.data || {};
+      return {
+        ...next,
+        ...getData,
+        questions: getData.questions ?? rawQuestions,
+        requiresStart: false,
+      };
+    } catch {
+      return next;
+    }
+  };
 
   const loadExamSession = async () => {
     setSessionLoading(true);
@@ -393,7 +630,7 @@ const Exam = () => {
         return;
       }
 
-      applyStudentSession(data);
+      applyStudentSession(await hydrateExamSessionForResume(data));
     } catch (err) {
       console.error(err);
       const shown = await loadAttemptReport();
@@ -475,8 +712,6 @@ const Exam = () => {
       }
 
       setQuestionsLoadError(null);
-      setCurrent(0);
-      setStudentAnswers({});
       setRequiresStart(false);
       toast({ title: "تم بدء الامتحان", status: "success" });
     } catch (err) {
@@ -803,21 +1038,57 @@ const Exam = () => {
     }
   };
 
-  // للطالب: عند اختيار إجابة بحرف (A/B/C/D) - مثل التطبيق المرجعي
+  const persistInProgress = useCallback((overrides = {}) => {
+    const id = toPositiveAttemptId(attemptIdRef.current);
+    if (!examId || !id || submitResultRef.current) return;
+    const existing = readExamProgress(examId, id);
+    writeExamProgress(examId, id, {
+      answers: overrides.answers ?? studentAnswersRef.current,
+      current: overrides.current ?? currentRef.current,
+      endsAt: overrides.endsAt ?? examEndsAtRef.current,
+      startedAt: overrides.startedAt ?? existing?.startedAt ?? null,
+    });
+  }, [examId]);
+
+  useEffect(() => {
+    if (!examStarted || submitResult || !questions.length) return;
+    persistInProgress();
+  }, [examStarted, submitResult, studentAnswers, current, examEndsAt, persistInProgress, questions.length]);
+
+  useEffect(() => {
+    return () => {
+      const id = toPositiveAttemptId(attemptIdRef.current);
+      if (!examId || !id || submitResultRef.current) return;
+      const existing = readExamProgress(examId, id);
+      writeExamProgress(examId, id, {
+        answers: studentAnswersRef.current,
+        current: currentRef.current,
+        endsAt: examEndsAtRef.current,
+        startedAt: existing?.startedAt ?? null,
+      });
+    };
+  }, [examId]);
+
   const handleStudentChoice = (questionId, selectedAnswer) => {
     if (submitResult) return;
-    setStudentAnswers((prev) => ({ ...prev, [questionId]: selectedAnswer }));
+    setStudentAnswers((prev) => {
+      const next = { ...prev, [questionId]: selectedAnswer };
+      persistInProgress({ answers: next });
+      return next;
+    });
   };
 
-  // للطالب: الانتقال لسؤال (كالتطبيق المرجعي - لا تنقل بعد التسليم)
   const goToQuestion = (index) => {
     if (submitResult) return;
     if (index < 0 || index >= questions.length) return;
     setCurrent(index);
+    persistInProgress({ current: index });
   };
 
   // للطالب: تسليم الامتحان — نفس الطريقة في التطبيق المرجعي (نفس الـ endpoint ونفس صيغة الإجابات)
   const handleSubmitExam = useCallback(async (autoSubmit = false, source = "manual") => {
+    if (autoSubmit && source !== "timer") return;
+
     if (!examId) {
       if (!autoSubmit) {
         toast({ title: "خطأ", description: "معرّف الامتحان غير متاح", status: "error" });
@@ -890,6 +1161,9 @@ const Exam = () => {
       const result = res.data;
       setSubmitResult(result);
       setRemainingSeconds(null);
+      setExamEndsAt(null);
+      examEndsAtRef.current = null;
+      clearExamProgress(examId, activeAttemptId);
       clearPersistedAttemptId(examId);
       commitAttemptId(null, { allowClear: true });
 
@@ -922,39 +1196,65 @@ const Exam = () => {
       clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
     }
-    if (remainingSeconds === null || remainingSeconds <= 0 || submitResult) {
-      timerExpiredRef.current = false;
-      if (remainingSeconds !== null && remainingSeconds <= 0 && !submitResult && !submitLoading) {
+    if (!examStarted || submitResult || examEndsAt == null) {
+      return undefined;
+    }
+
+    const tick = () => {
+      const ends = examEndsAtRef.current;
+      if (ends == null) return;
+      const left = remainingFromEndsAt(ends) ?? 0;
+      setRemainingSeconds(left);
+      if (
+        left <= 0 &&
+        !timerExpiredRef.current &&
+        !submitLoadingRef.current &&
+        !submitResultRef.current
+      ) {
         timerExpiredRef.current = true;
+        if (timerIntervalRef.current) {
+          clearInterval(timerIntervalRef.current);
+          timerIntervalRef.current = null;
+        }
         toast({ title: "انتهى الوقت!", description: "يتم تسليم الامتحان تلقائياً.", status: "warning" });
         handleSubmitExam(true, "timer");
       }
-      return undefined;
-    }
-    timerIntervalRef.current = setInterval(() => {
-      setRemainingSeconds((prev) => {
-        if (prev === null || prev <= 0) {
-          if (prev !== null && prev <= 0 && !timerExpiredRef.current && !submitLoadingRef.current && !submitResultRef.current) {
-            timerExpiredRef.current = true;
-            if (timerIntervalRef.current) {
-              clearInterval(timerIntervalRef.current);
-              timerIntervalRef.current = null;
-            }
-            toast({ title: "انتهى الوقت!", description: "يتم تسليم الامتحان تلقائياً.", status: "warning" });
-            handleSubmitExam(true, "timer");
-          }
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    };
+
+    tick();
+    timerIntervalRef.current = setInterval(tick, 1000);
     return () => {
       if (timerIntervalRef.current) {
         clearInterval(timerIntervalRef.current);
         timerIntervalRef.current = null;
       }
     };
-  }, [remainingSeconds, submitResult, submitLoading, handleSubmitExam, toast]);
+  }, [examStarted, examEndsAt, submitResult, handleSubmitExam, toast]);
+
+  useEffect(() => {
+    if (!examStarted || submitResult) return undefined;
+    const syncClock = () => {
+      const ends = examEndsAtRef.current;
+      if (ends == null) return;
+      const left = remainingFromEndsAt(ends) ?? 0;
+      setRemainingSeconds(left);
+      if (
+        left <= 0 &&
+        !timerExpiredRef.current &&
+        !submitLoadingRef.current &&
+        !submitResultRef.current
+      ) {
+        timerExpiredRef.current = true;
+        handleSubmitExam(true, "timer");
+      }
+    };
+    document.addEventListener("visibilitychange", syncClock);
+    window.addEventListener("focus", syncClock);
+    return () => {
+      document.removeEventListener("visibilitychange", syncClock);
+      window.removeEventListener("focus", syncClock);
+    };
+  }, [examStarted, submitResult, handleSubmitExam]);
 
   // للطالب: شاشة البدء أو التحميل قبل بدء المحاولة
   const studentPageBg = useColorModeValue("gray.100", "gray.900");
@@ -1103,7 +1403,7 @@ const Exam = () => {
           bg={studentHeaderBg}
           boxShadow="md"
         >
-          <HStack spacing={3} align="center" mb={3}>
+          <HStack spacing={3} align="center">
             <IconButton
               aria-label="العودة"
               icon={<MdArrowBack />}
@@ -1117,7 +1417,7 @@ const Exam = () => {
                 {examMeta?.examTitle || examSessionData?.title || "امتحان المحاضرة"}
               </Text>
               <Text fontSize="xs" color="gray.500">
-                {questions.length} سؤال • لا تغادر الصفحة أثناء الامتحان
+                {questions.length} سؤال
               </Text>
             </VStack>
             {remainingSeconds !== null && (
@@ -1133,12 +1433,6 @@ const Exam = () => {
               </Badge>
             )}
           </HStack>
-          <Alert status="warning" borderRadius="xl" py={2} px={3}>
-            <AlertIcon boxSize={4} />
-            <Text fontSize="xs" lineHeight="1.7">
-              أي محاولة للخروج أو فتح تبويب آخر أو تحديث الصفحة ستؤدي إلى تسليم الامتحان فوراً.
-            </Text>
-          </Alert>
         </Box>
       )}
       {/* هيدر المدرس: عنوان + إحصائيات + زر التبديل */}

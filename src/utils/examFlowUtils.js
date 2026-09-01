@@ -1,7 +1,3 @@
-import { getApiBaseURL } from "../api/apiConfig";
-import { getAuthScopeSubdomain } from "./tenantAuthStorage";
-import { getTenantSubdomain } from "./tenantHost";
-
 export const QUESTION_DISPLAY_MODES = {
   ORDERED: "ordered",
   RANDOM: "random",
@@ -229,32 +225,4 @@ export function extractExamAttemptId(source = {}, examId = null) {
   const examNum = toPositiveAttemptId(examId);
   const notExamId = examNum != null ? ids.filter((id) => id !== examNum) : ids;
   return notExamId[0] ?? null;
-}
-
-export function submitExamKeepalive({ examId, attemptId, answers = [] }) {
-  if (typeof window === "undefined" || !examId || !attemptId) return;
-
-  const token = localStorage.getItem("token");
-
-  const base = String(getApiBaseURL() || "/").replace(/\/$/, "");
-  const url = `${base}/api/exams/${examId}/submit`;
-
-  const headers = {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-
-  const tenant = getTenantSubdomain() || getAuthScopeSubdomain();
-  if (tenant) headers["X-Tenant-Subdomain"] = tenant;
-
-  try {
-    fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ attemptId, attempt_id: attemptId, answers }),
-      keepalive: true,
-    }).catch(() => {});
-  } catch {
-    // ignore unload errors
-  }
 }

@@ -7,37 +7,38 @@ import { getTenantSubdomain } from "../../../utils/tenantHost";
 import { field, studentCode, studentName } from "../centerMgmtUtils";
 
 /**
- * 9 كروت في صفحة A4 أفقي (3×3) — الشبكة تملأ الصفحة بهوامش صغيرة
- * حجم الكارت ثابت حتى لو الصفحة فيها كارت واحد
+ * العرض الأفقي يملأ الصفحة (3 أعمدة).
+ * الارتفاع الرأسي ثابت 53.98 مم — أي فراغ يتبقى ينزل أسفل الصفحة.
  */
 const A4_W_MM = 297;
 const A4_H_MM = 210;
-const PAGE_RENDER_W = 1188;
-const PAGE_RENDER_H = Math.round(PAGE_RENDER_W * (A4_H_MM / A4_W_MM));
+const CARD_H_MM = 53.98;
+const PX_PER_MM = 4;
+const PAGE_RENDER_W = Math.round(A4_W_MM * PX_PER_MM);
+const PAGE_RENDER_H = Math.round(A4_H_MM * PX_PER_MM);
 const GRID_COLS = 3;
 const GRID_ROWS = 3;
 const CARDS_PER_PAGE = 9;
-const PAGE_PAD_X = 8;
-const GRID_GAP = 8;
+const PAGE_PAD_X = Math.round(3.5 * PX_PER_MM);
+const PAGE_PAD_TOP = Math.round(3.5 * PX_PER_MM);
+const GRID_GAP = Math.round(2.2 * PX_PER_MM);
 
 const CARD_W = Math.floor(
-  (PAGE_RENDER_W - PAGE_PAD_X * 2 - GRID_GAP * GRID_COLS) / GRID_COLS
+  (PAGE_RENDER_W - PAGE_PAD_X * 2 - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS
 );
-const CARD_H_FILL = Math.floor(
-  (PAGE_RENDER_H - 16 - GRID_GAP * GRID_ROWS) / GRID_ROWS
-);
-const CARD_H = Math.floor(CARD_H_FILL * 0.86);
-const PAGE_PAD_Y = Math.floor(
-  (PAGE_RENDER_H - GRID_ROWS * (CARD_H + GRID_GAP)) / 2
-);
+const CARD_H = Math.round(CARD_H_MM * PX_PER_MM);
+const GRID_H = GRID_ROWS * CARD_H + (GRID_ROWS - 1) * GRID_GAP;
+const PAGE_PAD_BOTTOM = Math.max(0, PAGE_RENDER_H - PAGE_PAD_TOP - GRID_H);
 
-const LEFT_W = 52;
-const QR_COL_W = 108;
-const QR_RIGHT_PAD = 10;
+const LEFT_W = Math.round(CARD_W * 0.14);
+const QR_COL_W = Math.round(CARD_W * 0.28);
+const QR_RIGHT_PAD = 8;
 const QR_FRAME_PAD = 3;
-const QR_IMG = Math.min(QR_COL_W - QR_RIGHT_PAD - 22, CARD_H - 78);
-const ICON = 18;
-const TITLE_H = 36;
+const FOOTER_H = 8;
+const QR_IMG = Math.min(QR_COL_W - QR_RIGHT_PAD - 18, CARD_H - 70 - FOOTER_H);
+const ICON = 16;
+const TITLE_H = 32;
+const INFO_ROW_H = 26;
 
 const BLUE = "#004AAD";
 const ORANGE = "#FF7A00";
@@ -203,7 +204,7 @@ async function getCardTitleImage(teacherDisplay) {
   }
 
   const cssW = 250;
-  const cssH = 26;
+  const cssH = 34;
   const scale = 4;
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(cssW * scale);
@@ -213,7 +214,7 @@ async function getCardTitleImage(teacherDisplay) {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   ctx.clearRect(0, 0, cssW, cssH);
-  ctx.textBaseline = "middle";
+  ctx.textBaseline = "alphabetic";
   ctx.textAlign = "left";
   ctx.direction = "ltr";
 
@@ -240,7 +241,7 @@ async function getCardTitleImage(teacherDisplay) {
   }
 
   let x = Math.max(0, (cssW - total) / 2);
-  const y = cssH / 2 + 1;
+  const y = Math.round(cssH * 0.72);
   parts.forEach((part, i) => {
     ctx.font = `700 ${part.size}px Tahoma, Arial, sans-serif`;
     ctx.fillStyle = part.color;
@@ -254,6 +255,83 @@ async function getCardTitleImage(teacherDisplay) {
     height: cssH,
   };
   cardTitleCache.set(key, image);
+  return image;
+}
+
+let infoLineCache = new Map();
+
+async function getInfoLineImage(label, value) {
+  const key = `${label}::${value}`;
+  if (infoLineCache.has(key)) return infoLineCache.get(key);
+
+  try {
+    await document.fonts.load("700 20px Tahoma");
+    await document.fonts.ready;
+  } catch {
+    // fallback to system Tahoma
+  }
+
+  const labelSize = 13;
+  const valueSize = 16;
+  const padX = 4;
+  const padTop = 6;
+  const padBottom = 10;
+  const measureCanvas = document.createElement("canvas");
+  const mctx = measureCanvas.getContext("2d");
+  mctx.font = `700 ${labelSize}px Tahoma, Arial, sans-serif`;
+  const labelW = mctx.measureText(label).width;
+  const colonW = mctx.measureText(" : ").width;
+  mctx.font = `700 ${valueSize}px Tahoma, Arial, sans-serif`;
+  const valueMetrics = mctx.measureText(value);
+  const valueW = valueMetrics.width;
+  const ascent = Math.max(
+    valueMetrics.actualBoundingBoxAscent || valueSize * 0.8,
+    labelSize * 0.8
+  );
+  const descent = Math.max(
+    valueMetrics.actualBoundingBoxDescent || valueSize * 0.4,
+    labelSize * 0.4
+  );
+
+  const cssW = Math.ceil(padX * 2 + labelW + colonW + valueW + 4);
+  const cssH = Math.ceil(padTop + ascent + descent + padBottom);
+  const scale = 4;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(cssW * scale);
+  canvas.height = Math.round(cssH * scale);
+  const ctx = canvas.getContext("2d");
+  ctx.scale(scale, scale);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.clearRect(0, 0, cssW, cssH);
+  ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "right";
+  ctx.direction = "rtl";
+
+  const y = padTop + ascent;
+  let x = cssW - padX;
+
+  ctx.direction = "rtl";
+  ctx.font = `700 ${labelSize}px Tahoma, Arial, sans-serif`;
+  ctx.fillStyle = ORANGE;
+  ctx.fillText(label, x, y);
+  x -= labelW;
+
+  ctx.direction = "ltr";
+  ctx.fillText(" : ", x, y);
+  x -= colonW;
+
+  ctx.direction = "rtl";
+  ctx.font = `700 ${valueSize}px Tahoma, Arial, sans-serif`;
+  ctx.fillStyle = INK;
+  ctx.fillText(value, x, y);
+
+  const image = {
+    src: canvas.toDataURL("image/png"),
+    width: cssW,
+    height: cssH,
+  };
+  infoLineCache.set(key, image);
   return image;
 }
 
@@ -287,24 +365,37 @@ function rowSep() {
   `;
 }
 
-function infoRow({ icon, label, value, last }) {
+function infoRow({ icon, lineImg, last }) {
+  const displayH = 20;
+  const displayW = Math.round(lineImg.width * (displayH / lineImg.height));
   return `
     <tr>
-      <td style="padding:2px 0;height:${ICON + 6}px;vertical-align:middle;">
-        <table dir="rtl" cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;height:${ICON}px;">
+      <td style="padding:2px 0;height:${INFO_ROW_H}px;vertical-align:middle;overflow:visible;">
+        <table dir="rtl" cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;">
           <tr>
             <td style="
-              width:${ICON + 6}px;height:${ICON}px;
+              width:${ICON + 6}px;
               vertical-align:middle;text-align:center;padding:0 0 0 6px;
             ">${icon}</td>
             <td dir="rtl" style="
-              text-align:right;vertical-align:middle;white-space:nowrap;
-              font-family:${FONT};line-height:${ICON}px;padding:0;
-              overflow:hidden;max-width:1px;
+              text-align:right;vertical-align:middle;
+              padding:0;overflow:visible;line-height:0;
             ">
-              <span style="color:${ORANGE};font-size:8.5px;font-weight:700;font-family:${FONT};">${spacedAr(label)}</span>
-              <span style="color:${ORANGE};font-size:8.5px;font-weight:700;font-family:${FONT};unicode-bidi:isolate;">&nbsp;:&nbsp;</span>
-              <span style="color:${INK};font-size:10px;font-weight:700;font-family:${FONT};">${spacedAr(value)}</span>
+              <img
+                src="${lineImg.src}"
+                alt=""
+                width="${displayW}"
+                height="${displayH}"
+                style="
+                  display:block;
+                  height:${displayH}px;
+                  width:auto;
+                  max-width:100%;
+                  margin-right:0;
+                  margin-left:auto;
+                  border:0;
+                "
+              />
             </td>
           </tr>
         </table>
@@ -354,8 +445,9 @@ function leftBar(uid, code) {
       <polygon points="0,0 ${LEFT_W},0 ${LEFT_W - slant},${CARD_H} 0,${CARD_H}" fill="url(#${pid})"/>
     </svg>
     <div style="
-      position:absolute;left:4px;bottom:8px;
+      position:absolute;left:4px;bottom:${FOOTER_H + 6}px;
       width:${badgeW}px;height:${badgeH}px;
+      z-index:7;
     ">
       <table cellpadding="0" cellspacing="0" style="
         border-collapse:collapse;width:${badgeW}px;height:${badgeH}px;
@@ -366,8 +458,9 @@ function leftBar(uid, code) {
             width:${badgeW}px;height:${badgeH}px;
             text-align:center;vertical-align:middle;
             color:${WHITE};font-size:9px;font-weight:700;font-family:${FONT};
-            line-height:1;letter-spacing:0;
-            overflow:hidden;white-space:nowrap;
+            line-height:1.35;letter-spacing:0;
+            padding:2px 2px 3px;
+            overflow:visible;white-space:nowrap;
           ">${escapeHtml(code)}</td>
         </tr>
       </table>
@@ -392,7 +485,7 @@ function cornerDecor() {
       width="96"
       height="36"
       viewBox="0 0 96 36"
-      style="position:absolute;bottom:0;right:0;display:block;z-index:0;pointer-events:none;"
+      style="position:absolute;bottom:${FOOTER_H}px;right:0;display:block;z-index:0;pointer-events:none;"
     >
       <path fill="${BLUE}" d="M96 36 H10 C30 32, 54 14, 96 18 Z"/>
       <path fill="${ORANGE}" d="M96 36 H32 C52 30, 72 22, 96 24 Z"/>
@@ -409,6 +502,7 @@ function buildCardHtml({
   branding,
   uniqueKey = "",
   titleImg,
+  lineImgs,
 }) {
   const grade = truncate(gradeName || "—", 20);
   const safeName = truncate(name, 20);
@@ -495,29 +589,31 @@ function buildCardHtml({
       <td style="width:${LEFT_W}px;padding:0;font-size:0;">&nbsp;</td>
       <td style="
         vertical-align:middle;
-        padding:${TITLE_H + 2}px 8px 16px 8px;
-        overflow:hidden;
+        padding:${TITLE_H + 2}px 8px ${FOOTER_H + 8}px 8px;
+        overflow:visible;
       ">
         <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;">
-          ${infoRow({ icon: circleIcon(BLUE, SVG_USER), label: "اسم الطالب", value: safeName })}
-          ${infoRow({ icon: circleIcon(BLUE, SVG_BOOK), label: "الصف الدراسي", value: grade })}
-          ${infoRow({ icon: circleIcon(ORANGE, SVG_GROUP), label: "اسم المجموعة", value: safeGroup })}
-          ${infoRow({ icon: circleIcon(BLUE, SVG_BADGE), label: "كود الطالب", value: safeId, last: true })}
+          ${infoRow({ icon: circleIcon(BLUE, SVG_USER), lineImg: lineImgs.name })}
+          ${infoRow({ icon: circleIcon(BLUE, SVG_BOOK), lineImg: lineImgs.grade })}
+          ${infoRow({ icon: circleIcon(ORANGE, SVG_GROUP), lineImg: lineImgs.group })}
+          ${infoRow({ icon: circleIcon(BLUE, SVG_BADGE), lineImg: lineImgs.code, last: true })}
         </table>
       </td>
       <td style="
         width:${QR_COL_W}px;
         vertical-align:middle;
         text-align:center;
-        padding:${TITLE_H}px ${QR_RIGHT_PAD}px 16px 4px;
+        padding:${TITLE_H}px ${QR_RIGHT_PAD}px ${FOOTER_H + 8}px 4px;
         overflow:hidden;
       ">${qrFrame(qrInner)}</td>
     </tr>
   </table>
 
-  <div style="position:absolute;left:${LEFT_W + 20}px;right:${QR_COL_W + 6}px;bottom:4px;z-index:3;">
-    ${dottedRule(["#004AAD", "#004AAD", "#FF7A00"])}
-  </div>
+  <div style="
+    position:absolute;left:0;right:0;bottom:0;z-index:6;
+    height:${FOOTER_H}px;
+    background:${BLUE};
+  "></div>
 </div>`;
 }
 
@@ -565,27 +661,31 @@ async function loadStudentCards(students) {
 
 function buildPageHtml(cardHtmlList) {
   const slots = Array.from({ length: CARDS_PER_PAGE }, (_, i) => cardHtmlList[i] || "");
-  const halfGap = GRID_GAP / 2;
+  const colCount = GRID_COLS * 2 - 1;
 
-  const rowHtml = Array.from({ length: GRID_ROWS }, (_, rowIdx) => {
-    const cells = Array.from({ length: GRID_COLS }, (_, colIdx) => {
+  const cardCell = (card) => `
+    <td style="width:${CARD_W}px;height:${CARD_H}px;padding:0;vertical-align:top;">
+      <div style="width:${CARD_W}px;height:${CARD_H}px;overflow:hidden;">${card || ""}</div>
+    </td>`;
+  const gapCell = `<td style="width:${GRID_GAP}px;padding:0;font-size:0;line-height:0;"></td>`;
+  const gapRow = `<tr><td colspan="${colCount}" style="height:${GRID_GAP}px;padding:0;font-size:0;line-height:0;"></td></tr>`;
+
+  const rows = Array.from({ length: GRID_ROWS }, (_, rowIdx) => {
+    const cols = Array.from({ length: GRID_COLS }, (_, colIdx) => {
       const card = slots[rowIdx * GRID_COLS + colIdx] || "";
-      return `<td style="
-        width:${CARD_W + GRID_GAP}px;
-        height:${CARD_H + GRID_GAP}px;
-        padding:${halfGap}px;
-        vertical-align:top;
-        box-sizing:border-box;
-      "><div style="width:${CARD_W}px;height:${CARD_H}px;overflow:hidden;">${card || ""}</div></td>`;
+      return cardCell(card) + (colIdx < GRID_COLS - 1 ? gapCell : "");
     }).join("");
-    return `<tr>${cells}</tr>`;
+    return `<tr>${cols}</tr>${rowIdx < GRID_ROWS - 1 ? gapRow : ""}`;
   }).join("");
+
+  const gridW = GRID_COLS * CARD_W + (GRID_COLS - 1) * GRID_GAP;
+  const gridH = GRID_ROWS * CARD_H + (GRID_ROWS - 1) * GRID_GAP;
 
   return `
     <div id="pdf-page" style="
       width:${PAGE_RENDER_W}px;
       height:${PAGE_RENDER_H}px;
-      padding:${PAGE_PAD_Y}px ${PAGE_PAD_X}px;
+      padding:${PAGE_PAD_TOP}px ${PAGE_PAD_X}px ${PAGE_PAD_BOTTOM}px ${PAGE_PAD_X}px;
       background:#ffffff;
       box-sizing:border-box;
       font-family:${FONT};
@@ -593,10 +693,11 @@ function buildPageHtml(cardHtmlList) {
     ">
       <table dir="ltr" cellpadding="0" cellspacing="0" style="
         border-collapse:collapse;
-        width:${GRID_COLS * (CARD_W + GRID_GAP)}px;
+        width:${gridW}px;
+        height:${gridH}px;
         table-layout:fixed;
       ">
-        ${rowHtml}
+        ${rows}
       </table>
     </div>
   `;
@@ -682,7 +783,7 @@ async function renderPageInIsolatedFrame(pageInnerHtml) {
 }
 
 /**
- * Generate PDF — 9 cards per A4 landscape page (3×3 grid).
+ * Generate PDF — 3×3 on A4 landscape. Card height 53.98mm; extra space at the bottom.
  * Card size stays fixed even when a page has a single card.
  */
 export async function generateGroupStudentCardsPdf({
@@ -712,16 +813,34 @@ export async function generateGroupStudentCardsPdf({
       cards.length
     );
 
-    const cardHtmlList = slice.map(({ student, qrSrc }, cardIdx) =>
-      buildCardHtml({
-        studentName: studentName(student),
-        studentId: studentCode(student),
-        groupName,
-        gradeName,
-        qrSrc,
-        branding,
-        uniqueKey: `${pageIdx}-${cardIdx}-${student.id || studentCode(student)}`,
-        titleImg,
+    const cardHtmlList = await Promise.all(
+      slice.map(async ({ student, qrSrc }, cardIdx) => {
+        const safeName = truncate(studentName(student), 20);
+        const safeGroup = truncate(groupName || "—", 16);
+        const safeGrade = truncate(gradeName || "—", 20);
+        const safeId = String(studentCode(student) ?? "—");
+        const [nameImg, gradeImg, groupImg, codeImg] = await Promise.all([
+          getInfoLineImage("اسم الطالب", safeName),
+          getInfoLineImage("الصف الدراسي", safeGrade),
+          getInfoLineImage("اسم المجموعة", safeGroup),
+          getInfoLineImage("كود الطالب", safeId),
+        ]);
+        return buildCardHtml({
+          studentName: safeName,
+          studentId: safeId,
+          groupName: safeGroup,
+          gradeName: safeGrade,
+          qrSrc,
+          branding,
+          uniqueKey: `${pageIdx}-${cardIdx}-${student.id || safeId}`,
+          titleImg,
+          lineImgs: {
+            name: nameImg,
+            grade: gradeImg,
+            group: groupImg,
+            code: codeImg,
+          },
+        });
       })
     );
 
