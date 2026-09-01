@@ -69,10 +69,72 @@ export function buildLectureExamUpdatePayload(data) {
 }
 
 export function buildExamSubmitAnswers(studentAnswers = {}) {
-  return Object.entries(studentAnswers).map(([questionId, selectedAnswer]) => ({
-    questionId: Number(questionId),
-    selectedAnswer,
-  }));
+  return Object.entries(studentAnswers)
+    .map(([questionId, selectedAnswer]) => ({
+      questionId: Number(questionId),
+      selectedAnswer: String(selectedAnswer || "").trim().toUpperCase(),
+    }))
+    .filter(
+      (row) =>
+        Number.isInteger(row.questionId) &&
+        row.questionId > 0 &&
+        ["A", "B", "C", "D"].includes(row.selectedAnswer),
+    );
+}
+
+/** إجابات محفوظة من السيرفر → خريطة { questionId: "A" } */
+export function savedCourseExamAnswersToMap(savedAnswers = []) {
+  const map = {};
+  const rows = Array.isArray(savedAnswers) ? savedAnswers : [];
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const questionId = Number(row.questionId ?? row.question_id);
+    const letter = String(row.selectedAnswer ?? row.selected_answer ?? "")
+      .trim()
+      .toUpperCase();
+    if (Number.isInteger(questionId) && questionId > 0 && ["A", "B", "C", "D"].includes(letter)) {
+      map[questionId] = letter;
+    }
+  }
+  return map;
+}
+
+/** عدّاد السيرفر: remainingSeconds / attemptExpiresAt. لا يُعاد ضبطه من ساعة الجهاز. */
+export function resolveCourseExamServerTimer(session = {}) {
+  const expiresAt = session.attemptExpiresAt ?? session.attempt_expires_at ?? null;
+  if (expiresAt) {
+    const ms = new Date(expiresAt).getTime();
+    if (Number.isFinite(ms)) {
+      return {
+        endsAt: ms,
+        remaining: Math.max(0, Math.floor((ms - Date.now()) / 1000)),
+      };
+    }
+  }
+  const remainingRaw = session.remainingSeconds ?? session.remaining_seconds;
+  if (remainingRaw != null && remainingRaw !== "") {
+    const n = Number(remainingRaw);
+    if (Number.isFinite(n)) {
+      const remaining = Math.max(0, Math.floor(n));
+      return { endsAt: Date.now() + remaining * 1000, remaining };
+    }
+  }
+  return { endsAt: null, remaining: null };
+}
+
+export function isCourseExamTakingSession(session) {
+  return Array.isArray(session?.questions) && session.questions.length > 0;
+}
+
+export function isCourseExamFinishedPayload(session) {
+  if (!session || typeof session !== "object" || isCourseExamTakingSession(session)) {
+    return false;
+  }
+  return (
+    session.timedOut === true ||
+    session.timed_out === true ||
+    (session.totalGrade != null && session.maxGrade != null)
+  );
 }
 
 const LETTER_KEYS = ["A", "B", "C", "D"];

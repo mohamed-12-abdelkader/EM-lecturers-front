@@ -101,7 +101,11 @@ export default function TeacherExamShell({
   const meta = [
     courseName,
     `${questionsCount} سؤال`,
-    duration ? `${duration} دقيقة` : null,
+    duration != null && duration !== "" && Number(duration) > 0
+      ? `${duration} دقيقة`
+      : examType === "comprehensive"
+        ? "بدون حد زمني"
+        : null,
     totalGrade != null && totalGrade !== "" ? `الدرجة ${totalGrade}` : null,
   ].filter(Boolean);
 

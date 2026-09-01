@@ -27,6 +27,7 @@ import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import {
   startCourseExamAttempt,
   submitCourseExamAttempt,
+  autosaveCourseExamAnswers,
   translateCourseExamStudentError,
 } from "../../api/courseExamsApi";
 import ExamAttemptResultScreen from "./components/ExamAttemptResultScreen";
@@ -35,7 +36,11 @@ import LectureExamStudentQuestionCard from "./components/LectureExamStudentQuest
 import {
   buildExamSubmitAnswers,
   extractExamAttemptId,
+  isCourseExamFinishedPayload,
+  isCourseExamTakingSession,
   normalizeExamQuestionsFromApi,
+  resolveCourseExamServerTimer,
+  savedCourseExamAnswersToMap,
   toPositiveAttemptId,
 } from "../../utils/examFlowUtils";
 import {
@@ -53,34 +58,6 @@ function remainingFromEndsAt(endsAt) {
   const ms = Number(endsAt);
   if (!Number.isFinite(ms) || ms <= 0) return null;
   return Math.max(0, Math.ceil((ms - Date.now()) / 1000));
-}
-
-function resolveEndsAt({ startedAt, durationMinutes, localEndsAt, forceFreshCountdown }) {
-  const durationMs =
-    Number(durationMinutes) > 0 ? Number(durationMinutes) * 60 * 1000 : null;
-  if (!durationMs) return null;
-
-  const now = Date.now();
-  const localMs = Number(localEndsAt);
-  const hasLocal = Number.isFinite(localMs) && localMs > 1e12;
-  const localInFuture = hasLocal && localMs > now + 1000;
-
-  if (localInFuture) return localMs;
-  // بدء / استكمال من الكارت: عدّاد جديد. startedAt القديم من السيرفر لا يسلّم فوراً.
-  if (forceFreshCountdown) return now + durationMs;
-  // تحديث الصفحة بعد انتهاء جلسة محلية: سلّم. غير كده ابدأ المدة من الآن.
-  if (hasLocal) return localMs;
-
-  const startMs = startedAt ? new Date(startedAt).getTime() : NaN;
-  if (Number.isFinite(startMs)) {
-    const fromStart = startMs + durationMs;
-    const remainingMs = fromStart - now;
-    if (remainingMs > 1000 && remainingMs <= durationMs + 5000) {
-      return fromStart;
-    }
-  }
-
-  return now + durationMs;
 }
 
 function formatRemainingTime(value) {
@@ -138,7 +115,15 @@ export default function StudentCourseExamPage() {
     });
   }, [examId, examMeta?.startedAt, submitResult]);
 
-  const applySession = useCallback((session = {}, { fromStartButton = false } = {}) => {
+  const applySession = useCallback((session = {}) => {
+    if (isCourseExamFinishedPayload(session)) {
+      setSubmitResult(session);
+      return { remaining: 0, finished: true };
+    }
+    if (!isCourseExamTakingSession(session)) {
+      throw new Error("لم يتم تحميل أسئلة الامتحان");
+    }
+
     const resolvedAttemptId =
       extractExamAttemptId(session, examId) || toPositiveAttemptId(session.attemptId);
     const normalizedQuestions = normalizeExamQuestionsFromApi(session.questions || []);
@@ -150,28 +135,21 @@ export default function StudentCourseExamPage() {
     const localProgress = readExamProgress(examId, resolvedAttemptId);
     const startedAt = session.startedAt || session.started_at || localProgress?.startedAt || null;
     const durationMinutes = session.durationMinutes ?? session.duration_minutes ?? null;
-    const durationMs =
-      Number(durationMinutes) > 0 ? Number(durationMinutes) * 60 * 1000 : null;
-    const restoredAnswers = localProgress?.answers && typeof localProgress.answers === "object"
-      ? localProgress.answers
-      : {};
-    const localEndsAtMs = Number(localProgress?.endsAt);
-    const expiredLocalSitting =
-      !fromStartButton &&
-      Number.isFinite(localEndsAtMs) &&
-      localEndsAtMs > 1e12 &&
-      localEndsAtMs <= Date.now() + 1000;
-    let endsAt = resolveEndsAt({
-      startedAt,
-      durationMinutes,
-      localEndsAt: localProgress?.endsAt,
-      forceFreshCountdown: fromStartButton,
-    });
-    let remaining = remainingFromEndsAt(endsAt);
-    if (!expiredLocalSitting && durationMs && (remaining == null || remaining <= 1)) {
-      endsAt = Date.now() + durationMs;
-      remaining = Math.ceil(durationMs / 1000);
-    }
+    const durationUnlimited = Boolean(
+      session.durationUnlimited ??
+        session.duration_unlimited ??
+        (durationMinutes == null || Number(durationMinutes) <= 0),
+    );
+    const serverAnswers = savedCourseExamAnswersToMap(
+      session.savedAnswers || session.saved_answers,
+    );
+    const localAnswers =
+      localProgress?.answers && typeof localProgress.answers === "object"
+        ? localProgress.answers
+        : {};
+    const restoredAnswers = { ...serverAnswers, ...localAnswers };
+    const { endsAt, remaining } = resolveCourseExamServerTimer(session);
+
     let resumeIndex = Number(localProgress?.current);
     if (!Number.isInteger(resumeIndex) || resumeIndex < 0 || resumeIndex >= normalizedQuestions.length) {
       const firstOpen = normalizedQuestions.findIndex((q) => {
@@ -186,8 +164,8 @@ export default function StudentCourseExamPage() {
     currentRef.current = resumeIndex;
     examEndsAtRef.current = endsAt;
     questionsRef.current = normalizedQuestions;
-    timerExpiredRef.current = false;
-    allowTimerSubmitRef.current = remaining > 1 || expiredLocalSitting;
+    timerExpiredRef.current = remaining === 0;
+    allowTimerSubmitRef.current = remaining != null;
     sessionAppliedAtRef.current = Date.now();
 
     setAttemptId(resolvedAttemptId);
@@ -199,9 +177,10 @@ export default function StudentCourseExamPage() {
     setExamMeta({
       examTitle: session.examTitle || session.exam_title || "",
       durationMinutes,
+      durationUnlimited,
       questionsCount: session.questionsCount || normalizedQuestions.length,
       startedAt,
-      courseId: session.courseId || session.course_id || null,
+      courseId: session.courseId || session.course_id || location.state?.courseId || null,
     });
     writeExamProgress(examId, resolvedAttemptId, {
       answers: restoredAnswers,
@@ -209,7 +188,8 @@ export default function StudentCourseExamPage() {
       endsAt,
       startedAt,
     });
-  }, [examId]);
+    return { remaining, finished: false };
+  }, [examId, location.state?.courseId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -226,24 +206,21 @@ export default function StudentCourseExamPage() {
 
       try {
         const fromNav = location.state?.session;
-        const fromCoursePage = Boolean(fromNav?.questions?.length);
-        if (fromCoursePage) {
+        if (isCourseExamTakingSession(fromNav) || isCourseExamFinishedPayload(fromNav)) {
           if (cancelled) return;
-          applySession(
-            {
-              ...fromNav,
-              courseId: location.state?.courseId || fromNav.courseId || fromNav.course_id,
-            },
-            { fromStartButton: true },
-          );
+          applySession({
+            ...fromNav,
+            courseId: location.state?.courseId || fromNav.courseId || fromNav.course_id,
+          });
         } else if (readPersistedAttemptId(examId)) {
           const session = await startCourseExamAttempt(examId, token);
           if (cancelled) return;
-          applySession(session, { fromStartButton: false });
+          applySession({
+            ...session,
+            courseId: location.state?.courseId || session.courseId || session.course_id,
+          });
         } else {
-          setError(
-            "ابدأ الامتحان من صفحة الكورس. لا يمكن بدء محاولة جديدة من هنا.",
-          );
+          setError("ابدأ الامتحان من صفحة الكورس. لا يمكن بدء محاولة جديدة من هنا.");
         }
       } catch (err) {
         if (cancelled) return;
@@ -328,7 +305,13 @@ export default function StudentCourseExamPage() {
       examEndsAtRef.current = null;
       clearExamProgress(examId, id);
       clearPersistedAttemptId(examId);
-      if (!autoSubmit) {
+      if (autoSubmit || result?.timedOut) {
+        toast({
+          title: result?.timedOut ? "انتهى الوقت" : "تم التسليم تلقائياً",
+          description: `الدرجة: ${result.totalGrade}/${result.maxGrade}`,
+          status: "warning",
+        });
+      } else {
         toast({
           title: "تم تسليم الامتحان",
           description: `الدرجة: ${result.totalGrade}/${result.maxGrade}`,
@@ -347,6 +330,49 @@ export default function StudentCourseExamPage() {
     }
   }, [examId, submitResult, toast]);
 
+  const doAutosave = useCallback(async () => {
+    if (submitInFlightRef.current || submitResult) return;
+    const token = localStorage.getItem("token");
+    const id = toPositiveAttemptId(attemptIdRef.current);
+    if (!token || !id || !examId) return;
+    try {
+      const result = await autosaveCourseExamAnswers(examId, token, {
+        attemptId: id,
+        answers: buildExamSubmitAnswers(studentAnswersRef.current),
+      });
+      if (isCourseExamFinishedPayload(result)) {
+        setSubmitResult(result);
+        setExamEndsAt(null);
+        examEndsAtRef.current = null;
+        clearExamProgress(examId, id);
+        clearPersistedAttemptId(examId);
+        return;
+      }
+      if (result?.remainingSeconds != null || result?.attemptExpiresAt || result?.attempt_expires_at) {
+        const { endsAt, remaining } = resolveCourseExamServerTimer(result);
+        examEndsAtRef.current = endsAt;
+        setExamEndsAt(endsAt);
+        setRemainingSeconds(remaining);
+      }
+    } catch {
+      /* silent — next interval retries */
+    }
+  }, [examId, submitResult]);
+
+  useEffect(() => {
+    if (submitResult || !questions.length) return undefined;
+    const intervalId = setInterval(doAutosave, 18000);
+    return () => clearInterval(intervalId);
+  }, [doAutosave, questions.length, submitResult]);
+
+  useEffect(() => {
+    return () => {
+      if (!submitInFlightRef.current && attemptIdRef.current) {
+        doAutosave();
+      }
+    };
+  }, [doAutosave]);
+
   useEffect(() => {
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
@@ -360,7 +386,7 @@ export default function StudentCourseExamPage() {
       if (left > 0 || timerExpiredRef.current || submitInFlightRef.current) return;
       if (!allowTimerSubmitRef.current) return;
       const appliedAgo = Date.now() - (sessionAppliedAtRef.current || 0);
-      if (appliedAgo < 2000) return;
+      if (appliedAgo < 800) return;
       timerExpiredRef.current = true;
       toast({ title: "انتهى الوقت!", description: "يتم تسليم الامتحان تلقائياً.", status: "warning" });
       handleSubmitExam(true);
@@ -386,9 +412,11 @@ export default function StudentCourseExamPage() {
     if (submitResult) return;
     setStudentAnswers((prev) => {
       const next = { ...prev, [questionId]: selectedAnswer };
+      studentAnswersRef.current = next;
       persistProgress({ answers: next });
       return next;
     });
+    doAutosave();
   };
 
   const goToCourseExams = () => {
@@ -468,7 +496,7 @@ export default function StudentCourseExamPage() {
               {questions.length} سؤال
             </Text>
           </VStack>
-          {remainingSeconds != null && (
+          {remainingSeconds != null ? (
             <Badge
               px={3}
               py={2}
@@ -478,6 +506,10 @@ export default function StudentCourseExamPage() {
               colorScheme={remainingSeconds < 300 ? "red" : "blue"}
             >
               {formatRemainingTime(remainingSeconds)}
+            </Badge>
+          ) : (
+            <Badge px={3} py={2} borderRadius="xl" fontSize="xs" colorScheme="gray">
+              بدون حد زمني
             </Badge>
           )}
         </HStack>

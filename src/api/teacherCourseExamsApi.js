@@ -19,6 +19,12 @@ export function normalizeCourseExam(raw) {
     courseTitle:
       raw.courseTitle ?? raw.course_title ?? raw.courseName ?? raw.course_name,
     durationMinutes: raw.durationMinutes ?? raw.duration_minutes ?? raw.duration,
+    durationUnlimited: Boolean(
+      raw.durationUnlimited ??
+        raw.duration_unlimited ??
+        ((raw.durationMinutes ?? raw.duration_minutes ?? raw.duration) == null ||
+          Number(raw.durationMinutes ?? raw.duration_minutes ?? raw.duration) <= 0),
+    ),
     questionsCount: raw.questionsCount ?? raw.questions_count ?? 0,
     configuredQuestionsCount:
       raw.configuredQuestionsCount ?? raw.configured_questions_count ?? 0,

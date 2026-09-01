@@ -440,7 +440,7 @@ function ExamCard({ exam }) {
         <SimpleGrid columns={3} spacing={2} mb={4}>
           <StatPill icon={FaQuestionCircle} label="أسئلة" value={exam.questionsCount} color="blue" />
           <StatPill icon={FaCog} label="مُعدّ" value={exam.configuredQuestionsCount} color="orange" />
-          <StatPill icon={FaClock} label="دقيقة" value={exam.durationMinutes ?? "—"} color="gray" />
+          <StatPill icon={FaClock} label="المدة" value={exam.durationUnlimited ? "بدون حد" : (exam.durationMinutes ?? "—")} color="gray" />
         </SimpleGrid>
 
         {exam.configuredQuestionsCount > 0 && (
@@ -517,7 +517,7 @@ function ExamListRow({ exam }) {
         <HStack spacing={4} flexShrink={0} display={{ base: "none", md: "flex" }}>
           <MiniMeta icon={FaQuestionCircle} value={exam.questionsCount} label="سؤال" />
           <MiniMeta icon={FaUsers} value={exam.submissionsCount} label="تسليم" />
-          <MiniMeta icon={FaClock} value={exam.durationMinutes ?? "—"} label="دقيقة" />
+          <MiniMeta icon={FaClock} value={exam.durationUnlimited ? "بدون حد" : (exam.durationMinutes ?? "—")} label={exam.durationUnlimited ? "زمني" : "دقيقة"} />
         </HStack>
         <Button
           as={Link}

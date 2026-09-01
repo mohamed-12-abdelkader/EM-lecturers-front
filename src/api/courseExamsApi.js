@@ -104,6 +104,22 @@ export async function startCourseExamAttempt(examId, token) {
   return data;
 }
 
+/** POST /api/exams/:examId/autosave — حفظ إجابات المحاولة الجارية على السيرفر */
+export async function autosaveCourseExamAnswers(examId, token, { attemptId, answers }) {
+  const { data } = await baseUrl.post(
+    `/api/exams/${examId}/autosave`,
+    { attemptId, attempt_id: attemptId, answers },
+    {
+      headers: {
+        ...authHeaders(token),
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+    }
+  );
+  return data;
+}
+
 /** POST /api/exams/:examId/submit */
 export async function submitCourseExamAttempt(examId, token, { attemptId, answers }) {
   const { data } = await baseUrl.post(
@@ -148,6 +164,9 @@ export function translateCourseExamStudentError(err, fallback = "حدث خطأ �
   if (lower.includes("attempt has already been submitted")) return "تم تسليم هذه المحاولة مسبقاً.";
   if (lower.includes("attemptid is required") || lower.includes("attempt id is required")) {
     return "لا توجد محاولة نشطة. ابدأ الامتحان أولاً.";
+  }
+  if (lower.includes("autosave is only supported")) {
+    return "الحفظ التلقائي متاح لامتحانات الكورس الشاملة فقط.";
   }
 
   return raw || fallback;

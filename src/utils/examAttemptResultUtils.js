@@ -178,7 +178,7 @@ function normalizeFromSubmitResult(raw = {}) {
 
   return {
     mode: "submitted",
-    title: "تم تسليم الامتحان",
+    title: raw.timedOut || raw.timed_out ? "انتهى الوقت — تم التسليم تلقائياً" : "تم تسليم الامتحان",
     message: null,
     attemptId: raw.attemptId ?? null,
     totalGrade,
@@ -186,7 +186,8 @@ function normalizeFromSubmitResult(raw = {}) {
     correctCount: raw.correctCount ?? Math.max(0, (maxGrade || wrongQuestions.length) - wrongQuestions.length),
     wrongCount: raw.wrongCount ?? wrongQuestions.length,
     submittedAt: raw.submittedAt ?? new Date().toISOString(),
-    showAnswers: true,
+    timedOut: Boolean(raw.timedOut ?? raw.timed_out),
+    showAnswers: raw.showAnswers ?? true,
     releaseReason: raw.releaseReason ?? null,
     answersVisibleAt: raw.answersVisibleAt ?? null,
     wrongQuestions,

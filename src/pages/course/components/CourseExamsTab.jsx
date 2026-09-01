@@ -9,6 +9,7 @@ import {
 } from "../../../utils/teacherCoursePageTour";
 import {
   fromDateTimeLocalValue,
+  formatCourseExamDurationLabel,
   getAnswersVisibilityInfo,
   getCourseExamAvailabilityStatus,
   getStudentExamCta,
@@ -19,7 +20,13 @@ import {
   parseDateSafe,
   toDateTimeLocalValue,
 } from "../../../utils/courseLevelExamUtils";
-import { getQuestionDisplayModeLabel, QUESTION_DISPLAY_MODES, normalizeQuestionDisplayMode } from "../../../utils/examFlowUtils";
+import {
+  getQuestionDisplayModeLabel,
+  isCourseExamFinishedPayload,
+  isCourseExamTakingSession,
+  QUESTION_DISPLAY_MODES,
+  normalizeQuestionDisplayMode,
+} from "../../../utils/examFlowUtils";
 import QuestionDisplayModeFields from "../../../components/exam/QuestionDisplayModeFields";
 import ExamStudentSettingsFields, {
   inferAnswersReleaseMode,
@@ -32,6 +39,7 @@ const initialExamFormState = {
   questions_count: "",
   question_display_mode: QUESTION_DISPLAY_MODES.ORDERED,
   duration_minutes: "",
+  duration_unlimited: false,
   is_visible_to_students: true,
   available_from: "",
   visibility_end_date: "",
@@ -59,13 +67,23 @@ const normalizeExamPayload = (payload) => {
     questions_count:
       payload.questions_count === "" ? undefined : Number(payload.questions_count),
     duration_minutes:
-      payload.duration_minutes === "" ? undefined : Number(payload.duration_minutes),
+      payload.duration_unlimited ||
+      payload.duration_minutes === "" ||
+      payload.duration_minutes == null ||
+      Number(payload.duration_minutes) <= 0
+        ? null
+        : Number(payload.duration_minutes),
     attempt_limit:
       payload.attempt_limit === "" ? undefined : Number(payload.attempt_limit),
   };
 
-  // إزالة الحقول الفارغة
+  // إزالة الحقول الفارغة — أبقِ duration_minutes: null (= بدون حد زمني)
   Object.keys(normalized).forEach((key) => {
+    if (key === "duration_minutes" && normalized[key] === null) return;
+    if (key === "duration_unlimited") {
+      delete normalized[key];
+      return;
+    }
     if (normalized[key] === "" || normalized[key] === null) {
       delete normalized[key];
     }
@@ -109,6 +127,44 @@ const buildExamPayload = (payload) => {
 
   return jsonPayload;
 };
+
+function DurationMinutesFields({ minutes, unlimited, onChange, isDisabled }) {
+  return (
+    <FormControl>
+      <FormLabel fontSize="sm" fontWeight="600">
+        مدة الامتحان
+      </FormLabel>
+      <HStack mb={2} spacing={3}>
+        <Switch
+          colorScheme="blue"
+          isChecked={unlimited}
+          isDisabled={isDisabled}
+          onChange={(e) =>
+            onChange({
+              duration_unlimited: e.target.checked,
+              duration_minutes: e.target.checked ? minutes : minutes || "60",
+            })
+          }
+        />
+        <Text fontSize="sm">بدون حد زمني</Text>
+      </HStack>
+      {!unlimited && (
+        <Input
+          type="number"
+          min={1}
+          value={minutes}
+          onChange={(e) => onChange({ duration_minutes: e.target.value, duration_unlimited: false })}
+          placeholder="60"
+          borderRadius="lg"
+          isDisabled={isDisabled}
+        />
+      )}
+      <Text fontSize="xs" color="gray.500" mt={1}>
+        بدون حد زمني يبقى مفتوحاً حتى تاريخ انتهاء الامتحان أو تسليم الطالب.
+      </Text>
+    </FormControl>
+  );
+}
 
 /** صف معلومة داخل كارت الامتحان */
 const ExamInfoRow = ({ icon, label, value, valueColor }) => {
@@ -220,7 +276,7 @@ const ExamCard = ({
 
   const stats = [
     { label: "سؤال", value: exam.questions_count ?? "—", icon: FaBookOpen, color: "blue.500" },
-    { label: "دقيقة", value: exam.duration_minutes ?? "—", icon: FaClock, color: "orange.500" },
+    { label: "المدة", value: formatCourseExamDurationLabel(exam), icon: FaClock, color: "orange.500" },
     {
       label: "عرض الأسئلة",
       value: getQuestionDisplayModeLabel(exam.question_display_mode),
@@ -252,7 +308,10 @@ const ExamCard = ({
     try {
       const session = await startCourseExamAttempt(exam.id, token);
       if (session?.attemptId) persistAttemptId(exam.id, session.attemptId);
-      if (!Array.isArray(session?.questions) || !session.questions.length) {
+      if (
+        !isCourseExamTakingSession(session) &&
+        !isCourseExamFinishedPayload(session)
+      ) {
         throw new Error("لم يتم تحميل أسئلة الامتحان");
       }
       navigate(`/exam/${exam.id}/take`, {
@@ -695,8 +754,8 @@ const CourseExamsTab = ({
         setCreateLoading(false);
         return;
       }
-      if (!form.duration_minutes || Number(form.duration_minutes) <= 0) {
-        toast({ title: "مدة الامتحان مطلوبة ويجب أن تكون موجبة", status: "error" });
+      if (!form.duration_unlimited && (!form.duration_minutes || Number(form.duration_minutes) <= 0)) {
+        toast({ title: "حدد مدة الامتحان بالدقائق، أو فعّل بدون حد زمني", status: "error" });
         setCreateLoading(false);
         return;
       }
@@ -713,6 +772,7 @@ const CourseExamsTab = ({
         questions_count: form.questions_count,
         question_display_mode: form.question_display_mode,
         duration_minutes: form.duration_minutes,
+        duration_unlimited: form.duration_unlimited,
         is_visible_to_students: form.is_visible_to_students,
         available_from: fromDateTimeLocalValue(form.available_from),
         visibility_end_date: fromDateTimeLocalValue(form.visibility_end_date),
@@ -758,6 +818,12 @@ const CourseExamsTab = ({
       question_display_mode:
         exam?.question_display_mode || QUESTION_DISPLAY_MODES.ORDERED,
       duration_minutes: exam?.duration_minutes?.toString() || "",
+      duration_unlimited: Boolean(
+        exam?.duration_unlimited ||
+          exam?.duration_minutes == null ||
+          exam?.duration_minutes === "" ||
+          Number(exam?.duration_minutes) <= 0,
+      ),
       is_visible_to_students: exam?.is_visible_to_students ?? true,
       available_from: toDateTimeLocalValue(exam?.available_from),
       visibility_end_date: toDateTimeLocalValue(exam?.visibility_end_date),
@@ -777,6 +843,12 @@ const CourseExamsTab = ({
           question_display_mode:
             exam.question_display_mode || QUESTION_DISPLAY_MODES.ORDERED,
           duration_minutes: exam.duration_minutes?.toString() || "",
+          duration_unlimited: Boolean(
+            exam.duration_unlimited ||
+              exam.duration_minutes == null ||
+              exam.duration_minutes === "" ||
+              Number(exam.duration_minutes) <= 0,
+          ),
           is_visible_to_students: exam.is_visible_to_students ?? true,
           available_from: toDateTimeLocalValue(exam.available_from),
           visibility_end_date: toDateTimeLocalValue(exam.visibility_end_date),
@@ -800,8 +872,8 @@ const CourseExamsTab = ({
         toast({ title: "عدد الأسئلة يجب أن يكون أكبر من صفر", status: "error" });
         return;
       }
-      if (!formData.duration_minutes || Number(formData.duration_minutes) <= 0) {
-        toast({ title: "مدة الامتحان مطلوبة", status: "error" });
+      if (!formData.duration_unlimited && (!formData.duration_minutes || Number(formData.duration_minutes) <= 0)) {
+        toast({ title: "حدد مدة الامتحان بالدقائق، أو فعّل بدون حد زمني", status: "error" });
         return;
       }
 
@@ -950,20 +1022,14 @@ const CourseExamsTab = ({
                           }
                         />
                       </FormControl>
-                      <FormControl isRequired>
-                        <FormLabel>مدة الامتحان (دقائق)</FormLabel>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={formData.duration_minutes}
-                          onChange={(e) =>
-                            setFormData((prev) => ({
-                              ...prev,
-                              duration_minutes: e.target.value,
-                            }))
-                          }
-                        />
-                      </FormControl>
+                      <DurationMinutesFields
+                        minutes={formData.duration_minutes}
+                        unlimited={formData.duration_unlimited}
+                        isDisabled={loading}
+                        onChange={(partial) =>
+                          setFormData((prev) => ({ ...prev, ...partial }))
+                        }
+                      />
                       <FormControl display="flex" alignItems="center">
                         <FormLabel mb="0">إظهار الامتحان للطلاب</FormLabel>
                         <Switch
@@ -1546,21 +1612,11 @@ const CourseExamsTab = ({
                           borderRadius="lg"
                         />
                       </FormControl>
-                      <FormControl isRequired>
-                        <FormLabel fontSize="sm" fontWeight="600">
-                          المدة (دقائق)
-                        </FormLabel>
-                        <Input
-                          type="number"
-                          min={1}
-                          value={form.duration_minutes}
-                          onChange={(e) =>
-                            setForm((f) => ({ ...f, duration_minutes: e.target.value }))
-                          }
-                          placeholder="60"
-                          borderRadius="lg"
-                        />
-                      </FormControl>
+                      <DurationMinutesFields
+                        minutes={form.duration_minutes}
+                        unlimited={form.duration_unlimited}
+                        onChange={(partial) => setForm((f) => ({ ...f, ...partial }))}
+                      />
                     </SimpleGrid>
 
                     <QuestionDisplayModeFields

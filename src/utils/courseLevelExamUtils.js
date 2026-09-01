@@ -17,6 +17,13 @@ export function normalizeCourseLevelExam(raw = {}) {
     course_title: raw.course_title ?? raw.courseTitle ?? "",
     title: raw.title ?? "",
     duration_minutes: raw.duration_minutes ?? raw.durationMinutes ?? null,
+    duration_unlimited: Boolean(
+      raw.duration_unlimited ??
+        raw.durationUnlimited ??
+        ((raw.duration_minutes ?? raw.durationMinutes) == null ||
+          (raw.duration_minutes ?? raw.durationMinutes) === "" ||
+          Number(raw.duration_minutes ?? raw.durationMinutes) <= 0),
+    ),
     questions_count: raw.questions_count ?? raw.questionsCount ?? raw.configuredQuestionsCount ?? null,
     actual_questions_count: raw.actual_questions_count ?? raw.actualQuestionsCount ?? null,
     question_display_mode:
@@ -49,6 +56,13 @@ export function normalizeCourseLevelExam(raw = {}) {
       raw.has_in_progress_attempt ?? raw.hasInProgressAttempt ?? false,
     in_progress_attempt_id:
       raw.in_progress_attempt_id ?? raw.inProgressAttemptId ?? null,
+    attempt_expires_at:
+      raw.attempt_expires_at ?? raw.attemptExpiresAt ?? null,
+    remaining_seconds: raw.remaining_seconds ?? raw.remainingSeconds ?? null,
+    can_resume:
+      raw.can_resume ??
+      raw.canResume ??
+      Boolean(raw.has_in_progress_attempt ?? raw.hasInProgressAttempt),
     show_answers: raw.show_answers ?? raw.showAnswers ?? null,
     release_reason: raw.release_reason ?? raw.releaseReason ?? null,
     attempt_report: raw.attempt_report ?? raw.attemptReport ?? null,
@@ -162,6 +176,15 @@ export function formatAttemptLimitLabel(exam, { isTeacher = false } = {}) {
   return `${used}/${data.attempt_limit} (${remaining} متبقية)`;
 }
 
+export function formatCourseExamDurationLabel(exam) {
+  const data = normalizeCourseLevelExam(exam);
+  if (!data) return "—";
+  if (data.duration_unlimited) return "بدون حد زمني";
+  const minutes = Number(data.duration_minutes);
+  if (!Number.isFinite(minutes) || minutes <= 0) return "بدون حد زمني";
+  return `${minutes} دقيقة`;
+}
+
 export function getStudentAttemptsRemaining(exam) {
   const data = normalizeCourseLevelExam(exam);
   if (!data) return 0;
@@ -241,7 +264,9 @@ export function getStudentExamCta(exam) {
   const hasAttempt = hasCompletedCourseExamAttempt(exam);
   const answersOpen = areCourseExamAnswersReleased(exam);
   const inProgress =
-    Boolean(data.has_in_progress_attempt) || hasInProgressExamAttempt(data.id);
+    Boolean(data.can_resume) ||
+    Boolean(data.has_in_progress_attempt) ||
+    hasInProgressExamAttempt(data.id);
   const remaining = getStudentAttemptsRemaining(data);
   const canStartNew = remaining === Infinity || remaining > 0;
   const examOpen = Boolean(data.is_active) && !ended && data.availability_status !== "expired";
