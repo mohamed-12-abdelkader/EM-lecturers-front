@@ -1,5 +1,7 @@
 /** توحيد حقول امتحان الكورس (camelCase + snake_case) حسب course-level-exams.md */
 
+import { hasInProgressExamAttempt } from "./examAttemptProgress";
+
 export function parseDateSafe(value) {
   if (!value) return null;
   const date = new Date(value);
@@ -43,6 +45,10 @@ export function normalizeCourseLevelExam(raw = {}) {
     can_attempt: raw.can_attempt ?? raw.canAttempt ?? true,
     attempts_remaining:
       raw.attempts_remaining ?? raw.attemptsRemaining ?? null,
+    has_in_progress_attempt:
+      raw.has_in_progress_attempt ?? raw.hasInProgressAttempt ?? false,
+    in_progress_attempt_id:
+      raw.in_progress_attempt_id ?? raw.inProgressAttemptId ?? null,
     show_answers: raw.show_answers ?? raw.showAnswers ?? null,
     release_reason: raw.release_reason ?? raw.releaseReason ?? null,
     attempt_report: raw.attempt_report ?? raw.attemptReport ?? null,
@@ -146,11 +152,31 @@ export function formatAttemptLimitLabel(exam, { isTeacher = false } = {}) {
     return `${data.attempt_limit} محاولة`;
   }
 
-  const remaining =
-    data.attempts_remaining ??
-    Math.max(0, data.attempt_limit - (data.attempts_count || 0));
+  const remaining = getStudentAttemptsRemaining(data);
+  const used = data.attempts_count || 0;
 
-  return `${data.attempts_count || 0}/${data.attempt_limit} (${remaining} متبقية)`;
+  if (isCourseExamEnded(data) && remaining > 0) {
+    return `${used}/${data.attempt_limit} (انتهى الموعد)`;
+  }
+
+  return `${used}/${data.attempt_limit} (${remaining} متبقية)`;
+}
+
+export function getStudentAttemptsRemaining(exam) {
+  const data = normalizeCourseLevelExam(exam);
+  if (!data) return 0;
+  if (data.attempt_limit == null || data.attempt_limit === "") return Infinity;
+  if (data.attempts_remaining != null && data.attempts_remaining !== "") {
+    const n = Number(data.attempts_remaining);
+    if (Number.isFinite(n)) return Math.max(0, n);
+  }
+  return Math.max(0, Number(data.attempt_limit) - (Number(data.attempts_count) || 0));
+}
+
+export function hasExhaustedCourseExamAttempts(exam) {
+  const data = normalizeCourseLevelExam(exam);
+  if (!data || data.attempt_limit == null || data.attempt_limit === "") return false;
+  return getStudentAttemptsRemaining(data) <= 0;
 }
 
 export function isCourseExamEnded(exam) {
@@ -168,6 +194,9 @@ export function isCourseExamEnded(exam) {
 export function hasCompletedCourseExamAttempt(exam) {
   const data = normalizeCourseLevelExam(exam);
   if (!data) return false;
+  if (data.has_in_progress_attempt && Number(data.attempts_count) === 0 && !data.last_attempt_number) {
+    return false;
+  }
   if (Number(data.attempts_count) > 0) return true;
   if (data.last_attempt_number) return true;
   const report = exam?.attempt_report;
@@ -211,8 +240,21 @@ export function getStudentExamCta(exam) {
   const ended = isCourseExamEnded(exam);
   const hasAttempt = hasCompletedCourseExamAttempt(exam);
   const answersOpen = areCourseExamAnswersReleased(exam);
+  const inProgress =
+    Boolean(data.has_in_progress_attempt) || hasInProgressExamAttempt(data.id);
+  const remaining = getStudentAttemptsRemaining(data);
+  const canStartNew = remaining === Infinity || remaining > 0;
+  const examOpen = Boolean(data.is_active) && !ended && data.availability_status !== "expired";
 
-  if (hasAttempt && ended && answersOpen) {
+  if (inProgress) {
+    return { label: "استكمل المحاولة", disabled: false, kind: "start" };
+  }
+
+  if (examOpen && canStartNew) {
+    return { label: "بدء الامتحان", disabled: false, kind: "start" };
+  }
+
+  if (hasAttempt && answersOpen) {
     return { label: "عرض التقرير", disabled: false, kind: "report" };
   }
 
@@ -220,33 +262,23 @@ export function getStudentExamCta(exam) {
     return { label: "الامتحان غير نشط", disabled: true };
   }
 
-  if (data.availability_status === "expired" || ended) {
-    return { label: "انتهى — لا يمكن الدخول", disabled: true };
-  }
-
-  if (data.can_start === false) {
-    const expireAt = parseDateSafe(data.visibility_end_date);
-    if (expireAt && new Date() >= expireAt) {
-      return { label: "انتهى — لا يمكن الدخول", disabled: true };
-    }
-  }
-
-  if (!data.can_attempt) {
+  if (ended) {
     return {
-      label: data.attempts_count > 0 ? "عرض آخر محاولة" : "غير متاح",
-      disabled: data.attempts_count === 0,
-      kind: data.attempts_count > 0 ? "report" : undefined,
+      label: hasAttempt ? "عرض التقرير" : "انتهى — لا يمكن الدخول",
+      disabled: !hasAttempt,
+      kind: hasAttempt ? "report" : undefined,
     };
   }
 
-  if (data.attempts_count > 0) {
+  if (!canStartNew) {
     return {
-      label: `محاولة جديدة (${(data.attempts_count || 0) + 1})`,
-      disabled: false,
+      label: hasAttempt ? "عرض التقرير" : "استنفدت المحاولات",
+      disabled: !hasAttempt,
+      kind: hasAttempt ? "report" : undefined,
     };
   }
 
-  return { label: "ابدأ الامتحان", disabled: false };
+  return { label: "بدء الامتحان", disabled: false, kind: "start" };
 }
 
 export function toDateTimeLocalValue(value) {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Badge,
@@ -32,7 +32,7 @@ import {
   FiXCircle,
 } from "react-icons/fi";
 import { MdSort, MdOutlineAssignment } from "react-icons/md";
-import { Link, Navigate, useLocation, useParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   Bar,
   BarChart,
@@ -52,12 +52,19 @@ import {
   fetchCourseLevelExamReport,
   fetchLectureExamReport,
 } from "../../api/courseAssignmentReportsApi";
+import { fetchExamAttemptReport } from "../../api/courseExamsApi";
+import { readAuthToken } from "../../utils/authStorage";
+import {
+  normalizeAttemptReport,
+} from "../../utils/examAttemptResultUtils";
+import ExamAttemptResultScreen from "./components/ExamAttemptResultScreen";
 import {
   normalizeReportPayload,
   resolveExamReportRoute,
   buildExamManagePath,
 } from "./utils/examReportUtils";
 import { renderFormattedExamText } from "../../utils/renderFormattedExamText";
+import ExamEnrollmentSummary from "./components/ExamEnrollmentSummary";
 
 const NAVY = "#0E4C92";
 const NAVY_DEEP = "#082B57";
@@ -68,6 +75,11 @@ const RED = "#DC2626";
 const RED_SOFT = "#F87171";
 const AMBER = "#D97706";
 const SLATE = "#94A3B8";
+
+function courseExamsPath(courseId) {
+  if (courseId == null || courseId === "") return null;
+  return `/CourseDetailsPage/${courseId}?section=exams`;
+}
 
 function formatAnswerLabel(letter, text) {
   if (!letter && !text) return "لم يُجِب";
@@ -826,19 +838,24 @@ function QuestionReportCard({ question, index, displayNumber, onZoomImage }) {
 export default function ExamReportPage() {
   const { id, examId: examIdParam } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const examId = id || examIdParam;
   const { kind } = resolveExamReportRoute(location.pathname);
   const examBasePath = buildExamManagePath(examId, {
     from: kind === "course-level" ? "course-level" : "lecture",
   });
-  const [, isAdmin, isTeacher] = UserType();
+  const [, isAdmin, isTeacher, student] = UserType();
   const isStaff = Boolean(isAdmin || isTeacher);
 
   const [report, setReport] = useState(null);
+  const [studentResult, setStudentResult] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [imageZoomSrc, setImageZoomSrc] = useState(null);
   const [sortDir, setSortDir] = useState("most-errors");
+  const [passPercentage, setPassPercentage] = useState(50);
+  const reportRef = useRef(null);
 
   const pageBg = useColorModeValue("#EEF3F9", "gray.950");
   const cardBg = useColorModeValue("white", "gray.900");
@@ -850,14 +867,18 @@ export default function ExamReportPage() {
 
   const fetchReport = useCallback(async () => {
     if (!examId) return;
-    setLoading(true);
+    const isRefresh = Boolean(reportRef.current);
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
     setError(null);
     try {
       const raw =
         kind === "course-level"
-          ? await fetchCourseLevelExamReport(examId)
-          : await fetchLectureExamReport(examId);
-      setReport(normalizeReportPayload(raw));
+          ? await fetchCourseLevelExamReport(examId, { passPercentage })
+          : await fetchLectureExamReport(examId, { passPercentage });
+      const normalized = normalizeReportPayload(raw);
+      reportRef.current = normalized;
+      setReport(normalized);
     } catch (err) {
       setError(
         err.response?.data?.message ||
@@ -866,15 +887,50 @@ export default function ExamReportPage() {
       );
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  }, [examId, kind]);
+  }, [examId, kind, passPercentage]);
+
+  const fetchStudentAttemptReport = useCallback(async () => {
+    if (!examId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const token = readAuthToken() || localStorage.getItem("token");
+      const raw = await fetchExamAttemptReport(examId, token);
+      const normalized = normalizeAttemptReport(raw);
+      if (!normalized) {
+        throw new Error("لا توجد محاولة مكتملة لهذا الامتحان");
+      }
+      setStudentResult(normalized);
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+          err.response?.data?.msg ||
+          err.message ||
+          "حدث خطأ أثناء تحميل التقرير",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [examId]);
 
   useEffect(() => {
-    if (isStaff) fetchReport();
-  }, [fetchReport, isStaff]);
+    if (isStaff) {
+      fetchReport();
+      return;
+    }
+    if (student) {
+      fetchStudentAttemptReport();
+      return;
+    }
+    setLoading(false);
+  }, [fetchReport, fetchStudentAttemptReport, isStaff, student]);
 
   const reportExam = report?.exam || {};
   const overall = report?.overallStatistics || {};
+  const enrollmentSummary = report?.enrollmentSummary;
+  const notExaminedStudents = report?.notExaminedStudents || [];
   const sourceQuestions = useMemo(
     () =>
       Array.isArray(report?.questions) && report.questions.length
@@ -923,8 +979,75 @@ export default function ExamReportPage() {
         )
       : 0;
 
+  const goToCourseExams = () => {
+    const courseId =
+      location.state?.courseId ||
+      studentResult?.courseId ||
+      report?.exam?.courseId ||
+      report?.exam?.course_id ||
+      null;
+    const path = courseExamsPath(courseId);
+    if (path) navigate(path);
+    else navigate(-1);
+  };
+
   if (!isStaff) {
-    return <Navigate to={examBasePath} replace />;
+    if (!student) {
+      return <Navigate to="/login" replace />;
+    }
+    if (loading) {
+      return <BrandLoadingScreen />;
+    }
+    if (error) {
+      return (
+        <Box minH="100vh" bg={pageBg} pt={{ base: "4.75rem", md: "5.25rem" }} pb={12} dir="rtl">
+          <Container maxW="3xl">
+            <VStack spacing={4} py={16} textAlign="center">
+              <Text color="red.500" fontWeight="semibold">
+                {error}
+              </Text>
+              <Button colorScheme="blue" onClick={goToCourseExams}>
+                العودة لصفحة الكورس
+              </Button>
+            </VStack>
+          </Container>
+        </Box>
+      );
+    }
+    return (
+      <>
+        <ExamAttemptResultScreen
+          result={studentResult}
+          examTitle={studentResult?.examTitle}
+          pageBg={pageBg}
+          onBack={goToCourseExams}
+          onZoomImage={setImageZoomSrc}
+        />
+        <Modal
+          isOpen={Boolean(imageZoomSrc)}
+          onClose={() => setImageZoomSrc(null)}
+          size="4xl"
+          isCentered
+        >
+          <ModalOverlay bg="blackAlpha.800" />
+          <ModalContent bg="transparent" boxShadow="none">
+            <ModalBody p={4} display="flex" justifyContent="center">
+              {imageZoomSrc && (
+                <Image
+                  src={imageZoomSrc}
+                  alt="صورة السؤال"
+                  maxH="85vh"
+                  objectFit="contain"
+                  borderRadius="lg"
+                  cursor="pointer"
+                  onClick={() => setImageZoomSrc(null)}
+                />
+              )}
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      </>
+    );
   }
 
   if (loading) {
@@ -1022,6 +1145,9 @@ export default function ExamReportPage() {
                 <Text>
                   عدد الأسئلة: {reportExam.questionsCount ?? overall.totalQuestions ?? 0}
                 </Text>
+                {enrollmentSummary?.enrolledTotal != null ? (
+                  <Text>المشتركون: {enrollmentSummary.enrolledTotal}</Text>
+                ) : null}
               </HStack>
 
               {displayedQuestions.length > 0 && (
@@ -1045,6 +1171,18 @@ export default function ExamReportPage() {
               )}
             </Box>
           </Box>
+
+          {enrollmentSummary ? (
+            <ExamEnrollmentSummary
+              summary={enrollmentSummary}
+              students={notExaminedStudents}
+              passPercentage={passPercentage}
+              onPassPercentageChange={setPassPercentage}
+              isRefreshing={refreshing}
+              examTitle={reportExam.title || ""}
+              courseTitle={reportExam.courseTitle || ""}
+            />
+          ) : null}
 
           {displayedQuestions.length > 0 && (
             <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4}>
@@ -1155,7 +1293,9 @@ export default function ExamReportPage() {
               boxShadow="sm"
             >
               <Text color={muted}>
-                لا توجد بيانات في التقرير بعد — لم يُسلِّم أي طالب المحاولة.
+                {enrollmentSummary
+                  ? "لا توجد تفاصيل أسئلة بعد — لم يُسلِّم أي طالب المحاولة."
+                  : "لا توجد بيانات في التقرير بعد — لم يُسلِّم أي طالب المحاولة."}
               </Text>
             </Box>
           ) : (

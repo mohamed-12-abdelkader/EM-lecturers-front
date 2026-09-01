@@ -267,6 +267,7 @@ export function normalizeAttemptReport(raw = {}) {
     examEndAt: payload.examEndAt ?? null,
     showAnswersAfterHours: payload.showAnswersAfterHours ?? 0,
     examTitle: exam.title ?? null,
+    courseId: exam.courseId ?? exam.course_id ?? payload.courseId ?? payload.course_id ?? null,
     wrongQuestions,
   };
 }

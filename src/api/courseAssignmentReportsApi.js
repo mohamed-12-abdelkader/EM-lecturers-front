@@ -27,20 +27,29 @@ export async function fetchCourseAssignmentReports(courseId, filters = {}) {
   };
 }
 
+function reportQueryConfig(passPercentage) {
+  const config = authConfig();
+  const value = Number(passPercentage);
+  if (Number.isFinite(value) && value >= 0) {
+    config.params = { passPercentage: value };
+  }
+  return config;
+}
+
 /** GET /api/course/lecture-exam/:examId/report */
-export async function fetchLectureExamReport(examId) {
+export async function fetchLectureExamReport(examId, { passPercentage } = {}) {
   const { data } = await baseUrl.get(
     `/api/course/lecture-exam/${examId}/report`,
-    authConfig(),
+    reportQueryConfig(passPercentage),
   );
   return data;
 }
 
-/** GET /api/course/course-exam/:examId/report */
-export async function fetchCourseLevelExamReport(examId) {
+/** GET /api/course/course-exam/:examId/report?passPercentage= */
+export async function fetchCourseLevelExamReport(examId, { passPercentage } = {}) {
   const { data } = await baseUrl.get(
     `/api/course/course-exam/${examId}/report`,
-    authConfig(),
+    reportQueryConfig(passPercentage),
   );
   return data;
 }

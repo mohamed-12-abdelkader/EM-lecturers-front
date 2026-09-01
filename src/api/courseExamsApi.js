@@ -94,6 +94,65 @@ export async function fetchStudentCourseExams(courseId, token) {
   return attachAttemptReports(exams, token);
 }
 
+/** POST /api/exams/:examId/start — بدء أو استئناف محاولة الطالب */
+export async function startCourseExamAttempt(examId, token) {
+  const { data } = await baseUrl.post(
+    `/api/exams/${examId}/start`,
+    {},
+    { headers: authHeaders(token) }
+  );
+  return data;
+}
+
+/** POST /api/exams/:examId/submit */
+export async function submitCourseExamAttempt(examId, token, { attemptId, answers }) {
+  const { data } = await baseUrl.post(
+    `/api/exams/${examId}/submit`,
+    { attemptId, attempt_id: attemptId, answers },
+    {
+      headers: {
+        ...authHeaders(token),
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+    }
+  );
+  return data;
+}
+
+export function translateCourseExamStudentError(err, fallback = "حدث خطأ أثناء بدء الامتحان") {
+  if (isNetworkError(err)) {
+    return "تعذر الاتصال بالخادم. تحقق من الإنترنت ثم حاول مرة أخرى.";
+  }
+
+  const status = err?.response?.status;
+  const raw = String(err?.response?.data?.message || err?.message || "").trim();
+  const lower = raw.toLowerCase();
+
+  if (status === 401) return "يجب تسجيل الدخول كطالب لبدء الامتحان.";
+  if (lower.includes("invalid exam id")) return "معرف الامتحان غير صالح.";
+  if (lower.includes("not enrolled")) return "أنت غير مسجّل في هذا الكورس.";
+  if (lower.includes("not active")) return "الامتحان غير نشط حالياً.";
+  if (lower.includes("not visible")) return "الامتحان غير ظاهر للطلاب حالياً.";
+  if (lower.includes("has ended") || lower.includes("cannot start a new attempt")) {
+    return "انتهى موعد الامتحان. يمكنك الاطلاع عليه لكن لا يمكن بدء محاولة جديدة.";
+  }
+  if (lower.includes("not open yet")) return "الامتحان لم يُفتح بعد.";
+  if (lower.includes("not ready yet")) return "الامتحان غير جاهز بعد.";
+  if (lower.includes("no longer available")) return "الامتحان لم يعد متاحاً.";
+  if (lower.includes("all allowed attempts")) return "استنفدت كل المحاولات المتاحة لهذا الامتحان.";
+  if (lower.includes("already completed") || lower.includes("only one attempt")) {
+    return "أنهيت هذا الامتحان مسبقاً. يُسمح بمحاولة واحدة فقط.";
+  }
+  if (lower.includes("exam not found") || status === 404) return "الامتحان غير موجود.";
+  if (lower.includes("attempt has already been submitted")) return "تم تسليم هذه المحاولة مسبقاً.";
+  if (lower.includes("attemptid is required") || lower.includes("attempt id is required")) {
+    return "لا توجد محاولة نشطة. ابدأ الامتحان أولاً.";
+  }
+
+  return raw || fallback;
+}
+
 export function courseExamsErrorMessage(
   err,
   fallback = "حدث خطأ في تحميل الامتحانات الشاملة",

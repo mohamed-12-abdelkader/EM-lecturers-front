@@ -1,40 +1,9 @@
 import { safeLocalGet, safeLocalSet } from "./safeStorage";
 
-const DONE_KEY = "course_page_tours_done";
 const TEACHER_DONE_KEY = "teacher_course_page_tours_done";
 
-/** عرض الجولة أول مرة فقط لكل كورس */
+/** عرض جولة المدرس أول مرة فقط لكل كورس */
 const ALWAYS_SHOW_COURSE_PAGE_TOUR = false;
-
-function readDoneSet() {
-  try {
-    const raw = safeLocalGet(DONE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.map(String) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeDoneSet(ids) {
-  safeLocalSet(DONE_KEY, JSON.stringify([...new Set(ids.map(String))]));
-}
-
-export function shouldShowCoursePageTour(courseId) {
-  if (courseId == null || courseId === "") return false;
-  if (ALWAYS_SHOW_COURSE_PAGE_TOUR) return true;
-  return !readDoneSet().includes(String(courseId));
-}
-
-export function completeCoursePageTour(courseId) {
-  if (courseId == null || courseId === "") return;
-  const id = String(courseId);
-  const done = readDoneSet();
-  if (!done.includes(id)) {
-    writeDoneSet([...done, id]);
-  }
-}
 
 function readTeacherDoneSet() {
   try {

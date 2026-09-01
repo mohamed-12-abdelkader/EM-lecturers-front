@@ -26,6 +26,7 @@ export default function ExamReadyScreen({
   cardBorder,
   headingColor,
   subtextColor,
+  isResume = false,
 }) {
   const statBg = useColorModeValue("gray.50", "gray.700");
   const statBorder = useColorModeValue("gray.200", "gray.600");
@@ -65,7 +66,9 @@ export default function ExamReadyScreen({
               </HStack>
 
               <Text textAlign="center" color={subtextColor} fontSize="sm" lineHeight="1.9">
-                راجع البيانات التالية ثم ابدأ الامتحان.
+                {isResume
+                  ? "لديك محاولة لم تُسلَّم بعد. اضغط للاستكمال من حيث توقفت — الوقت مستمر."
+                  : "راجع البيانات التالية ثم ابدأ الامتحان. المحاولة لا تُحتسب إلا بعد التسليم أو انتهاء الوقت."}
               </Text>
 
               <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={3}>
@@ -97,11 +100,11 @@ export default function ExamReadyScreen({
                 leftIcon={<Icon as={AiFillCheckCircle} boxSize={5} />}
                 onClick={onStart}
                 isLoading={startingAttempt}
-                loadingText="جاري البدء..."
+                loadingText={isResume ? "جاري الاستكمال..." : "جاري البدء..."}
                 _hover={{ bg: "orange.600" }}
                 _active={{ bg: "orange.700" }}
               >
-                بدء الامتحان
+                {isResume ? "استكمل المحاولة" : "بدء الامتحان"}
               </Button>
             </VStack>
           </Box>

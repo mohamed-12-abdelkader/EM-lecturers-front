@@ -33,20 +33,21 @@ const PAGE_PAD_BOTTOM = Math.max(0, PAGE_RENDER_H - PAGE_PAD_TOP - GRID_H);
 const LEFT_W = Math.round(CARD_W * 0.14);
 const QR_COL_W = Math.round(CARD_W * 0.28);
 const QR_RIGHT_PAD = 8;
-const QR_FRAME_PAD = 3;
-const FOOTER_H = 8;
-const QR_IMG = Math.min(QR_COL_W - QR_RIGHT_PAD - 18, CARD_H - 70 - FOOTER_H);
+const QR_IMG = Math.min(QR_COL_W - QR_RIGHT_PAD - 18, CARD_H - 70);
 const ICON = 16;
 const TITLE_H = 32;
 const INFO_ROW_H = 26;
 
-const BLUE = "#004AAD";
-const ORANGE = "#FF7A00";
-const INK = "#1A1A1A";
+const NAVY = "#0C2340";
+const NAVY_MID = "#163A5C";
+const GOLD = "#C5A46E";
+const GOLD_TEXT = "#8B6914";
+const INK = "#0F172A";
+const LABEL = "#64748B";
+const LINE = "#E2E8F0";
 const WHITE = "#FFFFFF";
-const BORDER = "#E6EAF0";
-const LINE = "#E8EDF2";
-const DOT = "#C5CDD6";
+const PAPER = "#F7F8FA";
+const PANEL = "#FFFFFF";
 
 /** Tahoma يثبت تشكيل العربي في html2canvas — Cairo بيخلي الحروف تلزق */
 const FONT = "Tahoma,'Segoe UI',Arial,sans-serif";
@@ -185,16 +186,19 @@ const SVG_GROUP = `<svg width="12" height="12" viewBox="0 0 24 24" fill="${WHITE
 const SVG_BADGE = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="4" y="7" width="16" height="13" rx="2" stroke="${WHITE}" stroke-width="2"/><circle cx="9.2" cy="13.2" r="2.1" fill="${WHITE}"/><path d="M13.2 12h5.2M13.2 15.2h4" stroke="${WHITE}" stroke-width="1.8" stroke-linecap="round"/><path d="M9 7V5.2a3 3 0 0 1 6 0V7" stroke="${WHITE}" stroke-width="2" fill="none"/></svg>`;
 
 function titleDots() {
-  const cell = `<td style="padding:1.6px;"><div style="width:3.4px;height:3.4px;border-radius:50%;background:${DOT};"></div></td>`;
-  return `<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr>${cell.repeat(4)}</tr><tr>${cell.repeat(4)}</tr></table>`;
+  const pip = `<td style="padding:0 3px;vertical-align:middle;">
+    <div style="width:4px;height:4px;background:${GOLD};border-radius:50%;"></div>
+  </td>`;
+  return `<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr>${pip}${pip}</tr></table>`;
 }
 
 let cardTitleCache = new Map();
 
 /** html2canvas بيلخبط العربي المتصل — نرسم العنوان على Canvas ونحطه كصورة */
 async function getCardTitleImage(teacherDisplay) {
-  const key = String(teacherDisplay || "المدرس");
-  if (cardTitleCache.has(key)) return cardTitleCache.get(key);
+  const display = String(teacherDisplay || "المدرس");
+  const cacheKey = `v5:${display}`;
+  if (cardTitleCache.has(cacheKey)) return cardTitleCache.get(cacheKey);
 
   try {
     await document.fonts.load("700 15px Tahoma");
@@ -219,9 +223,9 @@ async function getCardTitleImage(teacherDisplay) {
   ctx.direction = "ltr";
 
   const parts = [
-    { text: key, color: BLUE, size: 13 },
-    { text: "سنتر", color: ORANGE, size: 15 },
-    { text: "كارت", color: BLUE, size: 15 },
+    { text: display, color: NAVY, size: 13 },
+    { text: "سنتر", color: GOLD_TEXT, size: 15 },
+    { text: "كارت", color: NAVY, size: 15 },
   ];
   const gap = 6;
 
@@ -254,14 +258,14 @@ async function getCardTitleImage(teacherDisplay) {
     width: cssW,
     height: cssH,
   };
-  cardTitleCache.set(key, image);
+  cardTitleCache.set(cacheKey, image);
   return image;
 }
 
 let infoLineCache = new Map();
 
 async function getInfoLineImage(label, value) {
-  const key = `${label}::${value}`;
+  const key = `v5:${label}::${value}`;
   if (infoLineCache.has(key)) return infoLineCache.get(key);
 
   try {
@@ -313,7 +317,7 @@ async function getInfoLineImage(label, value) {
 
   ctx.direction = "rtl";
   ctx.font = `700 ${labelSize}px Tahoma, Arial, sans-serif`;
-  ctx.fillStyle = ORANGE;
+  ctx.fillStyle = LABEL;
   ctx.fillText(label, x, y);
   x -= labelW;
 
@@ -335,18 +339,14 @@ async function getInfoLineImage(label, value) {
   return image;
 }
 
-function dottedRule(dots = ["#004AAD", "#FF7A00", "#004AAD"]) {
-  const beads = dots
-    .map(
-      (c) =>
-        `<span style="display:inline-block;width:5px;height:5px;border-radius:50%;background:${c};margin:0 2px;vertical-align:middle;"></span>`
-    )
-    .join("");
+function dottedRule() {
   return `
     <div style="position:relative;height:10px;">
-      <div style="position:absolute;left:16%;right:16%;top:5px;height:1px;background:${LINE};"></div>
+      <div style="position:absolute;left:16%;right:16%;top:5px;height:1px;background:${NAVY};opacity:0.18;"></div>
       <div style="position:relative;text-align:center;line-height:10px;font-size:0;">
-        <span style="display:inline-block;background:${WHITE};padding:0 7px;">${beads}</span>
+        <span style="display:inline-block;padding:0 8px;background:${PAPER};">
+          <span style="display:inline-block;width:5px;height:5px;background:${GOLD};border-radius:50%;vertical-align:middle;"></span>
+        </span>
       </div>
     </div>
   `;
@@ -355,11 +355,8 @@ function dottedRule(dots = ["#004AAD", "#FF7A00", "#004AAD"]) {
 function rowSep() {
   return `
     <tr>
-      <td style="padding:0;height:7px;font-size:0;line-height:0;">
-        <div style="position:relative;height:7px;">
-          <div style="position:absolute;right:2px;left:6px;top:3px;height:1px;background:${LINE};"></div>
-          <div style="position:absolute;right:0;top:1px;width:5px;height:5px;border-radius:50%;background:${ORANGE};"></div>
-        </div>
+      <td style="padding:0;height:6px;font-size:0;line-height:0;">
+        <div style="height:1px;margin:2px 8px 0 8px;background:${LINE};"></div>
       </td>
     </tr>
   `;
@@ -370,7 +367,7 @@ function infoRow({ icon, lineImg, last }) {
   const displayW = Math.round(lineImg.width * (displayH / lineImg.height));
   return `
     <tr>
-      <td style="padding:2px 0;height:${INFO_ROW_H}px;vertical-align:middle;overflow:visible;">
+      <td style="padding:3px 8px 3px 6px;height:${INFO_ROW_H}px;vertical-align:middle;overflow:visible;">
         <table dir="rtl" cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;">
           <tr>
             <td style="
@@ -409,86 +406,72 @@ function qrFrame(inner) {
   return `
     <table cellpadding="0" cellspacing="0" style="border-collapse:separate;margin:0 auto;">
       <tr>
-        <td style="border:2.5px solid ${BLUE};border-radius:10px;padding:3px;background:${WHITE};">
-          <table cellpadding="0" cellspacing="0" style="border-collapse:separate;">
-            <tr>
-              <td style="border:2px solid ${ORANGE};border-radius:7px;padding:${QR_FRAME_PAD}px;background:${WHITE};line-height:0;font-size:0;">
-                ${inner}
-              </td>
-            </tr>
-          </table>
+        <td style="
+          border:1.6px solid ${NAVY};
+          border-radius:8px;
+          padding:5px;
+          background:${WHITE};
+        ">
+          <div style="line-height:0;font-size:0;background:${WHITE};">
+            ${inner}
+          </div>
         </td>
       </tr>
     </table>
   `;
 }
 
-function leftBar(uid, code) {
-  const slant = 14;
+function leftBar(uid) {
+  const slant = 8;
   const pid = `dots-${uid}`;
-  const badgeW = LEFT_W - slant - 8;
-  const badgeH = 22;
+  const gid = `navy-${uid}`;
   return `
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width="${LEFT_W}"
       height="${CARD_H}"
       viewBox="0 0 ${LEFT_W} ${CARD_H}"
-      style="position:absolute;left:0;top:0;display:block;"
+      style="position:absolute;left:0;top:0;display:block;z-index:4;"
     >
       <defs>
+        <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${NAVY_MID}"/>
+          <stop offset="100%" stop-color="${NAVY}"/>
+        </linearGradient>
         <pattern id="${pid}" width="9" height="9" patternUnits="userSpaceOnUse">
-          <circle cx="1.5" cy="1.5" r="1.05" fill="rgba(255,255,255,0.22)"/>
+          <circle cx="1.1" cy="1.1" r="0.7" fill="rgba(255,255,255,0.16)"/>
         </pattern>
       </defs>
-      <polygon points="0,0 ${LEFT_W},0 ${LEFT_W - slant},${CARD_H} 0,${CARD_H}" fill="${BLUE}"/>
+      <polygon points="0,0 ${LEFT_W},0 ${LEFT_W - slant},${CARD_H} 0,${CARD_H}" fill="url(#${gid})"/>
       <polygon points="0,0 ${LEFT_W},0 ${LEFT_W - slant},${CARD_H} 0,${CARD_H}" fill="url(#${pid})"/>
+      <polygon points="${LEFT_W - 2.4},0 ${LEFT_W},0 ${LEFT_W - slant},${CARD_H} ${LEFT_W - slant - 2.4},${CARD_H}" fill="${GOLD}"/>
     </svg>
-    <div style="
-      position:absolute;left:4px;bottom:${FOOTER_H + 6}px;
-      width:${badgeW}px;height:${badgeH}px;
-      z-index:7;
-    ">
-      <table cellpadding="0" cellspacing="0" style="
-        border-collapse:collapse;width:${badgeW}px;height:${badgeH}px;
-        background:#003580;border:1.5px solid ${WHITE};border-radius:6px;
-      ">
-        <tr>
-          <td style="
-            width:${badgeW}px;height:${badgeH}px;
-            text-align:center;vertical-align:middle;
-            color:${WHITE};font-size:9px;font-weight:700;font-family:${FONT};
-            line-height:1.35;letter-spacing:0;
-            padding:2px 2px 3px;
-            overflow:visible;white-space:nowrap;
-          ">${escapeHtml(code)}</td>
-        </tr>
-      </table>
-    </div>
   `;
 }
 
-function cornerDecor() {
+function cardAtmosphere(uid) {
+  const paper = `paper-${uid}`;
+  const inset = 3;
   return `
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="64"
-      height="32"
-      viewBox="0 0 64 32"
-      style="position:absolute;top:0;right:0;display:block;z-index:0;pointer-events:none;"
+      width="${CARD_W}"
+      height="${CARD_H}"
+      viewBox="0 0 ${CARD_W} ${CARD_H}"
+      style="position:absolute;left:0;top:0;display:block;z-index:0;pointer-events:none;"
     >
-      <path fill="${BLUE}" d="M64 0 H34 C46 6, 56 16, 64 32 Z"/>
-      <path fill="${ORANGE}" d="M64 0 H42 C52 5, 58 14, 64 26 Z"/>
-    </svg>
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="96"
-      height="36"
-      viewBox="0 0 96 36"
-      style="position:absolute;bottom:${FOOTER_H}px;right:0;display:block;z-index:0;pointer-events:none;"
-    >
-      <path fill="${BLUE}" d="M96 36 H10 C30 32, 54 14, 96 18 Z"/>
-      <path fill="${ORANGE}" d="M96 36 H32 C52 30, 72 22, 96 24 Z"/>
+      <defs>
+        <linearGradient id="${paper}" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#FFFFFF"/>
+          <stop offset="100%" stop-color="${PAPER}"/>
+        </linearGradient>
+      </defs>
+      <rect width="${CARD_W}" height="${CARD_H}" fill="url(#${paper})"/>
+      <rect
+        x="${inset}" y="${inset}"
+        width="${CARD_W - inset * 2}" height="${CARD_H - inset * 2}"
+        fill="none" stroke="${GOLD}" stroke-width="0.9" rx="8"
+      />
     </svg>
   `;
 }
@@ -531,15 +514,15 @@ function buildCardHtml({
   position:relative;
   width:${CARD_W}px;
   height:${CARD_H}px;
-  border-radius:12px;
+  border-radius:10px;
   overflow:hidden;
-  border:1px solid ${BORDER};
-  background:${WHITE};
+  border:1.5px solid ${NAVY};
+  background:${PAPER};
   font-family:${FONT};
   box-sizing:border-box;
 ">
-  ${leftBar(uid, safeId)}
-  ${cornerDecor()}
+  ${cardAtmosphere(uid)}
+  ${leftBar(uid)}
 
   <div style="
     position:absolute;
@@ -589,31 +572,30 @@ function buildCardHtml({
       <td style="width:${LEFT_W}px;padding:0;font-size:0;">&nbsp;</td>
       <td style="
         vertical-align:middle;
-        padding:${TITLE_H + 2}px 8px ${FOOTER_H + 8}px 8px;
+        padding:${TITLE_H + 2}px 8px 10px 8px;
         overflow:visible;
       ">
-        <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;">
-          ${infoRow({ icon: circleIcon(BLUE, SVG_USER), lineImg: lineImgs.name })}
-          ${infoRow({ icon: circleIcon(BLUE, SVG_BOOK), lineImg: lineImgs.grade })}
-          ${infoRow({ icon: circleIcon(ORANGE, SVG_GROUP), lineImg: lineImgs.group })}
-          ${infoRow({ icon: circleIcon(BLUE, SVG_BADGE), lineImg: lineImgs.code, last: true })}
+        <table cellpadding="0" cellspacing="0" style="
+          border-collapse:collapse;width:100%;
+          background:${PANEL};
+          border:1px solid ${LINE};
+          border-radius:8px;
+        ">
+          ${infoRow({ icon: circleIcon(NAVY, SVG_USER), lineImg: lineImgs.name })}
+          ${infoRow({ icon: circleIcon(NAVY, SVG_BOOK), lineImg: lineImgs.grade })}
+          ${infoRow({ icon: circleIcon(NAVY, SVG_GROUP), lineImg: lineImgs.group })}
+          ${infoRow({ icon: circleIcon(NAVY, SVG_BADGE), lineImg: lineImgs.code, last: true })}
         </table>
       </td>
       <td style="
         width:${QR_COL_W}px;
         vertical-align:middle;
         text-align:center;
-        padding:${TITLE_H}px ${QR_RIGHT_PAD}px ${FOOTER_H + 8}px 4px;
+        padding:${TITLE_H}px ${QR_RIGHT_PAD}px 10px 4px;
         overflow:hidden;
       ">${qrFrame(qrInner)}</td>
     </tr>
   </table>
-
-  <div style="
-    position:absolute;left:0;right:0;bottom:0;z-index:6;
-    height:${FOOTER_H}px;
-    background:${BLUE};
-  "></div>
 </div>`;
 }
 

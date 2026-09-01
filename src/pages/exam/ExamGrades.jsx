@@ -23,29 +23,10 @@ import {
   useDisclosure,
   Circle,
 } from "@chakra-ui/react";
-import {
-  MdAssignment,
-  MdCheckCircle,
-  MdCancel,
-  MdSchedule,
-  MdReceiptLong,
-  MdVisibility,
-  MdQuiz,
-  MdTrendingUp,
-  MdPlayArrow,
-} from "react-icons/md";
+import { MdAssignment, MdCheckCircle, MdCancel, MdSchedule, MdReceiptLong, MdVisibility, MdQuiz, MdTrendingUp } from "react-icons/md";
 import { Link } from "react-router-dom";
 import baseUrl from "../../api/baseUrl";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
-import { buildExamManagePath } from "./utils/examReportUtils";
-
-function resolveExamPageFromType(examType) {
-  const type = String(examType || "").toLowerCase();
-  if (type === "comprehensive" || type === "course" || type === "course_exam") {
-    return "course-level";
-  }
-  return "lecture";
-}
 
 const FILTERS = [
   { id: "all", label: "الكل" },
@@ -109,7 +90,7 @@ const ExamGrades = () => {
 
   const heroMessage = useMemo(() => {
     if (!submittedExams.length && pendingExams.length) {
-      return "لديك امتحانات جاهزة — ابدأ الآن وحقق أفضل نتيجة.";
+      return "لديك امتحانات لم تُسلَّم بعد — ابدأها من صفحة الكورس.";
     }
     if (!exams.length) return "سجّل نتائجك هنا بمجرد أداء أول امتحان.";
     if (averageGrade >= 85) return "أداؤك ممتاز — استمر بنفس القوة.";
@@ -645,17 +626,15 @@ function ExamCard({
   const percentage =
     isSubmitted && totalGrade ? Math.round((studentGrade / totalGrade) * 100) : 0;
 
-  const statusColor = !isSubmitted ? "blue" : isPassed ? "green" : "red";
-  const statusLabel = !isSubmitted ? "جاهز للبدء" : isPassed ? "ناجح" : "غير مجتاز";
-  const progressColorScheme = !isSubmitted ? "blue" : isPassed ? "green" : "red";
+  const statusColor = !isSubmitted ? "gray" : isPassed ? "green" : "red";
+  const statusLabel = !isSubmitted ? "لم يُسلَّم" : isPassed ? "ناجح" : "غير مجتاز";
+  const progressColorScheme = !isSubmitted ? "gray" : isPassed ? "green" : "red";
   const cardShadow = useColorModeValue("0 8px 24px rgba(15,23,42,0.04)", "none");
   const hoverBorder = useColorModeValue("blue.200", "blue.700");
   const hoverShadow = useColorModeValue("0 14px 32px rgba(37,99,235,0.1)", "lg");
   const progressTrack = useColorModeValue("gray.100", "gray.800");
-
-  const examUrl = buildExamManagePath(exam.exam_id, {
-    from: resolveExamPageFromType(exam.exam_type),
-  });
+  const courseId = exam.course_id ?? exam.courseId ?? null;
+  const courseUrl = courseId ? `/CourseDetailsPage/${courseId}?section=exams` : null;
 
   const body = (
     <Box
@@ -671,7 +650,6 @@ function ExamCard({
         transform: "translateY(-2px)",
         boxShadow: hoverShadow,
       }}
-      cursor={!isSubmitted ? "pointer" : "default"}
     >
       <Box h="3px" bg={`${statusColor}.400`} />
       <Flex
@@ -704,11 +682,11 @@ function ExamCard({
             </>
           ) : (
             <>
-              <Circle size="40px" bg="blue.500" color="white">
-                <Icon as={MdPlayArrow} boxSize={6} />
+              <Circle size="40px" bg="gray.100" color="gray.500">
+                <Icon as={MdSchedule} boxSize={6} />
               </Circle>
-              <Text fontSize="11px" fontWeight="bold" color="blue.500" mt={1}>
-                ابدأ الآن
+              <Text fontSize="11px" fontWeight="bold" color="gray.500" mt={1}>
+                لم يُسلَّم
               </Text>
             </>
           )}
@@ -768,7 +746,7 @@ function ExamCard({
             </Box>
           ) : (
             <Text fontSize="sm" color={muted}>
-              الامتحان متاح الآن — اضغط للبدء.
+              لم تُؤدَّ هذا الامتحان بعد. ابدأه من صفحة الكورس.
             </Text>
           )}
 
@@ -791,6 +769,17 @@ function ExamCard({
               >
                 عرض التقرير
               </Button>
+            ) : !isSubmitted && courseUrl ? (
+              <Button
+                as={Link}
+                to={courseUrl}
+                size="sm"
+                colorScheme="blue"
+                variant="ghost"
+                borderRadius="lg"
+              >
+                فتح صفحة الكورس
+              </Button>
             ) : null}
           </Flex>
         </VStack>
@@ -798,12 +787,7 @@ function ExamCard({
     </Box>
   );
 
-  if (isSubmitted) return body;
-  return (
-    <Link to={examUrl} style={{ textDecoration: "none", display: "block" }}>
-      {body}
-    </Link>
-  );
+  return body;
 }
 
 function ExamReportBody({ report, formatDateTime, textColor, muted, borderColor, cardBg }) {

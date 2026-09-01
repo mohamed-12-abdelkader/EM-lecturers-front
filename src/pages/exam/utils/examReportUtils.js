@@ -47,6 +47,53 @@ function normalizeQuestion(question) {
   };
 }
 
+function toNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeStatBlock(block) {
+  if (!block || typeof block !== "object") {
+    return { count: 0, percentage: 0 };
+  }
+  const result = {
+    count: toNumber(block.count),
+    percentage: toNumber(block.percentage),
+  };
+  if (block.percentageOfExamined != null || block.percentage_of_examined != null) {
+    result.percentageOfExamined = toNumber(
+      block.percentageOfExamined ?? block.percentage_of_examined,
+    );
+  }
+  return result;
+}
+
+export function normalizeEnrollmentSummary(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  return {
+    passPercentage: toNumber(raw.passPercentage ?? raw.pass_percentage, 50),
+    enrolledTotal: toNumber(raw.enrolledTotal ?? raw.enrolled_total),
+    examined: normalizeStatBlock(raw.examined),
+    notExamined: normalizeStatBlock(raw.notExamined ?? raw.not_examined),
+    startedNotSubmitted: normalizeStatBlock(
+      raw.startedNotSubmitted ?? raw.started_not_submitted,
+    ),
+    passed: normalizeStatBlock(raw.passed),
+    failed: normalizeStatBlock(raw.failed),
+  };
+}
+
+export function normalizeNotExaminedStudents(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map((student) => ({
+    studentId: student.studentId ?? student.student_id ?? student.id ?? null,
+    studentName:
+      student.studentName ?? student.student_name ?? student.name ?? "طالب",
+    studentEmail: student.studentEmail ?? student.student_email ?? student.email ?? "",
+    examStatus: student.examStatus ?? student.exam_status ?? "never_started",
+  }));
+}
+
 export function normalizeReportPayload(data) {
   if (!data || typeof data !== "object") {
     return {
@@ -55,6 +102,8 @@ export function normalizeReportPayload(data) {
       questions: [],
       sortedQuestions: [],
       mostProblematicQuestions: [],
+      enrollmentSummary: null,
+      notExaminedStudents: [],
     };
   }
 
@@ -85,6 +134,12 @@ export function normalizeReportPayload(data) {
     questions,
     sortedQuestions,
     mostProblematicQuestions,
+    enrollmentSummary: normalizeEnrollmentSummary(
+      data.enrollmentSummary ?? data.enrollment_summary,
+    ),
+    notExaminedStudents: normalizeNotExaminedStudents(
+      data.notExaminedStudents ?? data.not_examined_students,
+    ),
   };
 }
 

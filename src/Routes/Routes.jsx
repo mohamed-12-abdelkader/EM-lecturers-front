@@ -102,6 +102,7 @@ const PaymentsPage = lazyPage(() => import("../pages/centerMgmt/PaymentsPage"));
 
 // Exams
 const Exam = lazyPage(() => import("../pages/exam/Exam"));
+const StudentCourseExamPage = lazyPage(() => import("../pages/exam/StudentCourseExamPage"));
 const ExamTeacher = lazyPage(() => import("../pages/exam/ExamTeacher"));
 const ComprehensiveExam = lazyPage(() => import("../pages/exam/ComprehensiveExam"));
 const ExamReportPage = lazyPage(() => import("../pages/exam/ExamReportPage"));
@@ -596,6 +597,7 @@ const AppRouter = () => {
           {/* Exams */}
           <Route path="Platform_exams" element={<PlatformExams />} />
           <Route path="essay-exam/:id" element={<EssayExam />} />
+          <Route path="exam/:examId/take" element={<StudentCourseExamPage />} />
           <Route path="exam/:examId" element={<Exam />} />
           <Route path="exam/:examId/report" element={<ExamReportPage />} />
           <Route path="lecture-exam/:examId/report" element={<ExamReportPage />} />

@@ -66,7 +66,6 @@ import {
   fetchPublicRegistrationSettings,
 } from "../../api/courseGroupsApi";
 import { saveAuthSession } from "../../utils/authStorage";
-import { markStudentHomeTourPending } from "../../utils/studentHomeTour";
 import {
   appendDeviceIp,
   getAuthDeviceErrorMessage,
@@ -495,7 +494,6 @@ const SignUp = () => {
 
       saveAuthSession(res.data);
       handleAuthIpRegistered(res.data);
-      markStudentHomeTourPending();
 
       toast.success(
         res.data?.ip_registered

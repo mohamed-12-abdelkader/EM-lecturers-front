@@ -161,10 +161,8 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import ScrollToTop from "../../components/scollToTop/ScrollToTop";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
-import CoursePageTour from "../../components/onboarding/CoursePageTour";
 import TeacherCoursePageTour from "../../components/onboarding/TeacherCoursePageTour";
 import {
-  shouldShowCoursePageTour,
   TOUR_SET_SECTION,
   buildLectureTourMeta,
   pickTourLecture,
@@ -930,14 +928,6 @@ const CourseDetailsPage = () => {
       setError(null);
     }
   }, [courseQueryError, courseData]);
-
-  useEffect(() => {
-    if (!student || isTeacher || isAdmin) return undefined;
-    if (!courseData?.course || courseLoading) return undefined;
-    if (!shouldShowCoursePageTour(id)) return undefined;
-    const timer = window.setTimeout(() => setCourseTourOpen(true), 850);
-    return () => window.clearTimeout(timer);
-  }, [student, isTeacher, isAdmin, courseData, courseLoading, id]);
 
   // State لمودال إنشاء الأكواد
   const [codeModalOpen, setCodeModalOpen] = useState(false);
@@ -4471,20 +4461,13 @@ display:block;
 
       <ScrollToTop />
 
-      {isTeacher || isAdmin ? (
+      {(isTeacher || isAdmin) && (
         <TeacherCoursePageTour
           isOpen={courseTourOpen}
           courseId={id}
           lectureTourMeta={lectureTourMeta}
           isCourseBasedAssignments={isCourseBasedAssignments}
           showActivationCodes={isTeacher}
-          onClose={() => setCourseTourOpen(false)}
-        />
-      ) : (
-        <CoursePageTour
-          isOpen={courseTourOpen}
-          courseId={id}
-          lectureTourMeta={lectureTourMeta}
           onClose={() => setCourseTourOpen(false)}
         />
       )}

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { VStack, Heading, Center, Spinner, Text, Icon, SimpleGrid, Box, HStack, Image, Button, useToast, Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton, FormControl, FormLabel, Input, NumberInput, NumberInputField, AlertDialog, AlertDialogOverlay, AlertDialogContent, AlertDialogHeader, AlertDialogBody, AlertDialogFooter, IconButton, Tooltip, Flex, useColorModeValue, Badge, InputGroup, InputRightElement, Switch, Divider, Tabs, TabList, TabPanels, Tab, TabPanel, RadioGroup, Radio, Textarea } from "@chakra-ui/react";
 import { FaGraduationCap, FaLightbulb, FaBookOpen, FaClock, FaStar, FaEdit, FaTrash, FaPlus, FaEye, FaEyeSlash, FaRegFileAlt, FaCalendarAlt, FaCog, FaTimes, FaCheck, FaCamera, FaChartBar, FaUsers } from "react-icons/fa";
 import baseUrl from "../../../api/baseUrl";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   TOUR_CLOSE_CREATE_EXAM,
   TOUR_OPEN_CREATE_EXAM,
@@ -13,6 +13,8 @@ import {
   getCourseExamAvailabilityStatus,
   getStudentExamCta,
   formatAttemptLimitLabel,
+  hasCompletedCourseExamAttempt,
+  hasExhaustedCourseExamAttempts,
   normalizeCourseLevelExam,
   parseDateSafe,
   toDateTimeLocalValue,
@@ -22,6 +24,8 @@ import QuestionDisplayModeFields from "../../../components/exam/QuestionDisplayM
 import ExamStudentSettingsFields, {
   inferAnswersReleaseMode,
 } from "../../../components/exam/ExamStudentSettingsFields";
+import { startCourseExamAttempt, translateCourseExamStudentError } from "../../../api/courseExamsApi";
+import { persistAttemptId } from "../../../utils/examAttemptProgress";
 
 const initialExamFormState = {
   title: "",
@@ -190,6 +194,7 @@ const ExamSwitchRow = ({ label, hint, isChecked, onChange, colorScheme = "blue" 
 const ExamCard = ({
   exam: rawExam,
   isTeacher,
+  courseId,
   formatDate,
   actionLoading,
   onToggleVisibility,
@@ -199,6 +204,9 @@ const ExamCard = ({
   onDelete,
 }) => {
   const exam = normalizeCourseLevelExam(rawExam) || rawExam;
+  const navigate = useNavigate();
+  const toast = useToast();
+  const [startingExam, setStartingExam] = useState(false);
   const cardBg = useColorModeValue("white", "gray.800");
   const border = useColorModeValue("gray.200", "gray.700");
   const panelBg = useColorModeValue("gray.50", "whiteAlpha.50");
@@ -226,6 +234,42 @@ const ExamCard = ({
       color: "purple.500",
     },
   ];
+
+  const handleStudentStart = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      toast({
+        title: "تعذر بدء الامتحان",
+        description: "يجب تسجيل الدخول كطالب لبدء الامتحان.",
+        status: "error",
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    setStartingExam(true);
+    try {
+      const session = await startCourseExamAttempt(exam.id, token);
+      if (session?.attemptId) persistAttemptId(exam.id, session.attemptId);
+      if (!Array.isArray(session?.questions) || !session.questions.length) {
+        throw new Error("لم يتم تحميل أسئلة الامتحان");
+      }
+      navigate(`/exam/${exam.id}/take`, {
+        state: { session, courseId: courseId || exam.course_id || exam.courseId || null },
+      });
+    } catch (err) {
+      toast({
+        title: "تعذر بدء الامتحان",
+        description: translateCourseExamStudentError(err),
+        status: "error",
+        duration: 6000,
+        isClosable: true,
+      });
+    } finally {
+      setStartingExam(false);
+    }
+  };
 
   return (
     <Box
@@ -275,7 +319,7 @@ const ExamCard = ({
                 غير نشط
               </Badge>
             ) : null}
-            {!isTeacher && exam.can_attempt === false ? (
+            {!isTeacher && hasExhaustedCourseExamAttempts(exam) ? (
               <Badge colorScheme="red" variant="subtle" borderRadius="full" px={2} fontSize="11px">
                 استنفدت المحاولات
               </Badge>
@@ -361,26 +405,66 @@ const ExamCard = ({
       </Box>
 
       <Box px={4} pt={4} pb={3} mt="auto">
-        {isTeacher || !studentCta.disabled ? (
+        {isTeacher ? (
+          <Link to={`/exam/${exam.id}`} style={{ display: "block", textDecoration: "none" }}>
+            <Button
+              w="full"
+              colorScheme="blue"
+              borderRadius="xl"
+              fontWeight="700"
+              size="md"
+              leftIcon={<Icon as={FaGraduationCap} />}
+            >
+              إدارة الامتحان
+            </Button>
+          </Link>
+        ) : studentCta.kind === "start" ? (
+          <>
+            <Button
+              w="full"
+              colorScheme="blue"
+              borderRadius="xl"
+              fontWeight="700"
+              size="md"
+              leftIcon={<Icon as={FaGraduationCap} />}
+              onClick={handleStudentStart}
+              isLoading={startingExam}
+              loadingText="جاري بدء الامتحان..."
+            >
+              {studentCta.label}
+            </Button>
+            {hasCompletedCourseExamAttempt(exam) ? (
+              <Button
+                as={Link}
+                to={`/exam/${exam.id}/report`}
+                state={{ courseId: courseId || exam.course_id || exam.courseId || null }}
+                w="full"
+                mt={2}
+                size="sm"
+                variant="outline"
+                colorScheme="teal"
+                borderRadius="xl"
+                leftIcon={<Icon as={FaChartBar} />}
+              >
+                عرض التقرير
+              </Button>
+            ) : null}
+          </>
+        ) : studentCta.kind === "report" && !studentCta.disabled ? (
           <Link
-            to={
-              isTeacher
-                ? `/exam/${exam.id}`
-                : studentCta.kind === "report"
-                  ? `/exam/${exam.id}?view=report`
-                  : `/exam/${exam.id}`
-            }
+            to={`/exam/${exam.id}/report`}
+            state={{ courseId: courseId || exam.course_id || exam.courseId || null }}
             style={{ display: "block", textDecoration: "none" }}
           >
             <Button
               w="full"
-              colorScheme={studentCta.kind === "report" ? "teal" : "blue"}
+              colorScheme="teal"
               borderRadius="xl"
               fontWeight="700"
               size="md"
-              leftIcon={<Icon as={studentCta.kind === "report" ? FaChartBar : FaGraduationCap} />}
+              leftIcon={<Icon as={FaChartBar} />}
             >
-              {isTeacher ? "إدارة الامتحان" : studentCta.label}
+              {studentCta.label}
             </Button>
           </Link>
         ) : (
@@ -1623,6 +1707,7 @@ const CourseExamsTab = ({
                 key={exam.id}
               exam={exam}
               isTeacher={isTeacher}
+              courseId={courseId}
               formatDate={formatDate}
               actionLoading={actionLoading}
               onToggleVisibility={() =>

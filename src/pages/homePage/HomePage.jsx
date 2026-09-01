@@ -66,9 +66,7 @@ import HomeProHero from "./components/HomeProHero";
 import HomeProQuickActions from "./components/HomeProQuickActions";
 import HomeProMyCourses from "./components/HomeProMyCourses";
 import HomeProPlatformCourses from "./components/HomeProPlatformCourses";
-import StudentHomeTour from "../../components/onboarding/StudentHomeTour";
 import StudentCourseGroupGate from "../../components/courseGroups/StudentCourseGroupGate";
-import { shouldShowStudentHomeTour } from "../../utils/studentHomeTour";
 
 const MotionBox = motion(Box);
 const MotionCard = motion(Card);
@@ -134,7 +132,6 @@ const HomePage = () => {
   const [teacherDisplayName, setTeacherDisplayName] = useState("");
   const [teacherAvatar, setTeacherAvatar] = useState("");
   const [availableCourses, setAvailableCourses] = useState([]);
-  const [homeTourOpen, setHomeTourOpen] = useState(false);
   const [coursesRefreshKey, setCoursesRefreshKey] = useState(0);
 
   const authHeader = useMemo(() => buildAuthHeader(), [token, sessionReady]);
@@ -149,14 +146,6 @@ const HomePage = () => {
     if (isAuthLoading) return;
     setSessionReady(isAuthenticated);
   }, [isAuthLoading, isAuthenticated]);
-
-  // جولة تعريفية للطالب الجديد بعد إنشاء الحساب
-  useEffect(() => {
-    if (!sessionReady || !student) return undefined;
-    if (!shouldShowStudentHomeTour()) return undefined;
-    const timer = window.setTimeout(() => setHomeTourOpen(true), 700);
-    return () => window.clearTimeout(timer);
-  }, [sessionReady, student]);
 
   const formatDateTime = (dateStr) => {
     if (!dateStr) return "";
@@ -1580,11 +1569,6 @@ const HomePage = () => {
           )}
         </ModalContent>
       </Modal>
-
-      <StudentHomeTour
-        isOpen={homeTourOpen}
-        onClose={() => setHomeTourOpen(false)}
-      />
     </Box>
   );
 };
