@@ -55,6 +55,42 @@ function statusMeta(status) {
   return { label: notExaminedStatusLabel(status), color: "gray", icon: FiUserX };
 }
 
+function formatStartedAt(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString("ar-EG", { dateStyle: "short", timeStyle: "short" });
+}
+
+function formatRemaining(seconds) {
+  if (seconds == null || seconds === "") return null;
+  const n = Math.max(0, Number(seconds));
+  if (!Number.isFinite(n)) return null;
+  if (n <= 0) return "انتهى الوقت";
+  const m = Math.floor(n / 60);
+  const s = n % 60;
+  return `متبقٍ ${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function inProgressDetail(student) {
+  if (student?.examStatus !== "in_progress") return "";
+  const parts = [];
+  const started = formatStartedAt(student.startedAt);
+  if (started) parts.push(`بدأ ${started}`);
+  if (student.answeredCount != null && student.answeredCount !== "") {
+    const answered = Number(student.answeredCount) || 0;
+    const total = Number(student.questionsCount);
+    parts.push(
+      Number.isFinite(total) && total > 0
+        ? `أجاب ${answered}/${total}`
+        : `أجاب ${answered}`,
+    );
+  }
+  const remaining = formatRemaining(student.remainingSeconds);
+  if (remaining) parts.push(remaining);
+  return parts.join(" · ");
+}
+
 function KpiCard({ label, value, hint, accent, icon: StatIcon, children }) {
   const cardBg = useColorModeValue("white", "gray.900");
   const muted = useColorModeValue("gray.500", "gray.400");
@@ -564,6 +600,11 @@ export default function ExamEnrollmentSummary({
                         >
                           {student.studentEmail || "—"}
                         </Text>
+                        {inProgressDetail(student) ? (
+                          <Text fontSize="xs" color="orange.600" mt={0.5} noOfLines={2}>
+                            {inProgressDetail(student)}
+                          </Text>
+                        ) : null}
                       </Box>
                       <Text
                         flex={1}

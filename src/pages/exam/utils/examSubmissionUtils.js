@@ -57,6 +57,13 @@ export function getWrongQuestionsCount(submission) {
 }
 
 export function resolveSubmissionOutcome(submission) {
+  const inProgress =
+    submission?.status === "in_progress" ||
+    submission?.in_progress === true ||
+    submission?.exam_status === "in_progress";
+  if (inProgress) {
+    return { obtained: 0, total: 0, percentage: 0, passed: false, inProgress: true };
+  }
   const obtained = Number(submission?.obtained_grade ?? submission?.obtainedGrade ?? 0);
   const total = Number(submission?.total_grade ?? submission?.totalGrade ?? 0);
   const percentage =
@@ -68,7 +75,7 @@ export function resolveSubmissionOutcome(submission) {
   const passed =
     submission?.passed != null ? Boolean(submission.passed) : percentage >= 50;
 
-  return { obtained, total, percentage, passed };
+  return { obtained, total, percentage, passed, inProgress: false };
 }
 
 function escapeCsvCell(value) {

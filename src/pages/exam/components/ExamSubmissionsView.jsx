@@ -47,6 +47,7 @@ const FONT = "'Noto Sans Arabic', 'Noto Naskh Arabic', Tahoma, sans-serif";
 const NAVY = "#0E4C92";
 const GREEN = "#16A34A";
 const RED = "#DC2626";
+const AMBER = "#D97706";
 
 function studentInitials(name) {
   const parts = String(name || "طالب")
@@ -287,12 +288,87 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
   const perfectText = useColorModeValue("green.700", "green.200");
   const scorePanelBg = useColorModeValue("#F7FAFC", "whiteAlpha.50");
 
-  const { obtained, total, percentage, passed } = resolveSubmissionOutcome(submission);
+  const { obtained, total, percentage, passed, inProgress } = resolveSubmissionOutcome(submission);
   const wrongCount = getWrongQuestionsCount(submission);
-  const statusLabel =
-    submission.status === "submitted"
+  const answeredCount = Number(submission.answered_count ?? submission.answeredCount ?? 0);
+  const remainingSeconds = submission.remaining_seconds ?? submission.remainingSeconds;
+  const statusLabel = inProgress
+    ? "بدأ ولم يسلّم"
+    : submission.status === "submitted"
       ? "مُسلَّم"
       : submission.status || "—";
+  const startedAt = submission.started_at || submission.startedAt;
+
+  if (inProgress) {
+    return (
+      <Box
+        bg={cardBg}
+        borderWidth="1px"
+        borderColor="orange.200"
+        borderRadius="2xl"
+        overflow="hidden"
+        fontFamily={FONT}
+        _dark={{ borderColor: "orange.700" }}
+      >
+        <Box h="4px" bg={AMBER} />
+        <Box p={{ base: 4, md: 5 }}>
+          <HStack align="start" spacing={3}>
+            <Flex
+              w="48px"
+              h="48px"
+              borderRadius="xl"
+              bg={avatarBg}
+              color={NAVY}
+              align="center"
+              justify="center"
+              fontWeight="800"
+              fontSize="md"
+              flexShrink={0}
+            >
+              {studentInitials(submission.name)}
+            </Flex>
+            <Box minW={0} flex={1}>
+              <HStack spacing={2} mb={1.5} flexWrap="wrap">
+                <Badge colorScheme="blue" variant="subtle" borderRadius="md" fontFamily={FONT}>
+                  #{index + 1}
+                </Badge>
+                <Badge colorScheme="orange" fontFamily={FONT}>
+                  {statusLabel}
+                </Badge>
+              </HStack>
+              <Heading
+                as="h3"
+                fontSize={{ base: "lg", md: "xl" }}
+                fontWeight="800"
+                color={heading}
+                mb={1}
+                fontFamily={FONT}
+                lineHeight="1.4"
+                noOfLines={1}
+              >
+                {submission.name || "طالب"}
+              </Heading>
+              <Text fontSize="sm" color="orange.600" fontWeight="600">
+                بدأ الامتحان ولم يسلّمه بعد
+                {answeredCount > 0 ? ` · أجاب على ${answeredCount} سؤال` : ""}
+                {startedAt
+                  ? ` · ${new Date(startedAt).toLocaleString("ar-EG", {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                    })}`
+                  : ""}
+                {remainingSeconds != null
+                  ? Number(remainingSeconds) > 0
+                    ? ` · متبقٍ ${String(Math.floor(Number(remainingSeconds) / 60)).padStart(2, "0")}:${String(Number(remainingSeconds) % 60).padStart(2, "0")}`
+                    : " · انتهى الوقت"
+                  : ""}
+              </Text>
+            </Box>
+          </HStack>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box
@@ -553,23 +629,20 @@ export default function ExamSubmissionsView({
     () => submissions.map(resolveSubmissionOutcome),
     [submissions],
   );
-  const passedCount = outcomes.filter((item) => item.passed).length;
-  const failedCount = submissions.length - passedCount;
-  const averagePercentage =
-    outcomes.length > 0
-      ? Math.round(
-          outcomes.reduce((sum, item) => sum + item.percentage, 0) / outcomes.length,
-        )
-      : 0;
+  const passedCount = outcomes.filter((item) => !item.inProgress && item.passed).length;
+  const inProgressCount = outcomes.filter((item) => item.inProgress).length;
+  const failedCount = outcomes.filter((item) => !item.inProgress && !item.passed).length;
+  const completedCount = Math.max(0, submissions.length - inProgressCount);
   const passRate =
-    submissions.length > 0 ? Math.round((passedCount / submissions.length) * 100) : 0;
+    completedCount > 0 ? Math.round((passedCount / completedCount) * 100) : 0;
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
     return submissions.filter((submission, index) => {
-      const { passed } = outcomes[index] || resolveSubmissionOutcome(submission);
-      if (statusFilter === "passed" && !passed) return false;
-      if (statusFilter === "failed" && passed) return false;
+      const outcome = outcomes[index] || resolveSubmissionOutcome(submission);
+      if (statusFilter === "passed" && (outcome.inProgress || !outcome.passed)) return false;
+      if (statusFilter === "failed" && (outcome.inProgress || outcome.passed)) return false;
+      if (statusFilter === "in_progress" && !outcome.inProgress) return false;
       if (!term) return true;
       return (
         (submission.name && submission.name.toLowerCase().includes(term)) ||
@@ -758,12 +831,12 @@ export default function ExamSubmissionsView({
               {submissions.length > 0 && (
                 <VStack spacing={4} align="stretch">
                   <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3}>
-                    <SummaryStat label="إجمالي التسليمات" value={submissions.length} />
+                    <SummaryStat label="إجمالي المحاولات" value={submissions.length} />
                     <SummaryStat
                       label="ناجح"
                       value={passedCount}
                       accent="green.500"
-                      hint={`${passRate}% من الطلاب`}
+                      hint={`${passRate}% من المسلّمين`}
                     />
                     <SummaryStat
                       label="راسب"
@@ -771,9 +844,9 @@ export default function ExamSubmissionsView({
                       accent="red.500"
                     />
                     <SummaryStat
-                      label="متوسط النسبة"
-                      value={`${averagePercentage}%`}
-                      accent={averagePercentage >= 50 ? "green.500" : "red.500"}
+                      label="بدأ ولم يسلّم"
+                      value={inProgressCount}
+                      accent="orange.500"
                     />
                   </SimpleGrid>
                   <Box>
@@ -793,6 +866,7 @@ export default function ExamSubmissionsView({
                     <Flex h="10px" borderRadius="full" overflow="hidden" bg="gray.100">
                       {passedCount > 0 && <Box flex={passedCount} bg={GREEN} />}
                       {failedCount > 0 && <Box flex={failedCount} bg={RED} />}
+                      {inProgressCount > 0 && <Box flex={inProgressCount} bg={AMBER} />}
                     </Flex>
                   </Box>
                 </VStack>
@@ -843,6 +917,14 @@ export default function ExamSubmissionsView({
                   onClick={() => setStatusFilter("failed")}
                 >
                   راسب
+                </Button>
+                <Button
+                  fontFamily={FONT}
+                  colorScheme={statusFilter === "in_progress" ? "orange" : "gray"}
+                  variant={statusFilter === "in_progress" ? "solid" : "outline"}
+                  onClick={() => setStatusFilter("in_progress")}
+                >
+                  لم يسلّم
                 </Button>
               </ButtonGroup>
             </Flex>

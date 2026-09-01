@@ -91,6 +91,11 @@ export function normalizeNotExaminedStudents(list) {
       student.studentName ?? student.student_name ?? student.name ?? "طالب",
     studentEmail: student.studentEmail ?? student.student_email ?? student.email ?? "",
     examStatus: student.examStatus ?? student.exam_status ?? "never_started",
+    startedAt: student.startedAt ?? student.started_at ?? null,
+    lastAutosaveAt: student.lastAutosaveAt ?? student.last_autosave_at ?? null,
+    remainingSeconds: student.remainingSeconds ?? student.remaining_seconds ?? null,
+    answeredCount: student.answeredCount ?? student.answered_count ?? null,
+    questionsCount: student.questionsCount ?? student.questions_count ?? null,
   }));
 }
 
