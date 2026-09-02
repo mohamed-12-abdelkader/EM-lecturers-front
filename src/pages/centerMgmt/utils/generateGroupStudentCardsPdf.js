@@ -30,23 +30,22 @@ const CARD_H = Math.round(CARD_H_MM * PX_PER_MM);
 const GRID_H = GRID_ROWS * CARD_H + (GRID_ROWS - 1) * GRID_GAP;
 const PAGE_PAD_BOTTOM = Math.max(0, PAGE_RENDER_H - PAGE_PAD_TOP - GRID_H);
 
-const LEFT_W = Math.round(CARD_W * 0.14);
-const QR_COL_W = Math.round(CARD_W * 0.28);
-const QR_RIGHT_PAD = 8;
-const QR_IMG = Math.min(QR_COL_W - QR_RIGHT_PAD - 18, CARD_H - 70);
+const LEFT_W = Math.round(CARD_W * 0.12);
+const QR_COL_W = Math.round(CARD_W * 0.34);
+const QR_RIGHT_PAD = 4;
 const ICON = 16;
-const TITLE_H = 32;
+const TITLE_H = 38;
+const QR_IMG = Math.min(QR_COL_W - QR_RIGHT_PAD - 10, CARD_H - TITLE_H - 18);
 const INFO_ROW_H = 26;
 
-const NAVY = "#0C2340";
-const NAVY_MID = "#163A5C";
-const GOLD = "#C5A46E";
-const GOLD_TEXT = "#8B6914";
-const INK = "#0F172A";
-const LABEL = "#64748B";
-const LINE = "#E2E8F0";
+const BLUE = "#3182CE";
+const BLUE_DEEP = "#2B6CB0";
+const ORANGE = "#DD6B20";
+const INK = "#1A365D";
+const LABEL = "#2C5282";
+const LINE = "#BEE3F8";
 const WHITE = "#FFFFFF";
-const PAPER = "#F7F8FA";
+const PAPER = "#B6D9F5";
 const PANEL = "#FFFFFF";
 
 /** Tahoma يثبت تشكيل العربي في html2canvas — Cairo بيخلي الحروف تلزق */
@@ -160,7 +159,7 @@ export async function fetchCenterCardBranding() {
 }
 
 function teacherLabel(name) {
-  const raw = truncate(String(name || "المدرس").trim(), 16);
+  const raw = truncate(String(name || "المدرس").trim(), 20);
   if (/^(مستر|أ[.\s]|ا\.|الاستاذ|الأستاذ)/i.test(raw)) return raw;
   return `مستر ${raw}`;
 }
@@ -185,29 +184,22 @@ const SVG_BOOK = `<svg width="12" height="12" viewBox="0 0 24 24" fill="${WHITE}
 const SVG_GROUP = `<svg width="12" height="12" viewBox="0 0 24 24" fill="${WHITE}"><circle cx="9" cy="8" r="3.2"/><circle cx="16.4" cy="9" r="2.6"/><path d="M3 19.8c0-3.1 2.6-5.3 6-5.3s6 2.2 6 5.3"/><path d="M13.8 19.8c.3-2.1 1.9-3.7 4.1-3.8 2.1.1 3.3 1.7 3.3 3.8"/></svg>`;
 const SVG_BADGE = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="4" y="7" width="16" height="13" rx="2" stroke="${WHITE}" stroke-width="2"/><circle cx="9.2" cy="13.2" r="2.1" fill="${WHITE}"/><path d="M13.2 12h5.2M13.2 15.2h4" stroke="${WHITE}" stroke-width="1.8" stroke-linecap="round"/><path d="M9 7V5.2a3 3 0 0 1 6 0V7" stroke="${WHITE}" stroke-width="2" fill="none"/></svg>`;
 
-function titleDots() {
-  const pip = `<td style="padding:0 3px;vertical-align:middle;">
-    <div style="width:4px;height:4px;background:${GOLD};border-radius:50%;"></div>
-  </td>`;
-  return `<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr>${pip}${pip}</tr></table>`;
-}
-
 let cardTitleCache = new Map();
 
 /** html2canvas بيلخبط العربي المتصل — نرسم العنوان على Canvas ونحطه كصورة */
 async function getCardTitleImage(teacherDisplay) {
   const display = String(teacherDisplay || "المدرس");
-  const cacheKey = `v5:${display}`;
+  const cacheKey = `v9:${display}`;
   if (cardTitleCache.has(cacheKey)) return cardTitleCache.get(cacheKey);
 
   try {
-    await document.fonts.load("700 15px Tahoma");
+    await document.fonts.load("700 16px Tahoma");
     await document.fonts.ready;
   } catch {
     // fallback to system Tahoma
   }
 
-  const cssW = 250;
+  const cssW = 300;
   const cssH = 34;
   const scale = 4;
   const canvas = document.createElement("canvas");
@@ -218,37 +210,61 @@ async function getCardTitleImage(teacherDisplay) {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   ctx.clearRect(0, 0, cssW, cssH);
-  ctx.textBaseline = "alphabetic";
-  ctx.textAlign = "left";
-  ctx.direction = "ltr";
 
+  const color = INK;
+  const gap = 8;
   const parts = [
-    { text: display, color: NAVY, size: 13 },
-    { text: "سنتر", color: GOLD_TEXT, size: 15 },
-    { text: "كارت", color: NAVY, size: 15 },
+    { text: display, size: 15 },
+    { text: "سنتر", size: 15 },
+    { text: "كارت", size: 15 },
   ];
-  const gap = 6;
 
-  const measure = (part) => {
-    ctx.font = `700 ${part.size}px Tahoma, Arial, sans-serif`;
-    return ctx.measureText(part.text).width;
+  const measure = (text, size) => {
+    ctx.font = `700 ${size}px Tahoma, Arial, sans-serif`;
+    return ctx.measureText(text).width;
   };
 
-  let widths = parts.map(measure);
+  let size = 15;
+  let widths = parts.map((p) => measure(p.text, size));
   let total = widths.reduce((a, b) => a + b, 0) + gap * (parts.length - 1);
-  if (total > cssW - 4) {
-    parts[0].size = 11;
-    parts[1].size = 13;
-    parts[2].size = 13;
-    widths = parts.map(measure);
+  if (total > cssW - 28) {
+    size = 13;
+    widths = parts.map((p) => measure(p.text, size));
     total = widths.reduce((a, b) => a + b, 0) + gap * (parts.length - 1);
   }
 
-  let x = Math.max(0, (cssW - total) / 2);
-  const y = Math.round(cssH * 0.72);
+  const pillW = Math.min(cssW - 4, total + 20);
+  const pillH = cssH - 6;
+  const pillX = (cssW - pillW) / 2;
+  const pillY = 3;
+  const radius = 8;
+
+  ctx.beginPath();
+  ctx.moveTo(pillX + radius, pillY);
+  ctx.lineTo(pillX + pillW - radius, pillY);
+  ctx.quadraticCurveTo(pillX + pillW, pillY, pillX + pillW, pillY + radius);
+  ctx.lineTo(pillX + pillW, pillY + pillH - radius);
+  ctx.quadraticCurveTo(pillX + pillW, pillY + pillH, pillX + pillW - radius, pillY + pillH);
+  ctx.lineTo(pillX + radius, pillY + pillH);
+  ctx.quadraticCurveTo(pillX, pillY + pillH, pillX, pillY + pillH - radius);
+  ctx.lineTo(pillX, pillY + radius);
+  ctx.quadraticCurveTo(pillX, pillY, pillX + radius, pillY);
+  ctx.closePath();
+  ctx.fillStyle = WHITE;
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = BLUE;
+  ctx.stroke();
+
+  ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "left";
+  ctx.direction = "ltr";
+  ctx.font = `700 ${size}px Tahoma, Arial, sans-serif`;
+  ctx.fillStyle = color;
+
+  let x = (cssW - total) / 2;
+  const y = Math.round(cssH * 0.68);
   parts.forEach((part, i) => {
-    ctx.font = `700 ${part.size}px Tahoma, Arial, sans-serif`;
-    ctx.fillStyle = part.color;
     ctx.fillText(part.text, x, y);
     x += widths[i] + gap;
   });
@@ -265,7 +281,7 @@ async function getCardTitleImage(teacherDisplay) {
 let infoLineCache = new Map();
 
 async function getInfoLineImage(label, value) {
-  const key = `v5:${label}::${value}`;
+  const key = `v6:${label}::${value}`;
   if (infoLineCache.has(key)) return infoLineCache.get(key);
 
   try {
@@ -342,10 +358,10 @@ async function getInfoLineImage(label, value) {
 function dottedRule() {
   return `
     <div style="position:relative;height:10px;">
-      <div style="position:absolute;left:16%;right:16%;top:5px;height:1px;background:${NAVY};opacity:0.18;"></div>
+      <div style="position:absolute;left:16%;right:16%;top:5px;height:1px;background:${BLUE};opacity:0.45;"></div>
       <div style="position:relative;text-align:center;line-height:10px;font-size:0;">
-        <span style="display:inline-block;padding:0 8px;background:${PAPER};">
-          <span style="display:inline-block;width:5px;height:5px;background:${GOLD};border-radius:50%;vertical-align:middle;"></span>
+        <span style="display:inline-block;padding:0 8px;">
+          <span style="display:inline-block;width:5px;height:5px;background:${ORANGE};border-radius:50%;vertical-align:middle;"></span>
         </span>
       </div>
     </div>
@@ -407,9 +423,9 @@ function qrFrame(inner) {
     <table cellpadding="0" cellspacing="0" style="border-collapse:separate;margin:0 auto;">
       <tr>
         <td style="
-          border:1.6px solid ${NAVY};
+          border:1.6px solid ${BLUE};
           border-radius:8px;
-          padding:5px;
+          padding:3px;
           background:${WHITE};
         ">
           <div style="line-height:0;font-size:0;background:${WHITE};">
@@ -435,42 +451,84 @@ function leftBar(uid) {
     >
       <defs>
         <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="${NAVY_MID}"/>
-          <stop offset="100%" stop-color="${NAVY}"/>
+          <stop offset="0%" stop-color="${BLUE}"/>
+          <stop offset="100%" stop-color="${BLUE_DEEP}"/>
         </linearGradient>
         <pattern id="${pid}" width="9" height="9" patternUnits="userSpaceOnUse">
-          <circle cx="1.1" cy="1.1" r="0.7" fill="rgba(255,255,255,0.16)"/>
+          <circle cx="1.1" cy="1.1" r="0.7" fill="rgba(255,255,255,0.28)"/>
         </pattern>
       </defs>
       <polygon points="0,0 ${LEFT_W},0 ${LEFT_W - slant},${CARD_H} 0,${CARD_H}" fill="url(#${gid})"/>
       <polygon points="0,0 ${LEFT_W},0 ${LEFT_W - slant},${CARD_H} 0,${CARD_H}" fill="url(#${pid})"/>
-      <polygon points="${LEFT_W - 2.4},0 ${LEFT_W},0 ${LEFT_W - slant},${CARD_H} ${LEFT_W - slant - 2.4},${CARD_H}" fill="${GOLD}"/>
+      <polygon points="${LEFT_W - 2.4},0 ${LEFT_W},0 ${LEFT_W - slant},${CARD_H} ${LEFT_W - slant - 2.4},${CARD_H}" fill="${ORANGE}"/>
     </svg>
   `;
 }
 
 function cardAtmosphere(uid) {
   const paper = `paper-${uid}`;
-  const inset = 3;
+  const glowB = `glowb-${uid}`;
+  const glowO = `glowo-${uid}`;
+  const inset = 3.2;
+  const w = CARD_W;
+  const h = CARD_H;
   return `
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      width="${CARD_W}"
-      height="${CARD_H}"
-      viewBox="0 0 ${CARD_W} ${CARD_H}"
+      width="${w}"
+      height="${h}"
+      viewBox="0 0 ${w} ${h}"
       style="position:absolute;left:0;top:0;display:block;z-index:0;pointer-events:none;"
     >
       <defs>
         <linearGradient id="${paper}" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="#FFFFFF"/>
-          <stop offset="100%" stop-color="${PAPER}"/>
+          <stop offset="0%" stop-color="#7EB6EA"/>
+          <stop offset="38%" stop-color="#C5E4F9"/>
+          <stop offset="68%" stop-color="#F8E1C4"/>
+          <stop offset="100%" stop-color="#F0A35A"/>
         </linearGradient>
+        <radialGradient id="${glowB}" cx="12%" cy="8%" r="52%">
+          <stop offset="0%" stop-color="#63B3ED" stop-opacity="0.7"/>
+          <stop offset="100%" stop-color="#63B3ED" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="${glowO}" cx="92%" cy="92%" r="58%">
+          <stop offset="0%" stop-color="#DD6B20" stop-opacity="0.5"/>
+          <stop offset="100%" stop-color="#DD6B20" stop-opacity="0"/>
+        </radialGradient>
       </defs>
-      <rect width="${CARD_W}" height="${CARD_H}" fill="url(#${paper})"/>
+      <rect width="${w}" height="${h}" fill="url(#${paper})"/>
+      <rect width="${w}" height="${h}" fill="url(#${glowB})"/>
+      <rect width="${w}" height="${h}" fill="url(#${glowO})"/>
+      <path
+        d="M${w} 0 H${w - 92} C${w - 58} 12, ${w - 22} 34, ${w} 64 Z"
+        fill="${BLUE}"
+        fill-opacity="0.42"
+      />
+      <path
+        d="M${w} 0 H${w - 58} C${w - 36} 8, ${w - 14} 24, ${w} 46 Z"
+        fill="${ORANGE}"
+        fill-opacity="0.88"
+      />
+      <path
+        d="M${w} ${h} H${w - 84} C${w - 52} ${h - 14}, ${w - 18} ${h - 32}, ${w} ${h - 46} Z"
+        fill="${ORANGE}"
+        fill-opacity="0.38"
+      />
+      <path
+        d="M${w} ${h} H${w - 52} C${w - 32} ${h - 10}, ${w - 12} ${h - 24}, ${w} ${h - 34} Z"
+        fill="${BLUE}"
+        fill-opacity="0.55"
+      />
+      <g fill="rgba(255,255,255,0.38)">
+        <circle cx="${w - 22}" cy="10" r="1.4"/>
+        <circle cx="${w - 14}" cy="10" r="1.4"/>
+        <circle cx="${w - 18}" cy="16" r="1.4"/>
+        <circle cx="${w - 10}" cy="16" r="1.4"/>
+      </g>
       <rect
         x="${inset}" y="${inset}"
-        width="${CARD_W - inset * 2}" height="${CARD_H - inset * 2}"
-        fill="none" stroke="${GOLD}" stroke-width="0.9" rx="8"
+        width="${w - inset * 2}" height="${h - inset * 2}"
+        fill="none" stroke="${ORANGE}" stroke-width="1.15" rx="8"
       />
     </svg>
   `;
@@ -516,7 +574,7 @@ function buildCardHtml({
   height:${CARD_H}px;
   border-radius:10px;
   overflow:hidden;
-  border:1.5px solid ${NAVY};
+  border:1.5px solid ${BLUE};
   background:${PAPER};
   font-family:${FONT};
   box-sizing:border-box;
@@ -534,28 +592,22 @@ function buildCardHtml({
     overflow:hidden;
     text-align:center;
   ">
-    <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 auto;">
-      <tr>
-        <td style="width:22px;text-align:center;vertical-align:middle;">${titleDots()}</td>
-        <td style="text-align:center;vertical-align:middle;padding:0 2px;line-height:0;">
-          <img
-            src="${titleImg.src}"
-            alt=""
-            width="${titleImg.width}"
-            height="${titleImg.height}"
-            style="
-              display:block;
-              height:20px;
-              width:auto;
-              max-width:210px;
-              margin:0 auto;
-              border:0;
-            "
-          />
-        </td>
-        <td style="width:22px;text-align:center;vertical-align:middle;">${titleDots()}</td>
-      </tr>
-    </table>
+    <div style="text-align:center;line-height:0;padding-top:1px;">
+      <img
+        src="${titleImg.src}"
+        alt=""
+        width="${titleImg.width}"
+        height="${titleImg.height}"
+        style="
+          display:inline-block;
+          height:26px;
+          width:auto;
+          max-width:270px;
+          margin:0 auto;
+          border:0;
+        "
+      />
+    </div>
     ${dottedRule()}
   </div>
 
@@ -581,18 +633,18 @@ function buildCardHtml({
           border:1px solid ${LINE};
           border-radius:8px;
         ">
-          ${infoRow({ icon: circleIcon(NAVY, SVG_USER), lineImg: lineImgs.name })}
-          ${infoRow({ icon: circleIcon(NAVY, SVG_BOOK), lineImg: lineImgs.grade })}
-          ${infoRow({ icon: circleIcon(NAVY, SVG_GROUP), lineImg: lineImgs.group })}
-          ${infoRow({ icon: circleIcon(NAVY, SVG_BADGE), lineImg: lineImgs.code, last: true })}
+          ${infoRow({ icon: circleIcon(BLUE, SVG_USER), lineImg: lineImgs.name })}
+          ${infoRow({ icon: circleIcon(BLUE, SVG_BOOK), lineImg: lineImgs.grade })}
+          ${infoRow({ icon: circleIcon(ORANGE, SVG_GROUP), lineImg: lineImgs.group })}
+          ${infoRow({ icon: circleIcon(BLUE, SVG_BADGE), lineImg: lineImgs.code, last: true })}
         </table>
       </td>
       <td style="
         width:${QR_COL_W}px;
         vertical-align:middle;
         text-align:center;
-        padding:${TITLE_H}px ${QR_RIGHT_PAD}px 10px 4px;
-        overflow:hidden;
+        padding:${TITLE_H - 4}px ${QR_RIGHT_PAD}px 8px 2px;
+        overflow:visible;
       ">${qrFrame(qrInner)}</td>
     </tr>
   </table>
