@@ -69,6 +69,7 @@ import {
 } from "../../../utils/lectureAccessUtils";
 import LectureActivateCodeForm, { LectureActivationTimer } from "./LectureActivateCodeForm";
 import LectureActivationCodesModal from "./LectureActivationCodesModal";
+import { formatLectureExamDurationLabel } from "../../../utils/examFlowUtils";
 
 const EASE = [0.22, 1, 0.36, 1];
 
@@ -144,7 +145,9 @@ function LecturePdfRow({ file, courseId, canManage, onEdit, onDelete }) {
 function getExamStatus(exam) {
   if (!exam) return null;
   if (exam.is_solved) return { label: "تم الحل", tone: "done", cta: "عرض النتيجة", icon: FaCheckCircle };
-  if (exam.in_progress || exam.is_started) return { label: "قيد التنفيذ", tone: "active", cta: "متابعة الواجب", icon: FaPen };
+  if (exam.can_resume || exam.in_progress || exam.is_started) {
+    return { label: "قيد التنفيذ", tone: "active", cta: "متابعة الواجب", icon: FaPen };
+  }
   if (exam.availability_status === "expired" || exam.can_start === false) {
     return { label: "انتهى — لا يمكن الدخول", tone: "closed", cta: "انتهى — لا يمكن الدخول", icon: FaPen };
   }
@@ -401,10 +404,12 @@ function AssignmentRow({
           </div>
           <p className={`mt-0.5 break-words ${lcCaption}`}>
             {canManage
-              ? `الدرجة: ${exam.total_grade ?? "—"} • المدة: ${exam.duration ?? "—"} دقيقة`
+              ? `الدرجة: ${exam.total_grade ?? "—"} • المدة: ${formatLectureExamDurationLabel(exam)}`
               : exam.student_submission?.score != null
                 ? `درجتك: ${exam.student_submission.score}`
-                : null}
+                : exam.remaining_seconds != null
+                  ? `متبقٍ ${String(Math.floor(Number(exam.remaining_seconds) / 60)).padStart(2, "0")}:${String(Number(exam.remaining_seconds) % 60).padStart(2, "0")}`
+                  : null}
           </p>
         </div>
       </div>

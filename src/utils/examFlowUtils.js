@@ -24,7 +24,7 @@ export function buildLectureExamCreatePayload(lectureId, data) {
     questionsCount: Number(data.questions_count),
     questionDisplayMode: normalizeQuestionDisplayMode(data.question_display_mode),
     totalGrade: data.total_grade,
-    duration: data.duration,
+    duration: normalizeLectureDurationPayload(data),
     isVisible: data.is_visible ?? true,
     lockNextLectures: data.lock_next_lectures ?? true,
     answersReleaseMode: data.answers_release_mode || "immediate",
@@ -48,7 +48,7 @@ export function buildLectureExamUpdatePayload(data) {
   const payload = {
     title: data.title,
     total_grade: data.total_grade,
-    duration: data.duration,
+    duration: normalizeLectureDurationPayload(data),
     is_visible: data.is_visible,
     lock_next_lectures: data.lock_next_lectures,
     show_answers_immediately: data.show_answers_immediately,
@@ -136,6 +136,64 @@ export function isCourseExamFinishedPayload(session) {
     (session.totalGrade != null && session.maxGrade != null)
   );
 }
+
+export function isLectureExamFinishedPayload(session) {
+  return isCourseExamFinishedPayload(session);
+}
+
+export function normalizeLectureDurationPayload(data = {}) {
+  if (
+    data.duration_unlimited === true ||
+    data.durationUnlimited === true ||
+    data.duration === "unlimited" ||
+    data.duration === "" ||
+    data.duration == null ||
+    Number(data.duration) <= 0
+  ) {
+    return null;
+  }
+  const minutes = Number(data.duration);
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : null;
+}
+
+export function formatLectureExamDurationLabel(exam) {
+  if (
+    exam?.duration_unlimited ||
+    exam?.durationUnlimited ||
+    exam?.duration == null ||
+    exam?.duration === "" ||
+    Number(exam?.duration) <= 0
+  ) {
+    return "بدون حد زمني";
+  }
+  return `${exam.duration} دقيقة`;
+}
+
+/** إجابات محفوظة لواجب/امتحان محاضرة → { questionId: choiceId } */
+export function savedLectureExamAnswersToMap(savedAnswers = []) {
+  const map = {};
+  const rows = Array.isArray(savedAnswers) ? savedAnswers : [];
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const questionId = Number(row.questionId ?? row.question_id);
+    const choiceId = Number(
+      row.choiceId ?? row.choice_id ?? row.selectedChoiceId ?? row.selected_choice_id,
+    );
+    if (Number.isInteger(questionId) && questionId > 0 && Number.isFinite(choiceId) && choiceId !== 0) {
+      map[questionId] = choiceId;
+    }
+  }
+  return map;
+}
+
+export function remainingFromEndsAt(endsAt) {
+  if (endsAt == null) return null;
+  const ms = typeof endsAt === "number" ? endsAt : new Date(endsAt).getTime();
+  if (!Number.isFinite(ms)) return null;
+  return Math.max(0, Math.floor((ms - Date.now()) / 1000));
+}
+
+export const resolveLectureExamServerTimer = resolveCourseExamServerTimer;
 
 const LETTER_KEYS = ["A", "B", "C", "D"];
 

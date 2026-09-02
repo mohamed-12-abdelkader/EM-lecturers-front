@@ -1848,6 +1848,11 @@ const CourseDetailsPage = () => {
         QUESTION_DISPLAY_MODES.ORDERED,
       total_grade: data?.total_grade ?? 20,
       duration: data?.duration || 60,
+      duration_unlimited: Boolean(
+        data?.duration_unlimited ||
+          data?.durationUnlimited ||
+          (data?.id && (data.duration == null || Number(data.duration) <= 0)),
+      ),
       is_visible: data?.is_visible ?? true,
       show_at: toExamDateTimeLocal(data?.show_at) || "",
       hide_at: toExamDateTimeLocal(data?.hide_at) || "",
@@ -1873,6 +1878,11 @@ const CourseDetailsPage = () => {
             QUESTION_DISPLAY_MODES.ORDERED,
           total_grade: data.total_grade ?? 20,
           duration: data.duration || 60,
+          duration_unlimited: Boolean(
+            data.duration_unlimited ||
+              data.durationUnlimited ||
+              (data.id && (data.duration == null || Number(data.duration) <= 0)),
+          ),
           is_visible: data.is_visible ?? true,
           show_at: toExamDateTimeLocal(data.show_at) || "",
           hide_at: toExamDateTimeLocal(data.hide_at) || "",
@@ -1890,6 +1900,7 @@ const CourseDetailsPage = () => {
           question_display_mode: QUESTION_DISPLAY_MODES.ORDERED,
           total_grade: 20,
           duration: 60,
+          duration_unlimited: false,
           is_visible: true,
           show_at: "",
           hide_at: "",
@@ -1911,6 +1922,19 @@ const CourseDetailsPage = () => {
         toast({
           title: "عدد الأسئلة مطلوب",
           description: "حدد عدد الأسئلة المعروضة للطالب",
+          status: "error",
+          duration: 4000,
+          isClosable: true,
+        });
+        return;
+      }
+      if (
+        (type === "add" || type === "edit") &&
+        !formData.duration_unlimited &&
+        !(Number(formData.duration) > 0)
+      ) {
+        toast({
+          title: "حدد مدة الامتحان بالدقائق، أو فعّل بدون حد زمني",
           status: "error",
           duration: 4000,
           isClosable: true,
@@ -2172,7 +2196,7 @@ const CourseDetailsPage = () => {
                         size="lg"
                       />
                     </FormControl>
-                    <FormControl isRequired flex={1} w="full">
+                    <FormControl flex={1} w="full">
                       <FormLabel
                         display="flex"
                         alignItems="center"
@@ -2192,29 +2216,52 @@ const CourseDetailsPage = () => {
                         </Box>
                         المدة (بالدقائق)
                       </FormLabel>
-                      <Input
-                        type="number"
-                        value={formData.duration}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            duration: parseInt(e.target.value) || 60,
-                          })
-                        }
-                        placeholder="60"
-                        min={1}
-                        max={300}
-                        isDisabled={loading}
-                        borderRadius="lg"
-                        borderWidth="1px"
-                        borderColor={cardBorder}
-                        _focus={{
-                          borderColor: "blue.500",
-                          boxShadow: "0 0 0 2px rgba(66, 153, 225, 0.3)",
-                          outline: "none",
-                        }}
-                        size="lg"
-                      />
+                      <HStack mb={2} spacing={3}>
+                        <Switch
+                          colorScheme="blue"
+                          isChecked={!!formData.duration_unlimited}
+                          isDisabled={loading}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              duration_unlimited: e.target.checked,
+                              duration: e.target.checked
+                                ? formData.duration
+                                : formData.duration || 60,
+                            })
+                          }
+                        />
+                        <Text fontSize="sm">بدون حد زمني</Text>
+                      </HStack>
+                      {!formData.duration_unlimited ? (
+                        <Input
+                          type="number"
+                          value={formData.duration}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              duration: parseInt(e.target.value, 10) || "",
+                              duration_unlimited: false,
+                            })
+                          }
+                          placeholder="60"
+                          min={1}
+                          max={300}
+                          isDisabled={loading}
+                          borderRadius="lg"
+                          borderWidth="1px"
+                          borderColor={cardBorder}
+                          _focus={{
+                            borderColor: "blue.500",
+                            boxShadow: "0 0 0 2px rgba(66, 153, 225, 0.3)",
+                            outline: "none",
+                          }}
+                          size="lg"
+                        />
+                      ) : null}
+                      <Text fontSize="xs" color="gray.500" mt={1}>
+                        بدون حد زمني يبقى مفتوحاً حتى تاريخ انتهاء الواجب أو تسليم الطالب.
+                      </Text>
                     </FormControl>
                   </HStack>
                 </Box>

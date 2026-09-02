@@ -82,7 +82,22 @@ import baseUrl from "../../api/baseUrl";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import { useParams, useNavigate } from "react-router-dom";
 import UserType from "../../Hooks/auth/userType";
-import { normalizeSingleExamQuestion } from "../../utils/examFlowUtils";
+import {
+  extractExamAttemptId,
+  isLectureExamFinishedPayload,
+  normalizeSingleExamQuestion,
+  remainingFromEndsAt,
+  resolveLectureExamServerTimer,
+  savedLectureExamAnswersToMap,
+  toPositiveAttemptId,
+} from "../../utils/examFlowUtils";
+import {
+  clearExamProgress,
+  clearPersistedAttemptId,
+  persistAttemptId,
+  readExamProgress,
+  writeExamProgress,
+} from "../../utils/examAttemptProgress";
 import { normalizeExamAttemptResult } from "../../utils/examAttemptResultUtils";
 import ExamAttemptResultScreen from "./components/ExamAttemptResultScreen";
 
@@ -121,6 +136,7 @@ const ComprehensiveExam = () => {
   const [examStatus, setExamStatus] = useState(null); // hidden, not_open_yet, closed, already_submitted, ready
   const [currentAttempt, setCurrentAttempt] = useState(null);
   const [remainingSeconds, setRemainingSeconds] = useState(null);
+  const [examEndsAt, setExamEndsAt] = useState(null);
   const [attemptHistory, setAttemptHistory] = useState([]);
   const [feedback, setFeedback] = useState(null);
   const [startingAttempt, setStartingAttempt] = useState(false);
@@ -208,10 +224,28 @@ const ComprehensiveExam = () => {
   const prevExamIdRef = useRef(null);
   const questionsRef = useRef([]);
   const questionsAutoRetryRef = useRef(false);
+  const studentAnswersRef = useRef({});
+  const attemptIdRef = useRef(null);
+  const examEndsAtRef = useRef(null);
+  const timerIntervalRef = useRef(null);
+  const timerExpiredRef = useRef(false);
+  const submitInFlightRef = useRef(false);
+  const allowTimerSubmitRef = useRef(false);
+  const sessionAppliedAtRef = useRef(0);
+  const currentQuestionIndexRef = useRef(0);
+  const handleSubmitExamRef = useRef(null);
 
   useEffect(() => {
     questionsRef.current = questions;
   }, [questions]);
+
+  useEffect(() => {
+    studentAnswersRef.current = studentAnswers;
+  }, [studentAnswers]);
+
+  useEffect(() => {
+    currentQuestionIndexRef.current = currentQuestionIndex;
+  }, [currentQuestionIndex]);
 
   useEffect(() => {
     if (id) {
@@ -223,6 +257,7 @@ const ComprehensiveExam = () => {
         setExamStatus(null);
         setCurrentAttempt(null);
         setRemainingSeconds(null);
+        setExamEndsAt(null);
         setAttemptHistory([]);
         setFeedback(null);
         setError(null);
@@ -254,29 +289,110 @@ const ComprehensiveExam = () => {
     return undefined;
   }, [id, isTeacher, isAdmin, fetchGrades]);
 
-  // عداد الوقت للمحاولة النشطة
+  const persistLectureProgress = useCallback(
+    (overrides = {}) => {
+      const attemptId = toPositiveAttemptId(attemptIdRef.current);
+      if (!id || !attemptId || submitResult) return;
+      writeExamProgress(id, attemptId, {
+        answers: overrides.answers ?? studentAnswersRef.current,
+        current: overrides.current ?? currentQuestionIndexRef.current,
+        endsAt: overrides.endsAt ?? examEndsAtRef.current,
+      });
+    },
+    [id, submitResult],
+  );
+
+  const applyLectureAttemptSession = useCallback(
+    (payload = {}, { wipeAnswers = false } = {}) => {
+      if (isLectureExamFinishedPayload(payload) && !payload.questions?.length) {
+        setSubmitResult(payload);
+        return { remaining: 0, finished: true };
+      }
+      const attempt = payload.attempt || payload;
+      const resolvedAttemptId =
+        extractExamAttemptId(payload, id) ||
+        toPositiveAttemptId(attempt.attemptId ?? attempt.attempt_id ?? attempt.id);
+      if (resolvedAttemptId) {
+        persistAttemptId(id, resolvedAttemptId);
+        attemptIdRef.current = resolvedAttemptId;
+      }
+      const timerSource = {
+        attemptExpiresAt:
+          attempt.attemptExpiresAt ??
+          attempt.attemptExpireAt ??
+          attempt.attempt_expire_at ??
+          payload.attemptExpiresAt ??
+          payload.attempt_expires_at,
+        remainingSeconds: attempt.remainingSeconds ?? payload.remainingSeconds,
+      };
+      const { endsAt, remaining } = resolveLectureExamServerTimer(timerSource);
+      examEndsAtRef.current = endsAt;
+      setExamEndsAt(endsAt);
+      setRemainingSeconds(remaining);
+      allowTimerSubmitRef.current = remaining != null;
+      timerExpiredRef.current = remaining === 0;
+      sessionAppliedAtRef.current = Date.now();
+
+      const serverAnswers = savedLectureExamAnswersToMap(
+        payload.savedAnswers || payload.saved_answers,
+      );
+      const localProgress = resolvedAttemptId ? readExamProgress(id, resolvedAttemptId) : null;
+      const localAnswers =
+        localProgress?.answers && typeof localProgress.answers === "object"
+          ? localProgress.answers
+          : {};
+      const merged = wipeAnswers
+        ? { ...serverAnswers }
+        : { ...serverAnswers, ...localAnswers };
+      studentAnswersRef.current = merged;
+      setStudentAnswers(merged);
+      persistLectureProgress({ answers: merged, endsAt });
+      return { remaining, finished: false, attemptId: resolvedAttemptId };
+    },
+    [id, persistLectureProgress],
+  );
+
+  // عداد الوقت للمحاولة النشطة — مصدر الوقت هو السيرفر فقط
   useEffect(() => {
-    if (
-      currentAttempt &&
-      currentAttempt.remainingSeconds > 0 &&
-      student &&
-      !isTeacher &&
-      !isAdmin
-    ) {
-      const interval = setInterval(() => {
-        setRemainingSeconds((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            // عند انتهاء الوقت، تحديث البيانات
-            fetchExamData();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-      return () => clearInterval(interval);
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
     }
-  }, [currentAttempt, student, isTeacher, isAdmin]);
+    if (
+      submitResult ||
+      blockedAttemptResult ||
+      examEndsAt == null ||
+      isTeacher ||
+      isAdmin
+    ) {
+      return undefined;
+    }
+
+    const tick = () => {
+      const left = remainingFromEndsAt(examEndsAtRef.current) ?? 0;
+      setRemainingSeconds(left);
+      if (left > 0 || timerExpiredRef.current || submitInFlightRef.current) return;
+      if (!allowTimerSubmitRef.current) return;
+      const appliedAgo = Date.now() - (sessionAppliedAtRef.current || 0);
+      if (appliedAgo < 800) return;
+      timerExpiredRef.current = true;
+      toast({
+        title: "انتهى الوقت!",
+        description: "يتم تسليم الامتحان تلقائياً.",
+        status: "warning",
+      });
+      handleSubmitExamRef.current?.(true);
+    };
+
+    tick();
+    timerIntervalRef.current = setInterval(tick, 1000);
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+    };
+  }, [examEndsAt, submitResult, blockedAttemptResult, isTeacher, isAdmin, toast]);
 
   /**
    * تسوية مصفوفة الأسئلة من الـ API:
@@ -330,22 +446,27 @@ const ComprehensiveExam = () => {
 
       const startRes = await baseUrl.post(`/api/exams/${id}/start`, {}, authConfig);
       const startData = startRes.data || {};
+      if (isLectureExamFinishedPayload(startData) && !startData.questions?.length) {
+        setSubmitResult(startData);
+        return false;
+      }
       let rawQuestions = startData.questions ?? [];
+      let sessionPayload = startData;
 
       if (!rawQuestions.length) {
         const getRes = await baseUrl.get(`/api/exams/${id}`, authConfig);
         const getData = getRes.data || {};
         rawQuestions = getData.questions ?? [];
-        if (getData.attempt) {
-          const remaining =
-            getData.attempt.remainingSeconds ??
-            (getData.exam?.duration != null ? getData.exam.duration * 60 : null);
-          setCurrentAttempt({
-            ...getData.attempt,
-            remainingSeconds: remaining ?? getData.attempt.remainingSeconds,
-          });
-          setRemainingSeconds(remaining ?? getData.attempt.remainingSeconds ?? null);
-        }
+        sessionPayload = { ...startData, ...getData };
+      }
+
+      if (sessionPayload.attempt || sessionPayload.attemptId || sessionPayload.savedAnswers) {
+        applyLectureAttemptSession(sessionPayload, { wipeAnswers: false });
+        const attempt = sessionPayload.attempt || sessionPayload;
+        setCurrentAttempt({
+          ...attempt,
+          remainingSeconds: attempt.remainingSeconds ?? sessionPayload.remainingSeconds,
+        });
       }
 
       const formattedQuestions = normalizeQuestions(rawQuestions);
@@ -377,7 +498,7 @@ const ComprehensiveExam = () => {
     } finally {
       setQuestionsReloading(false);
     }
-  }, [id]);
+  }, [id, applyLectureAttemptSession]);
 
   useEffect(() => {
     if (
@@ -439,18 +560,35 @@ const ComprehensiveExam = () => {
       }
 
       const data = res.data;
+      if (isLectureExamFinishedPayload(data) && !data.questions?.length && student && !isTeacher && !isAdmin) {
+        setSubmitResult(data);
+      }
       const exam = data.exam;
       const attempt = data.attempt;
       setExamData(exam);
       setExamStatus(data.status);
-      const derivedSeconds = exam?.duration != null ? exam.duration * 60 : null;
-      const remaining =
-        attempt?.remainingSeconds ??
-        (attempt && derivedSeconds ? derivedSeconds : null);
+      const appliedAttempt = attempt
+        ? applyLectureAttemptSession(
+            {
+              ...data,
+              attempt,
+            },
+            { wipeAnswers: false },
+          )
+        : null;
       setCurrentAttempt(
-        attempt ? { ...attempt, remainingSeconds: remaining ?? attempt.remainingSeconds } : null
+        attempt
+          ? {
+              ...attempt,
+              remainingSeconds: appliedAttempt?.remaining ?? attempt.remainingSeconds,
+            }
+          : null,
       );
-      setRemainingSeconds(remaining ?? null);
+      if (!attempt) {
+        setRemainingSeconds(null);
+        setExamEndsAt(null);
+        examEndsAtRef.current = null;
+      }
       setAttemptHistory(data.attemptHistory || []);
       setFeedback(data.feedback || null);
       setAttemptSummary(data.attemptSummary || null);
@@ -636,6 +774,11 @@ const ComprehensiveExam = () => {
       );
 
       const attemptData = res.data || {};
+      if (isLectureExamFinishedPayload(attemptData) && !attemptData.questions?.length) {
+        setSubmitResult(attemptData);
+        setStartingAttempt(false);
+        return;
+      }
       let rawQuestions = attemptData.questions ?? [];
       let sessionData = attemptData;
 
@@ -649,26 +792,28 @@ const ComprehensiveExam = () => {
         if (sessionData.exam) setExamData(sessionData.exam);
       }
 
+      const resumed = Boolean(attemptData.resumed ?? sessionData.resumed);
+      const durationUnlimited = Boolean(
+        attemptData.durationUnlimited ??
+          attemptData.duration_unlimited ??
+          sessionData.exam?.durationUnlimited,
+      );
       const durationMinutes =
-        attemptData.timeLimitMinutes ??
         attemptData.durationMinutes ??
+        attemptData.timeLimitMinutes ??
         attemptData.duration ??
-        sessionData.exam?.timeLimitMinutes ??
         sessionData.exam?.durationMinutes ??
-        sessionData.exam?.duration ??
-        examData?.timeLimitMinutes ??
-        examData?.duration;
+        sessionData.exam?.duration;
       const attempt = sessionData.attempt || attemptData.attempt || attemptData;
-      const initialSeconds =
-        attempt?.remainingSeconds ??
-        attemptData.remainingSeconds ??
-        (durationMinutes ? durationMinutes * 60 : null);
+      applyLectureAttemptSession(
+        { ...attemptData, ...sessionData, attempt },
+        { wipeAnswers: !resumed },
+      );
 
       setCurrentAttempt({
         ...attempt,
-        remainingSeconds: initialSeconds ?? attempt?.remainingSeconds,
+        remainingSeconds: attempt?.remainingSeconds ?? attemptData.remainingSeconds,
       });
-      setRemainingSeconds(initialSeconds ?? attempt?.remainingSeconds ?? null);
       setExamStatus("ready");
 
       const formattedQuestions = normalizeQuestions(rawQuestions);
@@ -691,12 +836,12 @@ const ComprehensiveExam = () => {
       setQuestions(formattedQuestions);
       setQuestionsLoadError(null);
       setCurrentQuestionIndex(0);
-      setStudentAnswers({});
 
       toast({
-        title: "تم بدء المحاولة بنجاح",
-        description:
-          durationMinutes != null
+        title: resumed ? "تم استئناف المحاولة" : "تم بدء المحاولة بنجاح",
+        description: durationUnlimited
+          ? "بدون حد زمني"
+          : durationMinutes != null
             ? `المدة: ${durationMinutes} دقيقة`
             : "بدون مدة محددة",
         status: "success",
@@ -1122,9 +1267,67 @@ const ComprehensiveExam = () => {
     }
   };
 
+  const doAutosave = useCallback(async () => {
+    if (submitInFlightRef.current || submitResult || isTeacher || isAdmin) return;
+    const token = localStorage.getItem("token");
+    const attemptId = toPositiveAttemptId(attemptIdRef.current);
+    if (!token || !attemptId || !id) return;
+    const answers = Object.entries(studentAnswersRef.current || {})
+      .map(([questionId, choiceId]) => ({
+        questionId: Number(questionId),
+        choiceId: Number(choiceId),
+      }))
+      .filter((row) => Number.isInteger(row.questionId) && row.questionId > 0 && Number.isFinite(row.choiceId) && row.choiceId !== 0);
+    try {
+      const res = await baseUrl.post(
+        `/api/exams/${id}/autosave`,
+        { attemptId, answers },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const result = res.data;
+      if (isLectureExamFinishedPayload(result) && !result.questions?.length) {
+        setSubmitResult(result);
+        setExamEndsAt(null);
+        examEndsAtRef.current = null;
+        clearExamProgress(id, attemptId);
+        clearPersistedAttemptId(id);
+        return;
+      }
+      if (result?.remainingSeconds != null || result?.attemptExpiresAt || result?.attempt_expires_at) {
+        const { endsAt, remaining } = resolveLectureExamServerTimer(result);
+        examEndsAtRef.current = endsAt;
+        setExamEndsAt(endsAt);
+        setRemainingSeconds(remaining);
+      }
+    } catch {
+      /* silent — next interval retries */
+    }
+  }, [id, submitResult, isTeacher, isAdmin]);
+
+  useEffect(() => {
+    if (submitResult || !questions.length || isTeacher || isAdmin) return undefined;
+    const intervalId = setInterval(doAutosave, 18000);
+    return () => clearInterval(intervalId);
+  }, [doAutosave, questions.length, submitResult, isTeacher, isAdmin]);
+
+  useEffect(() => {
+    return () => {
+      if (!submitInFlightRef.current && attemptIdRef.current) {
+        doAutosave();
+      }
+    };
+  }, [doAutosave]);
+
   // للطالب: عند اختيار إجابة
   const handleStudentChoice = (qid, cid) => {
-    setStudentAnswers((prev) => ({ ...prev, [qid]: cid }));
+    if (submitResult) return;
+    setStudentAnswers((prev) => {
+      const next = { ...prev, [qid]: cid };
+      studentAnswersRef.current = next;
+      persistLectureProgress({ answers: next });
+      return next;
+    });
+    doAutosave();
   };
 
   // دوال التنقل بين الأسئلة
@@ -1145,19 +1348,23 @@ const ComprehensiveExam = () => {
   };
 
   // للطالب: تسليم الامتحان
-  const handleSubmitExam = async () => {
+  const handleSubmitExam = async (autoSubmit = false) => {
+    const isAuto = autoSubmit === true;
+    if (submitInFlightRef.current || submitResult) return;
+    submitInFlightRef.current = true;
     setSubmitLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const answersArr = Object.entries(studentAnswers).map(
+      const answersArr = Object.entries(studentAnswersRef.current || {}).map(
         ([questionId, choiceId]) => ({
           questionId: Number(questionId),
           choiceId: Number(choiceId),
         })
       );
+      const attemptId = toPositiveAttemptId(attemptIdRef.current);
       const res = await baseUrl.post(
         `/api/exams/${id}/submit`,
-        { answers: answersArr },
+        { answers: answersArr, attemptId },
         token ? { headers: { Authorization: `Bearer ${token}` } } : {}
       );
 
@@ -1168,12 +1375,12 @@ const ComprehensiveExam = () => {
         totalGrade: result.totalGrade,
         maxGrade: result.maxGrade,
         passed: result.passed,
+        timedOut: result.timedOut,
         wrongQuestions: result.wrongQuestions || [],
         releaseReason: result.releaseReason,
         showAnswers: result.showAnswers,
       });
 
-      // تحديث حالة الامتحان
       setExamStatus(
         result.status === "submitted" || result.status === "late"
           ? "already_submitted"
@@ -1181,8 +1388,13 @@ const ComprehensiveExam = () => {
       );
       setCurrentAttempt(null);
       setRemainingSeconds(null);
+      setExamEndsAt(null);
+      examEndsAtRef.current = null;
+      if (attemptId) {
+        clearExamProgress(id, attemptId);
+        clearPersistedAttemptId(id);
+      }
 
-      // إذا كان هناك feedback، تحديثه
       if (result.wrongQuestions && result.wrongQuestions.length > 0) {
         setFeedback({
           wrongQuestions: result.wrongQuestions,
@@ -1191,14 +1403,13 @@ const ComprehensiveExam = () => {
       }
 
       toast({
-        title: "تم تسليم الامتحان!",
+        title: result.timedOut || isAuto ? "انتهى الوقت — تم التسليم" : "تم تسليم الامتحان!",
         description: `الدرجة: ${result.totalGrade}/${result.maxGrade}`,
-        status: "success",
+        status: result.timedOut || isAuto ? "warning" : "success",
         duration: 4000,
         isClosable: true,
       });
 
-      // إعادة جلب بيانات الامتحان لتحديث الحالة
       await fetchExamData();
     } catch (err) {
       console.error("Error submitting exam:", err);
@@ -1211,8 +1422,10 @@ const ComprehensiveExam = () => {
       });
     } finally {
       setSubmitLoading(false);
+      submitInFlightRef.current = false;
     }
   };
+  handleSubmitExamRef.current = handleSubmitExam;
 
   // فتح مودال إضافة الصور
   const openAddImageModal = () => {
@@ -2130,7 +2343,7 @@ const ComprehensiveExam = () => {
                             {Object.keys(studentAnswers).length === questions.length && (
                               <Button
                                 colorScheme="green"
-                                onClick={handleSubmitExam}
+                                onClick={() => handleSubmitExam(false)}
                                 isLoading={submitLoading}
                                 size="md"
                                 borderRadius="lg"

@@ -13,6 +13,7 @@ import {
 } from "@chakra-ui/react";
 import { FaCheckCircle, FaCog, FaEdit, FaPen, FaPlus, FaTasks, FaTrash, FaChartBar } from "react-icons/fa";
 import { buildExamReportPath } from "../../exam/utils/examReportUtils";
+import { formatLectureExamDurationLabel } from "../../../utils/examFlowUtils";
 import { crEyebrowOrange, crSubheading, lcBadge, lcBtn, lcCaption, lcLabel, lcRoot, lcTitleSm } from "../courseTheme";
 
 function getExamStatus(exam) {
@@ -20,7 +21,7 @@ function getExamStatus(exam) {
   if (exam.is_solved) {
     return { label: "تم الحل", tone: "done", cta: "عرض النتيجة", icon: FaCheckCircle };
   }
-  if (exam.in_progress || exam.is_started) {
+  if (exam.can_resume || exam.in_progress || exam.is_started) {
     return { label: "قيد التنفيذ", tone: "active", cta: "متابعة الواجب", icon: FaPen };
   }
   if (exam.availability_status === "expired" || exam.can_start === false) {
@@ -79,10 +80,12 @@ function CourseAssignmentRow({
           </div>
           <p className={`mt-0.5 break-words ${lcCaption}`}>
             {canManage
-              ? `الدرجة: ${exam.total_grade ?? "—"} • المدة: ${exam.duration ?? "—"} دقيقة${exam.is_visible === false ? " • مخفي" : ""}`
+              ? `الدرجة: ${exam.total_grade ?? "—"} • المدة: ${formatLectureExamDurationLabel(exam)}${exam.is_visible === false ? " • مخفي" : ""}`
               : exam.student_submission?.score != null
                 ? `درجتك: ${exam.student_submission.score}`
-                : null}
+                : exam.remaining_seconds != null
+                  ? `متبقٍ ${String(Math.floor(Number(exam.remaining_seconds) / 60)).padStart(2, "0")}:${String(Number(exam.remaining_seconds) % 60).padStart(2, "0")}`
+                  : null}
           </p>
         </div>
       </div>
