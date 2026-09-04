@@ -187,6 +187,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
         { to: "/admin/management", Icon: MdDashboard, label: "لوحة التحكم" },
         { to: "/admin/finance", Icon: MdAccountBalanceWallet, label: "الحسابات والمالية" },
         { to: "/admin/whatsapp/inbox", Icon: FaWhatsapp, label: "واتساب" },
+        { to: "/admin/whatsapp/policy", Icon: FaWhatsapp, label: "تخصيص الدعم" },
         { to: "/all_students", Icon: MdPeople, label: "كل الطلاب" },
         {
           to: "/question-bank-dashboard",

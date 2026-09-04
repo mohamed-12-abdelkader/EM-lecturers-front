@@ -258,6 +258,9 @@ export default function WhatsAppInboxPage() {
               </Text>
             </Box>
             <HStack wrap="wrap">
+              <Button as={RouterLink} to="/admin/whatsapp/policy" size="sm" variant="outline">
+                تخصيص الدعم
+              </Button>
               <Button as={RouterLink} to="/admin/whatsapp/sessions" size="sm" variant="outline">
                 الجلسات
               </Button>

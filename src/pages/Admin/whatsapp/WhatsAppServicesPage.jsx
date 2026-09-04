@@ -204,6 +204,9 @@ export default function WhatsAppServicesPage() {
               </Text>
             </Box>
             <HStack>
+              <Button as={RouterLink} to="/admin/whatsapp/policy" size="sm" variant="outline">
+                تخصيص الدعم
+              </Button>
               <Button as={RouterLink} to="/admin/whatsapp/inbox" size="sm" variant="outline">
                 صندوق الوارد
               </Button>

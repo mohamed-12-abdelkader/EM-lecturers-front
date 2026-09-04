@@ -171,3 +171,26 @@ export async function sendWhatsAppConversationMessage({ conversation_id, body })
   );
   return data;
 }
+
+export async function fetchSupportPolicyPack() {
+  const { data } = await baseUrl.get(`${API}/support-policy`, {
+    headers: authHeaders(getToken()),
+  });
+  return data?.data || data;
+}
+
+export async function fetchSupportPolicyMessages() {
+  const { data } = await baseUrl.get(`${API}/support-policy/messages`, {
+    headers: authHeaders(getToken()),
+  });
+  return data?.data?.messages || [];
+}
+
+export async function sendSupportPolicyChat(message) {
+  const { data } = await baseUrl.post(
+    `${API}/support-policy/chat`,
+    { message },
+    { headers: authHeaders(getToken(), "application/json") },
+  );
+  return data?.data || data;
+}
