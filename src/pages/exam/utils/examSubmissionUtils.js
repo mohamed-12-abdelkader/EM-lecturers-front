@@ -1,4 +1,4 @@
-/** تطبيع حقول wrong_questions من GET /api/course/course-exam/:id/submissions */
+/** تطبيع حقول تسليمات المدرس: الدرجات، الأسئلة الخاطئة/المتروكة، والحالة */
 
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
@@ -6,6 +6,18 @@ import jsPDF from "jspdf";
 const EXPORT_FONT = "'Noto Sans Arabic', 'Noto Naskh Arabic', Tahoma, sans-serif";
 const PDF_ROWS_FIRST_PAGE = 20;
 const PDF_ROWS_PER_PAGE = 26;
+
+function firstDefined(...values) {
+  for (const value of values) {
+    if (value != null && value !== "") return value;
+  }
+  return undefined;
+}
+
+function toFiniteNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
 
 function resolveOptionText(question, letter) {
   if (!letter || !question) return null;
@@ -32,13 +44,21 @@ export function normalizeWrongQuestion(raw) {
   const correctLetter = raw.correctAnswer ?? raw.correctChoice?.id ?? null;
   const yourText = raw.yourAnswerText ?? raw.yourChoice?.text ?? null;
   const correctText = raw.correctAnswerText ?? raw.correctChoice?.text ?? null;
+  const unanswered = Boolean(
+    raw.unanswered ||
+      raw.unanswered === true ||
+      ((yourLetter == null || yourLetter === "") && (yourText == null || yourText === "")),
+  );
 
   return {
     questionId: raw.questionId ?? raw.id,
     questionText: raw.questionText ?? raw.text ?? "",
     questionImage: raw.questionImage ?? raw.image ?? null,
     type: raw.type ?? "mcq",
-    yourAnswerDisplay: formatSubmissionAnswer(yourLetter, yourText, raw),
+    unanswered,
+    yourAnswerDisplay: unanswered
+      ? "لم يجب"
+      : formatSubmissionAnswer(yourLetter, yourText, raw),
     correctAnswerDisplay: formatSubmissionAnswer(correctLetter, correctText, raw),
   };
 }
@@ -49,11 +69,51 @@ export function getWrongQuestions(submission) {
   return list.map(normalizeWrongQuestion).filter(Boolean);
 }
 
-export function getWrongQuestionsCount(submission) {
-  if (submission?.wrong_questions_count != null) {
-    return Number(submission.wrong_questions_count) || 0;
+export function getUnansweredQuestionsCount(submission, wrongQuestions = getWrongQuestions(submission)) {
+  if (submission?.unanswered_count != null || submission?.unansweredCount != null) {
+    return Math.max(0, toFiniteNumber(submission.unanswered_count ?? submission.unansweredCount));
   }
-  return getWrongQuestions(submission).length;
+  return wrongQuestions.filter((q) => q.unanswered).length;
+}
+
+export function getWrongQuestionsCount(submission) {
+  const listed = getWrongQuestions(submission);
+  if (listed.length > 0) return listed.length;
+  if (submission?.wrong_questions_count != null || submission?.wrongQuestionsCount != null) {
+    return Math.max(0, toFiniteNumber(submission.wrong_questions_count ?? submission.wrongQuestionsCount));
+  }
+  return 0;
+}
+
+export function resolveSubmissionStatus(submission, outcome) {
+  if (outcome?.inProgress || submission?.status === "in_progress" || submission?.in_progress) {
+    return {
+      key: "in_progress",
+      label: "بدأ ولم يسلّم",
+      colorScheme: "orange",
+    };
+  }
+  if (submission?.timed_out || submission?.timedOut || submission?.exam_status === "timed_out") {
+    return {
+      key: "timed_out",
+      label: "انتهى الوقت — تم التسليم",
+      colorScheme: "orange",
+    };
+  }
+  if (submission?.status === "late" || submission?.is_late || submission?.exam_status === "late") {
+    return {
+      key: "late",
+      label: "تسليم متأخر",
+      colorScheme: "yellow",
+    };
+  }
+  if (outcome?.perfect) {
+    return { key: "perfect", label: "مكتمل — إجابة كاملة", colorScheme: "green" };
+  }
+  if (outcome?.passed) {
+    return { key: "submitted", label: "مُسلَّم", colorScheme: "blue" };
+  }
+  return { key: "failed", label: "مُسلَّم", colorScheme: "gray" };
 }
 
 export function resolveSubmissionOutcome(submission) {
@@ -62,10 +122,28 @@ export function resolveSubmissionOutcome(submission) {
     submission?.in_progress === true ||
     submission?.exam_status === "in_progress";
   if (inProgress) {
-    return { obtained: 0, total: 0, percentage: 0, passed: false, inProgress: true };
+    return {
+      obtained: 0,
+      total: 0,
+      percentage: 0,
+      passed: false,
+      inProgress: true,
+      perfect: false,
+    };
   }
-  const obtained = Number(submission?.obtained_grade ?? submission?.obtainedGrade ?? 0);
-  const total = Number(submission?.total_grade ?? submission?.totalGrade ?? 0);
+
+  const obtained = toFiniteNumber(
+    firstDefined(submission?.obtained_grade, submission?.obtainedGrade, 0),
+  );
+  const total = toFiniteNumber(
+    firstDefined(
+      submission?.max_grade,
+      submission?.maxGrade,
+      submission?.total_grade,
+      submission?.totalGrade,
+      0,
+    ),
+  );
   const percentage =
     submission?.percentage != null
       ? Math.round(Number(submission.percentage))
@@ -74,8 +152,23 @@ export function resolveSubmissionOutcome(submission) {
         : 0;
   const passed =
     submission?.passed != null ? Boolean(submission.passed) : percentage >= 50;
+  const wrongCount = getWrongQuestionsCount(submission);
+  const unansweredCount = getUnansweredQuestionsCount(submission);
+  const inferredMisses = total > 0 ? Math.max(0, total - obtained) : 0;
+  const misses = Math.max(wrongCount, unansweredCount, inferredMisses);
+  const perfect = total > 0 && obtained >= total && misses === 0 && percentage >= 100;
 
-  return { obtained, total, percentage, passed, inProgress: false };
+  return {
+    obtained,
+    total,
+    percentage,
+    passed,
+    inProgress: false,
+    perfect,
+    wrongCount,
+    unansweredCount,
+    misses,
+  };
 }
 
 function escapeCsvCell(value) {
@@ -106,15 +199,19 @@ export function downloadExamGradesExcel(submissions = [], options = {}) {
   ];
 
   const rows = list.map((submission, index) => {
-    const { obtained, total, percentage, passed } = resolveSubmissionOutcome(submission);
+    const outcome = resolveSubmissionOutcome(submission);
+    const { obtained, total, percentage, passed, inProgress } = outcome;
+    const statusLabel = inProgress
+      ? status.label
+      : `${passed ? "ناجح" : "راسب"}${status.key === "timed_out" ? " — انتهى الوقت" : ""}`;
     return [
       index + 1,
       submission.name || "طالب",
       submission.student_id ?? "",
-      Number.isFinite(obtained) ? obtained : "",
-      Number.isFinite(total) && total > 0 ? total : "",
-      `${percentage}%`,
-      passed ? "ناجح" : "راسب",
+      inProgress ? "" : Number.isFinite(obtained) ? obtained : "",
+      inProgress ? "" : Number.isFinite(total) && total > 0 ? total : "",
+      inProgress ? "" : `${percentage}%`,
+      statusLabel,
     ];
   });
 
@@ -146,14 +243,16 @@ function escapeHtml(value) {
 function buildGradesPdfTableRows(submissions, startIndex = 0) {
   return submissions
     .map((submission, index) => {
-      const { obtained, total, percentage, passed } = resolveSubmissionOutcome(submission);
+      const outcome = resolveSubmissionOutcome(submission);
+      const { obtained, total, percentage, passed, inProgress } = outcome;
+      const status = resolveSubmissionStatus(submission, outcome);
       const rowNum = startIndex + index + 1;
-      const obtainedText = Number.isFinite(obtained) ? obtained : "—";
-      const totalText = Number.isFinite(total) && total > 0 ? total : "—";
-      const statusText = passed ? "ناجح" : "راسب";
+      const obtainedText = inProgress ? "—" : Number.isFinite(obtained) ? obtained : "—";
+      const totalText = inProgress ? "—" : Number.isFinite(total) && total > 0 ? total : "—";
+      const statusText = status.label;
       const rowBg = index % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
-      const statusBg = passed ? "#DCFCE7" : "#FEE2E2";
-      const statusColor = passed ? "#15803D" : "#B91C1C";
+      const statusBg = inProgress ? "#FFEDD5" : passed ? "#DCFCE7" : "#FEE2E2";
+      const statusColor = inProgress ? "#C2410C" : passed ? "#15803D" : "#B91C1C";
 
       return `
         <tr style="background: ${rowBg}; border-bottom: 1px solid #E2E8F0;">
@@ -162,7 +261,7 @@ function buildGradesPdfTableRows(submissions, startIndex = 0) {
           <td style="padding: 11px 10px; text-align: center; color: #475569;">${escapeHtml(submission.student_id ?? "—")}</td>
           <td style="padding: 11px 10px; text-align: center; font-weight: 800; color: #0E4C92;">${obtainedText}</td>
           <td style="padding: 11px 10px; text-align: center; color: #475569;">${totalText}</td>
-          <td style="padding: 11px 10px; text-align: center; font-weight: 800; color: ${passed ? "#15803D" : "#B91C1C"};">${percentage}%</td>
+          <td style="padding: 11px 10px; text-align: center; font-weight: 800; color: ${inProgress ? "#C2410C" : passed ? "#15803D" : "#B91C1C"};">${inProgress ? "—" : `${percentage}%`}</td>
           <td style="padding: 11px 10px; text-align: center;">
             <span style="display: inline-block; padding: 4px 12px; border-radius: 999px; background: ${statusBg}; color: ${statusColor}; font-weight: 800; font-size: 12px;">
               ${statusText}
@@ -262,16 +361,17 @@ function buildGradesPdfPageHtml({
 
 function buildGradesPdfSummary(submissions) {
   const outcomes = submissions.map(resolveSubmissionOutcome);
-  const passed = outcomes.filter((item) => item.passed).length;
+  const completed = outcomes.filter((item) => !item.inProgress);
+  const passed = completed.filter((item) => item.passed).length;
   const averagePercentage =
-    outcomes.length > 0
-      ? Math.round(outcomes.reduce((sum, item) => sum + item.percentage, 0) / outcomes.length)
+    completed.length > 0
+      ? Math.round(completed.reduce((sum, item) => sum + item.percentage, 0) / completed.length)
       : 0;
 
   return {
     total: submissions.length,
     passed,
-    failed: submissions.length - passed,
+    failed: completed.length - passed,
     averagePercentage,
   };
 }

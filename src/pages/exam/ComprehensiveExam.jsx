@@ -316,22 +316,21 @@ const ComprehensiveExam = () => {
         persistAttemptId(id, resolvedAttemptId);
         attemptIdRef.current = resolvedAttemptId;
       }
-      const timerSource = {
-        attemptExpiresAt:
-          attempt.attemptExpiresAt ??
-          attempt.attemptExpireAt ??
-          attempt.attempt_expire_at ??
-          payload.attemptExpiresAt ??
-          payload.attempt_expires_at,
-        remainingSeconds: attempt.remainingSeconds ?? payload.remainingSeconds,
-      };
-      const { endsAt, remaining } = resolveLectureExamServerTimer(timerSource);
+      const { endsAt, remaining } = resolveLectureExamServerTimer(payload, {
+        isNewAttempt: wipeAnswers,
+      });
       examEndsAtRef.current = endsAt;
       setExamEndsAt(endsAt);
       setRemainingSeconds(remaining);
+      submitInFlightRef.current = false;
       allowTimerSubmitRef.current = remaining != null;
-      timerExpiredRef.current = remaining === 0;
+      timerExpiredRef.current = false;
       sessionAppliedAtRef.current = Date.now();
+      setSubmitResult(null);
+      if (wipeAnswers) {
+        setFeedback(null);
+        setBlockedAttemptResult(null);
+      }
 
       const serverAnswers = savedLectureExamAnswersToMap(
         payload.savedAnswers || payload.saved_answers,
@@ -805,14 +804,25 @@ const ComprehensiveExam = () => {
         sessionData.exam?.durationMinutes ??
         sessionData.exam?.duration;
       const attempt = sessionData.attempt || attemptData.attempt || attemptData;
-      applyLectureAttemptSession(
-        { ...attemptData, ...sessionData, attempt },
+      const applied = applyLectureAttemptSession(
+        {
+          ...attemptData,
+          ...sessionData,
+          attempt,
+          resumed,
+          durationMinutes,
+          durationUnlimited,
+        },
         { wipeAnswers: !resumed },
       );
 
       setCurrentAttempt({
         ...attempt,
-        remainingSeconds: attempt?.remainingSeconds ?? attemptData.remainingSeconds,
+        remainingSeconds:
+          applied?.remaining ??
+          attempt?.remainingSeconds ??
+          attemptData.remainingSeconds ??
+          sessionData.remainingSeconds,
       });
       setExamStatus("ready");
 

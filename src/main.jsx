@@ -77,13 +77,14 @@ const RootContent = () => {
     path.startsWith("/video/") ||
     path.startsWith("/exam/") ||
     path.startsWith("/essay-exam/");
+  const isStudentExamTake = /\/exam\/[^/]+\/take\/?$/.test(path);
   const showStudentBottomNav = Boolean(student) && hasUser && !hideStudentBottomNav;
 
   return (
     <NotificationProvider>
       <ForceArabicLocale />
       <SyncTheme />
-      {showSidebar && <SidebarWithHeader />}
+      {showSidebar && !isStudentExamTake && <SidebarWithHeader />}
       <Box pb={showStudentBottomNav ? { base: "76px", [BOTTOM_NAV_MAX_BP]: 0 } : 0} dir="rtl" lang="ar">
         <App />
       </Box>

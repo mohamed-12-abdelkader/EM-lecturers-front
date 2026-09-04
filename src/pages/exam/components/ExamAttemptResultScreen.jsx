@@ -173,6 +173,7 @@ export default function ExamAttemptResultScreen({
   onBack,
   onZoomImage,
   pageBg,
+  compactTop = false,
 }) {
   const cardBg = useColorModeValue("white", "gray.800");
   const cardBorder = useColorModeValue("gray.200", "gray.700");
@@ -186,7 +187,13 @@ export default function ExamAttemptResultScreen({
       : 0;
 
   return (
-    <Box minH="100vh" bg={pageBg} pt="96px" pb={10} dir="rtl">
+    <Box
+      minH="100dvh"
+      bg={pageBg}
+      pt={compactTop ? { base: "max(16px, env(safe-area-inset-top))", md: 8 } : "96px"}
+      pb={10}
+      dir="rtl"
+    >
       <Container maxW="3xl">
         <Box
           borderRadius="3xl"

@@ -112,7 +112,8 @@ function TextChoiceCard({ label, text, isSelected, onSelect }) {
       w="full"
       textAlign="right"
       dir="rtl"
-      p={{ base: 3.5, md: 4 }}
+      minH={{ base: "56px", md: "auto" }}
+      p={{ base: 4, md: 4 }}
       borderRadius="2xl"
       borderWidth={isSelected ? "2px" : "1px"}
       borderColor={isSelected ? "blue.400" : border}
@@ -120,6 +121,7 @@ function TextChoiceCard({ label, text, isSelected, onSelect }) {
       boxShadow={isSelected ? "0 10px 28px rgba(49,130,206,0.14)" : "sm"}
       transition="all 0.18s ease"
       onClick={onSelect}
+      sx={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
       _hover={{
         bg: isSelected ? selectedBg : hoverBg,
         borderColor: isSelected ? "blue.400" : "blue.300",
@@ -144,15 +146,15 @@ function TextChoiceCard({ label, text, isSelected, onSelect }) {
 
       <Flex align="flex-start" gap={3}>
         <Flex
-          w={10}
-          h={10}
+          w={{ base: 12, md: 10 }}
+          h={{ base: 12, md: 10 }}
           borderRadius="xl"
           bg={isSelected ? "blue.500" : letterBg}
           color={isSelected ? "white" : letterColor}
           align="center"
           justify="center"
           fontWeight="bold"
-          fontSize="md"
+          fontSize={{ base: "lg", md: "md" }}
           flexShrink={0}
           boxShadow={isSelected ? "0 4px 12px rgba(49,130,206,0.35)" : "none"}
         >
@@ -161,17 +163,17 @@ function TextChoiceCard({ label, text, isSelected, onSelect }) {
 
         <Box flex={1} minW={0} pt={0.5}>
           <Text
-            fontSize={{ base: "sm", md: "md" }}
+            fontSize={{ base: "md", md: "md" }}
             fontWeight={isSelected ? "700" : "500"}
             color={textColor}
-            lineHeight="1.95"
+            lineHeight="1.9"
             whiteSpace="pre-wrap"
             wordBreak="break-word"
             sx={examQuestionTextSx}
           >
             {renderFormattedExamText(text)}
           </Text>
-          <Text mt={2} fontSize="xs" color={muted}>
+          <Text mt={2} fontSize="xs" color={muted} display={{ base: "none", md: "block" }}>
             {isSelected ? "إجابتك المختارة" : "اضغط للاختيار"}
           </Text>
         </Box>
@@ -205,7 +207,8 @@ function ImageChoiceCard({
       w="full"
       textAlign="right"
       dir="rtl"
-      p={4}
+      p={{ base: 4, md: 4 }}
+      minH={{ base: "56px", md: "auto" }}
       borderRadius="2xl"
       borderWidth={isSelected ? "2px" : "1px"}
       borderColor={isSelected ? "blue.400" : border}
@@ -213,6 +216,7 @@ function ImageChoiceCard({
       boxShadow={isSelected ? "0 10px 28px rgba(49,130,206,0.14)" : "sm"}
       transition="all 0.18s ease"
       onClick={onSelect}
+      sx={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
       _hover={{ bg: isSelected ? selectedBg : hoverBg, borderColor: "blue.300" }}
       position="relative"
       overflow="hidden"
@@ -231,8 +235,8 @@ function ImageChoiceCard({
       <Flex align="center" justify="space-between" mb={3} gap={3}>
         <HStack spacing={2}>
           <Flex
-            w={9}
-            h={9}
+          w={{ base: 11, md: 9 }}
+          h={{ base: 11, md: 9 }}
             borderRadius="lg"
             bg={isSelected ? "blue.500" : letterBg}
             color={isSelected ? "white" : "gray.700"}
@@ -287,6 +291,7 @@ export default function LectureExamStudentQuestionCard({
   selectedLetter,
   onSelectLetter,
   onZoomImage,
+  compactHeader = false,
 }) {
   const cardBg = useColorModeValue("white", "gray.800");
   const border = useColorModeValue("gray.200", "gray.700");
@@ -337,10 +342,11 @@ export default function LectureExamStudentQuestionCard({
         align="center"
         justify="space-between"
         px={{ base: 4, md: 5 }}
-        py={3}
+        py={compactHeader ? 2.5 : 3}
         bg={headerBg}
         borderBottomWidth="1px"
         borderColor={border}
+        display={compactHeader ? { base: "none", md: "flex" } : "flex"}
       >
         <HStack spacing={3}>
           <Flex
@@ -400,7 +406,7 @@ export default function LectureExamStudentQuestionCard({
             borderColor="blue.400"
           >
             <Text
-              fontSize={{ base: "md", md: "lg" }}
+            fontSize={{ base: "lg", md: "lg" }}
               fontWeight="semibold"
               color={textColor}
               lineHeight="2"

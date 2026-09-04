@@ -37,6 +37,7 @@ import {
   getWrongQuestions,
   getWrongQuestionsCount,
   resolveSubmissionOutcome,
+  resolveSubmissionStatus,
   downloadExamGradesExcel,
   downloadExamGradesPdf,
 } from "../utils/examSubmissionUtils";
@@ -124,7 +125,7 @@ function StatusBadge({ passed }) {
       borderWidth="1px"
       borderColor={passed ? "green.200" : "red.200"}
       _dark={{
-        bg: passed ? "whiteAlpha.100" : "whiteAlpha.100",
+        bg: "whiteAlpha.100",
         borderColor: passed ? "green.700" : "red.700",
       }}
     >
@@ -201,9 +202,13 @@ function WrongQuestionCard({ question, index, onZoomImage }) {
       <Box px={3} py={2} bg={softBg} borderBottomWidth="1px" borderColor={border}>
         <HStack spacing={2} flexWrap="wrap">
           <Text fontSize="xs" fontWeight="semibold" color={muted}>
-            سؤال خاطئ {index + 1}
+            {question.unanswered ? `سؤال متروك ${index + 1}` : `سؤال خاطئ ${index + 1}`}
           </Text>
-          {question.type ? (
+          {question.unanswered ? (
+            <Badge colorScheme="orange" variant="subtle" fontSize="2xs">
+              بدون إجابة
+            </Badge>
+          ) : question.type ? (
             <Badge colorScheme="purple" variant="subtle" fontSize="2xs">
               {question.type === "mcq" ? "اختيار من متعدد" : question.type}
             </Badge>
@@ -286,17 +291,25 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
   const perfectBg = useColorModeValue("green.50", "whiteAlpha.100");
   const perfectBorder = useColorModeValue("green.200", "green.700");
   const perfectText = useColorModeValue("green.700", "green.200");
+  const missedBg = useColorModeValue("orange.50", "whiteAlpha.100");
+  const missedBorder = useColorModeValue("orange.200", "orange.700");
+  const missedText = useColorModeValue("orange.700", "orange.200");
   const scorePanelBg = useColorModeValue("#F7FAFC", "whiteAlpha.50");
 
-  const { obtained, total, percentage, passed, inProgress } = resolveSubmissionOutcome(submission);
-  const wrongCount = getWrongQuestionsCount(submission);
+  const { obtained, total, percentage, passed, inProgress, perfect, misses } =
+    resolveSubmissionOutcome(submission);
+  const wrongQuestions = getWrongQuestions(submission);
+  const wrongCount = Math.max(getWrongQuestionsCount(submission), misses);
+  const unansweredCount = wrongQuestions.filter((q) => q.unanswered).length ||
+    Number(submission.unanswered_count ?? submission.unansweredCount ?? 0);
   const answeredCount = Number(submission.answered_count ?? submission.answeredCount ?? 0);
   const remainingSeconds = submission.remaining_seconds ?? submission.remainingSeconds;
-  const statusLabel = inProgress
-    ? "بدأ ولم يسلّم"
-    : submission.status === "submitted"
-      ? "مُسلَّم"
-      : submission.status || "—";
+  const statusMeta = resolveSubmissionStatus(submission, {
+    inProgress,
+    passed,
+    perfect,
+  });
+  const statusLabel = statusMeta.label;
   const startedAt = submission.started_at || submission.startedAt;
 
   if (inProgress) {
@@ -413,6 +426,16 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
                   محاولة {submission.attempt_number ?? 1}
                 </Badge>
                 <StatusBadge passed={passed} />
+                {(submission.timed_out || submission.timedOut) && (
+                  <Badge colorScheme="orange" fontFamily={FONT}>
+                    انتهى الوقت
+                  </Badge>
+                )}
+                {(submission.status === "late" || submission.is_late) && (
+                  <Badge colorScheme="yellow" fontFamily={FONT}>
+                    متأخر
+                  </Badge>
+                )}
               </HStack>
               <Heading
                 as="h3"
@@ -470,6 +493,11 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
               >
                 {passed ? "اجتاز الامتحان" : "لم يجتز الامتحان"}
               </Text>
+              {submission.timed_out || submission.timedOut ? (
+                <Text mt={0.5} fontSize="xs" fontWeight="700" color="orange.600">
+                  سُلّم لانتهاء الوقت
+                </Text>
+              ) : null}
             </Box>
           </Flex>
         </Flex>
@@ -498,7 +526,7 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
           />
         </Box>
 
-        <SimpleGrid columns={{ base: 2, md: 3 }} spacing={3} mb={4}>
+        <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3} mb={4}>
           <Box textAlign="center">
             <Text fontSize="xs" color={muted} fontWeight="600" mb={1}>
               الحالة
@@ -509,13 +537,21 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
           </Box>
           <Box textAlign="center">
             <Text fontSize="xs" color={muted} fontWeight="600" mb={1}>
-              الأسئلة الخاطئة
+              أخطاء / متروك
             </Text>
             <Text fontSize="sm" fontWeight="800" color={wrongCount > 0 ? "red.500" : "green.500"}>
               {wrongCount}
             </Text>
           </Box>
-          <Box textAlign="center" gridColumn={{ base: "span 2", md: "auto" }}>
+          <Box textAlign="center">
+            <Text fontSize="xs" color={muted} fontWeight="600" mb={1}>
+              بدون إجابة
+            </Text>
+            <Text fontSize="sm" fontWeight="800" color={unansweredCount > 0 ? "orange.500" : muted}>
+              {unansweredCount}
+            </Text>
+          </Box>
+          <Box textAlign="center">
             <Text fontSize="xs" color={muted} fontWeight="600" mb={1}>
               تاريخ التسليم
             </Text>
@@ -530,7 +566,7 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
           </Box>
         </SimpleGrid>
 
-        {wrongCount > 0 ? (
+        {wrongQuestions.length > 0 ? (
           <Box
             borderWidth="1px"
             borderColor={border}
@@ -553,11 +589,16 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
               <HStack spacing={2}>
                 <Icon as={AiOutlineCloseCircle} color="red.500" />
                 <Text fontWeight="bold" fontSize="sm">
-                  الأسئلة الخاطئة
+                  الأسئلة الخاطئة والمتروكة
                 </Text>
                 <Badge colorScheme="red" variant="subtle" borderRadius="full">
-                  {wrongCount}
+                  {wrongQuestions.length}
                 </Badge>
+                {unansweredCount > 0 ? (
+                  <Badge colorScheme="orange" variant="subtle" borderRadius="full">
+                    {unansweredCount} بدون إجابة
+                  </Badge>
+                ) : null}
               </HStack>
               <Icon
                 as={FiChevronDown}
@@ -570,7 +611,7 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
             <Collapse in={wrongOpen} animateOpacity unmountOnExit>
               <Box px={4} pb={4} pt={1}>
                 <VStack spacing={3} align="stretch">
-                  {getWrongQuestions(submission).map((q, qIdx) => (
+                  {wrongQuestions.map((q, qIdx) => (
                     <WrongQuestionCard
                       key={q.questionId || qIdx}
                       question={q}
@@ -582,7 +623,7 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
               </Box>
             </Collapse>
           </Box>
-        ) : (
+        ) : perfect ? (
           <HStack
             spacing={2}
             p={3}
@@ -594,6 +635,22 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
             <Icon as={FiAward} color="green.500" />
             <Text fontSize="sm" fontWeight="700" color={perfectText}>
               لا توجد أسئلة خاطئة — إجابة كاملة
+            </Text>
+          </HStack>
+        ) : (
+          <HStack
+            spacing={2}
+            p={3}
+            borderRadius="lg"
+            bg={missedBg}
+            borderWidth="1px"
+            borderColor={missedBorder}
+          >
+            <Icon as={AiOutlineCloseCircle} color="orange.500" />
+            <Text fontSize="sm" fontWeight="700" color={missedText}>
+              {wrongCount > 0
+                ? `${wrongCount} سؤال خاطئ أو متروك — لا تُحتسب درجة للسؤال المتروك`
+                : "لم تكتمل الإجابة على كل الأسئلة"}
             </Text>
           </HStack>
         )}

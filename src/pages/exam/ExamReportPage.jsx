@@ -254,17 +254,26 @@ function ReportCharts({ overall, questions }) {
   const panelSoft = useColorModeValue("#F8FAFC", "whiteAlpha.50");
 
   const pieData = useMemo(() => {
-    const correct = Number(overall.totalCorrect ?? 0);
-    const wrong = Number(overall.totalWrong ?? 0);
-    const unanswered = Number(
-      overall.totalUnanswered ??
-        questions.reduce((sum, q) => sum + (q.unansweredCount ?? 0), 0),
+    const correct = questions.reduce((sum, q) => sum + Number(q.correctCount ?? 0), 0);
+    const unanswered = questions.reduce(
+      (sum, q) => sum + Number(q.unansweredCount ?? q.unansweredStudents?.length ?? 0),
+      0,
     );
-    const total = correct + wrong + unanswered;
+    const wrongInclusive = questions.reduce((sum, q) => sum + Number(q.wrongCount ?? 0), 0);
+    const answeredWrong = Math.max(0, wrongInclusive - unanswered);
+    const fromOverallCorrect = Number(overall.totalCorrect ?? 0);
+    const fromOverallUnanswered = Number(overall.totalUnanswered ?? 0);
+    const fromOverallWrong = Number(overall.totalWrong ?? 0);
+    const correctValue = questions.length ? correct : fromOverallCorrect;
+    const unansweredValue = questions.length ? unanswered : fromOverallUnanswered;
+    const wrongValue = questions.length
+      ? answeredWrong
+      : Math.max(0, fromOverallWrong - unansweredValue);
+    const total = correctValue + wrongValue + unansweredValue;
     return [
-      { name: "صحيح", value: correct, color: GREEN },
-      { name: "خطأ", value: wrong, color: RED },
-      { name: "بدون إجابة", value: unanswered, color: AMBER },
+      { name: "صحيح", value: correctValue, color: GREEN },
+      { name: "خطأ", value: wrongValue, color: RED },
+      { name: "بدون إجابة", value: unansweredValue, color: AMBER },
     ]
       .filter((item) => item.value > 0)
       .map((item) => ({
@@ -277,15 +286,15 @@ function ReportCharts({ overall, questions }) {
     () =>
       questions.map((question, index) => {
         const correct = question.correctCount ?? 0;
-        const wrong = question.wrongCount ?? 0;
         const unanswered = question.unansweredCount ?? 0;
+        const answeredWrong = Math.max(0, (question.wrongCount ?? 0) - unanswered);
         const total =
-          question.statistics?.totalStudents ?? correct + wrong + unanswered;
+          question.statistics?.totalStudents ?? correct + answeredWrong + unanswered;
         return {
           name: `س ${question.displayNumber ?? index + 1}`,
           preview: stripQuestionPreview(question.questionText, 48),
           صحيح: correct,
-          خطأ: wrong,
+          خطأ: answeredWrong,
           "بدون إجابة": unanswered,
           total,
           successRate: total > 0 ? Math.round((correct / total) * 100) : 0,
@@ -525,20 +534,24 @@ function StudentList({ title, students, variant, showAnswer = false }) {
   const muted = useColorModeValue("gray.500", "gray.400");
   const hoverBg = useColorModeValue("blackAlpha.50", "whiteAlpha.100");
   const isCorrect = variant === "correct";
+  const isUnanswered = variant === "unanswered";
   const panelBg = useColorModeValue(
-    isCorrect ? "green.50" : "red.50",
-    isCorrect ? "whiteAlpha.100" : "whiteAlpha.100",
+    isCorrect ? "green.50" : isUnanswered ? "orange.50" : "red.50",
+    "whiteAlpha.100",
   );
   const panelBorder = useColorModeValue(
-    isCorrect ? "green.200" : "red.200",
-    isCorrect ? "green.700" : "red.700",
+    isCorrect ? "green.200" : isUnanswered ? "orange.200" : "red.200",
+    isCorrect ? "green.700" : isUnanswered ? "orange.700" : "red.700",
   );
   const titleColor = useColorModeValue(
-    isCorrect ? "green.700" : "red.700",
-    isCorrect ? "green.200" : "red.200",
+    isCorrect ? "green.700" : isUnanswered ? "orange.700" : "red.700",
+    isCorrect ? "green.200" : isUnanswered ? "orange.200" : "red.200",
   );
   const rowBorder = useColorModeValue("gray.100", "gray.700");
   const hasStudents = students.length > 0;
+  const IconComp = isCorrect ? FiCheckCircle : isUnanswered ? FiHelpCircle : FiXCircle;
+  const iconColor = isCorrect ? "green.500" : isUnanswered ? "orange.500" : "red.500";
+  const badgeScheme = isCorrect ? "green" : isUnanswered ? "orange" : "red";
 
   return (
     <Box
@@ -565,15 +578,15 @@ function StudentList({ title, students, variant, showAnswer = false }) {
       >
         <HStack spacing={2} minW={0}>
           <Icon
-            as={isCorrect ? FiCheckCircle : FiXCircle}
-            color={isCorrect ? "green.500" : "red.500"}
+            as={IconComp}
+            color={iconColor}
             flexShrink={0}
           />
           <Text fontWeight="bold" fontSize="sm" color={titleColor} noOfLines={1}>
             {title}
           </Text>
           <Badge
-            colorScheme={isCorrect ? "green" : "red"}
+            colorScheme={badgeScheme}
             variant="solid"
             borderRadius="full"
             px={2}
@@ -661,19 +674,28 @@ function QuestionReportCard({ question, index, displayNumber, onZoomImage }) {
   const correctBorder = useColorModeValue("green.200", "green.700");
 
   const correctStudents = question.correctStudents || [];
-  const wrongStudents = question.wrongStudents || [];
   const unansweredStudents = question.unansweredStudents || [];
+  const unansweredIds = new Set(
+    unansweredStudents.map((s) => Number(s.studentId ?? s.student_id)),
+  );
+  const answeredWrongStudents = (question.wrongStudents || []).filter((student) => {
+    const selected = student.selectedAnswer ?? student.selectedAnswerText ?? student.selectedChoiceId;
+    if (selected != null && selected !== "") return true;
+    return !unansweredIds.has(Number(student.studentId ?? student.student_id));
+  });
   const totalStudents =
     question.statistics?.totalStudents ??
     (question.correctCount ?? 0) + (question.wrongCount ?? 0);
   const correctCount = question.correctCount ?? 0;
-  const wrongCount = question.wrongCount ?? 0;
   const unansweredCount = question.unansweredCount ?? unansweredStudents.length;
+  const wrongCount = question.wrongCount ?? 0;
+  const answeredWrongCount = Math.max(0, wrongCount - unansweredCount);
   const correctRate =
     totalStudents > 0 ? Math.round((correctCount / totalStudents) * 100) : 0;
   const wrongRate =
-    totalStudents > 0 ? Math.round((wrongCount / totalStudents) * 100) : 0;
-  const unansweredRate = Math.max(0, 100 - correctRate - wrongRate);
+    totalStudents > 0 ? Math.round((answeredWrongCount / totalStudents) * 100) : 0;
+  const unansweredRate =
+    totalStudents > 0 ? Math.round((unansweredCount / totalStudents) * 100) : 0;
   const difficulty = questionDifficulty(wrongCount, totalStudents);
 
   return (
@@ -811,23 +833,29 @@ function QuestionReportCard({ question, index, displayNumber, onZoomImage }) {
           </Box>
         )}
 
-        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
+        <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3}>
           <StudentList
             title="إجابات صحيحة"
             students={correctStudents}
             variant="correct"
           />
           <StudentList
-            title="إجابات خاطئة / بدون إجابة"
-            students={wrongStudents}
+            title="إجابات خاطئة"
+            students={answeredWrongStudents}
             variant="incorrect"
+            showAnswer
+          />
+          <StudentList
+            title="بدون إجابة"
+            students={unansweredStudents}
+            variant="unanswered"
             showAnswer
           />
         </SimpleGrid>
 
-        {wrongStudents.length > 0 && (
+        {(answeredWrongStudents.length > 0 || unansweredStudents.length > 0) && (
           <Text fontSize="xs" color={muted} mt={2.5} textAlign="center">
-            اضغط على القسم لعرض من أخطأ وماذا اختار (آخر محاولة لكل طالب)
+            اضغط على القسم لعرض من أخطأ أو ترك السؤال (آخر محاولة لكل طالب)
           </Text>
         )}
       </Box>
@@ -1206,9 +1234,14 @@ export default function ExamReportPage() {
                 icon={FiTrendingUp}
               />
               <StatCard
-                label="إجابات خاطئة"
+                label="أخطاء ومتروكة"
                 value={overall.totalWrong ?? 0}
                 accent={RED}
+                hint={
+                  overall.totalUnanswered
+                    ? `منها ${overall.totalUnanswered} بدون إجابة`
+                    : "يشمل الأسئلة المتروكة"
+                }
                 icon={FiHelpCircle}
               />
             </SimpleGrid>

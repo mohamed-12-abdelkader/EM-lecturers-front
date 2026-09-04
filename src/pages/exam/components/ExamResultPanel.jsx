@@ -34,6 +34,7 @@ export default function ExamResultPanel({
   const wrongQuestions =
     submitResult?.wrongQuestions ?? feedback?.wrongQuestions ?? [];
   const wrongCount = wrongQuestions.length;
+  const isPerfect = maxGrade > 0 && Number(totalGrade) >= Number(maxGrade) && wrongCount === 0;
   const accent = passed ? "green" : "orange";
 
   const releaseLabel =
@@ -146,7 +147,7 @@ export default function ExamResultPanel({
         </Box>
       )}
 
-      {wrongCount === 0 && (
+      {wrongCount === 0 && isPerfect && (
         <Box
           p={5}
           borderRadius="xl"
@@ -159,6 +160,23 @@ export default function ExamResultPanel({
             <AiOutlineCheckCircle size={20} />
             <Text fontSize="sm" fontWeight="medium">
               لا توجد أخطاء — أحسنت!
+            </Text>
+          </HStack>
+        </Box>
+      )}
+      {wrongCount === 0 && !isPerfect && (
+        <Box
+          p={5}
+          borderRadius="xl"
+          borderWidth="1px"
+          borderColor={cardBorder}
+          bg={softBg}
+          textAlign="center"
+        >
+          <HStack justify="center" spacing={2} color="orange.600">
+            <AiOutlineCloseCircle size={20} />
+            <Text fontSize="sm" fontWeight="medium">
+              توجد أسئلة خاطئة أو متروكة — السؤال المتروك لا يُحتسب
             </Text>
           </HStack>
         </Box>

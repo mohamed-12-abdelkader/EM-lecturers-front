@@ -99,26 +99,98 @@ export function savedCourseExamAnswersToMap(savedAnswers = []) {
   return map;
 }
 
-/** عدّاد السيرفر: remainingSeconds / attemptExpiresAt. لا يُعاد ضبطه من ساعة الجهاز. */
-export function resolveCourseExamServerTimer(session = {}) {
-  const expiresAt = session.attemptExpiresAt ?? session.attempt_expires_at ?? null;
-  if (expiresAt) {
-    const ms = new Date(expiresAt).getTime();
-    if (Number.isFinite(ms)) {
-      return {
-        endsAt: ms,
-        remaining: Math.max(0, Math.floor((ms - Date.now()) / 1000)),
-      };
-    }
+const EPOCH_MS_FLOOR = 1e12;
+
+function firstDefined(...values) {
+  for (const value of values) {
+    if (value != null && value !== "") return value;
   }
-  const remainingRaw = session.remainingSeconds ?? session.remaining_seconds;
-  if (remainingRaw != null && remainingRaw !== "") {
-    const n = Number(remainingRaw);
-    if (Number.isFinite(n)) {
-      const remaining = Math.max(0, Math.floor(n));
+  return undefined;
+}
+
+function readTimerFields(session = {}) {
+  const nested = session.attempt && typeof session.attempt === "object" ? session.attempt : {};
+  const exam = session.exam && typeof session.exam === "object" ? session.exam : {};
+  return {
+    remainingRaw: firstDefined(
+      session.remainingSeconds,
+      session.remaining_seconds,
+      nested.remainingSeconds,
+      nested.remaining_seconds,
+    ),
+    expiresAt: firstDefined(
+      session.attemptExpiresAt,
+      session.attempt_expires_at,
+      session.attemptExpireAt,
+      session.attempt_expire_at,
+      nested.attemptExpiresAt,
+      nested.attempt_expires_at,
+      nested.attemptExpireAt,
+      nested.attempt_expire_at,
+    ),
+    durationMinutes: firstDefined(
+      session.durationMinutes,
+      session.duration_minutes,
+      session.timeLimitMinutes,
+      session.time_limit_minutes,
+      nested.durationMinutes,
+      nested.timeLimitMinutes,
+      exam.durationMinutes,
+      exam.duration,
+    ),
+    durationUnlimited: Boolean(
+      firstDefined(
+        session.durationUnlimited,
+        session.duration_unlimited,
+        nested.durationUnlimited,
+        nested.duration_unlimited,
+        exam.durationUnlimited,
+        exam.duration_unlimited,
+      ),
+    ),
+    resumed: session.resumed ?? nested.resumed,
+  };
+}
+
+function timerFromRemainingSeconds(value) {
+  const remaining = Math.max(0, Math.floor(Number(value)));
+  if (!Number.isFinite(remaining)) return null;
+  return { endsAt: Date.now() + remaining * 1000, remaining };
+}
+
+/**
+ * عدّاد السيرفر للمحاولة النشطة.
+ * 1) remainingSeconds من السيرفر (عدّ تنازلي نسبي لساعة الجهاز)
+ * 2) attemptExpiresAt
+ * 3) محاولة جديدة فقط: durationMinutes * 60 — لا يُستخدم عند الاستئناف
+ */
+export function resolveCourseExamServerTimer(session = {}, options = {}) {
+  const fields = readTimerFields(session);
+  const unlimited = Boolean(options.durationUnlimited ?? fields.durationUnlimited);
+  const isNewAttempt =
+    options.isNewAttempt === true ||
+    (options.isNewAttempt !== false && fields.resumed === false);
+
+  const fromRemaining = timerFromRemainingSeconds(fields.remainingRaw);
+  if (fromRemaining) return fromRemaining;
+
+  if (fields.expiresAt) {
+    const expireMs = new Date(fields.expiresAt).getTime();
+    if (Number.isFinite(expireMs)) {
+      const remaining = Math.max(0, Math.floor((expireMs - Date.now()) / 1000));
       return { endsAt: Date.now() + remaining * 1000, remaining };
     }
   }
+
+  if (unlimited) return { endsAt: null, remaining: null };
+
+  if (isNewAttempt) {
+    const durationMinutes = Number(options.durationMinutes ?? fields.durationMinutes);
+    if (Number.isFinite(durationMinutes) && durationMinutes > 0) {
+      return timerFromRemainingSeconds(durationMinutes * 60);
+    }
+  }
+
   return { endsAt: null, remaining: null };
 }
 
@@ -187,10 +259,27 @@ export function savedLectureExamAnswersToMap(savedAnswers = []) {
 }
 
 export function remainingFromEndsAt(endsAt) {
-  if (endsAt == null) return null;
-  const ms = typeof endsAt === "number" ? endsAt : new Date(endsAt).getTime();
-  if (!Number.isFinite(ms)) return null;
-  return Math.max(0, Math.floor((ms - Date.now()) / 1000));
+  if (endsAt == null || endsAt === "") return null;
+
+  let epochMs = null;
+  if (typeof endsAt === "number" && Number.isFinite(endsAt)) {
+    epochMs = endsAt;
+  } else {
+    const asNumber = Number(endsAt);
+    if (Number.isFinite(asNumber) && String(endsAt).trim() !== "" && !String(endsAt).includes("T")) {
+      epochMs = asNumber;
+    } else {
+      const parsed = new Date(endsAt).getTime();
+      if (Number.isFinite(parsed)) epochMs = parsed;
+    }
+  }
+
+  if (epochMs == null || !Number.isFinite(epochMs)) return null;
+  // Remaining-seconds accidentally stored as endsAt would otherwise look already expired.
+  if (epochMs > 0 && epochMs < EPOCH_MS_FLOOR) {
+    return Math.max(0, Math.floor(epochMs));
+  }
+  return Math.max(0, Math.floor((epochMs - Date.now()) / 1000));
 }
 
 export const resolveLectureExamServerTimer = resolveCourseExamServerTimer;

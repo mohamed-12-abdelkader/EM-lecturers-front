@@ -6,7 +6,7 @@ import {
   Box,
   Button,
   Center,
-  HStack,
+  Flex,
   IconButton,
   Image,
   Modal,
@@ -15,12 +15,10 @@ import {
   ModalOverlay,
   Spinner,
   Text,
-  Tooltip,
   VStack,
   useColorModeValue,
   useToast,
 } from "@chakra-ui/react";
-import { FaCheckCircle, FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { MdArrowBack } from "react-icons/md";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
@@ -32,6 +30,7 @@ import {
 } from "../../api/courseExamsApi";
 import ExamAttemptResultScreen from "./components/ExamAttemptResultScreen";
 import ExamStudentProgress from "./components/ExamStudentProgress";
+import ExamTakingActionBar from "./components/ExamTakingActionBar";
 import LectureExamStudentQuestionCard from "./components/LectureExamStudentQuestionCard";
 import {
   buildExamSubmitAnswers,
@@ -39,6 +38,7 @@ import {
   isCourseExamFinishedPayload,
   isCourseExamTakingSession,
   normalizeExamQuestionsFromApi,
+  remainingFromEndsAt,
   resolveCourseExamServerTimer,
   savedCourseExamAnswersToMap,
   toPositiveAttemptId,
@@ -53,12 +53,6 @@ import {
   writeExamProgress,
 } from "../../utils/examAttemptProgress";
 import { normalizeExamAttemptResult } from "../../utils/examAttemptResultUtils";
-
-function remainingFromEndsAt(endsAt) {
-  const ms = Number(endsAt);
-  if (!Number.isFinite(ms) || ms <= 0) return null;
-  return Math.max(0, Math.ceil((ms - Date.now()) / 1000));
-}
 
 function formatRemainingTime(value) {
   if (value == null) return "--:--";
@@ -140,18 +134,28 @@ export default function StudentCourseExamPage() {
         session.duration_unlimited ??
         (durationMinutes == null || Number(durationMinutes) <= 0),
     );
+    const isNewAttempt = session.resumed === false;
     const serverAnswers = savedCourseExamAnswersToMap(
       session.savedAnswers || session.saved_answers,
     );
     const localAnswers =
-      localProgress?.answers && typeof localProgress.answers === "object"
+      !isNewAttempt && localProgress?.answers && typeof localProgress.answers === "object"
         ? localProgress.answers
         : {};
     const restoredAnswers = { ...serverAnswers, ...localAnswers };
-    const { endsAt, remaining } = resolveCourseExamServerTimer(session);
+    const { endsAt, remaining } = resolveCourseExamServerTimer(session, {
+      isNewAttempt,
+      durationMinutes,
+      durationUnlimited,
+    });
 
     let resumeIndex = Number(localProgress?.current);
-    if (!Number.isInteger(resumeIndex) || resumeIndex < 0 || resumeIndex >= normalizedQuestions.length) {
+    if (
+      isNewAttempt ||
+      !Number.isInteger(resumeIndex) ||
+      resumeIndex < 0 ||
+      resumeIndex >= normalizedQuestions.length
+    ) {
       const firstOpen = normalizedQuestions.findIndex((q) => {
         const ans = restoredAnswers[q.id] ?? restoredAnswers[String(q.id)];
         return ans == null || ans === "";
@@ -164,10 +168,12 @@ export default function StudentCourseExamPage() {
     currentRef.current = resumeIndex;
     examEndsAtRef.current = endsAt;
     questionsRef.current = normalizedQuestions;
-    timerExpiredRef.current = remaining === 0;
+    submitInFlightRef.current = false;
+    timerExpiredRef.current = false;
     allowTimerSubmitRef.current = remaining != null;
     sessionAppliedAtRef.current = Date.now();
 
+    setSubmitResult(null);
     setAttemptId(resolvedAttemptId);
     setQuestions(normalizedQuestions);
     setStudentAnswers(restoredAnswers);
@@ -261,7 +267,7 @@ export default function StudentCourseExamPage() {
 
   useEffect(() => {
     if (submitResult || !questions.length) return undefined;
-    questionBlockRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    questionBlockRef.current?.scrollIntoView({ behavior: "auto", block: "nearest" });
     return undefined;
   }, [current, questions.length, submitResult]);
 
@@ -436,6 +442,7 @@ export default function StudentCourseExamPage() {
         result={normalizeExamAttemptResult(submitResult)}
         examTitle={examMeta?.examTitle}
         pageBg={pageBg}
+        compactTop
         onBack={goToCourseExams}
         onZoomImage={(src) => {
           setImageModalSrc(src);
@@ -447,7 +454,7 @@ export default function StudentCourseExamPage() {
 
   if (error) {
     return (
-      <Box maxW="2xl" mx="auto" py={10} px={4} className="mt-[80px]">
+      <Box maxW="2xl" mx="auto" py={10} px={4} minH="100dvh">
         <VStack spacing={6}>
           <Alert status="info" borderRadius="md" w="full">
             <AlertIcon />
@@ -466,43 +473,55 @@ export default function StudentCourseExamPage() {
   const currentQuestion = questions[current];
 
   return (
-    <Box maxW="3xl" mx="auto" py={{ base: 6, md: 10 }} px={{ base: 3, sm: 4 }} className="mt-[80px]" bg={pageBg} minH="100vh">
+    <Box
+      bg={pageBg}
+      minH="100dvh"
+      dir="rtl"
+      display="flex"
+      flexDirection="column"
+    >
       <Box
         position="sticky"
-        top="80px"
-        zIndex={20}
-        mb={5}
-        p={{ base: 3, md: 4 }}
-        borderRadius="2xl"
-        borderWidth="1px"
-        borderColor={headerBorder}
+        top={0}
+        zIndex={30}
         bg={headerBg}
-        boxShadow="md"
+        borderBottomWidth="1px"
+        borderColor={headerBorder}
+        boxShadow="sm"
+        pt="max(10px, env(safe-area-inset-top))"
+        px={{ base: 3, md: 4 }}
+        pb={3}
       >
-        <HStack spacing={3} align="center">
+        <Flex align="center" gap={2.5} mb={3}>
           <IconButton
             aria-label="العودة"
             icon={<MdArrowBack />}
             variant="ghost"
-            size="sm"
+            minW="44px"
+            h="44px"
+            borderRadius="xl"
             onClick={goToCourseExams}
             isDisabled={submitLoading}
           />
-          <VStack align="stretch" flex={1} spacing={0}>
-            <Text fontWeight="bold" fontSize={{ base: "md", md: "lg" }} noOfLines={1}>
+          <Box flex={1} minW={0}>
+            <Text fontWeight="800" fontSize={{ base: "sm", md: "lg" }} noOfLines={1}>
               {examMeta?.examTitle || "امتحان شامل"}
             </Text>
-            <Text fontSize="xs" color="gray.500">
-              {questions.length} سؤال
+            <Text fontSize="xs" color="gray.500" fontWeight="600">
+              سؤال {current + 1} من {questions.length}
+              {answeredCount > 0 ? ` · ${answeredCount} مجاب` : ""}
             </Text>
-          </VStack>
+          </Box>
           {remainingSeconds != null ? (
             <Badge
               px={3}
               py={2}
+              minW="76px"
+              textAlign="center"
               borderRadius="xl"
-              fontSize="sm"
+              fontSize={{ base: "md", md: "sm" }}
               fontFamily="mono"
+              fontWeight="800"
               colorScheme={remainingSeconds < 300 ? "red" : "blue"}
             >
               {formatRemainingTime(remainingSeconds)}
@@ -512,92 +531,63 @@ export default function StudentCourseExamPage() {
               بدون حد زمني
             </Badge>
           )}
-        </HStack>
+        </Flex>
+
+        <ExamStudentProgress
+          remainingSeconds={remainingSeconds}
+          answeredCount={answeredCount}
+          totalQuestions={questions.length}
+          questions={questions}
+          currentQuestionIndex={current}
+          studentAnswers={studentAnswers}
+          showPagination
+          hasActiveAttempt
+          compact
+          onGoToQuestion={goToQuestion}
+        />
       </Box>
 
       {currentQuestion ? (
         <>
-          <ExamStudentProgress
-            remainingSeconds={remainingSeconds}
-            answeredCount={answeredCount}
-            totalQuestions={questions.length}
-            questions={questions}
-            currentQuestionIndex={current}
-            studentAnswers={studentAnswers}
-            showPagination
-            hasActiveAttempt
-            onGoToQuestion={goToQuestion}
-          />
-
-          <Box ref={questionBlockRef} mb={5} sx={{ scrollMarginTop: "168px" }}>
-            <LectureExamStudentQuestionCard
-              key={currentQuestion.id}
-              question={currentQuestion}
-              questionIndex={current}
-              totalQuestions={questions.length}
-              selectedLetter={studentAnswers[currentQuestion.id]}
-              onSelectLetter={handleStudentChoice}
-              onZoomImage={(src) => {
-                setImageModalSrc(src);
-                setImageModalOpen(true);
-              }}
-            />
+          <Box
+            flex="1"
+            px={{ base: 3, md: 4 }}
+            pt={{ base: 3, md: 5 }}
+            pb={{ base: allAnswered ? "168px" : "132px", md: allAnswered ? "160px" : "124px" }}
+            maxW="3xl"
+            w="full"
+            mx="auto"
+          >
+            <Box ref={questionBlockRef}>
+              <LectureExamStudentQuestionCard
+                key={currentQuestion.id}
+                question={currentQuestion}
+                questionIndex={current}
+                totalQuestions={questions.length}
+                selectedLetter={studentAnswers[currentQuestion.id]}
+                onSelectLetter={handleStudentChoice}
+                compactHeader
+                onZoomImage={(src) => {
+                  setImageModalSrc(src);
+                  setImageModalOpen(true);
+                }}
+              />
+            </Box>
           </Box>
 
-          <HStack spacing={3} w="full" flexWrap="wrap">
-            <Button
-              flex={1}
-              minW="100px"
-              size="lg"
-              variant="outline"
-              leftIcon={<FaChevronRight />}
-              onClick={() => goToQuestion(current - 1)}
-              isDisabled={current === 0 || submitLoading}
-              borderRadius="xl"
-            >
-              السابق
-            </Button>
-            {allAnswered ? (
-              <Button
-                flex={1}
-                minW="140px"
-                size="lg"
-                colorScheme="green"
-                leftIcon={<FaCheckCircle />}
-                isLoading={submitLoading}
-                onClick={() => handleSubmitExam(false)}
-                borderRadius="xl"
-              >
-                تسليم الامتحان
-              </Button>
-            ) : (
-              <Tooltip
-                label={`يجب الإجابة على كل الأسئلة قبل التسليم (${answeredCount}/${questions.length})`}
-                hasArrow
-              >
-                <Box flex={1} minW="140px">
-                  <Button w="full" size="lg" colorScheme="green" variant="outline" leftIcon={<FaCheckCircle />} isDisabled borderRadius="xl">
-                    تسليم الامتحان
-                  </Button>
-                </Box>
-              </Tooltip>
-            )}
-            <Button
-              flex={1}
-              minW="100px"
-              size="lg"
-              variant="outline"
-              rightIcon={<FaChevronLeft />}
-              onClick={() => goToQuestion(current + 1)}
-              isDisabled={current === questions.length - 1 || submitLoading}
-              borderRadius="xl"
-            >
-              {current === questions.length - 1 ? "آخر سؤال" : "التالي"}
-            </Button>
-          </HStack>
+          <ExamTakingActionBar
+            currentIndex={current}
+            totalQuestions={questions.length}
+            answeredCount={answeredCount}
+            allAnswered={allAnswered}
+            submitLoading={submitLoading}
+            onPrev={() => goToQuestion(current - 1)}
+            onNext={() => goToQuestion(current + 1)}
+            onSubmit={() => handleSubmitExam(false)}
+          />
         </>
       ) : (
-        <Center py={16}>
+        <Center py={16} flex="1">
           <Spinner />
         </Center>
       )}
