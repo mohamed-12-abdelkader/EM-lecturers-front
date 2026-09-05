@@ -22,7 +22,6 @@ import { motion } from "framer-motion";
 
 import ScrollToTop from "../../components/scollToTop/ScrollToTop";
 import SecureVideoPlayer from "../../components/video/SecureVideoPlayer";
-import VideoQualityMenu from "../../components/video/VideoQualityMenu";
 import {
   fetchSecurePlayback,
   sendPlaybackHeartbeat,
@@ -52,9 +51,7 @@ const Video = () => {
   const [playback, setPlayback] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [quality, setQuality] = useState(null);
   const videoElRef = useRef(null);
-  const qualitySetterRef = useRef(null);
 
   const mainBg = useColorModeValue("gray.50", "gray.900");
   const cardBg = useColorModeValue("white", "gray.800");
@@ -95,8 +92,6 @@ const Video = () => {
     };
 
     if (videoId) load();
-    setQuality(null);
-    qualitySetterRef.current = null;
   }, [videoId, authToken]);
 
   useEffect(() => {
@@ -117,20 +112,6 @@ const Video = () => {
 
   const onPlayerReady = useCallback((_player, videoEl) => {
     if (videoEl) videoElRef.current = videoEl;
-  }, []);
-
-  const onQualityReady = useCallback((nextQuality) => {
-    qualitySetterRef.current = nextQuality?.setQuality || null;
-    setQuality(
-      nextQuality
-        ? { options: nextQuality.options, value: nextQuality.value ?? 0 }
-        : null,
-    );
-  }, []);
-
-  const onQualityChange = useCallback((value) => {
-    qualitySetterRef.current?.(value);
-    setQuality((current) => (current ? { ...current, value } : current));
   }, []);
 
   if (loading) {
@@ -184,20 +165,10 @@ const Video = () => {
           borderColor={borderColor}
         >
           <Flex px={{ base: 4, md: 8 }} py={4} align="center" justify="space-between" flexWrap="wrap" gap={3}>
-            <HStack spacing={3} flexWrap="wrap">
+            <HStack>
               <Text fontSize="sm" color="gray.500">
                 مشغل الفيديو
               </Text>
-              <VideoQualityMenu
-                options={quality?.options}
-                value={quality?.value}
-                onChange={onQualityChange}
-              />
-              {playback?.streamType === "bunny" ? (
-                <Text fontSize="xs" color="gray.500">
-                  غيّر الجودة من إعدادات مشغل الفيديو
-                </Text>
-              ) : null}
             </HStack>
             <Button size="md" colorScheme="blue" onClick={() => navigate(-1)} rightIcon={<FaArrowRight />}>
               العودة للدرس
@@ -219,7 +190,6 @@ const Video = () => {
                   playback={playback}
                   authToken={authToken}
                   onPlayerReady={onPlayerReady}
-                  onQualityReady={onQualityReady}
                 />
               </Box>
             </Box>

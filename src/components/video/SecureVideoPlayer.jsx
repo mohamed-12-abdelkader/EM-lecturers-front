@@ -1,11 +1,9 @@
-import { useEffect, useRef, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useRef, useMemo } from "react";
 import { Box, Text } from "@chakra-ui/react";
 import Plyr from "plyr";
 import Hls from "hls.js";
 import "plyr/dist/plyr.css";
 import { getYouTubeVideoId, YOUTUBE_PLYR_OPTIONS } from "../../utils/youtubeEmbed";
-import VideoQualityMenu from "./VideoQualityMenu";
 
 const PLYR_I18N = {
   restart: "إعادة التشغيل",
@@ -42,9 +40,7 @@ function getBunnyEmbed(url) {
   return `https://iframe.mediadelivery.net/embed/${match[1]}/${match[2]}?autoplay=false&preload=true`;
 }
 
-function buildPlyrOptions({ quality, qualityLabel } = {}) {
-  const hasQuality = Array.isArray(quality?.options) && quality.options.length > 0;
-
+function buildPlyrOptions() {
   return {
     disableContextMenu: false,
     controls: [
@@ -60,147 +56,12 @@ function buildPlyrOptions({ quality, qualityLabel } = {}) {
       "settings",
       "fullscreen",
     ],
-    settings: hasQuality ? ["quality", "speed"] : ["speed"],
-    speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5] },
+    settings: ["speed"],
+    speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5, 2, 3] },
     seekTime: 10,
-    ...(hasQuality ? { quality } : {}),
-    i18n: {
-      ...PLYR_I18N,
-      ...(qualityLabel ? { qualityLabel } : {}),
-    },
+    i18n: PLYR_I18N,
     ratio: "16:9",
   };
-}
-
-function getHlsQualityValue(level) {
-  if (level?.height) return level.height;
-  if (level?.bitrate) return Math.round(level.bitrate / 1000);
-  return 0;
-}
-
-function buildHlsQualityMenu(hls) {
-  const levels = hls?.levels ?? [];
-  const values = [
-    ...new Set(levels.map(getHlsQualityValue).filter(Boolean)),
-  ].sort((a, b) => b - a);
-
-  const qualityLabel = {
-    0: "تلقائي",
-    ...Object.fromEntries(
-      values.map((value) => {
-        const level = levels.find((item) => getHlsQualityValue(item) === value);
-        return [value, level?.height ? `${level.height}p` : `${value} kbps`];
-      }),
-    ),
-  };
-
-  return {
-    quality: {
-      default: 0,
-      options: values.length ? [0, ...values] : [0],
-      forced: true,
-      onChange(nextQuality) {
-        applyHlsQuality(hls, nextQuality);
-      },
-    },
-    qualityLabel,
-  };
-}
-
-function applyHlsQuality(hls, nextQuality) {
-  if (!hls) return;
-
-  if (!nextQuality) {
-    hls.currentLevel = -1;
-    return;
-  }
-
-  const index = hls.levels.findIndex(
-    (level) => getHlsQualityValue(level) === nextQuality,
-  );
-  if (index >= 0) hls.currentLevel = index;
-}
-
-const YT_QUALITY_TO_HEIGHT = {
-  auto: 0,
-  tiny: 144,
-  small: 240,
-  medium: 360,
-  large: 480,
-  hd720: 720,
-  hd1080: 1080,
-  hd1440: 1440,
-  hd2160: 2160,
-  highres: 4320,
-};
-
-const HEIGHT_TO_YT_QUALITY = Object.fromEntries(
-  Object.entries(YT_QUALITY_TO_HEIGHT).map(([label, height]) => [height, label]),
-);
-
-const YT_QUALITY_OPTIONS = [0, 144, 240, 360, 480, 720, 1080, 1440, 2160];
-
-const YT_QUALITY_LABELS = {
-  0: "تلقائي",
-  144: "144p",
-  240: "240p",
-  360: "360p",
-  480: "480p",
-  720: "720p",
-  1080: "1080p",
-  1440: "1440p",
-  2160: "2160p",
-};
-
-function getYouTubeLevels(ytPlayer) {
-  try {
-    const levels = ytPlayer?.getAvailableQualityLevels?.();
-    return Array.isArray(levels) ? levels : [];
-  } catch {
-    return [];
-  }
-}
-
-function resolveYouTubeQualityLabel(ytPlayer, height) {
-  const wanted = height ? HEIGHT_TO_YT_QUALITY[height] || "auto" : "auto";
-  const levels = getYouTubeLevels(ytPlayer);
-  if (!levels.length || wanted === "auto" || levels.includes(wanted)) return wanted;
-
-  const availableHeights = levels
-    .map((label) => YT_QUALITY_TO_HEIGHT[label])
-    .filter((value) => value > 0)
-    .sort((a, b) => a - b);
-
-  if (!availableHeights.length) return wanted;
-
-  const closest = availableHeights.reduce((best, value) =>
-    Math.abs(value - height) < Math.abs(best - height) ? value : best,
-  );
-  return HEIGHT_TO_YT_QUALITY[closest] || "auto";
-}
-
-function applyYouTubeQuality(ytPlayer, height) {
-  if (!ytPlayer) return;
-
-  const label = resolveYouTubeQualityLabel(ytPlayer, height);
-
-  try {
-    ytPlayer.setPlaybackQualityRange?.(label, label);
-  } catch {
-    /* YouTube may ignore quality hints */
-  }
-  try {
-    ytPlayer.setPlaybackQuality?.(label);
-  } catch {
-    /* deprecated, still the only embed hook */
-  }
-}
-
-function qualitiesFromLabels(values, labels) {
-  return values.map((value) => ({
-    value,
-    label: labels[value] || `${value}p`,
-  }));
 }
 
 function SecureHlsPlayer({
@@ -211,7 +72,6 @@ function SecureHlsPlayer({
   resumePosition,
   onPlayerReady,
   onEvent,
-  onQualityReady,
 }) {
   const containerRef = useRef(null);
   const playerId = useMemo(() => `secure-hls-${Math.random().toString(36).slice(2)}`, []);
@@ -228,6 +88,7 @@ function SecureHlsPlayer({
 
     let player;
     let hls;
+    const plyrOpts = buildPlyrOptions();
 
     if (Hls.isSupported()) {
       hls = new Hls({
@@ -241,17 +102,8 @@ function SecureHlsPlayer({
       hls.loadSource(manifestUrl);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        const qualityMenu = buildHlsQualityMenu(hls);
-        player = new Plyr(video, buildPlyrOptions(qualityMenu));
+        player = new Plyr(video, plyrOpts);
         onPlayerReady?.(player, video);
-        onQualityReady?.({
-          options: qualitiesFromLabels(
-            qualityMenu.quality.options,
-            qualityMenu.qualityLabel,
-          ),
-          value: 0,
-          setQuality: (nextQuality) => applyHlsQuality(hls, nextQuality),
-        });
         if (resumePosition > 0) video.currentTime = resumePosition;
       });
       hls.on(Hls.Events.ERROR, (_, data) => {
@@ -259,7 +111,7 @@ function SecureHlsPlayer({
       });
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = manifestUrl;
-      player = new Plyr(video, buildPlyrOptions());
+      player = new Plyr(video, plyrOpts);
       onPlayerReady?.(player, video);
     }
 
@@ -278,9 +130,8 @@ function SecureHlsPlayer({
       }
       hls?.destroy();
       if (container.contains(video)) container.removeChild(video);
-      onQualityReady?.(null);
     };
-  }, [manifestUrl, authToken, sessionId, segmentToken, resumePosition, playerId, onPlayerReady, onEvent, onQualityReady]);
+  }, [manifestUrl, authToken, sessionId, segmentToken, resumePosition, playerId, onPlayerReady, onEvent]);
 
   return (
     <Box
@@ -330,27 +181,12 @@ function bindYouTubeCaptionGuard(player) {
   player.on("statechange", apply);
 }
 
-function SecureYoutubePlayer({ youtubeUrl, onPlayerReady, onQualityReady }) {
+function SecureYoutubePlayer({ youtubeUrl, onPlayerReady }) {
   const youtubeId = getYouTubeVideoId(youtubeUrl);
   const playerId = useMemo(() => `secure-yt-${youtubeId}`, [youtubeId]);
-  const ytPlayerRef = useRef(null);
-  const selectedQualityRef = useRef(0);
-  const [qualityValue, setQualityValue] = useState(0);
-  const [portalTarget, setPortalTarget] = useState(null);
-  const qualityOptions = useMemo(
-    () => qualitiesFromLabels(YT_QUALITY_OPTIONS, YT_QUALITY_LABELS),
-    [],
-  );
-
-  const applyQuality = (nextQuality) => {
-    selectedQualityRef.current = nextQuality;
-    setQualityValue(nextQuality);
-    applyYouTubeQuality(ytPlayerRef.current, nextQuality);
-  };
 
   useEffect(() => {
     if (!youtubeId) return undefined;
-
     const player = new Plyr(`#${playerId}`, {
       ...buildPlyrOptions(),
       captions: { active: false, update: false },
@@ -358,46 +194,19 @@ function SecureYoutubePlayer({ youtubeUrl, onPlayerReady, onQualityReady }) {
         noCookie: true,
         iv_load_policy: 3,
         modestbranding: 1,
-        controls: 0,
-        disablekb: 1,
-        fs: 0,
-        playsinline: 1,
         ...YOUTUBE_PLYR_OPTIONS,
       },
     });
-
-    const syncEmbed = () => {
-      ytPlayerRef.current = player.embed || ytPlayerRef.current;
-      applyYouTubeQuality(ytPlayerRef.current, selectedQualityRef.current);
-    };
-
-    player.on("ready", () => {
-      syncEmbed();
-      setPortalTarget(player.elements?.container || null);
-    });
-    player.on("playing", syncEmbed);
-    player.on("statechange", (event) => {
-      if (event?.detail?.code === 1) syncEmbed();
-    });
-
     bindYouTubeCaptionGuard(player);
     onPlayerReady?.(player);
-    onQualityReady?.({
-      options: qualityOptions,
-      value: selectedQualityRef.current,
-      setQuality: applyQuality,
-    });
-
     return () => {
       try {
         player.destroy();
       } catch {
         /* ignore */
       }
-      setPortalTarget(null);
-      onQualityReady?.(null);
     };
-  }, [youtubeId, playerId, onPlayerReady, onQualityReady, qualityOptions]);
+  }, [youtubeId, playerId, onPlayerReady]);
 
   if (!youtubeId) {
     return (
@@ -407,26 +216,9 @@ function SecureYoutubePlayer({ youtubeUrl, onPlayerReady, onQualityReady }) {
     );
   }
 
-  const qualityMenu = (
-    <Box
-      position="absolute"
-      top="12px"
-      left="12px"
-      zIndex={8}
-    >
-      <VideoQualityMenu
-        variant="overlay"
-        options={qualityOptions}
-        value={qualityValue}
-        onChange={applyQuality}
-      />
-    </Box>
-  );
-
   return (
-    <Box position="relative" sx={PLAYER_SX}>
+    <Box sx={PLAYER_SX}>
       <div id={playerId} data-plyr-provider="youtube" data-plyr-embed-id={youtubeId} />
-      {portalTarget ? createPortal(qualityMenu, portalTarget) : qualityMenu}
     </Box>
   );
 }
@@ -480,13 +272,7 @@ function SecureProgressivePlayer({ url, authToken, sessionId, onPlayerReady, onE
   return <Box ref={containerRef} w="full" />;
 }
 
-export default function SecureVideoPlayer({
-  playback,
-  authToken,
-  onPlayerReady,
-  onEvent,
-  onQualityReady,
-}) {
+export default function SecureVideoPlayer({ playback, authToken, onPlayerReady, onEvent }) {
   if (!playback) return null;
 
   switch (playback.streamType) {
@@ -500,17 +286,10 @@ export default function SecureVideoPlayer({
           resumePosition={playback.resumePosition}
           onPlayerReady={onPlayerReady}
           onEvent={onEvent}
-          onQualityReady={onQualityReady}
         />
       );
     case "youtube":
-      return (
-        <SecureYoutubePlayer
-          youtubeUrl={playback.youtubeUrl}
-          onPlayerReady={onPlayerReady}
-          onQualityReady={onQualityReady}
-        />
-      );
+      return <SecureYoutubePlayer youtubeUrl={playback.youtubeUrl} onPlayerReady={onPlayerReady} />;
     case "bunny":
       return <SecureBunnyPlayer embedUrl={playback.embedUrl} />;
     case "progressive":
