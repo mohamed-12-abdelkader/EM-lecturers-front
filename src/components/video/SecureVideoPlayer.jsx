@@ -119,6 +119,108 @@ function applyHlsQuality(hls, nextQuality) {
   if (index >= 0) hls.currentLevel = index;
 }
 
+const YT_QUALITY_TO_HEIGHT = {
+  auto: 0,
+  tiny: 144,
+  small: 240,
+  medium: 360,
+  large: 480,
+  hd720: 720,
+  hd1080: 1080,
+  hd1440: 1440,
+  hd2160: 2160,
+  highres: 4320,
+};
+
+const HEIGHT_TO_YT_QUALITY = Object.fromEntries(
+  Object.entries(YT_QUALITY_TO_HEIGHT).map(([label, height]) => [height, label]),
+);
+
+const YT_QUALITY_OPTIONS = [0, 144, 240, 360, 480, 720, 1080, 1440, 2160];
+
+const YT_QUALITY_LABELS = {
+  0: "تلقائي",
+  144: "144p",
+  240: "240p",
+  360: "360p",
+  480: "480p",
+  720: "720p",
+  1080: "1080p",
+  1440: "1440p",
+  2160: "2160p",
+};
+
+function getYouTubeLevels(ytPlayer) {
+  try {
+    const levels = ytPlayer?.getAvailableQualityLevels?.();
+    return Array.isArray(levels) ? levels : [];
+  } catch {
+    return [];
+  }
+}
+
+function resolveYouTubeQualityLabel(ytPlayer, height) {
+  const wanted = height ? HEIGHT_TO_YT_QUALITY[height] || "auto" : "auto";
+  const levels = getYouTubeLevels(ytPlayer);
+  if (!levels.length || wanted === "auto" || levels.includes(wanted)) return wanted;
+
+  const availableHeights = levels
+    .map((label) => YT_QUALITY_TO_HEIGHT[label])
+    .filter((value) => value > 0)
+    .sort((a, b) => a - b);
+
+  if (!availableHeights.length) return wanted;
+
+  const closest = availableHeights.reduce((best, value) =>
+    Math.abs(value - height) < Math.abs(best - height) ? value : best,
+  );
+  return HEIGHT_TO_YT_QUALITY[closest] || "auto";
+}
+
+function applyYouTubeQuality(ytPlayer, height) {
+  if (!ytPlayer) return;
+
+  const label = resolveYouTubeQualityLabel(ytPlayer, height);
+
+  try {
+    ytPlayer.setPlaybackQualityRange?.(label, label);
+  } catch {
+    /* YouTube may ignore quality hints */
+  }
+  try {
+    ytPlayer.setPlaybackQuality?.(label);
+  } catch {
+    /* deprecated, still the only embed hook */
+  }
+}
+
+function buildYouTubeQualityMenu(getYtPlayer) {
+  return {
+    quality: {
+      default: 0,
+      options: YT_QUALITY_OPTIONS,
+      forced: true,
+      onChange(nextQuality) {
+        applyYouTubeQuality(getYtPlayer(), nextQuality);
+      },
+    },
+    qualityLabel: YT_QUALITY_LABELS,
+  };
+}
+
+function bindYouTubeQualityControl(player) {
+  const applyCurrent = () => {
+    applyYouTubeQuality(player.embed, player.quality ?? 0);
+  };
+
+  player.on("ready", applyCurrent);
+  player.on("playing", applyCurrent);
+  player.on("statechange", (event) => {
+    const code = event?.detail?.code;
+    if (code === 1) applyCurrent();
+  });
+}
+
 function SecureHlsPlayer({
   manifestUrl,
   authToken,
@@ -241,17 +343,29 @@ function SecureYoutubePlayer({ youtubeUrl, onPlayerReady }) {
 
   useEffect(() => {
     if (!youtubeId) return undefined;
+
+    let ytPlayer = null;
     const player = new Plyr(`#${playerId}`, {
-      ...buildPlyrOptions(),
+      ...buildPlyrOptions(buildYouTubeQualityMenu(() => ytPlayer || player.embed)),
       captions: { active: false, update: false },
       youtube: {
         noCookie: true,
         iv_load_policy: 3,
         modestbranding: 1,
+        controls: 0,
+        disablekb: 1,
+        fs: 0,
+        playsinline: 1,
         ...YOUTUBE_PLYR_OPTIONS,
       },
     });
+
+    player.on("ready", () => {
+      ytPlayer = player.embed || ytPlayer;
+    });
+
     bindYouTubeCaptionGuard(player);
+    bindYouTubeQualityControl(player);
     onPlayerReady?.(player);
     return () => {
       try {
