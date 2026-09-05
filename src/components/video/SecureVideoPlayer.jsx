@@ -1,9 +1,11 @@
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Box, Text } from "@chakra-ui/react";
 import Plyr from "plyr";
 import Hls from "hls.js";
 import "plyr/dist/plyr.css";
 import { getYouTubeVideoId, YOUTUBE_PLYR_OPTIONS } from "../../utils/youtubeEmbed";
+import VideoQualityMenu from "./VideoQualityMenu";
 
 const PLYR_I18N = {
   restart: "إعادة التشغيل",
@@ -194,33 +196,6 @@ function applyYouTubeQuality(ytPlayer, height) {
   }
 }
 
-function buildYouTubeQualityMenu(getYtPlayer) {
-  return {
-    quality: {
-      default: 0,
-      options: YT_QUALITY_OPTIONS,
-      forced: true,
-      onChange(nextQuality) {
-        applyYouTubeQuality(getYtPlayer(), nextQuality);
-      },
-    },
-    qualityLabel: YT_QUALITY_LABELS,
-  };
-}
-
-function bindYouTubeQualityControl(player) {
-  const applyCurrent = () => {
-    applyYouTubeQuality(player.embed, player.quality ?? 0);
-  };
-
-  player.on("ready", applyCurrent);
-  player.on("playing", applyCurrent);
-  player.on("statechange", (event) => {
-    const code = event?.detail?.code;
-    if (code === 1) applyCurrent();
-  });
-}
-
 function qualitiesFromLabels(values, labels) {
   return values.map((value) => ({
     value,
@@ -358,14 +333,26 @@ function bindYouTubeCaptionGuard(player) {
 function SecureYoutubePlayer({ youtubeUrl, onPlayerReady, onQualityReady }) {
   const youtubeId = getYouTubeVideoId(youtubeUrl);
   const playerId = useMemo(() => `secure-yt-${youtubeId}`, [youtubeId]);
+  const ytPlayerRef = useRef(null);
+  const selectedQualityRef = useRef(0);
+  const [qualityValue, setQualityValue] = useState(0);
+  const [portalTarget, setPortalTarget] = useState(null);
+  const qualityOptions = useMemo(
+    () => qualitiesFromLabels(YT_QUALITY_OPTIONS, YT_QUALITY_LABELS),
+    [],
+  );
+
+  const applyQuality = (nextQuality) => {
+    selectedQualityRef.current = nextQuality;
+    setQualityValue(nextQuality);
+    applyYouTubeQuality(ytPlayerRef.current, nextQuality);
+  };
 
   useEffect(() => {
     if (!youtubeId) return undefined;
 
-    let ytPlayer = null;
-    const getYtPlayer = () => ytPlayer || player.embed;
     const player = new Plyr(`#${playerId}`, {
-      ...buildPlyrOptions(buildYouTubeQualityMenu(getYtPlayer)),
+      ...buildPlyrOptions(),
       captions: { active: false, update: false },
       youtube: {
         noCookie: true,
@@ -379,27 +366,38 @@ function SecureYoutubePlayer({ youtubeUrl, onPlayerReady, onQualityReady }) {
       },
     });
 
+    const syncEmbed = () => {
+      ytPlayerRef.current = player.embed || ytPlayerRef.current;
+      applyYouTubeQuality(ytPlayerRef.current, selectedQualityRef.current);
+    };
+
     player.on("ready", () => {
-      ytPlayer = player.embed || ytPlayer;
+      syncEmbed();
+      setPortalTarget(player.elements?.container || null);
+    });
+    player.on("playing", syncEmbed);
+    player.on("statechange", (event) => {
+      if (event?.detail?.code === 1) syncEmbed();
     });
 
     bindYouTubeCaptionGuard(player);
-    bindYouTubeQualityControl(player);
     onPlayerReady?.(player);
     onQualityReady?.({
-      options: qualitiesFromLabels(YT_QUALITY_OPTIONS, YT_QUALITY_LABELS),
-      value: 0,
-      setQuality: (nextQuality) => applyYouTubeQuality(getYtPlayer(), nextQuality),
+      options: qualityOptions,
+      value: selectedQualityRef.current,
+      setQuality: applyQuality,
     });
+
     return () => {
       try {
         player.destroy();
       } catch {
         /* ignore */
       }
+      setPortalTarget(null);
       onQualityReady?.(null);
     };
-  }, [youtubeId, playerId, onPlayerReady, onQualityReady]);
+  }, [youtubeId, playerId, onPlayerReady, onQualityReady, qualityOptions]);
 
   if (!youtubeId) {
     return (
@@ -409,9 +407,26 @@ function SecureYoutubePlayer({ youtubeUrl, onPlayerReady, onQualityReady }) {
     );
   }
 
+  const qualityMenu = (
+    <Box
+      position="absolute"
+      top="12px"
+      left="12px"
+      zIndex={8}
+    >
+      <VideoQualityMenu
+        variant="overlay"
+        options={qualityOptions}
+        value={qualityValue}
+        onChange={applyQuality}
+      />
+    </Box>
+  );
+
   return (
-    <Box sx={PLAYER_SX}>
+    <Box position="relative" sx={PLAYER_SX}>
       <div id={playerId} data-plyr-provider="youtube" data-plyr-embed-id={youtubeId} />
+      {portalTarget ? createPortal(qualityMenu, portalTarget) : qualityMenu}
     </Box>
   );
 }
