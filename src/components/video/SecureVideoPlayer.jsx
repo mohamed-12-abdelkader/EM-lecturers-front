@@ -40,7 +40,9 @@ function getBunnyEmbed(url) {
   return `https://iframe.mediadelivery.net/embed/${match[1]}/${match[2]}?autoplay=false&preload=true`;
 }
 
-function buildPlyrOptions() {
+function buildPlyrOptions({ quality, qualityLabel } = {}) {
+  const hasQuality = Array.isArray(quality?.options) && quality.options.length > 0;
+
   return {
     disableContextMenu: false,
     controls: [
@@ -56,12 +58,65 @@ function buildPlyrOptions() {
       "settings",
       "fullscreen",
     ],
-    settings: ["speed"],
+    settings: hasQuality ? ["quality", "speed"] : ["speed"],
     speed: { selected: 1, options: [0.5, 0.75, 1, 1.25, 1.5] },
     seekTime: 10,
-    i18n: PLYR_I18N,
+    ...(hasQuality ? { quality } : {}),
+    i18n: {
+      ...PLYR_I18N,
+      ...(qualityLabel ? { qualityLabel } : {}),
+    },
     ratio: "16:9",
   };
+}
+
+function getHlsQualityValue(level) {
+  if (level?.height) return level.height;
+  if (level?.bitrate) return Math.round(level.bitrate / 1000);
+  return 0;
+}
+
+function buildHlsQualityMenu(hls) {
+  const levels = hls?.levels ?? [];
+  const values = [
+    ...new Set(levels.map(getHlsQualityValue).filter(Boolean)),
+  ].sort((a, b) => b - a);
+
+  const qualityLabel = {
+    0: "تلقائي",
+    ...Object.fromEntries(
+      values.map((value) => {
+        const level = levels.find((item) => getHlsQualityValue(item) === value);
+        return [value, level?.height ? `${level.height}p` : `${value} kbps`];
+      }),
+    ),
+  };
+
+  return {
+    quality: {
+      default: 0,
+      options: values.length ? [0, ...values] : [0],
+      forced: true,
+      onChange(nextQuality) {
+        applyHlsQuality(hls, nextQuality);
+      },
+    },
+    qualityLabel,
+  };
+}
+
+function applyHlsQuality(hls, nextQuality) {
+  if (!hls) return;
+
+  if (!nextQuality) {
+    hls.currentLevel = -1;
+    return;
+  }
+
+  const index = hls.levels.findIndex(
+    (level) => getHlsQualityValue(level) === nextQuality,
+  );
+  if (index >= 0) hls.currentLevel = index;
 }
 
 function SecureHlsPlayer({
@@ -88,7 +143,6 @@ function SecureHlsPlayer({
 
     let player;
     let hls;
-    const plyrOpts = buildPlyrOptions();
 
     if (Hls.isSupported()) {
       hls = new Hls({
@@ -102,7 +156,7 @@ function SecureHlsPlayer({
       hls.loadSource(manifestUrl);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        player = new Plyr(video, plyrOpts);
+        player = new Plyr(video, buildPlyrOptions(buildHlsQualityMenu(hls)));
         onPlayerReady?.(player, video);
         if (resumePosition > 0) video.currentTime = resumePosition;
       });
@@ -111,7 +165,7 @@ function SecureHlsPlayer({
       });
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = manifestUrl;
-      player = new Plyr(video, plyrOpts);
+      player = new Plyr(video, buildPlyrOptions());
       onPlayerReady?.(player, video);
     }
 
