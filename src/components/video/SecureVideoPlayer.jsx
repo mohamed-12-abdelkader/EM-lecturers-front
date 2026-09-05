@@ -221,6 +221,13 @@ function bindYouTubeQualityControl(player) {
   });
 }
 
+function qualitiesFromLabels(values, labels) {
+  return values.map((value) => ({
+    value,
+    label: labels[value] || `${value}p`,
+  }));
+}
+
 function SecureHlsPlayer({
   manifestUrl,
   authToken,
@@ -229,6 +236,7 @@ function SecureHlsPlayer({
   resumePosition,
   onPlayerReady,
   onEvent,
+  onQualityReady,
 }) {
   const containerRef = useRef(null);
   const playerId = useMemo(() => `secure-hls-${Math.random().toString(36).slice(2)}`, []);
@@ -258,8 +266,17 @@ function SecureHlsPlayer({
       hls.loadSource(manifestUrl);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        player = new Plyr(video, buildPlyrOptions(buildHlsQualityMenu(hls)));
+        const qualityMenu = buildHlsQualityMenu(hls);
+        player = new Plyr(video, buildPlyrOptions(qualityMenu));
         onPlayerReady?.(player, video);
+        onQualityReady?.({
+          options: qualitiesFromLabels(
+            qualityMenu.quality.options,
+            qualityMenu.qualityLabel,
+          ),
+          value: 0,
+          setQuality: (nextQuality) => applyHlsQuality(hls, nextQuality),
+        });
         if (resumePosition > 0) video.currentTime = resumePosition;
       });
       hls.on(Hls.Events.ERROR, (_, data) => {
@@ -286,8 +303,9 @@ function SecureHlsPlayer({
       }
       hls?.destroy();
       if (container.contains(video)) container.removeChild(video);
+      onQualityReady?.(null);
     };
-  }, [manifestUrl, authToken, sessionId, segmentToken, resumePosition, playerId, onPlayerReady, onEvent]);
+  }, [manifestUrl, authToken, sessionId, segmentToken, resumePosition, playerId, onPlayerReady, onEvent, onQualityReady]);
 
   return (
     <Box
@@ -337,7 +355,7 @@ function bindYouTubeCaptionGuard(player) {
   player.on("statechange", apply);
 }
 
-function SecureYoutubePlayer({ youtubeUrl, onPlayerReady }) {
+function SecureYoutubePlayer({ youtubeUrl, onPlayerReady, onQualityReady }) {
   const youtubeId = getYouTubeVideoId(youtubeUrl);
   const playerId = useMemo(() => `secure-yt-${youtubeId}`, [youtubeId]);
 
@@ -345,8 +363,9 @@ function SecureYoutubePlayer({ youtubeUrl, onPlayerReady }) {
     if (!youtubeId) return undefined;
 
     let ytPlayer = null;
+    const getYtPlayer = () => ytPlayer || player.embed;
     const player = new Plyr(`#${playerId}`, {
-      ...buildPlyrOptions(buildYouTubeQualityMenu(() => ytPlayer || player.embed)),
+      ...buildPlyrOptions(buildYouTubeQualityMenu(getYtPlayer)),
       captions: { active: false, update: false },
       youtube: {
         noCookie: true,
@@ -367,14 +386,20 @@ function SecureYoutubePlayer({ youtubeUrl, onPlayerReady }) {
     bindYouTubeCaptionGuard(player);
     bindYouTubeQualityControl(player);
     onPlayerReady?.(player);
+    onQualityReady?.({
+      options: qualitiesFromLabels(YT_QUALITY_OPTIONS, YT_QUALITY_LABELS),
+      value: 0,
+      setQuality: (nextQuality) => applyYouTubeQuality(getYtPlayer(), nextQuality),
+    });
     return () => {
       try {
         player.destroy();
       } catch {
         /* ignore */
       }
+      onQualityReady?.(null);
     };
-  }, [youtubeId, playerId, onPlayerReady]);
+  }, [youtubeId, playerId, onPlayerReady, onQualityReady]);
 
   if (!youtubeId) {
     return (
@@ -440,7 +465,13 @@ function SecureProgressivePlayer({ url, authToken, sessionId, onPlayerReady, onE
   return <Box ref={containerRef} w="full" />;
 }
 
-export default function SecureVideoPlayer({ playback, authToken, onPlayerReady, onEvent }) {
+export default function SecureVideoPlayer({
+  playback,
+  authToken,
+  onPlayerReady,
+  onEvent,
+  onQualityReady,
+}) {
   if (!playback) return null;
 
   switch (playback.streamType) {
@@ -454,10 +485,17 @@ export default function SecureVideoPlayer({ playback, authToken, onPlayerReady, 
           resumePosition={playback.resumePosition}
           onPlayerReady={onPlayerReady}
           onEvent={onEvent}
+          onQualityReady={onQualityReady}
         />
       );
     case "youtube":
-      return <SecureYoutubePlayer youtubeUrl={playback.youtubeUrl} onPlayerReady={onPlayerReady} />;
+      return (
+        <SecureYoutubePlayer
+          youtubeUrl={playback.youtubeUrl}
+          onPlayerReady={onPlayerReady}
+          onQualityReady={onQualityReady}
+        />
+      );
     case "bunny":
       return <SecureBunnyPlayer embedUrl={playback.embedUrl} />;
     case "progressive":
