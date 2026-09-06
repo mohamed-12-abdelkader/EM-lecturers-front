@@ -14,10 +14,8 @@ import {
   Progress,
   SimpleGrid,
   Text,
-  Tooltip,
   VStack,
   useColorModeValue,
-  useToast,
 } from "@chakra-ui/react";
 import {
   FiCheckCircle,
@@ -28,12 +26,8 @@ import {
   FiUsers,
   FiXCircle,
 } from "react-icons/fi";
-import { FaFileExcel, FaFilePdf } from "react-icons/fa";
-import {
-  downloadNotExaminedExcel,
-  downloadNotExaminedPdf,
-  notExaminedStatusLabel,
-} from "../utils/exportNotExaminedStudents";
+import { notExaminedStatusLabel } from "../utils/exportNotExaminedStudents";
+import ExamReportGroupExportButtons from "./ExamReportGroupExportButtons";
 
 const NAVY = "#0E4C92";
 const GREEN = "#059669";
@@ -165,17 +159,19 @@ function SplitBar({ left, right, leftColor, rightColor, track }) {
 export default function ExamEnrollmentSummary({
   summary,
   students = [],
+  examinedStudents = [],
   passPercentage,
   onPassPercentageChange,
   isRefreshing = false,
   examTitle = "",
   courseTitle = "",
+  groupName: groupNameProp = "",
 }) {
-  const toast = useToast();
   const [statusFilter, setStatusFilter] = useState("all");
   const [query, setQuery] = useState("");
+  const [examinedFilter, setExaminedFilter] = useState("all");
+  const [examinedQuery, setExaminedQuery] = useState("");
   const [draftPass, setDraftPass] = useState(String(passPercentage ?? 50));
-  const [exporting, setExporting] = useState(null);
 
   useEffect(() => {
     setDraftPass(String(passPercentage ?? 50));
@@ -191,6 +187,7 @@ export default function ExamEnrollmentSummary({
   const headerBg = useColorModeValue("#F1F5F9", "whiteAlpha.100");
 
   const enrolledTotal = summary?.enrolledTotal ?? 0;
+  const groupName = groupNameProp || summary?.groupName || "";
   const examined = summary?.examined || { count: 0, percentage: 0 };
   const notExamined = summary?.notExamined || { count: 0, percentage: 0 };
   const startedNotSubmitted = summary?.startedNotSubmitted || { count: 0, percentage: 0 };
@@ -213,51 +210,23 @@ export default function ExamEnrollmentSummary({
     });
   }, [students, statusFilter, query]);
 
+  const filteredExamined = useMemo(() => {
+    const q = examinedQuery.trim().toLowerCase();
+    return examinedStudents.filter((student) => {
+      if (examinedFilter === "passed" && !student.passed) return false;
+      if (examinedFilter === "failed" && student.passed) return false;
+      if (!q) return true;
+      const name = String(student.studentName || "").toLowerCase();
+      const email = String(student.studentEmail || "").toLowerCase();
+      return name.includes(q) || email.includes(q);
+    });
+  }, [examinedStudents, examinedFilter, examinedQuery]);
+
   const applyPassPercentage = (value) => {
     const n = Math.min(100, Math.max(0, Number(value)));
     if (!Number.isFinite(n)) return;
     setDraftPass(String(n));
     onPassPercentageChange?.(n);
-  };
-
-  const exportFileName = examTitle ? `لم-يسلموا-${examTitle}` : "لم-يسلموا-الامتحان";
-
-  const handleExport = async (kind) => {
-    if (!filteredStudents.length) {
-      toast({
-        title: "لا يوجد طلاب للتنزيل",
-        description: "غيّر الفلتر أو تأكد أن هناك طلاباً لم يسلّموا.",
-        status: "warning",
-      });
-      return;
-    }
-    setExporting(kind);
-    try {
-      const options = {
-        title: examTitle || "الطلاب الذين لم يسلّموا",
-        courseTitle,
-        filename: exportFileName,
-      };
-      const ok =
-        kind === "excel"
-          ? downloadNotExaminedExcel(filteredStudents, options)
-          : await downloadNotExaminedPdf(filteredStudents, options);
-      if (ok) {
-        toast({
-          title: kind === "excel" ? "تم تنزيل ملف Excel" : "تم تنزيل ملف PDF",
-          description: `${filteredStudents.length} طالب حسب الفلتر الحالي`,
-          status: "success",
-        });
-      }
-    } catch (err) {
-      toast({
-        title: "تعذر التنزيل",
-        description: err?.message || "حدث خطأ أثناء إنشاء الملف",
-        status: "error",
-      });
-    } finally {
-      setExporting(null);
-    }
   };
 
   return (
@@ -286,10 +255,21 @@ export default function ExamEnrollmentSummary({
               حضور الامتحان ونتائجه
             </Heading>
             <Text fontSize="sm" color={muted} mt={1}>
-              {enrolledTotal} طالب مشترك في الكورس · النجاح من {passPercentage}%
+              {groupName
+                ? `${enrolledTotal} طالب في مجموعة ${groupName}`
+                : `${enrolledTotal} طالب مشترك`}
+              {" · "}النجاح من {passPercentage}%
             </Text>
           </Box>
           <HStack spacing={2} flexWrap="wrap">
+            <ExamReportGroupExportButtons
+              examinedStudents={examinedStudents}
+              notExaminedStudents={students}
+              examTitle={examTitle}
+              courseTitle={courseTitle}
+              groupName={groupName}
+              isDisabled={isRefreshing}
+            />
             <Text fontSize="xs" color={muted} fontWeight="bold">
               حد النجاح
             </Text>
@@ -334,9 +314,9 @@ export default function ExamEnrollmentSummary({
         <Box p={{ base: 4, md: 5 }}>
           <SimpleGrid columns={{ base: 1, sm: 2, xl: 4 }} spacing={4} mb={5}>
             <KpiCard
-              label="مشتركو الكورس"
+              label={groupName ? "طلاب المجموعة" : "المشتركون"}
               value={enrolledTotal}
-              hint="الإجمالي الذي تُحسب منه النسب"
+              hint={groupName ? `مجموعة ${groupName}` : "الإجمالي الذي تُحسب منه النسب"}
               accent={NAVY}
               icon={FiUsers}
             />
@@ -460,40 +440,177 @@ export default function ExamEnrollmentSummary({
         >
           <Box>
             <Heading size="sm" color={titleColor}>
+              الطلاب الذين سلّموا
+            </Heading>
+            <Text fontSize="sm" color={muted} mt={1}>
+              {examinedStudents.length} طالب · الدرجة ونسبة النجاح حسب حد {passPercentage}%
+            </Text>
+          </Box>
+        </Flex>
+
+        <Box px={{ base: 4, md: 5 }} py={4}>
+          <Flex gap={3} mb={3} direction={{ base: "column", md: "row" }} align={{ md: "center" }}>
+            <ButtonGroup size="sm" variant="outline" flexWrap="wrap">
+              <Button
+                colorScheme={examinedFilter === "all" ? "blue" : "gray"}
+                variant={examinedFilter === "all" ? "solid" : "outline"}
+                onClick={() => setExaminedFilter("all")}
+              >
+                الكل ({examinedStudents.length})
+              </Button>
+              <Button
+                colorScheme={examinedFilter === "passed" ? "green" : "gray"}
+                variant={examinedFilter === "passed" ? "solid" : "outline"}
+                onClick={() => setExaminedFilter("passed")}
+              >
+                ناجحون ({passed.count || 0})
+              </Button>
+              <Button
+                colorScheme={examinedFilter === "failed" ? "red" : "gray"}
+                variant={examinedFilter === "failed" ? "solid" : "outline"}
+                onClick={() => setExaminedFilter("failed")}
+              >
+                راسبون ({failed.count || 0})
+              </Button>
+            </ButtonGroup>
+            <InputGroup size="sm" maxW={{ md: "260px" }} ms={{ md: "auto" }}>
+              <InputRightElement pointerEvents="none">
+                <Icon as={FiSearch} color={muted} />
+              </InputRightElement>
+              <Input
+                placeholder="بحث بالاسم أو الإيميل"
+                value={examinedQuery}
+                onChange={(e) => setExaminedQuery(e.target.value)}
+                borderRadius="lg"
+                pe={9}
+              />
+            </InputGroup>
+          </Flex>
+
+          {filteredExamined.length === 0 ? (
+            <Flex minH="88px" align="center" justify="center" bg={panelSoft} borderRadius="xl">
+              <Text fontSize="sm" color={muted}>
+                لا يوجد طلاب في هذا التصنيف
+              </Text>
+            </Flex>
+          ) : (
+            <Box
+              borderWidth="1px"
+              borderColor={border}
+              borderRadius="xl"
+              overflow="hidden"
+              maxH="420px"
+              overflowY="auto"
+            >
+              <Flex
+                px={3.5}
+                py={2.5}
+                bg={headerBg}
+                fontSize="xs"
+                fontWeight="bold"
+                color={muted}
+                position="sticky"
+                top={0}
+                zIndex={1}
+                gap={2}
+              >
+                <Text w="36px">م</Text>
+                <Text flex={1.4}>اسم الطالب</Text>
+                <Text w="88px" textAlign="center" display={{ base: "none", sm: "block" }}>
+                  الدرجة
+                </Text>
+                <Text w="72px" textAlign="center">
+                  النسبة
+                </Text>
+                <Text w="88px" textAlign="end">
+                  النتيجة
+                </Text>
+              </Flex>
+              <VStack align="stretch" spacing={0}>
+                {filteredExamined.map((student, index) => (
+                  <Flex
+                    key={student.studentId ?? `${student.studentEmail}-${index}`}
+                    px={3.5}
+                    py={3}
+                    align="center"
+                    gap={2}
+                    borderBottomWidth={index === filteredExamined.length - 1 ? 0 : "1px"}
+                    borderColor={rowBorder}
+                    _hover={{ bg: panelSoft }}
+                  >
+                    <Text w="36px" fontSize="sm" color={muted} fontWeight="bold">
+                      {index + 1}
+                    </Text>
+                    <Box flex={1.4} minW={0}>
+                      <Text fontWeight="semibold" noOfLines={1}>
+                        {student.studentName}
+                      </Text>
+                      <Text fontSize="xs" color={muted} dir="ltr" textAlign="left" noOfLines={1}>
+                        {student.studentEmail || "—"}
+                      </Text>
+                      {formatStartedAt(student.submittedAt) ? (
+                        <Text fontSize="xs" color={muted} mt={0.5}>
+                          سُلِّم {formatStartedAt(student.submittedAt)}
+                        </Text>
+                      ) : null}
+                    </Box>
+                    <Text
+                      w="88px"
+                      textAlign="center"
+                      fontSize="sm"
+                      fontWeight="bold"
+                      display={{ base: "none", sm: "block" }}
+                    >
+                      {student.obtainedGrade}/{student.totalGrade}
+                    </Text>
+                    <Text w="72px" textAlign="center" fontSize="sm" fontWeight="black" color={NAVY}>
+                      {formatPct(student.percentage)}
+                    </Text>
+                    <Badge
+                      colorScheme={student.passed ? "green" : "red"}
+                      variant="subtle"
+                      borderRadius="full"
+                      px={2.5}
+                      w="88px"
+                      textAlign="center"
+                    >
+                      {student.passed ? "ناجح" : "راسب"}
+                    </Badge>
+                  </Flex>
+                ))}
+              </VStack>
+            </Box>
+          )}
+        </Box>
+      </Box>
+
+      <Box
+        bg={cardBg}
+        borderWidth="1px"
+        borderColor={border}
+        borderRadius="2xl"
+        overflow="hidden"
+        boxShadow="sm"
+      >
+        <Flex
+          px={{ base: 4, md: 5 }}
+          py={4}
+          borderBottomWidth="1px"
+          borderColor={border}
+          justify="space-between"
+          align={{ base: "stretch", md: "center" }}
+          gap={3}
+          direction={{ base: "column", md: "row" }}
+        >
+          <Box>
+            <Heading size="sm" color={titleColor}>
               الطلاب الذين لم يسلّموا
             </Heading>
             <Text fontSize="sm" color={muted} mt={1}>
-              {students.length} طالب · التنزيل حسب الفلتر الظاهر الآن
+              {students.length} طالب
+              {groupName ? ` في مجموعة ${groupName}` : ""}
             </Text>
           </Box>
-          <HStack spacing={2} flexWrap="wrap">
-            <Tooltip label="ملف Excel يفتح في Microsoft Excel" hasArrow>
-              <Button
-                size="sm"
-                colorScheme="green"
-                variant="outline"
-                leftIcon={<Icon as={FaFileExcel} />}
-                onClick={() => handleExport("excel")}
-                isLoading={exporting === "excel"}
-                isDisabled={!filteredStudents.length || Boolean(exporting)}
-              >
-                Excel
-              </Button>
-            </Tooltip>
-            <Tooltip label="كشف PDF للطباعة" hasArrow>
-              <Button
-                size="sm"
-                colorScheme="red"
-                variant="outline"
-                leftIcon={<Icon as={FaFilePdf} />}
-                onClick={() => handleExport("pdf")}
-                isLoading={exporting === "pdf"}
-                isDisabled={!filteredStudents.length || Boolean(exporting)}
-              >
-                PDF
-              </Button>
-            </Tooltip>
-          </HStack>
         </Flex>
 
         <Box px={{ base: 4, md: 5 }} py={4}>

@@ -27,29 +27,53 @@ export async function fetchCourseAssignmentReports(courseId, filters = {}) {
   };
 }
 
-function reportQueryConfig(passPercentage) {
+function reportQueryConfig({ passPercentage, groupId } = {}) {
   const config = authConfig();
-  const value = Number(passPercentage);
-  if (Number.isFinite(value) && value >= 0) {
-    config.params = { passPercentage: value };
+  const params = {};
+  const pass = Number(passPercentage);
+  if (Number.isFinite(pass) && pass >= 0) {
+    params.passPercentage = pass;
+  }
+  const gid = Number(groupId);
+  if (Number.isFinite(gid) && gid > 0) {
+    params.groupId = gid;
+  }
+  if (Object.keys(params).length) {
+    config.params = params;
   }
   return config;
 }
 
-/** GET /api/course/lecture-exam/:examId/report */
-export async function fetchLectureExamReport(examId, { passPercentage } = {}) {
+/** GET /api/exams/:examId/report?groupId= */
+export async function fetchLectureExamReport(examId, filters = {}) {
   const { data } = await baseUrl.get(
-    `/api/course/lecture-exam/${examId}/report`,
-    reportQueryConfig(passPercentage),
+    `/api/exams/${examId}/report`,
+    reportQueryConfig(filters),
   );
   return data;
 }
 
-/** GET /api/course/course-exam/:examId/report?passPercentage= */
-export async function fetchCourseLevelExamReport(examId, { passPercentage } = {}) {
+/** GET /api/course/course-exam/:examId/report?groupId= */
+export async function fetchCourseLevelExamReport(examId, filters = {}) {
   const { data } = await baseUrl.get(
     `/api/course/course-exam/${examId}/report`,
-    reportQueryConfig(passPercentage),
+    reportQueryConfig(filters),
   );
   return data;
+}
+
+/** GET /api/exams/:examId/grades?groupId= */
+export async function fetchExamGrades(examId, filters = {}) {
+  const { data } = await baseUrl.get(
+    `/api/exams/${examId}/grades`,
+    reportQueryConfig({ groupId: filters.groupId }),
+  );
+  const payload = data?.data && !Array.isArray(data?.submissions) ? data.data : data;
+  const list =
+    payload?.submissions ??
+    payload?.grades ??
+    payload?.students ??
+    payload?.examinedStudents ??
+    (Array.isArray(payload) ? payload : []);
+  return Array.isArray(list) ? list : [];
 }

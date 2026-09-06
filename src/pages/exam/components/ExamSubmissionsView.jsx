@@ -15,6 +15,7 @@ import {
   InputGroup,
   InputRightElement,
   Progress,
+  Select,
   SimpleGrid,
   Spinner,
   Text,
@@ -668,6 +669,10 @@ export default function ExamSubmissionsView({
   onReport,
   onZoomImage,
   examTitle = "درجات الطلاب في الامتحان",
+  groups = [],
+  selectedGroupId = "",
+  onGroupChange,
+  groupFilterDisabled = false,
 }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -844,6 +849,24 @@ export default function ExamSubmissionsView({
                   درجات الطلاب في الامتحان
                 </Heading>
                 <HStack spacing={2} flexShrink={0} flexWrap="wrap">
+                  {typeof onGroupChange === "function" ? (
+                    <Select
+                      size="sm"
+                      maxW="220px"
+                      value={String(selectedGroupId ?? "")}
+                      onChange={(e) => onGroupChange(e.target.value)}
+                      isDisabled={groupFilterDisabled || loading}
+                      borderRadius="lg"
+                      fontFamily={FONT}
+                    >
+                      <option value="">كل المجموعات</option>
+                      {groups.map((group) => (
+                        <option key={group.id} value={group.id}>
+                          {group.name}
+                        </option>
+                      ))}
+                    </Select>
+                  ) : null}
                   {submissions.length > 0 && (
                     <>
                       <Button
