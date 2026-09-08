@@ -392,13 +392,15 @@ function ExamChoicesSection({
           w="full"
           direction="column"
           gap={2}
-          p={2.5}
-          borderRadius="xl"
+          p={{ base: 4, md: 2.5 }}
+          minH={{ base: "56px", md: "auto" }}
+          borderRadius="2xl"
           borderWidth={isSelected ? "2px" : "1px"}
           borderColor={isSelected ? selectedBorder : border}
           bg={isSelected ? selectedBg : cardBg}
           cursor="pointer"
           transition="all 0.15s"
+          sx={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
           _hover={{
             borderColor: isSelected ? selectedBorder : "blue.300",
             bg: isSelected ? selectedBg : hoverBg,
@@ -408,21 +410,21 @@ function ExamChoicesSection({
         >
           <Flex align="center" gap={2}>
             <Flex
-              w={7}
-              h={7}
+              w={{ base: 11, md: 7 }}
+              h={{ base: 11, md: 7 }}
               flexShrink={0}
               borderRadius="md"
               bg={isSelected ? "blue.500" : letterBg}
               color={isSelected ? "white" : letterColor}
               align="center"
               justify="center"
-              fontSize="xs"
+              fontSize={{ base: "md", md: "xs" }}
               fontWeight="bold"
             >
               {letter}
             </Flex>
             {choice.text && (
-              <Text flex={1} fontSize="sm" fontWeight={isSelected ? "semibold" : "500"} color={headingColor} lineHeight="1.75" sx={examQuestionTextSx}>
+              <Text flex={1} fontSize={{ base: "md", md: "sm" }} fontWeight={isSelected ? "semibold" : "500"} color={headingColor} lineHeight="1.75" sx={examQuestionTextSx}>
                 {renderFormattedExamText(choice.text)}
               </Text>
             )}
@@ -460,7 +462,7 @@ function ExamChoicesSection({
           value={studentAnswers?.[questionId] ? String(studentAnswers[questionId]) : ""}
           onChange={(val) => onChoice?.(questionId, Number(val))}
         >
-          <SimpleGrid columns={imageGrid ? { base: 2, lg: 4 } : { base: 1, md: 2 }} spacing={2.5}>
+          <SimpleGrid columns={imageGrid ? { base: 1, sm: 2, lg: 4 } : { base: 1, md: 2 }} spacing={3}>
             {normalized.map((choice, cidx) => renderStudentChoice(choice, cidx))}
           </SimpleGrid>
         </RadioGroup>
@@ -670,6 +672,7 @@ export function StudentQuestionPanel({
   subtextColor,
   cardBg,
   cardBorder,
+  compactHeader = false,
 }) {
   const border = cardBorder || useColorModeValue("gray.200", "gray.600");
   const bg = cardBg || useColorModeValue("white", "gray.800");
@@ -687,6 +690,7 @@ export function StudentQuestionPanel({
         bg={headerBg}
         borderBottomWidth="1px"
         borderColor={border}
+        display={compactHeader ? { base: "none", md: "flex" } : "flex"}
       >
         <HStack spacing={2}>
           <Flex w={8} h={8} borderRadius="lg" bg="blue.500" color="white" align="center" justify="center" fontWeight="bold" fontSize="sm">

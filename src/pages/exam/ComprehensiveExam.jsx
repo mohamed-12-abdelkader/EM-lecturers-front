@@ -51,7 +51,9 @@ import { FaBookOpen } from "react-icons/fa";
 import AiQuestionExtractionModal from "./components/AiQuestionExtractionModal";
 import ExamReadyScreen from "./components/ExamReadyScreen";
 import ExamStudentProgress from "./components/ExamStudentProgress";
+import ExamTakingActionBar from "./components/ExamTakingActionBar";
 import ExamResultPanel from "./components/ExamResultPanel";
+import { MdArrowBack } from "react-icons/md";
 import TeacherExamShell, {
   TeacherExamEmptyState,
 } from "./components/TeacherExamShell";
@@ -100,6 +102,22 @@ import {
 } from "../../utils/examAttemptProgress";
 import { normalizeExamAttemptResult } from "../../utils/examAttemptResultUtils";
 import ExamAttemptResultScreen from "./components/ExamAttemptResultScreen";
+
+function formatExamClock(value) {
+  if (value == null) return "--:--";
+  const s = Math.max(0, Number(value) || 0);
+  const m = Math.floor(s / 60).toString().padStart(2, "0");
+  const sec = (s % 60).toString().padStart(2, "0");
+  return `${m}:${sec}`;
+}
+
+function countLectureAnswered(questions, answers) {
+  return (questions || []).filter((q) => {
+    const id = q?.type === "passage_sub" ? q.sub_question?.id : q?.id;
+    const ans = answers?.[id];
+    return ans != null && ans !== "";
+  }).length;
+}
 
 const ComprehensiveExam = () => {
   const { id } = useParams();
@@ -1827,7 +1845,7 @@ const ComprehensiveExam = () => {
 
   if (error) {
     return (
-      <Box minH="100vh" bg={pageBg} pt="100px" pb={10} dir="rtl">
+      <Box minH="100vh" bg={pageBg} pt={isStaff ? "100px" : 6} pb={10} dir="rtl">
         <Container maxW="container.md">
           <Box
             p={8}
@@ -1866,7 +1884,7 @@ const ComprehensiveExam = () => {
 
     if (examStatus === "hidden") {
       return (
-        <Box minH="100vh" bg={pageBg} pt="100px" pb={10} dir="rtl">
+        <Box minH="100vh" bg={pageBg} pt={6} pb={10} dir="rtl">
           <Container maxW="container.sm">
             <Box
               p={8}
@@ -1895,7 +1913,7 @@ const ComprehensiveExam = () => {
 
     if (examStatus === "not_open_yet") {
       return (
-        <Box minH="100vh" bg={pageBg} pt="100px" pb={10} dir="rtl">
+        <Box minH="100vh" bg={pageBg} pt={6} pb={10} dir="rtl">
           <Container maxW="container.sm">
             <Box
               p={8}
@@ -1930,7 +1948,7 @@ const ComprehensiveExam = () => {
 
     if (examStatus === "closed") {
       return (
-        <Box minH="100vh" bg={pageBg} pt="100px" pb={10} dir="rtl">
+        <Box minH="100vh" bg={pageBg} pt={6} pb={10} dir="rtl">
           <Container maxW="container.sm">
             <Box
               p={8}
@@ -1967,7 +1985,7 @@ const ComprehensiveExam = () => {
 
     if (examStatus === "already_submitted" && !feedback) {
       return (
-        <Box minH="100vh" bg={pageBg} pt="100px" pb={10} dir="rtl">
+        <Box minH="100vh" bg={pageBg} pt={6} pb={10} dir="rtl">
           <Container maxW="container.sm">
             <Box
               p={8}
@@ -2196,195 +2214,196 @@ const ComprehensiveExam = () => {
           )}
         </TeacherExamShell>
       ) : (
-    <Box
-      minH="100vh"
-      bg={pageBg}
-      pt="100px"
-      pb={10}
-      dir="rtl"
-      style={{ fontFamily: "'Noto Sans Arabic', 'Segoe UI', sans-serif" }}
-    >
-      <Container maxW="container.md" px={{ base: 4, md: 6 }}>
-          <Box
-              borderRadius="2xl"
-              bg={cardBg}
-              borderWidth="1px"
-              borderColor={cardBorder}
-              boxShadow="lg"
-              overflow="hidden"
-              mb={8}
-            >
-              <Box h="1" w="100%" bgGradient="linear(to-r, blue.500, orange.500)" />
-              <Box px={{ base: 4, md: 6 }} py={6}>
-            <VStack
-              spacing={{ base: 4, sm: 5, md: 6 }}
-              mb={{ base: 4, sm: 5, md: 6 }}
-            >
-              {student && !submitResult && questions.length > 0 && (
-                <Text
-                  color={subtextColor}
-                  textAlign="center"
-                  fontSize="sm"
-                  px={{ base: 2, sm: 4 }}
-                >
-                  أجب على جميع الأسئلة ثم اضغط تسليم الامتحان
-                </Text>
-              )}
-            </VStack>
-            <VStack spacing={{ base: 5, sm: 6, md: 6 }} align="stretch">
-              {(submitResult ||
-                (feedback &&
-                  feedback.wrongQuestions &&
-                  feedback.wrongQuestions.length > 0)) &&
-              student ? (
-                <ExamResultPanel
-                  submitResult={submitResult}
-                  feedback={feedback}
-                  attemptHistory={attemptHistory}
-                  examData={examData}
-                  onZoomImage={(src) => {
-                    setImageZoomSrc(src);
-                    setImageZoomOpen(true);
-                  }}
-                />
-              ) : questions.length === 0 ? (
-                <Center py={12}>
-                  <VStack spacing={4} px={4}>
-                    {questionsReloading || (currentAttempt && !questionsLoadError) ? (
-                      <>
-                        <Spinner size="lg" color="blue.500" />
-                        <Text color={subtextColor} textAlign="center">
-                          جاري تحميل الأسئلة...
-                        </Text>
-                      </>
-                    ) : (
-                      <>
-                        <Alert status="error" borderRadius="xl" w="full">
-                          <AlertIcon />
-                          <Text fontSize="sm">
-                            {questionsLoadError ||
-                              "لم يتم تحميل أسئلة الامتحان. حاول إعادة التحميل."}
-                          </Text>
-                        </Alert>
-                        <Button
-                          colorScheme="blue"
-                          onClick={reloadQuestionsForAttempt}
-                          isLoading={questionsReloading}
-                          borderRadius="lg"
-                        >
-                          إعادة تحميل الأسئلة
-                        </Button>
-                      </>
-                    )}
-                  </VStack>
-                </Center>
-              ) : (
-                <>
-                  {questions.length > 0 &&
-                    (() => {
-                      const currentItem = questions[currentQuestionIndex];
-                      const isPassageSub = currentItem?.type === "passage_sub";
-                      const questionId = isPassageSub
-                        ? currentItem?.sub_question?.id
-                        : currentItem?.id;
-                      const questionText = isPassageSub
-                        ? currentItem?.sub_question?.text
-                        : currentItem?.text;
-                      const questionImage = isPassageSub
-                        ? currentItem?.sub_question?.image
-                        : currentItem?.image;
-                      const questionChoices = isPassageSub
-                        ? currentItem?.sub_question?.choices
-                        : currentItem?.choices;
-                      const passageContent = isPassageSub
-                        ? currentItem?.passage?.content
-                        : currentItem?.passage?.content;
-                      return (
-                        <>
-                          <ExamStudentProgress
-                            remainingSeconds={remainingSeconds}
-                            answeredCount={Object.keys(studentAnswers).length}
-                            totalQuestions={questions.length}
-                            questions={questions}
-                            currentQuestionIndex={currentQuestionIndex}
-                            studentAnswers={studentAnswers}
-                            showPagination={showPagination}
-                            onGoToQuestion={goToQuestion}
-                            hasActiveAttempt={!!currentAttempt}
-                          />
+    (() => {
+      const lectureAnswered = countLectureAnswered(questions, studentAnswers);
+      const lectureAllAnswered = questions.length > 0 && lectureAnswered === questions.length;
+      const currentItem = questions[currentQuestionIndex];
+      const isPassageSub = currentItem?.type === "passage_sub";
+      const questionId = isPassageSub ? currentItem?.sub_question?.id : currentItem?.id;
+      const questionText = isPassageSub ? currentItem?.sub_question?.text : currentItem?.text;
+      const questionImage = isPassageSub ? currentItem?.sub_question?.image : currentItem?.image;
+      const questionChoices = isPassageSub ? currentItem?.sub_question?.choices : currentItem?.choices;
+      const passageContent = isPassageSub ? currentItem?.passage?.content : currentItem?.passage?.content;
 
-                          <StudentQuestionPanel
-                            questionIndex={currentQuestionIndex}
-                            totalQuestions={questions.length}
-                            questionId={questionId}
-                            questionText={questionText}
-                            questionImage={questionImage}
-                            questionChoices={questionChoices}
-                            passageContent={passageContent}
-                            studentAnswers={studentAnswers}
-                            submitResult={submitResult}
-                            onChoice={handleStudentChoice}
-                            onZoomImage={(src) => {
-                              setImageZoomSrc(src);
-                              setImageZoomOpen(true);
-                            }}
-                            headingColor={headingColor}
-                            subtextColor={subtextColor}
-                            cardBg={cardBg}
-                          />
-
-                          <HStack
-                            mt={5}
-                            spacing={3}
-                            justify="space-between"
-                            flexWrap="wrap"
-                          >
-                            <Button
-                              variant="outline"
-                              onClick={goToPreviousQuestion}
-                              isDisabled={currentQuestionIndex === 0}
-                              size="md"
-                              borderRadius="lg"
-                              flex={{ base: "1", sm: "none" }}
-                            >
-                              السابق
-                            </Button>
-
-                            {Object.keys(studentAnswers).length === questions.length && (
-                              <Button
-                                colorScheme="green"
-                                onClick={() => handleSubmitExam(false)}
-                                isLoading={submitLoading}
-                                size="md"
-                                borderRadius="lg"
-                                flex={{ base: "1 1 100%", sm: "none" }}
-                                order={{ base: 3, sm: 0 }}
-                              >
-                                {submitLoading ? "جاري التسليم..." : "تسليم الامتحان"}
-                              </Button>
-                            )}
-
-                            <Button
-                              colorScheme="blue"
-                              onClick={goToNextQuestion}
-                              isDisabled={currentQuestionIndex === questions.length - 1}
-                              size="md"
-                              borderRadius="lg"
-                              flex={{ base: "1", sm: "none" }}
-                            >
-                              {currentQuestionIndex === questions.length - 1 ? "آخر سؤال" : "التالي"}
-                            </Button>
-                          </HStack>
-                        </>
-                      );
-                    })()}
-                </>
-              )}
-            </VStack>
-              </Box>
+      if (
+        (submitResult ||
+          (feedback && feedback.wrongQuestions && feedback.wrongQuestions.length > 0)) &&
+        student
+      ) {
+        return (
+          <Box minH="100dvh" bg={pageBg} pt={6} pb={10} dir="rtl" px={4}>
+            <Box maxW="3xl" mx="auto">
+              <ExamResultPanel
+                submitResult={submitResult}
+                feedback={feedback}
+                attemptHistory={attemptHistory}
+                examData={examData}
+                onZoomImage={(src) => {
+                  setImageZoomSrc(src);
+                  setImageZoomOpen(true);
+                }}
+              />
             </Box>
-      </Container>
-    </Box>
+          </Box>
+        );
+      }
+
+      if (questions.length === 0) {
+        return (
+          <Box minH="100dvh" bg={pageBg} pt={6} pb={10} dir="rtl">
+            <Center py={12}>
+              <VStack spacing={4} px={4}>
+                {questionsReloading || (currentAttempt && !questionsLoadError) ? (
+                  <>
+                    <Spinner size="lg" color="blue.500" />
+                    <Text color={subtextColor} textAlign="center">
+                      جاري تحميل الأسئلة...
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Alert status="error" borderRadius="xl" w="full">
+                      <AlertIcon />
+                      <Text fontSize="sm">
+                        {questionsLoadError ||
+                          "لم يتم تحميل أسئلة الامتحان. حاول إعادة التحميل."}
+                      </Text>
+                    </Alert>
+                    <Button
+                      colorScheme="blue"
+                      onClick={reloadQuestionsForAttempt}
+                      isLoading={questionsReloading}
+                      borderRadius="lg"
+                    >
+                      إعادة تحميل الأسئلة
+                    </Button>
+                  </>
+                )}
+              </VStack>
+            </Center>
+          </Box>
+        );
+      }
+
+      return (
+        <Box
+          bg={pageBg}
+          minH="100dvh"
+          dir="rtl"
+          display="flex"
+          flexDirection="column"
+          style={{ fontFamily: "'Noto Sans Arabic', 'Segoe UI', sans-serif" }}
+        >
+          <Box
+            position="sticky"
+            top={0}
+            zIndex={30}
+            bg={cardBg}
+            borderBottomWidth="1px"
+            borderColor={cardBorder}
+            boxShadow="sm"
+            pt="max(10px, env(safe-area-inset-top))"
+            px={{ base: 3, md: 4 }}
+            pb={3}
+          >
+            <Flex align="center" gap={2.5} mb={3}>
+              <IconButton
+                aria-label="العودة"
+                icon={<MdArrowBack />}
+                variant="ghost"
+                minW="44px"
+                h="44px"
+                borderRadius="xl"
+                onClick={() => navigate(-1)}
+                isDisabled={submitLoading}
+              />
+              <Box flex={1} minW={0}>
+                <Text fontWeight="800" fontSize={{ base: "sm", md: "lg" }} noOfLines={1}>
+                  {examData?.title || "امتحان المحاضرة"}
+                </Text>
+                <Text fontSize="xs" color="gray.500" fontWeight="600">
+                  سؤال {currentQuestionIndex + 1} من {questions.length}
+                  {lectureAnswered > 0 ? ` · ${lectureAnswered} مجاب` : ""}
+                </Text>
+              </Box>
+              {remainingSeconds != null ? (
+                <Badge
+                  px={3}
+                  py={2}
+                  minW="76px"
+                  textAlign="center"
+                  borderRadius="xl"
+                  fontSize={{ base: "md", md: "sm" }}
+                  fontFamily="mono"
+                  fontWeight="800"
+                  colorScheme={remainingSeconds < 300 ? "red" : "blue"}
+                >
+                  {formatExamClock(remainingSeconds)}
+                </Badge>
+              ) : (
+                <Badge px={3} py={2} borderRadius="xl" fontSize="xs" colorScheme="gray">
+                  بدون حد زمني
+                </Badge>
+              )}
+            </Flex>
+            <ExamStudentProgress
+              remainingSeconds={remainingSeconds}
+              answeredCount={lectureAnswered}
+              totalQuestions={questions.length}
+              questions={questions}
+              currentQuestionIndex={currentQuestionIndex}
+              studentAnswers={studentAnswers}
+              showPagination
+              onGoToQuestion={goToQuestion}
+              hasActiveAttempt={!!currentAttempt}
+              compact
+            />
+          </Box>
+
+          <Box
+            flex="1"
+            px={{ base: 3, md: 4 }}
+            pt={{ base: 3, md: 5 }}
+            pb={{ base: lectureAllAnswered ? "168px" : "132px", md: lectureAllAnswered ? "160px" : "124px" }}
+            maxW="3xl"
+            w="full"
+            mx="auto"
+          >
+            <StudentQuestionPanel
+              questionIndex={currentQuestionIndex}
+              totalQuestions={questions.length}
+              questionId={questionId}
+              questionText={questionText}
+              questionImage={questionImage}
+              questionChoices={questionChoices}
+              passageContent={passageContent}
+              studentAnswers={studentAnswers}
+              submitResult={submitResult}
+              onChoice={handleStudentChoice}
+              compactHeader
+              onZoomImage={(src) => {
+                setImageZoomSrc(src);
+                setImageZoomOpen(true);
+              }}
+              headingColor={headingColor}
+              subtextColor={subtextColor}
+              cardBg={cardBg}
+            />
+          </Box>
+
+          <ExamTakingActionBar
+            currentIndex={currentQuestionIndex}
+            totalQuestions={questions.length}
+            answeredCount={lectureAnswered}
+            allAnswered={lectureAllAnswered}
+            submitLoading={submitLoading}
+            onPrev={goToPreviousQuestion}
+            onNext={goToNextQuestion}
+            onSubmit={() => handleSubmitExam(false)}
+          />
+        </Box>
+      );
+    })()
       )}
 
             {/* Edit Modal */}

@@ -201,6 +201,7 @@ export function downloadExamGradesExcel(submissions = [], options = {}) {
   const rows = list.map((submission, index) => {
     const outcome = resolveSubmissionOutcome(submission);
     const { obtained, total, percentage, passed, inProgress } = outcome;
+    const status = resolveSubmissionStatus(submission, outcome);
     const statusLabel = inProgress
       ? status.label
       : `${passed ? "ناجح" : "راسب"}${status.key === "timed_out" ? " — انتهى الوقت" : ""}`;

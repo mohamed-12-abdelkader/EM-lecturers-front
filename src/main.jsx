@@ -76,8 +76,11 @@ const RootContent = () => {
     path === "/teacherchat" ||
     path.startsWith("/video/") ||
     path.startsWith("/exam/") ||
-    path.startsWith("/essay-exam/");
-  const isStudentExamTake = /\/exam\/[^/]+\/take\/?$/.test(path);
+    path.startsWith("/essay-exam/") ||
+    path.startsWith("/comprehensiveexam/");
+  const isStudentExamTake =
+    /\/exam\/[^/]+\/take\/?$/.test(path) ||
+    (Boolean(student) && path.startsWith("/comprehensiveexam/"));
   const showStudentBottomNav = Boolean(student) && hasUser && !hideStudentBottomNav;
 
   return (

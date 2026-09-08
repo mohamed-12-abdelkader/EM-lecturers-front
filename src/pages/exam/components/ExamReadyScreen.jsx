@@ -46,7 +46,7 @@ export default function ExamReadyScreen({
     null;
 
   return (
-    <Box minH="100vh" bg={pageBg} pt="96px" pb={10} dir="rtl">
+    <Box minH="100vh" bg={pageBg} pt={6} pb={10} dir="rtl">
       <Container maxW="container.sm">
         <MotionBox initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}>
           <Box

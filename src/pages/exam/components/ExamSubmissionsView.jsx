@@ -426,6 +426,9 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
                   محاولة {submission.attempt_number ?? 1}
                 </Badge>
                 <StatusBadge passed={passed} />
+                <Badge colorScheme={statusMeta.colorScheme} variant="subtle" fontFamily={FONT}>
+                  {statusLabel}
+                </Badge>
                 {(submission.timed_out || submission.timedOut) && (
                   <Badge colorScheme="orange" fontFamily={FONT}>
                     انتهى الوقت
