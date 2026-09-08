@@ -3,13 +3,16 @@ import {
   Box, VStack, Heading, Text, Spinner, Center, Alert, AlertIcon, IconButton, HStack, useToast,
   Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton,
   Button, Input, Tooltip, InputGroup, InputRightElement, Image, useColorModeValue, Flex,
-  SimpleGrid, Textarea,
+  SimpleGrid, Textarea, Select,
 } from "@chakra-ui/react";
 import { AiFillEdit, AiFillDelete, AiOutlineCloseCircle, AiOutlineRobot } from "react-icons/ai";
 import baseUrl from "../../api/baseUrl";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import { useParams, useNavigate } from "react-router-dom";
 import UserType from "../../Hooks/auth/userType";
+import { useTeacherCourseGroups } from "../../Hooks/course/useCourseGroups";
+import { fetchExamGrades } from "../../api/courseAssignmentReportsApi";
+import { normalizeStudyGroups } from "./utils/examReportUtils";
 import { FaBookOpen, FaUser, FaImage, FaChartBar, FaCompass, FaFilePdf } from "react-icons/fa";
 import { BiSearch } from "react-icons/bi";
 import { FiDownload } from "react-icons/fi";
@@ -39,6 +42,13 @@ const Exam = () => {
   const navigate = useNavigate();
   const [, isAdmin, isTeacher, student] = UserType();
   const isStaff = Boolean(isTeacher || isAdmin);
+  const { data: teacherGroupsRaw = [] } = useTeacherCourseGroups(undefined, {
+    enabled: isStaff,
+  });
+  const studyGroups = useMemo(
+    () => normalizeStudyGroups(teacherGroupsRaw),
+    [teacherGroupsRaw],
+  );
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -53,6 +63,7 @@ const Exam = () => {
   const [gradesData, setGradesData] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [gradesCurrentPage, setGradesCurrentPage] = useState(1);
+  const [gradesGroupId, setGradesGroupId] = useState("");
   const [isExportingGradesPdf, setIsExportingGradesPdf] = useState(false);
   const [examMeta, setExamMeta] = useState(null);
   const [imageModalOpen, setImageModalOpen] = useState(false);
@@ -101,14 +112,11 @@ const Exam = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [examId, isStaff]);
 
-  const fetchGrades = async () => {
+  const fetchGrades = async (groupFilter = gradesGroupId) => {
     setGradesLoading(true);
     try {
-      const res = await baseUrl.get(
-        `/api/course/course-exam/${examId}/submissions`,
-        token ? { headers: { Authorization: `Bearer ${token}` } } : {}
-      );
-      setGradesData(res.data.submissions || []);
+      const list = await fetchExamGrades(examId, { groupId: groupFilter });
+      setGradesData(list);
     } catch {
       toast({ title: "فشل جلب الدرجات", status: "error" });
     } finally {
@@ -549,6 +557,26 @@ const Exam = () => {
               درجات الطلاب في الامتحان
             </Heading>
             <HStack spacing={2} flexWrap="wrap" justify={{ base: "center", sm: "flex-end" }}>
+              <Select
+                size={{ base: "sm", md: "md" }}
+                maxW="220px"
+                value={String(gradesGroupId ?? "")}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setGradesGroupId(value);
+                  setGradesCurrentPage(1);
+                  fetchGrades(value);
+                }}
+                isDisabled={gradesLoading}
+                borderRadius="xl"
+              >
+                <option value="">كل المجموعات</option>
+                {studyGroups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
+                  </option>
+                ))}
+              </Select>
               {gradesData.length > 0 && (
                 <>
                   <Button

@@ -84,6 +84,9 @@ import baseUrl from "../../api/baseUrl";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import { useParams, useNavigate } from "react-router-dom";
 import UserType from "../../Hooks/auth/userType";
+import { useTeacherCourseGroups } from "../../Hooks/course/useCourseGroups";
+import { fetchExamGrades } from "../../api/courseAssignmentReportsApi";
+import { normalizeStudyGroups } from "./utils/examReportUtils";
 import {
   extractExamAttemptId,
   isLectureExamFinishedPayload,
@@ -145,6 +148,7 @@ const ComprehensiveExam = () => {
   const [gradesData, setGradesData] = useState(null);
   const [gradesLoading, setGradesLoading] = useState(false);
   const [gradesError, setGradesError] = useState(null);
+  const [gradesGroupId, setGradesGroupId] = useState("");
   // State للتنقل بين الأسئلة
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   // State لعرض/إخفاء الباجنيشن
@@ -202,6 +206,13 @@ const ComprehensiveExam = () => {
   const headingColor = useColorModeValue("gray.900", "white");
   const subtextColor = useColorModeValue("gray.500", "gray.400");
   const isStaff = Boolean(isTeacher || isAdmin);
+  const { data: teacherGroupsRaw = [] } = useTeacherCourseGroups(undefined, {
+    enabled: isStaff,
+  });
+  const studyGroups = useMemo(
+    () => normalizeStudyGroups(teacherGroupsRaw),
+    [teacherGroupsRaw],
+  );
 
   const filteredQuestions = useMemo(() => {
     const term = questionSearch.trim().toLowerCase();
@@ -215,23 +226,22 @@ const ComprehensiveExam = () => {
     });
   }, [questions, questionSearch]);
 
-  const fetchGrades = useCallback(async () => {
-    if (!id) return;
-    setGradesLoading(true);
-    setGradesError(null);
-    try {
-      const token = localStorage.getItem("token");
-      const res = await baseUrl.get(
-        `/api/course/lecture-exam/${id}/submissions`,
-        token ? { headers: { Authorization: `Bearer ${token}` } } : {},
-      );
-      setGradesData(res.data.submissions || []);
-    } catch (err) {
-      setGradesError("حدث خطأ أثناء تحميل الدرجات");
-    } finally {
-      setGradesLoading(false);
-    }
-  }, [id]);
+  const fetchGrades = useCallback(
+    async (groupFilter = gradesGroupId) => {
+      if (!id) return;
+      setGradesLoading(true);
+      setGradesError(null);
+      try {
+        const list = await fetchExamGrades(id, { groupId: groupFilter });
+        setGradesData(list);
+      } catch (err) {
+        setGradesError("حدث خطأ أثناء تحميل الدرجات");
+      } finally {
+        setGradesLoading(false);
+      }
+    },
+    [id, gradesGroupId],
+  );
 
   const openGrades = useCallback(() => {
     setShowGrades(true);
@@ -2091,6 +2101,10 @@ const ComprehensiveExam = () => {
           onBack={() => setShowGrades(false)}
           onRetry={fetchGrades}
           onReport={() => navigate(`/lecture-exam/${id}/report`)}
+          groups={studyGroups}
+          selectedGroupId={gradesGroupId}
+          onGroupChange={setGradesGroupId}
+          groupFilterDisabled={gradesLoading}
           onZoomImage={(src) => {
             setImageZoomSrc(src);
             setImageZoomOpen(true);

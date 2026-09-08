@@ -70,8 +70,11 @@ function normalizeStatBlock(block) {
 
 export function normalizeEnrollmentSummary(raw) {
   if (!raw || typeof raw !== "object") return null;
+  const groupId = raw.groupId ?? raw.group_id ?? null;
   return {
     passPercentage: toNumber(raw.passPercentage ?? raw.pass_percentage, 50),
+    groupId: groupId == null || groupId === "" ? null : toNumber(groupId, groupId),
+    groupName: raw.groupName ?? raw.group_name ?? "",
     enrolledTotal: toNumber(raw.enrolledTotal ?? raw.enrolled_total),
     examined: normalizeStatBlock(raw.examined),
     notExamined: normalizeStatBlock(raw.notExamined ?? raw.not_examined),
@@ -83,6 +86,27 @@ export function normalizeEnrollmentSummary(raw) {
   };
 }
 
+export function normalizeGroupFilter(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const groupId = raw.groupId ?? raw.group_id ?? null;
+  if (groupId == null || groupId === "") return null;
+  return {
+    groupId: toNumber(groupId, groupId),
+    groupName: raw.groupName ?? raw.group_name ?? "",
+  };
+}
+
+export function normalizeStudyGroups(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((group) => ({
+      id: group.id ?? group.groupId ?? group.group_id ?? null,
+      name: group.name ?? group.groupName ?? group.group_name ?? "مجموعة",
+      gradeId: group.gradeId ?? group.grade_id ?? null,
+    }))
+    .filter((group) => group.id != null);
+}
+
 export function normalizeNotExaminedStudents(list) {
   if (!Array.isArray(list)) return [];
   return list.map((student) => ({
@@ -90,6 +114,12 @@ export function normalizeNotExaminedStudents(list) {
     studentName:
       student.studentName ?? student.student_name ?? student.name ?? "طالب",
     studentEmail: student.studentEmail ?? student.student_email ?? student.email ?? "",
+    groupName:
+      student.groupName ??
+      student.group_name ??
+      student.studyGroupName ??
+      student.study_group_name ??
+      "",
     examStatus: student.examStatus ?? student.exam_status ?? "never_started",
     startedAt: student.startedAt ?? student.started_at ?? null,
     lastAutosaveAt: student.lastAutosaveAt ?? student.last_autosave_at ?? null,
@@ -99,8 +129,36 @@ export function normalizeNotExaminedStudents(list) {
   }));
 }
 
+export function normalizeExaminedStudents(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map((student) => ({
+    studentId: student.studentId ?? student.student_id ?? student.id ?? null,
+    studentName:
+      student.studentName ?? student.student_name ?? student.name ?? "طالب",
+    studentEmail: student.studentEmail ?? student.student_email ?? student.email ?? "",
+    groupName:
+      student.groupName ??
+      student.group_name ??
+      student.studyGroupName ??
+      student.study_group_name ??
+      "",
+    obtainedGrade: toNumber(student.obtainedGrade ?? student.obtained_grade),
+    totalGrade: toNumber(student.totalGrade ?? student.total_grade),
+    percentage: toNumber(student.percentage),
+    passed: Boolean(student.passed),
+    submittedAt: student.submittedAt ?? student.submitted_at ?? null,
+  }));
+}
+
 export function normalizeReportPayload(data) {
-  if (!data || typeof data !== "object") {
+  const payload =
+    data?.exam || data?.enrollmentSummary || Array.isArray(data?.questions)
+      ? data
+      : data?.data && typeof data.data === "object"
+        ? data.data
+        : data;
+
+  if (!payload || typeof payload !== "object") {
     return {
       exam: {},
       overallStatistics: {},
@@ -108,20 +166,23 @@ export function normalizeReportPayload(data) {
       sortedQuestions: [],
       mostProblematicQuestions: [],
       enrollmentSummary: null,
+      groupFilter: null,
+      availableStudyGroups: [],
+      examinedStudents: [],
       notExaminedStudents: [],
     };
   }
 
-  const questions = (Array.isArray(data.questions) ? data.questions : []).map(
+  const questions = (Array.isArray(payload.questions) ? payload.questions : []).map(
     normalizeQuestion,
   );
 
-  const sortedQuestions = Array.isArray(data.sortedQuestions)
-    ? data.sortedQuestions.map(normalizeQuestion)
+  const sortedQuestions = Array.isArray(payload.sortedQuestions)
+    ? payload.sortedQuestions.map(normalizeQuestion)
     : [...questions].sort((a, b) => (b.wrongCount ?? 0) - (a.wrongCount ?? 0));
 
-  const mostProblematicQuestions = Array.isArray(data.mostProblematicQuestions)
-    ? data.mostProblematicQuestions
+  const mostProblematicQuestions = Array.isArray(payload.mostProblematicQuestions)
+    ? payload.mostProblematicQuestions
     : sortedQuestions
         .filter((q) => (q.wrongCount ?? 0) > 0)
         .slice(0, 5)
@@ -134,16 +195,31 @@ export function normalizeReportPayload(data) {
         }));
 
   return {
-    exam: data.exam || {},
-    overallStatistics: data.overallStatistics || {},
+    exam: payload.exam || {},
+    overallStatistics: payload.overallStatistics || payload.overall_statistics || {},
     questions,
     sortedQuestions,
     mostProblematicQuestions,
     enrollmentSummary: normalizeEnrollmentSummary(
-      data.enrollmentSummary ?? data.enrollment_summary,
+      payload.enrollmentSummary ?? payload.enrollment_summary,
+    ),
+    groupFilter: normalizeGroupFilter(payload.groupFilter ?? payload.group_filter),
+    availableStudyGroups: normalizeStudyGroups(
+      payload.availableStudyGroups ??
+        payload.available_study_groups ??
+        payload.studyGroups ??
+        payload.study_groups ??
+        payload.groups ??
+        payload.data?.availableStudyGroups ??
+        payload.data?.available_study_groups ??
+        payload.data?.studyGroups ??
+        payload.data?.groups,
+    ),
+    examinedStudents: normalizeExaminedStudents(
+      payload.examinedStudents ?? payload.examined_students,
     ),
     notExaminedStudents: normalizeNotExaminedStudents(
-      data.notExaminedStudents ?? data.not_examined_students,
+      payload.notExaminedStudents ?? payload.not_examined_students,
     ),
   };
 }

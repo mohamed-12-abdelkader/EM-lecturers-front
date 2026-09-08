@@ -17,8 +17,11 @@ import {
   ModalOverlay,
   Progress,
   SimpleGrid,
+  Select,
   Text,
   VStack,
+  Wrap,
+  WrapItem,
   useColorModeValue,
 } from "@chakra-ui/react";
 import {
@@ -26,13 +29,14 @@ import {
   FiArrowRight,
   FiCheckCircle,
   FiChevronDown,
+  FiFilter,
   FiHelpCircle,
   FiTrendingUp,
   FiUsers,
   FiXCircle,
 } from "react-icons/fi";
 import { MdSort, MdOutlineAssignment } from "react-icons/md";
-import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   Bar,
   BarChart,
@@ -48,6 +52,7 @@ import {
 } from "recharts";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import UserType from "../../Hooks/auth/userType";
+import { useTeacherCourseGroups } from "../../Hooks/course/useCourseGroups";
 import {
   fetchCourseLevelExamReport,
   fetchLectureExamReport,
@@ -60,11 +65,13 @@ import {
 import ExamAttemptResultScreen from "./components/ExamAttemptResultScreen";
 import {
   normalizeReportPayload,
+  normalizeStudyGroups,
   resolveExamReportRoute,
   buildExamManagePath,
 } from "./utils/examReportUtils";
 import { renderFormattedExamText } from "../../utils/renderFormattedExamText";
 import ExamEnrollmentSummary from "./components/ExamEnrollmentSummary";
+import ExamReportGroupExportButtons from "./components/ExamReportGroupExportButtons";
 
 const NAVY = "#0E4C92";
 const NAVY_DEEP = "#082B57";
@@ -872,8 +879,12 @@ export default function ExamReportPage() {
   const examBasePath = buildExamManagePath(examId, {
     from: kind === "course-level" ? "course-level" : "lecture",
   });
+  const [searchParams, setSearchParams] = useSearchParams();
   const [, isAdmin, isTeacher, student] = UserType();
   const isStaff = Boolean(isAdmin || isTeacher);
+  const { data: teacherGroupsRaw = [] } = useTeacherCourseGroups(undefined, {
+    enabled: isStaff,
+  });
 
   const [report, setReport] = useState(null);
   const [studentResult, setStudentResult] = useState(null);
@@ -883,6 +894,10 @@ export default function ExamReportPage() {
   const [imageZoomSrc, setImageZoomSrc] = useState(null);
   const [sortDir, setSortDir] = useState("most-errors");
   const [passPercentage, setPassPercentage] = useState(50);
+  const [groupId, setGroupId] = useState(() => {
+    const fromUrl = Number(searchParams.get("groupId") || searchParams.get("group_id"));
+    return Number.isFinite(fromUrl) && fromUrl > 0 ? fromUrl : null;
+  });
   const reportRef = useRef(null);
 
   const pageBg = useColorModeValue("#EEF3F9", "gray.950");
@@ -902,8 +917,8 @@ export default function ExamReportPage() {
     try {
       const raw =
         kind === "course-level"
-          ? await fetchCourseLevelExamReport(examId, { passPercentage })
-          : await fetchLectureExamReport(examId, { passPercentage });
+          ? await fetchCourseLevelExamReport(examId, { passPercentage, groupId })
+          : await fetchLectureExamReport(examId, { passPercentage, groupId });
       const normalized = normalizeReportPayload(raw);
       reportRef.current = normalized;
       setReport(normalized);
@@ -917,7 +932,7 @@ export default function ExamReportPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [examId, kind, passPercentage]);
+  }, [examId, kind, passPercentage, groupId]);
 
   const fetchStudentAttemptReport = useCallback(async () => {
     if (!examId) return;
@@ -959,6 +974,69 @@ export default function ExamReportPage() {
   const overall = report?.overallStatistics || {};
   const enrollmentSummary = report?.enrollmentSummary;
   const notExaminedStudents = report?.notExaminedStudents || [];
+  const examinedStudents = report?.examinedStudents || [];
+  const groupFilter = report?.groupFilter;
+  const studyGroups = useMemo(() => {
+    const merged = new Map();
+    const addGroups = (list) => {
+      normalizeStudyGroups(list).forEach((group) => {
+        merged.set(String(group.id), group);
+      });
+    };
+    addGroups(report?.availableStudyGroups);
+    addGroups(teacherGroupsRaw);
+    if (groupFilter?.groupId) {
+      addGroups([
+        { id: groupFilter.groupId, name: groupFilter.groupName || "مجموعة" },
+      ]);
+    }
+    if (enrollmentSummary?.groupId) {
+      addGroups([
+        {
+          id: enrollmentSummary.groupId,
+          name: enrollmentSummary.groupName || "مجموعة",
+        },
+      ]);
+    }
+    return Array.from(merged.values());
+  }, [
+    report?.availableStudyGroups,
+    teacherGroupsRaw,
+    groupFilter,
+    enrollmentSummary?.groupId,
+    enrollmentSummary?.groupName,
+  ]);
+  const selectedGroupId =
+    groupId === null || groupId === "" ? "" : String(groupId);
+  const selectedGroupName = useMemo(() => {
+    if (enrollmentSummary?.groupName) return enrollmentSummary.groupName;
+    if (groupFilter?.groupName) return groupFilter.groupName;
+    if (!selectedGroupId) return "";
+    return studyGroups.find((group) => String(group.id) === selectedGroupId)?.name || "";
+  }, [
+    enrollmentSummary?.groupName,
+    groupFilter?.groupName,
+    selectedGroupId,
+    studyGroups,
+  ]);
+
+  const applyGroupFilter = useCallback(
+    (value) => {
+      const next = new URLSearchParams(searchParams);
+      if (!value) {
+        setGroupId("");
+        next.delete("groupId");
+        next.delete("group_id");
+      } else {
+        const id = Number(value);
+        setGroupId(id);
+        next.set("groupId", String(id));
+        next.delete("group_id");
+      }
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
   const sourceQuestions = useMemo(
     () =>
       Array.isArray(report?.questions) && report.questions.length
@@ -1178,6 +1256,44 @@ export default function ExamReportPage() {
                 ) : null}
               </HStack>
 
+              <HStack mt={4} spacing={3} align="center" flexWrap="wrap">
+                <Text fontSize="sm" fontWeight="bold" opacity={0.95}>
+                  فلتر المجموعة
+                </Text>
+                <Select
+                  value={selectedGroupId}
+                  onChange={(e) => applyGroupFilter(e.target.value)}
+                  size="sm"
+                  maxW="260px"
+                  bg="white"
+                  color={NAVY_DEEP}
+                  borderColor="whiteAlpha.400"
+                  borderRadius="lg"
+                  fontWeight="bold"
+                  isDisabled={refreshing}
+                  _hover={{ borderColor: "white" }}
+                  sx={{
+                    option: { color: NAVY_DEEP, bg: "white" },
+                  }}
+                >
+                  <option value="">كل المجموعات</option>
+                  {studyGroups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name}
+                    </option>
+                  ))}
+                </Select>
+                <ExamReportGroupExportButtons
+                  examinedStudents={examinedStudents}
+                  notExaminedStudents={notExaminedStudents}
+                  examTitle={reportExam.title || ""}
+                  courseTitle={reportExam.courseTitle || ""}
+                  groupName={selectedGroupName}
+                  isDisabled={refreshing}
+                  colorMode="dark"
+                />
+              </HStack>
+
               {displayedQuestions.length > 0 && (
                 <Box mt={5} maxW="420px">
                   <Flex justify="space-between" mb={1.5} fontSize="xs" opacity={0.9}>
@@ -1200,15 +1316,82 @@ export default function ExamReportPage() {
             </Box>
           </Box>
 
-          {enrollmentSummary ? (
+          <Box
+              bg={cardBg}
+              borderWidth="1px"
+              borderColor={border}
+              borderRadius="2xl"
+              p={{ base: 4, md: 5 }}
+              boxShadow="sm"
+              opacity={refreshing ? 0.72 : 1}
+              transition="opacity 0.2s ease"
+            >
+              <HStack spacing={3} mb={3} align="flex-start">
+                <Flex
+                  w="36px"
+                  h="36px"
+                  borderRadius="lg"
+                  align="center"
+                  justify="center"
+                  bg={`${NAVY}14`}
+                  color={NAVY}
+                  flexShrink={0}
+                >
+                  <Icon as={FiFilter} boxSize={5} />
+                </Flex>
+                <Box>
+                  <Heading size="sm" color={titleColor}>
+                    تقرير كل مجموعة
+                  </Heading>
+                  <Text fontSize="sm" color={muted} mt={1}>
+                    اختر مجموعة لعرض نتائجها وإحصائياتها فقط، أو اعرض كل المجموعات معًا
+                  </Text>
+                </Box>
+              </HStack>
+              <Wrap spacing={2}>
+                <WrapItem>
+                  <Button
+                    size="sm"
+                    borderRadius="full"
+                    colorScheme={selectedGroupId === "" ? "blue" : "gray"}
+                    variant={selectedGroupId === "" ? "solid" : "outline"}
+                    onClick={() => applyGroupFilter("")}
+                    isDisabled={refreshing}
+                  >
+                    كل المجموعات
+                  </Button>
+                </WrapItem>
+                {studyGroups.map((group) => {
+                  const active = String(group.id) === selectedGroupId;
+                  return (
+                    <WrapItem key={group.id}>
+                      <Button
+                        size="sm"
+                        borderRadius="full"
+                        colorScheme={active ? "blue" : "gray"}
+                        variant={active ? "solid" : "outline"}
+                        onClick={() => applyGroupFilter(group.id)}
+                        isDisabled={refreshing}
+                      >
+                        {group.name}
+                      </Button>
+                    </WrapItem>
+                  );
+                })}
+              </Wrap>
+            </Box>
+
+          {enrollmentSummary || examinedStudents.length || notExaminedStudents.length ? (
             <ExamEnrollmentSummary
               summary={enrollmentSummary}
               students={notExaminedStudents}
+              examinedStudents={examinedStudents}
               passPercentage={passPercentage}
               onPassPercentageChange={setPassPercentage}
               isRefreshing={refreshing}
               examTitle={reportExam.title || ""}
               courseTitle={reportExam.courseTitle || ""}
+              groupName={selectedGroupName}
             />
           ) : null}
 
@@ -1218,6 +1401,13 @@ export default function ExamReportPage() {
                 label="عدد الطلاب"
                 value={overall.totalStudents ?? 0}
                 accent={NAVY}
+                hint={
+                  overall.enrolledTotal != null
+                    ? `من ${overall.enrolledTotal} مشترك`
+                    : enrollmentSummary?.enrolledTotal != null
+                      ? `من ${enrollmentSummary.enrolledTotal} مشترك`
+                      : undefined
+                }
                 icon={FiUsers}
               />
               <StatCard
