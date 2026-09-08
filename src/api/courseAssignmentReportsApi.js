@@ -1,5 +1,6 @@
 import baseUrl from "./baseUrl";
 import { readAuthToken } from "../utils/authStorage";
+import { normalizeGradeSubmission } from "../pages/exam/utils/examSubmissionUtils";
 
 function authConfig() {
   const token = readAuthToken();
@@ -75,5 +76,5 @@ export async function fetchExamGrades(examId, filters = {}) {
     payload?.students ??
     payload?.examinedStudents ??
     (Array.isArray(payload) ? payload : []);
-  return Array.isArray(list) ? list : [];
+  return Array.isArray(list) ? list.map(normalizeGradeSubmission) : [];
 }

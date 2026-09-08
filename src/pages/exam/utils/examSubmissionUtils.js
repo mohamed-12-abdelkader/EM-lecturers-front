@@ -25,6 +25,73 @@ function resolveOptionText(question, letter) {
   return question[key] ?? null;
 }
 
+/** توحيد حقول درجة الطالب القادمة من grades أو submissions */
+export function normalizeGradeSubmission(raw) {
+  if (!raw || typeof raw !== "object") return raw;
+  const name = firstDefined(raw.name, raw.studentName, raw.student_name, "طالب");
+  const studentId = firstDefined(raw.student_id, raw.studentId, raw.user_id, raw.userId);
+  const email = firstDefined(raw.email, raw.studentEmail, raw.student_email, "");
+  const phone = firstDefined(raw.phone, raw.studentPhone, raw.student_phone, "");
+  const obtained = firstDefined(raw.obtained_grade, raw.obtainedGrade, raw.totalGrade);
+  const total = firstDefined(
+    raw.max_grade,
+    raw.maxGrade,
+    raw.total_grade,
+    raw.totalGrade,
+  );
+  return {
+    ...raw,
+    name,
+    student_id: studentId ?? raw.student_id,
+    studentId: studentId ?? raw.studentId,
+    email,
+    phone,
+    obtained_grade: obtained ?? raw.obtained_grade,
+    obtainedGrade: obtained ?? raw.obtainedGrade,
+    max_grade: total ?? raw.max_grade,
+    total_grade: total ?? raw.total_grade,
+    maxGrade: total ?? raw.maxGrade,
+    totalGrade: total ?? raw.totalGrade,
+    submission_id: firstDefined(raw.submission_id, raw.attemptId, raw.attempt_id),
+    attempt_number: firstDefined(raw.attempt_number, raw.attemptNumber, 1),
+    submitted_at: firstDefined(raw.submitted_at, raw.submittedAt),
+    started_at: firstDefined(raw.started_at, raw.startedAt),
+    percentage: raw.percentage,
+  };
+}
+
+export function matchesStudentSearch(submission, term) {
+  const q = String(term || "").trim().toLowerCase();
+  if (!q) return true;
+  const digits = q.replace(/\D/g, "");
+  const haystack = [
+    submission?.name,
+    submission?.studentName,
+    submission?.student_name,
+    submission?.email,
+    submission?.studentEmail,
+    submission?.student_email,
+    submission?.phone,
+    submission?.studentPhone,
+    submission?.student_id,
+    submission?.studentId,
+    submission?.submission_id,
+    submission?.attemptId,
+    submission?.attempt_id,
+    submission?.attempt_number,
+    submission?.attemptNumber,
+  ]
+    .filter((value) => value != null && value !== "")
+    .map((value) => String(value).toLowerCase());
+
+  if (haystack.some((value) => value.includes(q))) return true;
+  if (digits.length >= 2) {
+    const phoneDigits = String(submission?.phone || submission?.studentPhone || "").replace(/\D/g, "");
+    if (phoneDigits && phoneDigits.includes(digits)) return true;
+  }
+  return false;
+}
+
 export function formatSubmissionAnswer(letter, text, question) {
   const normalizedLetter = letter ? String(letter).trim().toUpperCase() : "";
   const resolvedText =

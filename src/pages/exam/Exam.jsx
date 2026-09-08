@@ -19,7 +19,7 @@ import { FiDownload } from "react-icons/fi";
 import { PlatformExamTeacherCard } from "./components/PlatformExamQuestionCard";
 import AiQuestionExtractionModal from "./components/AiQuestionExtractionModal";
 import { SubmissionCard } from "./components/ExamSubmissionsView";
-import { downloadExamGradesExcel, downloadExamGradesPdf } from "./utils/examSubmissionUtils";
+import { downloadExamGradesExcel, downloadExamGradesPdf, matchesStudentSearch } from "./utils/examSubmissionUtils";
 import { PaginationBar } from "../centerMgmt/components/UiBits";
 import FormattedQuestionText from "../../components/question/FormattedQuestionText";
 import { MdArrowBack } from "react-icons/md";
@@ -126,17 +126,7 @@ const Exam = () => {
 
   const filteredGrades = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    return gradesData.filter((submission) => {
-      if (!term) return true;
-      return (
-        (submission.name && submission.name.toLowerCase().includes(term)) ||
-        (submission.student_id != null && String(submission.student_id).includes(term)) ||
-        (submission.submission_id != null && String(submission.submission_id).includes(term)) ||
-        (submission.attempt_number != null && String(submission.attempt_number).includes(term)) ||
-        (submission.email && submission.email.toLowerCase().includes(term)) ||
-        (submission.phone && submission.phone.includes(term))
-      );
-    });
+    return gradesData.filter((submission) => matchesStudentSearch(submission, term));
   }, [gradesData, searchTerm]);
 
   const gradesTotalPages = Math.max(1, Math.ceil(filteredGrades.length / GRADES_PAGE_SIZE));
@@ -620,7 +610,7 @@ const Exam = () => {
           <Box w="full" maxW={{ base: "100%", sm: "400px" }} mx="auto" mb={{ base: 4, md: 6 }}>
             <InputGroup size="lg">
               <Input
-                placeholder="ابحث بالاسم، رقم الطالب، رقم التسليم أو المحاولة..."
+                placeholder="ابحث بالاسم أو الإيميل أو الهاتف أو رقم الطالب..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 borderRadius="full"

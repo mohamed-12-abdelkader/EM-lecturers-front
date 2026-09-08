@@ -41,6 +41,7 @@ import {
   resolveSubmissionStatus,
   downloadExamGradesExcel,
   downloadExamGradesPdf,
+  matchesStudentSearch,
 } from "../utils/examSubmissionUtils";
 
 const PAGE_SIZE = 20;
@@ -112,6 +113,37 @@ function ScoreRing({ percentage, passed, size = 92 }) {
         </Text>
       </Flex>
     </Box>
+  );
+}
+
+function StudentIdentity({ submission, heading, muted }) {
+  const name = submission.name || submission.studentName || "طالب";
+  const studentId = submission.student_id ?? submission.studentId;
+  const phone = submission.phone || submission.studentPhone || "";
+  const email = submission.email || submission.studentEmail || "";
+
+  return (
+    <>
+      <Heading
+        as="h3"
+        fontSize={{ base: "lg", md: "xl" }}
+        fontWeight="800"
+        color={heading}
+        mb={1}
+        fontFamily={FONT}
+        lineHeight="1.4"
+        noOfLines={1}
+      >
+        {name}
+      </Heading>
+      <HStack spacing={3} flexWrap="wrap" fontSize="sm" color={muted}>
+        <Text>رقم الطالب: {studentId != null ? studentId : "—"}</Text>
+        <Text dir="ltr">{phone || "بدون هاتف"}</Text>
+        <Text noOfLines={1} dir="ltr">
+          {email || "بدون إيميل"}
+        </Text>
+      </HStack>
+    </>
   );
 }
 
@@ -339,7 +371,7 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
               fontSize="md"
               flexShrink={0}
             >
-              {studentInitials(submission.name)}
+              {studentInitials(submission.name || submission.studentName)}
             </Flex>
             <Box minW={0} flex={1}>
               <HStack spacing={2} mb={1.5} flexWrap="wrap">
@@ -350,19 +382,8 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
                   {statusLabel}
                 </Badge>
               </HStack>
-              <Heading
-                as="h3"
-                fontSize={{ base: "lg", md: "xl" }}
-                fontWeight="800"
-                color={heading}
-                mb={1}
-                fontFamily={FONT}
-                lineHeight="1.4"
-                noOfLines={1}
-              >
-                {submission.name || "طالب"}
-              </Heading>
-              <Text fontSize="sm" color="orange.600" fontWeight="600">
+              <StudentIdentity submission={submission} heading={heading} muted={muted} />
+              <Text fontSize="sm" color="orange.600" fontWeight="600" mt={2}>
                 بدأ الامتحان ولم يسلّمه بعد
                 {answeredCount > 0 ? ` · أجاب على ${answeredCount} سؤال` : ""}
                 {startedAt
@@ -416,7 +437,7 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
               fontSize="md"
               flexShrink={0}
             >
-              {studentInitials(submission.name)}
+              {studentInitials(submission.name || submission.studentName)}
             </Flex>
             <Box minW={0} flex={1}>
               <HStack spacing={2} mb={1.5} flexWrap="wrap">
@@ -441,23 +462,7 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
                   </Badge>
                 )}
               </HStack>
-              <Heading
-                as="h3"
-                fontSize={{ base: "lg", md: "xl" }}
-                fontWeight="800"
-                color={heading}
-                mb={1}
-                fontFamily={FONT}
-                lineHeight="1.4"
-                noOfLines={1}
-              >
-                {submission.name || "طالب"}
-              </Heading>
-              <HStack spacing={3} flexWrap="wrap" fontSize="sm" color={muted}>
-                {submission.phone && <Text>{submission.phone}</Text>}
-                {submission.email && <Text noOfLines={1}>{submission.email}</Text>}
-                {submission.student_id != null && <Text>رقم الطالب: {submission.student_id}</Text>}
-              </HStack>
+              <StudentIdentity submission={submission} heading={heading} muted={muted} />
             </Box>
           </HStack>
 
@@ -709,12 +714,7 @@ export default function ExamSubmissionsView({
       if (statusFilter === "failed" && (outcome.inProgress || outcome.passed)) return false;
       if (statusFilter === "in_progress" && !outcome.inProgress) return false;
       if (!term) return true;
-      return (
-        (submission.name && submission.name.toLowerCase().includes(term)) ||
-        (submission.student_id != null && String(submission.student_id).includes(term)) ||
-        (submission.phone && String(submission.phone).includes(term)) ||
-        (submission.email && submission.email.toLowerCase().includes(term))
-      );
+      return matchesStudentSearch(submission, term);
     });
   }, [submissions, outcomes, query, statusFilter]);
 
@@ -965,7 +965,7 @@ export default function ExamSubmissionsView({
             >
               <InputGroup size="md" maxW={{ md: "360px" }}>
                 <Input
-                  placeholder="ابحث باسم الطالب أو رقمه..."
+                  placeholder="ابحث بالاسم أو الإيميل أو الهاتف أو رقم الطالب..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   bg={inputBg}
