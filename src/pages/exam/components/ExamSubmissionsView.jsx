@@ -29,7 +29,7 @@ import {
   AiOutlineCheckCircle,
   AiOutlineCloseCircle,
 } from "react-icons/ai";
-import { FiChevronDown, FiArrowRight, FiSearch, FiAward, FiDownload } from "react-icons/fi";
+import { FiChevronDown, FiArrowRight, FiSearch, FiAward, FiDownload, FiHelpCircle, FiUsers } from "react-icons/fi";
 import { FaChartBar, FaFilePdf } from "react-icons/fa";
 import { PaginationBar } from "../../centerMgmt/components/UiBits";
 import { ExamQuestionImage } from "./ExamQuestionDisplay";
@@ -42,6 +42,7 @@ import {
   downloadExamGradesExcel,
   downloadExamGradesPdf,
   matchesStudentSearch,
+  buildQuestionLevelReport,
 } from "../utils/examSubmissionUtils";
 
 const PAGE_SIZE = 20;
@@ -384,8 +385,12 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
               </HStack>
               <StudentIdentity submission={submission} heading={heading} muted={muted} />
               <Text fontSize="sm" color="orange.600" fontWeight="600" mt={2}>
-                بدأ الامتحان ولم يسلّمه بعد
-                {answeredCount > 0 ? ` · أجاب على ${answeredCount} سؤال` : ""}
+                بدأ ولم يسلّم بعد — الدرجة غير محسوبة
+                {Number(submission.questions_count ?? submission.questionsCount) > 0
+                  ? ` · أجاب ${answeredCount}/${Number(submission.questions_count ?? submission.questionsCount)}`
+                  : answeredCount > 0
+                    ? ` · أجاب على ${answeredCount} سؤال`
+                    : ""}
                 {startedAt
                   ? ` · ${new Date(startedAt).toLocaleString("ar-EG", {
                       dateStyle: "short",
@@ -538,10 +543,13 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
         <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3} mb={4}>
           <Box textAlign="center">
             <Text fontSize="xs" color={muted} fontWeight="600" mb={1}>
-              الحالة
+              أجاب
             </Text>
             <Text fontSize="sm" fontWeight="700">
-              {statusLabel}
+              {answeredCount}
+              {Number(submission.questions_count ?? submission.questionsCount) > 0
+                ? ` / ${Number(submission.questions_count ?? submission.questionsCount)}`
+                : ""}
             </Text>
           </Box>
           <Box textAlign="center">
@@ -562,15 +570,10 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
           </Box>
           <Box textAlign="center">
             <Text fontSize="xs" color={muted} fontWeight="600" mb={1}>
-              تاريخ التسليم
+              الحالة
             </Text>
             <Text fontSize="sm" fontWeight="700">
-              {submission.submitted_at
-                ? new Date(submission.submitted_at).toLocaleString("ar-EG", {
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  })
-                : "—"}
+              {statusLabel}
             </Text>
           </Box>
         </SimpleGrid>
@@ -668,8 +671,191 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
   );
 }
 
+function StudentNameList({ students, emptyLabel, accent }) {
+  const muted = useColorModeValue("gray.500", "gray.400");
+  const chipBg = useColorModeValue(`${accent}.50`, "whiteAlpha.100");
+  const chipColor = useColorModeValue(`${accent}.700`, `${accent}.200`);
+
+  if (!students.length) {
+    return (
+      <Text fontSize="sm" color={muted}>
+        {emptyLabel}
+      </Text>
+    );
+  }
+
+  return (
+    <VStack align="stretch" spacing={1.5} maxH="220px" overflowY="auto">
+      {students.map((student, index) => (
+        <Flex
+          key={`${student.studentId || student.name}-${index}`}
+          justify="space-between"
+          gap={2}
+          px={3}
+          py={2}
+          borderRadius="md"
+          bg={chipBg}
+          fontFamily={FONT}
+        >
+          <Text fontSize="sm" fontWeight="700" color={chipColor} noOfLines={1}>
+            {student.name}
+          </Text>
+          {student.yourChoice ? (
+            <Text fontSize="xs" color={muted} noOfLines={1} flexShrink={0} maxW="45%">
+              {student.yourChoice}
+            </Text>
+          ) : null}
+        </Flex>
+      ))}
+    </VStack>
+  );
+}
+
+function QuestionLevelReport({ questions, onZoomImage }) {
+  const cardBg = useColorModeValue("white", "gray.900");
+  const border = useColorModeValue("gray.200", "gray.700");
+  const heading = useColorModeValue("gray.900", "white");
+  const muted = useColorModeValue("gray.500", "gray.400");
+  const softBg = useColorModeValue("gray.50", "whiteAlpha.50");
+  const [openId, setOpenId] = useState(null);
+
+  if (!questions.length) {
+    return (
+      <Box
+        bg={cardBg}
+        borderWidth="1px"
+        borderColor={border}
+        borderRadius="xl"
+        p={8}
+        textAlign="center"
+        fontFamily={FONT}
+      >
+        <Text color={muted}>لا توجد أسئلة لعرض تقريرها بعد تسليم الطلاب.</Text>
+      </Box>
+    );
+  }
+
+  return (
+    <VStack spacing={4} align="stretch" fontFamily={FONT}>
+      {questions.map((question, index) => {
+        const total =
+          question.correct.length + question.wrong.length + question.unanswered.length;
+        const correctPct = total ? Math.round((question.correct.length / total) * 100) : 0;
+        const isOpen = openId === String(question.questionId);
+
+        return (
+          <Box
+            key={question.questionId ?? index}
+            bg={cardBg}
+            borderWidth="1px"
+            borderColor={border}
+            borderRadius="2xl"
+            overflow="hidden"
+          >
+            <Box px={{ base: 4, md: 5 }} py={4} bg={softBg} borderBottomWidth="1px" borderColor={border}>
+              <HStack spacing={2} mb={2} flexWrap="wrap">
+                <Badge colorScheme="blue" variant="subtle">
+                  سؤال {index + 1}
+                </Badge>
+                <Badge colorScheme="green" variant="subtle">
+                  صح {question.correct.length}
+                </Badge>
+                <Badge colorScheme="red" variant="subtle">
+                  غلط {question.wrong.length}
+                </Badge>
+                <Badge colorScheme="orange" variant="subtle">
+                  متروك {question.unanswered.length}
+                </Badge>
+              </HStack>
+              <Box fontSize="md" fontWeight="800" color={heading} lineHeight="1.8" mb={3}>
+                {question.questionText
+                  ? renderFormattedExamText(question.questionText)
+                  : `سؤال ${index + 1}`}
+              </Box>
+              {question.questionImage ? (
+                <Box mb={3}>
+                  <ExamQuestionImage src={question.questionImage} onZoom={onZoomImage} compact />
+                </Box>
+              ) : null}
+              <Flex justify="space-between" mb={1.5}>
+                <Text fontSize="xs" fontWeight="700" color={muted}>
+                  نسبة الإجابات الصحيحة
+                </Text>
+                <Text fontSize="sm" fontWeight="800" color={correctPct >= 50 ? "green.600" : "red.500"}>
+                  {correctPct}%
+                </Text>
+              </Flex>
+              <Progress
+                value={correctPct}
+                size="sm"
+                borderRadius="full"
+                colorScheme={correctPct >= 50 ? "green" : "red"}
+              />
+            </Box>
+            <Button
+              variant="ghost"
+              w="full"
+              justifyContent="space-between"
+              borderRadius={0}
+              py={3}
+              rightIcon={
+                <Icon
+                  as={FiChevronDown}
+                  transform={isOpen ? "rotate(180deg)" : "rotate(0deg)"}
+                  transition="transform 0.2s ease"
+                />
+              }
+              onClick={() =>
+                setOpenId(isOpen ? null : String(question.questionId))
+              }
+              fontFamily={FONT}
+            >
+              مين صح ومين غلط
+            </Button>
+            <Collapse in={isOpen} animateOpacity>
+              <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4} p={{ base: 4, md: 5 }}>
+                <Box>
+                  <Text fontSize="sm" fontWeight="800" color="green.600" mb={2}>
+                    صح ({question.correct.length})
+                  </Text>
+                  <StudentNameList
+                    students={question.correct}
+                    emptyLabel="لا أحد أجاب صح"
+                    accent="green"
+                  />
+                </Box>
+                <Box>
+                  <Text fontSize="sm" fontWeight="800" color="red.500" mb={2}>
+                    غلط ({question.wrong.length})
+                  </Text>
+                  <StudentNameList
+                    students={question.wrong}
+                    emptyLabel="لا أحد أجاب غلط"
+                    accent="red"
+                  />
+                </Box>
+                <Box>
+                  <Text fontSize="sm" fontWeight="800" color="orange.500" mb={2}>
+                    متروك ({question.unanswered.length})
+                  </Text>
+                  <StudentNameList
+                    students={question.unanswered}
+                    emptyLabel="لا أحد ترك السؤال"
+                    accent="orange"
+                  />
+                </Box>
+              </SimpleGrid>
+            </Collapse>
+          </Box>
+        );
+      })}
+    </VStack>
+  );
+}
+
 export default function ExamSubmissionsView({
   submissions = [],
+  examQuestions = [],
   loading = false,
   error = null,
   onBack,
@@ -686,6 +872,7 @@ export default function ExamSubmissionsView({
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [viewMode, setViewMode] = useState("students");
   const toast = useToast();
 
   const pageBg = useColorModeValue("#F4F7FB", "gray.950");
@@ -705,6 +892,25 @@ export default function ExamSubmissionsView({
   const completedCount = Math.max(0, submissions.length - inProgressCount);
   const passRate =
     completedCount > 0 ? Math.round((passedCount / completedCount) * 100) : 0;
+  const questionReport = useMemo(
+    () => buildQuestionLevelReport(examQuestions, submissions),
+    [examQuestions, submissions],
+  );
+  const filteredQuestionReport = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    if (!term) return questionReport;
+    return questionReport.filter((question) => {
+      const haystack = [
+        question.questionText,
+        ...question.correct.map((s) => s.name),
+        ...question.wrong.map((s) => s.name),
+        ...question.unanswered.map((s) => s.name),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(term);
+    });
+  }, [questionReport, query]);
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -849,7 +1055,7 @@ export default function ExamSubmissionsView({
                 mb={5}
               >
                 <Heading size="lg" color={heading} fontFamily={FONT} fontWeight="800">
-                  درجات الطلاب في الامتحان
+                  {examTitle || "درجات الطلاب في الواجب"}
                 </Heading>
                 <HStack spacing={2} flexShrink={0} flexWrap="wrap">
                   {typeof onGroupChange === "function" ? (
@@ -900,12 +1106,13 @@ export default function ExamSubmissionsView({
                     <Button
                       size="sm"
                       colorScheme="blue"
+                      variant="outline"
                       leftIcon={<Icon as={FaChartBar} />}
                       rightIcon={<Icon as={FiArrowRight} />}
                       onClick={onReport}
                       fontFamily={FONT}
                     >
-                      تقرير الأسئلة
+                      تقرير الإحصائيات
                     </Button>
                   )}
                 </HStack>
@@ -963,9 +1170,33 @@ export default function ExamSubmissionsView({
               direction={{ base: "column", md: "row" }}
               align={{ md: "center" }}
             >
+              <ButtonGroup size="sm" isAttached variant="outline">
+                <Button
+                  fontFamily={FONT}
+                  leftIcon={<Icon as={FiUsers} />}
+                  colorScheme={viewMode === "students" ? "blue" : "gray"}
+                  variant={viewMode === "students" ? "solid" : "outline"}
+                  onClick={() => setViewMode("students")}
+                >
+                  درجات الطلاب
+                </Button>
+                <Button
+                  fontFamily={FONT}
+                  leftIcon={<Icon as={FiHelpCircle} />}
+                  colorScheme={viewMode === "questions" ? "blue" : "gray"}
+                  variant={viewMode === "questions" ? "solid" : "outline"}
+                  onClick={() => setViewMode("questions")}
+                >
+                  مين صح / مين غلط
+                </Button>
+              </ButtonGroup>
               <InputGroup size="md" maxW={{ md: "360px" }}>
                 <Input
-                  placeholder="ابحث بالاسم أو الإيميل أو الهاتف أو رقم الطالب..."
+                  placeholder={
+                    viewMode === "questions"
+                      ? "ابحث في السؤال أو اسم الطالب..."
+                      : "ابحث بالاسم أو الإيميل أو الهاتف أو رقم الطالب..."
+                  }
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   bg={inputBg}
@@ -976,6 +1207,7 @@ export default function ExamSubmissionsView({
                   <Icon as={FiSearch} color={muted} />
                 </InputRightElement>
               </InputGroup>
+              {viewMode === "students" ? (
               <ButtonGroup size="sm" isAttached variant="outline">
                 <Button
                   fontFamily={FONT}
@@ -1010,6 +1242,7 @@ export default function ExamSubmissionsView({
                   لم يسلّم
                 </Button>
               </ButtonGroup>
+              ) : null}
             </Flex>
           )}
 
@@ -1033,6 +1266,12 @@ export default function ExamSubmissionsView({
               </VStack>
             </Alert>
           ) : submissions.length > 0 ? (
+            viewMode === "questions" ? (
+              <QuestionLevelReport
+                questions={filteredQuestionReport}
+                onZoomImage={onZoomImage}
+              />
+            ) : (
             <VStack spacing={4} align="stretch">
               {filtered.length === 0 ? (
                 <Box
@@ -1069,6 +1308,7 @@ export default function ExamSubmissionsView({
                 </>
               )}
             </VStack>
+            )
           ) : (
             <Box
               bg={cardBg}

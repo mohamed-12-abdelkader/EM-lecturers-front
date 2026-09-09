@@ -63,6 +63,17 @@ export async function fetchCourseLevelExamReport(examId, filters = {}) {
   return data;
 }
 
+/** GET /api/course/lecture-exam/:examId/submissions — نتائج الواجب / امتحان المحاضرة مع الأخطاء */
+export async function fetchLectureExamSubmissions(examId, filters = {}) {
+  const { data } = await baseUrl.get(
+    `/api/course/lecture-exam/${examId}/submissions`,
+    reportQueryConfig({ groupId: filters.groupId }),
+  );
+  const payload = data?.data && !Array.isArray(data?.submissions) ? data.data : data;
+  const list = payload?.submissions ?? (Array.isArray(payload) ? payload : []);
+  return Array.isArray(list) ? list.map(normalizeGradeSubmission) : [];
+}
+
 /** GET /api/exams/:examId/grades?groupId= */
 export async function fetchExamGrades(examId, filters = {}) {
   const { data } = await baseUrl.get(

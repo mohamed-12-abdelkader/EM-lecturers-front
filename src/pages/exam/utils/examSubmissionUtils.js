@@ -104,29 +104,42 @@ export function formatSubmissionAnswer(letter, text, question) {
   return resolvedText || normalizedLetter;
 }
 
+function formatChoiceDisplay(choice, letter, text, question) {
+  if (choice && typeof choice === "object") {
+    const choiceText = choice.text ?? text;
+    if (choiceText != null && String(choiceText).trim()) return String(choiceText).trim();
+    if (choice.id != null && choice.id !== "") return String(choice.id);
+  }
+  return formatSubmissionAnswer(letter, text, question);
+}
+
 export function normalizeWrongQuestion(raw) {
   if (!raw || typeof raw !== "object") return null;
 
-  const yourLetter = raw.yourAnswer ?? raw.yourChoice?.id ?? null;
-  const correctLetter = raw.correctAnswer ?? raw.correctChoice?.id ?? null;
-  const yourText = raw.yourAnswerText ?? raw.yourChoice?.text ?? null;
-  const correctText = raw.correctAnswerText ?? raw.correctChoice?.text ?? null;
-  const unanswered = Boolean(
-    raw.unanswered ||
-      raw.unanswered === true ||
-      ((yourLetter == null || yourLetter === "") && (yourText == null || yourText === "")),
-  );
+  const yourChoice = raw.yourChoice ?? raw.your_choice ?? null;
+  const correctChoice = raw.correctChoice ?? raw.correct_choice ?? null;
+  const yourLetter = raw.yourAnswer ?? raw.your_answer ?? yourChoice?.id ?? null;
+  const correctLetter = raw.correctAnswer ?? raw.correct_answer ?? correctChoice?.id ?? null;
+  const yourText = raw.yourAnswerText ?? raw.your_answer_text ?? yourChoice?.text ?? null;
+  const correctText =
+    raw.correctAnswerText ?? raw.correct_answer_text ?? correctChoice?.text ?? null;
+  const unanswered = raw.unanswered === true || raw.unanswered === "true";
 
   return {
-    questionId: raw.questionId ?? raw.id,
-    questionText: raw.questionText ?? raw.text ?? "",
-    questionImage: raw.questionImage ?? raw.image ?? null,
+    questionId: raw.questionId ?? raw.question_id ?? raw.id,
+    questionText: raw.questionText ?? raw.question_text ?? raw.text ?? "",
+    questionImage: raw.questionImage ?? raw.question_image ?? raw.image ?? null,
     type: raw.type ?? "mcq",
     unanswered,
     yourAnswerDisplay: unanswered
       ? "لم يجب"
-      : formatSubmissionAnswer(yourLetter, yourText, raw),
-    correctAnswerDisplay: formatSubmissionAnswer(correctLetter, correctText, raw),
+      : formatChoiceDisplay(yourChoice, yourLetter, yourText, raw),
+    correctAnswerDisplay: formatChoiceDisplay(
+      correctChoice,
+      correctLetter,
+      correctText,
+      raw,
+    ),
   };
 }
 
@@ -236,6 +249,98 @@ export function resolveSubmissionOutcome(submission) {
     unansweredCount,
     misses,
   };
+}
+
+function examQuestionMeta(question, index = 0) {
+  if (!question || typeof question !== "object") return null;
+  const isPassageSub = question.type === "passage_sub";
+  const id = isPassageSub
+    ? question.sub_question?.id ?? question.id ?? question.questionId
+    : question.id ?? question.questionId;
+  if (id == null) return null;
+  const text = isPassageSub
+    ? question.sub_question?.text ?? question.text ?? question.questionText
+    : question.text ?? question.questionText;
+  const image = isPassageSub
+    ? question.sub_question?.image ?? question.image
+    : question.questionImage ?? question.image;
+  return {
+    questionId: id,
+    questionText: text || `سؤال ${index + 1}`,
+    questionImage: image || null,
+  };
+}
+
+/** لكل سؤال: مين جاوب صح / غلط / ساب فاضي — من تسليمات الواجب */
+export function buildQuestionLevelReport(examQuestions = [], submissions = []) {
+  const questionMap = new Map();
+
+  const ensureQuestion = (id, text, image, index) => {
+    const key = String(id);
+    if (!questionMap.has(key)) {
+      questionMap.set(key, {
+        questionId: id,
+        questionText: text || `سؤال ${index + 1}`,
+        questionImage: image || null,
+        correct: [],
+        wrong: [],
+        unanswered: [],
+      });
+      return;
+    }
+    const existing = questionMap.get(key);
+    if (text && (!existing.questionText || existing.questionText.startsWith("سؤال "))) {
+      existing.questionText = text;
+    }
+    if (image && !existing.questionImage) existing.questionImage = image;
+  };
+
+  (Array.isArray(examQuestions) ? examQuestions : []).forEach((question, index) => {
+    const meta = examQuestionMeta(question, index);
+    if (meta) ensureQuestion(meta.questionId, meta.questionText, meta.questionImage, index);
+  });
+
+  const completed = (Array.isArray(submissions) ? submissions : []).filter(
+    (submission) => !resolveSubmissionOutcome(submission).inProgress,
+  );
+
+  completed.forEach((submission) => {
+    getWrongQuestions(submission).forEach((item, index) => {
+      if (item.questionId == null) return;
+      ensureQuestion(item.questionId, item.questionText, item.questionImage, index);
+    });
+  });
+
+  completed.forEach((submission) => {
+    const student = {
+      studentId: submission.student_id ?? submission.studentId ?? null,
+      name: submission.name || "طالب",
+      email: submission.email || "",
+    };
+    const missed = new Map(
+      getWrongQuestions(submission)
+        .filter((item) => item.questionId != null)
+        .map((item) => [String(item.questionId), item]),
+    );
+    questionMap.forEach((question) => {
+      const miss = missed.get(String(question.questionId));
+      if (!miss) {
+        question.correct.push(student);
+        return;
+      }
+      if (miss.unanswered) {
+        question.unanswered.push(student);
+        return;
+      }
+      question.wrong.push({
+        ...student,
+        yourChoice: miss.yourAnswerDisplay,
+        correctChoice: miss.correctAnswerDisplay,
+      });
+    });
+  });
+
+  return Array.from(questionMap.values());
 }
 
 function escapeCsvCell(value) {
