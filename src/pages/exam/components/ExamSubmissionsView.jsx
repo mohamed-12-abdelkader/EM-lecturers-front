@@ -244,7 +244,9 @@ function WrongQuestionCard({ question, index, onZoomImage }) {
             </Badge>
           ) : question.type ? (
             <Badge colorScheme="purple" variant="subtle" fontSize="2xs">
-              {question.type === "mcq" ? "اختيار من متعدد" : question.type}
+              {question.type === "mcq" || String(question.type).toUpperCase() === "TEXT"
+                ? "اختيار من متعدد"
+                : question.type}
             </Badge>
           ) : null}
         </HStack>

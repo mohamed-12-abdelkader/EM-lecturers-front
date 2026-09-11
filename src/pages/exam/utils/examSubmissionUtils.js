@@ -19,6 +19,16 @@ function toFiniteNumber(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+export function pickWrongQuestionsList(raw) {
+  const camel = raw?.wrongQuestions;
+  const snake = raw?.wrong_questions;
+  if (Array.isArray(camel) && camel.length) return camel;
+  if (Array.isArray(snake) && snake.length) return snake;
+  if (Array.isArray(camel)) return camel;
+  if (Array.isArray(snake)) return snake;
+  return [];
+}
+
 function resolveOptionText(question, letter) {
   if (!letter || !question) return null;
   const key = `option${String(letter).trim().toUpperCase()}`;
@@ -32,22 +42,31 @@ export function normalizeGradeSubmission(raw) {
   const studentId = firstDefined(raw.student_id, raw.studentId, raw.user_id, raw.userId);
   const email = firstDefined(raw.email, raw.studentEmail, raw.student_email, "");
   const phone = firstDefined(raw.phone, raw.studentPhone, raw.student_phone, "");
-  const obtained = firstDefined(raw.obtained_grade, raw.obtainedGrade, raw.totalGrade);
+  const obtained = firstDefined(raw.obtained_grade, raw.obtainedGrade);
   const total = firstDefined(
     raw.max_grade,
     raw.maxGrade,
     raw.total_grade,
     raw.totalGrade,
   );
+  const wrongList = pickWrongQuestionsList(raw);
+  const inProgress =
+    raw.status === "in_progress" ||
+    raw.in_progress === true ||
+    raw.exam_status === "in_progress";
+
   return {
     ...raw,
     name,
+    studentName: name,
     student_id: studentId ?? raw.student_id,
     studentId: studentId ?? raw.studentId,
     email,
+    studentEmail: email,
     phone,
-    obtained_grade: obtained ?? raw.obtained_grade,
-    obtainedGrade: obtained ?? raw.obtainedGrade,
+    studentPhone: phone,
+    obtained_grade: inProgress ? null : obtained ?? raw.obtained_grade,
+    obtainedGrade: inProgress ? null : obtained ?? raw.obtainedGrade,
     max_grade: total ?? raw.max_grade,
     total_grade: total ?? raw.total_grade,
     maxGrade: total ?? raw.maxGrade,
@@ -56,7 +75,10 @@ export function normalizeGradeSubmission(raw) {
     attempt_number: firstDefined(raw.attempt_number, raw.attemptNumber, 1),
     submitted_at: firstDefined(raw.submitted_at, raw.submittedAt),
     started_at: firstDefined(raw.started_at, raw.startedAt),
-    percentage: raw.percentage,
+    percentage: inProgress ? null : raw.percentage,
+    in_progress: inProgress,
+    wrongQuestions: wrongList,
+    wrong_questions: wrongList,
   };
 }
 
@@ -144,8 +166,7 @@ export function normalizeWrongQuestion(raw) {
 }
 
 export function getWrongQuestions(submission) {
-  const list = submission?.wrong_questions ?? submission?.wrongQuestions ?? [];
-  if (!Array.isArray(list)) return [];
+  const list = pickWrongQuestionsList(submission);
   return list.map(normalizeWrongQuestion).filter(Boolean);
 }
 
@@ -234,8 +255,7 @@ export function resolveSubmissionOutcome(submission) {
     submission?.passed != null ? Boolean(submission.passed) : percentage >= 50;
   const wrongCount = getWrongQuestionsCount(submission);
   const unansweredCount = getUnansweredQuestionsCount(submission);
-  const inferredMisses = total > 0 ? Math.max(0, total - obtained) : 0;
-  const misses = Math.max(wrongCount, unansweredCount, inferredMisses);
+  const misses = Math.max(wrongCount, unansweredCount);
   const perfect = total > 0 && obtained >= total && misses === 0 && percentage >= 100;
 
   return {

@@ -8,6 +8,7 @@ const STUDENT_ONLY_PATH_PREFIXES = [
   "/student-daily-quizzes",
   "/exam_grades",
   "/lectures_taple",
+  "/my-points",
 ];
 
 export function normalizeAuthUser(user, { fallbackUser = null, token = null } = {}) {

@@ -61,6 +61,8 @@ const Exam = () => {
   const [showGrades, setShowGrades] = useState(false);
   const [gradesLoading, setGradesLoading] = useState(false);
   const [gradesData, setGradesData] = useState([]);
+  const [gradesStats, setGradesStats] = useState(null);
+  const [gradesError, setGradesError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [gradesCurrentPage, setGradesCurrentPage] = useState(1);
   const [gradesGroupId, setGradesGroupId] = useState("");
@@ -114,11 +116,30 @@ const Exam = () => {
 
   const fetchGrades = async (groupFilter = gradesGroupId) => {
     setGradesLoading(true);
+    setGradesError(null);
     try {
-      const list = await fetchExamGrades(examId, { groupId: groupFilter });
-      setGradesData(list);
-    } catch {
-      toast({ title: "فشل جلب الدرجات", status: "error" });
+      const result = await fetchExamGrades(examId, {
+        groupId: groupFilter,
+        groupType: groupFilter ? "study" : undefined,
+      });
+      setGradesData(result.students || []);
+      setGradesStats(result.statistics || null);
+      if (result.exam?.title) {
+        setExamMeta((prev) => ({
+          ...(prev || {}),
+          examTitle: result.exam.title,
+          courseTitle: result.exam.courseTitle || prev?.courseTitle,
+        }));
+      }
+    } catch (err) {
+      const message =
+        err?.response?.data?.message ||
+        err?.response?.data?.msg ||
+        "فشل جلب درجات الطلاب";
+      setGradesError(message);
+      setGradesData([]);
+      setGradesStats(null);
+      toast({ title: message, status: "error" });
     } finally {
       setGradesLoading(false);
     }
@@ -544,7 +565,7 @@ const Exam = () => {
             mb={{ base: 4, md: 6 }}
           >
             <Heading textAlign={{ base: "center", sm: "start" }} color="blue.600" fontSize={{ base: "xl", sm: "2xl", md: "3xl" }}>
-              درجات الطلاب في الامتحان
+              {examMeta?.examTitle || "درجات الطلاب في الامتحان"}
             </Heading>
             <HStack spacing={2} flexWrap="wrap" justify={{ base: "center", sm: "flex-end" }}>
               <Select
@@ -624,10 +645,47 @@ const Exam = () => {
               </InputRightElement>
             </InputGroup>
           </Box>
+          {gradesStats ? (
+            <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3} mb={{ base: 4, md: 6 }}>
+              <Box bg={teacherCardBg} borderWidth="1px" borderColor={teacherCardBorder} borderRadius="xl" p={4} textAlign="center">
+                <Text fontSize="xs" color="gray.500" fontWeight="600" mb={1}>عدد الطلاب</Text>
+                <Text fontSize="2xl" fontWeight="800" color="blue.600">{gradesStats.totalStudents ?? gradesData.length}</Text>
+              </Box>
+              <Box bg={teacherCardBg} borderWidth="1px" borderColor={teacherCardBorder} borderRadius="xl" p={4} textAlign="center">
+                <Text fontSize="xs" color="gray.500" fontWeight="600" mb={1}>متوسط النسبة</Text>
+                <Text fontSize="2xl" fontWeight="800" color="purple.600">
+                  {gradesStats.averageGrade != null ? `${Math.round(Number(gradesStats.averageGrade))}%` : "—"}
+                </Text>
+              </Box>
+              <Box bg={teacherCardBg} borderWidth="1px" borderColor={teacherCardBorder} borderRadius="xl" p={4} textAlign="center">
+                <Text fontSize="xs" color="gray.500" fontWeight="600" mb={1}>أعلى درجة</Text>
+                <Text fontSize="2xl" fontWeight="800" color="green.600">
+                  {gradesStats.maxGrade ?? "—"}
+                  {gradesStats.totalGrade != null ? (
+                    <Text as="span" fontSize="md" color="gray.500" fontWeight="600"> / {gradesStats.totalGrade}</Text>
+                  ) : null}
+                </Text>
+              </Box>
+              <Box bg={teacherCardBg} borderWidth="1px" borderColor={teacherCardBorder} borderRadius="xl" p={4} textAlign="center">
+                <Text fontSize="xs" color="gray.500" fontWeight="600" mb={1}>أقل درجة</Text>
+                <Text fontSize="2xl" fontWeight="800" color="orange.500">{gradesStats.minGrade ?? "—"}</Text>
+              </Box>
+            </SimpleGrid>
+          ) : null}
+          {examMeta?.courseTitle ? (
+            <Text fontSize="sm" color="gray.500" textAlign="center" mb={4}>
+              الكورس: {examMeta.courseTitle}
+            </Text>
+          ) : null}
           {gradesLoading ? (
             <Center py={12}>
               <Spinner size="xl" color="blue.500" thickness="4px" />
             </Center>
+          ) : gradesError && gradesData.length === 0 ? (
+            <Alert status="error" borderRadius="lg">
+              <AlertIcon />
+              {gradesError}
+            </Alert>
           ) : gradesData.length === 0 ? (
             <Center py={12}>
               <Text fontSize="lg" color="gray.600" fontWeight="medium">
@@ -649,9 +707,13 @@ const Exam = () => {
                   )}
                   {paginatedGrades.map((submission, idx) => (
                     <SubmissionCard
-                      key={submission.submission_id ?? `${gradesCurrentPage}-${idx}`}
+                      key={submission.submission_id ?? submission.attemptId ?? `${gradesCurrentPage}-${idx}`}
                       submission={submission}
                       index={(gradesCurrentPage - 1) * GRADES_PAGE_SIZE + idx}
+                      onZoomImage={(src) => {
+                        setImageModalSrc(src);
+                        setImageModalOpen(true);
+                      }}
                     />
                   ))}
                   <PaginationBar

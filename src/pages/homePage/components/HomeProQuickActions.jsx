@@ -5,6 +5,7 @@ import {
   FaClipboardList,
   FaFire,
   FaKey,
+  FaTrophy,
 } from "react-icons/fa";
 import { MdSchedule } from "react-icons/md";
 import { hpContainer, hpEyebrow, hpSectionTitle } from "../homeTheme";
@@ -37,6 +38,13 @@ const ACTIONS = [
     label: "المسابقة",
     desc: "المسابقة اليومية وترتيبك",
     icon: FaFire,
+    tone: "orange",
+  },
+  {
+    to: "/my-points",
+    label: "نقاطي",
+    desc: "رصيدك وترتيبك في الصف",
+    icon: FaTrophy,
     tone: "orange",
   },
   {
@@ -192,7 +200,7 @@ export default function HomeProQuickActions({ onCourseActivated }) {
         </div>
 
         {/* ديسكتوب: شبكة */}
-        <div className="hidden gap-3 md:grid md:grid-cols-3 lg:grid-cols-5">
+        <div className="hidden gap-3 md:grid md:grid-cols-3 lg:grid-cols-6">
           {ACTIONS.map((item) => renderAction(item, onCourseActivated, "grid"))}
         </div>
       </div>
