@@ -49,29 +49,46 @@ function excelCell(value, type = "String") {
   return `<Cell><Data ss:Type="${type}">${xmlEscape(value)}</Data></Cell>`;
 }
 
+function resolveExportGroupName(student, fallbackGroupName) {
+  return (
+    student?.groupName ||
+    student?.group_name ||
+    fallbackGroupName ||
+    "كل المجموعات"
+  );
+}
+
 export function downloadNotExaminedExcel(students = [], options = {}) {
   const list = Array.isArray(students) ? students : [];
   if (!list.length) return false;
 
   const title = options.title || "الطلاب الذين لم يسلّموا";
   const courseTitle = options.courseTitle || "";
-  const filename = `${safeFileName(options.filename || title, "لم-يسلموا")}-${todayStamp()}.xls`;
+  const groupName = options.groupName || "";
+  const resolvedGroup = groupName || "كل المجموعات";
+  const filename = `${safeFileName(
+    options.filename || `لم-يسلموا-${resolvedGroup}-${title}`,
+    "لم-يسلموا",
+  )}-${todayStamp()}.xls`;
 
   const header = `
     <Row ss:StyleID="title">
-      <Cell ss:MergeAcross="3"><Data ss:Type="String">${xmlEscape(title)}</Data></Cell>
+      <Cell ss:MergeAcross="4"><Data ss:Type="String">${xmlEscape(title)}</Data></Cell>
+    </Row>
+    <Row>
+      <Cell ss:MergeAcross="4"><Data ss:Type="String">${xmlEscape(`المجموعة: ${resolvedGroup}`)}</Data></Cell>
     </Row>
     ${
       courseTitle
-        ? `<Row><Cell ss:MergeAcross="3"><Data ss:Type="String">${xmlEscape(`الكورس: ${courseTitle}`)}</Data></Cell></Row>`
+        ? `<Row><Cell ss:MergeAcross="4"><Data ss:Type="String">${xmlEscape(`الكورس: ${courseTitle}`)}</Data></Cell></Row>`
         : ""
     }
     <Row>
-      <Cell ss:MergeAcross="3"><Data ss:Type="String">${xmlEscape(`العدد: ${list.length} — ${todayStamp()}`)}</Data></Cell>
+      <Cell ss:MergeAcross="4"><Data ss:Type="String">${xmlEscape(`العدد: ${list.length} — ${todayStamp()}`)}</Data></Cell>
     </Row>
     <Row></Row>
     <Row ss:StyleID="header">
-      ${["م", "اسم الطالب", "البريد الإلكتروني", "الحالة"].map((h) => excelCell(h)).join("")}
+      ${["م", "اسم الطالب", "البريد الإلكتروني", "المجموعة", "الحالة"].map((h) => excelCell(h)).join("")}
     </Row>
   `;
 
@@ -82,6 +99,7 @@ export function downloadNotExaminedExcel(students = [], options = {}) {
       ${excelCell(index + 1, "Number")}
       ${excelCell(student.studentName || "طالب")}
       ${excelCell(student.studentEmail || "")}
+      ${excelCell(resolveExportGroupName(student, resolvedGroup))}
       ${excelCell(notExaminedStatusLabel(student.examStatus))}
     </Row>`,
     )
@@ -106,6 +124,7 @@ export function downloadNotExaminedExcel(students = [], options = {}) {
       <Column ss:Width="40"/>
       <Column ss:Width="160"/>
       <Column ss:Width="200"/>
+      <Column ss:Width="140"/>
       <Column ss:Width="110"/>
       ${header}
       ${body}
