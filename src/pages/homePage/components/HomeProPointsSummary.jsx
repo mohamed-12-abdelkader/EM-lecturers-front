@@ -42,7 +42,7 @@ export default function HomeProPointsSummary() {
         </div>
         <Link
           to="/my-points"
-          className="grid grid-cols-3 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+          className="grid grid-cols-1 overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 sm:grid-cols-2"
         >
           <div className="border-e border-slate-100 p-4 text-right dark:border-slate-800">
             <p className="text-[11px] font-bold text-slate-500">نقاطي</p>
@@ -50,20 +50,14 @@ export default function HomeProPointsSummary() {
               {summary.totalPoints}
             </p>
           </div>
-          <div className="border-e border-slate-100 p-4 text-right dark:border-slate-800">
-            <p className="text-[11px] font-bold text-slate-500">ترتيبي</p>
-            <p className="mt-1 font-heading text-2xl font-black text-blue-600">
-              {summary.rank ? `#${summary.rank}` : "—"}
-            </p>
-          </div>
           <div className="flex items-center gap-3 p-4">
             <span className="hidden h-10 w-10 items-center justify-center rounded-xl bg-orange-50 text-orange-500 sm:flex dark:bg-orange-950/40">
               <FaTrophy />
             </span>
             <div className="min-w-0 text-right">
-              <p className="text-[11px] font-bold text-slate-500">للمركز التالي</p>
+              <p className="text-[11px] font-bold text-slate-500">قائمة المتفوقين</p>
               <p className="mt-1 text-sm font-black text-slate-900 dark:text-white">
-                {summary.rank === 1 ? "أنت الأول" : `${summary.pointsToNextRank} نقطة`}
+                أعلى 10 يظهر ترتيبهم فقط
               </p>
             </div>
           </div>

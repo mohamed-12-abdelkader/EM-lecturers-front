@@ -12,7 +12,7 @@ import {
   useToast,
   VStack,
 } from "@chakra-ui/react";
-import { FaArrowUp, FaMedal, FaTrophy, FaUsers } from "react-icons/fa";
+import { FaMedal, FaTrophy, FaUsers } from "react-icons/fa";
 import {
   fetchStudentPointsLeaderboard,
   fetchStudentPointsSummary,
@@ -59,6 +59,32 @@ function StatCard({ label, value, hint, icon: IconComp, accent = "blue" }) {
       ) : null}
     </DailyQuizSurface>
   );
+}
+
+function isCurrentStudent(row, meId) {
+  return meId != null && row?.studentId != null && String(row.studentId) === String(meId);
+}
+
+function getTopTenStatus(myPoints, topStudents, meId) {
+  const list = Array.isArray(topStudents) ? topStudents : [];
+  const myRow = list.find((row) => isCurrentStudent(row, meId));
+  if (myRow) {
+    return { inTop: true, rank: myRow.rank, pointsNeeded: 0, tiedOut: false };
+  }
+  if (!list.length) {
+    return { inTop: false, rank: null, pointsNeeded: null, tiedOut: false };
+  }
+  const lowestTop = Math.min(...list.map((row) => Number(row.points) || 0));
+  const mine = Number(myPoints) || 0;
+  if (mine >= lowestTop) {
+    return { inTop: false, rank: null, pointsNeeded: 0, tiedOut: true };
+  }
+  return {
+    inTop: false,
+    rank: null,
+    pointsNeeded: lowestTop - mine,
+    tiedOut: false,
+  };
 }
 
 function RankRow({ row, highlight }) {
@@ -135,17 +161,15 @@ export default function StudentPointsPage() {
     load();
   }, [load]);
 
-  const inTop = (board.topStudents || []).some(
-    (row) => meId != null && String(row.studentId) === String(meId),
-  );
+  const topStatus = getTopTenStatus(summary?.totalPoints, board.topStudents, meId);
 
   return (
     <DailyQuizPageShell maxW="4xl">
       <DailyQuizHero
         icon={FaTrophy}
         eyebrow="My Points"
-        title="نقاطي وترتيبي"
-        subtitle="النقاط تُحسب تلقائيًا من مشاهدة الفيديوهات وبدء الامتحانات والواجبات ودرجاتك. الترتيب داخل صفك عند مدرسك فقط."
+        title="نقاطي"
+        subtitle="النقاط تُحسب تلقائيًا من مشاهدة الفيديوهات وبدء الامتحانات والواجبات ودرجاتك. قائمة المتفوقين تعرض أعلى 10 في صفك فقط."
         actions={
           <Button
             as={RouterLink}
@@ -162,17 +186,16 @@ export default function StudentPointsPage() {
       />
 
       {loading ? (
-        <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4} mb={5}>
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} h="140px" borderRadius="2xl" />
-          ))}
+        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} mb={5}>
+          <Skeleton h="140px" borderRadius="2xl" />
+          <Skeleton h="140px" borderRadius="2xl" display={{ base: "none", md: "block" }} />
         </SimpleGrid>
       ) : error ? (
         <DailyQuizSurface p={8} textAlign="center" mb={5}>
           <Text color={theme.muted}>{error}</Text>
         </DailyQuizSurface>
       ) : (
-        <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4} mb={5}>
+        <SimpleGrid columns={{ base: 1, md: topStatus.inTop ? 2 : 1 }} spacing={4} mb={5}>
           <StatCard
             label="نقاطي"
             value={summary?.totalPoints ?? 0}
@@ -180,27 +203,14 @@ export default function StudentPointsPage() {
             icon={FaTrophy}
             accent="orange"
           />
-          <StatCard
-            label="ترتيبي"
-            value={summary?.rank ? `#${summary.rank}` : "—"}
-            hint={
-              summary?.totalStudents
-                ? `ترتيبك #${summary.rank} من ${summary.totalStudents} طالب في صفك`
-                : "سيظهر الترتيب بعد أول نقاط"
-            }
-            icon={FaMedal}
-          />
-          <StatCard
-            label="للمركز التالي"
-            value={summary?.pointsToNextRank ?? 0}
-            hint={
-              summary?.rank === 1
-                ? "أنت في المركز الأول"
-                : "النقاط المتبقية للوصول لصاحب الرتبة الأعلى مباشرة"
-            }
-            icon={FaArrowUp}
-            accent="orange"
-          />
+          {topStatus.inTop ? (
+            <StatCard
+              label="ترتيبي"
+              value={topStatus.rank ? `#${topStatus.rank}` : "—"}
+              hint="أنت ضمن العشرة الأوائل في صفك"
+              icon={FaMedal}
+            />
+          ) : null}
         </SimpleGrid>
       )}
 
@@ -232,23 +242,34 @@ export default function StudentPointsPage() {
             <RankRow
               key={`${row.studentId}-${row.rank}`}
               row={row}
-              highlight={meId != null && String(row.studentId) === String(meId)}
+              highlight={isCurrentStudent(row, meId)}
             />
           ))
         )}
       </DailyQuizSurface>
 
-      {!loading && summary?.rank && !inTop ? (
+      {!loading && !error && !topStatus.inTop && board.topStudents?.length ? (
         <DailyQuizSurface mt={4} p={4}>
-          <Text fontWeight="800" color={theme.heading}>
-            ترتيبك الحالي #{summary.rank} • {summary.totalPoints} نقطة
-          </Text>
-          <Text mt={1} fontSize="sm" color={theme.muted}>
-            لست ضمن أعلى 10 حاليًا
-            {summary.pointsToNextRank
-              ? ` — باقي ${summary.pointsToNextRank} نقطة للمركز التالي.`
-              : "."}
-          </Text>
+          {topStatus.tiedOut ? (
+            <>
+              <Text fontWeight="800" color={theme.heading}>
+                لست ضمن قائمة الـ 10 الأوائل — متبقٍ لك 0 نقطة
+              </Text>
+              <Text mt={2} fontSize="sm" color={theme.muted} lineHeight="1.9">
+                أنت بالفعل تندرج ضمن الأوائل، لكن سبب عدم وضعك معهم هو أسبقية حل زملائك للامتحان.
+                أنت قريب جدًا من الظهور ضمن المتفوقين.
+              </Text>
+            </>
+          ) : (
+            <>
+              <Text fontWeight="800" color={theme.heading}>
+                لست ضمن الـ 10 الأوائل
+              </Text>
+              <Text mt={2} fontSize="sm" color={theme.muted} lineHeight="1.9">
+                يتبقى لك {topStatus.pointsNeeded} نقطة لتنضم لهم.
+              </Text>
+            </>
+          )}
         </DailyQuizSurface>
       ) : null}
     </DailyQuizPageShell>
