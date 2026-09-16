@@ -262,7 +262,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
         { to: "/my-courses", Icon: MdCollectionsBookmark, label: "كورساتي" },
         { to: "/student-daily-quizzes", Icon: MdWhatshot, label: "المسابقات اليومية" },
         { to: "/my-points", Icon: MdEmojiEvents, label: "نقاطي وترتيبي" },
-        { to: "/lectures_taple", Icon: MdSchedule, label: "جدول المحاضرات" },
+
         { to: "/exam_grades", Icon: MdGrading, label: "درجات الامتحانات" },
         { to: "/scientific-chat", Icon: FaRobot, label: "المساعد العلمي" },
       ],
