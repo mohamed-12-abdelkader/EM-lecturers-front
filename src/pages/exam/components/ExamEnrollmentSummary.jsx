@@ -16,6 +16,7 @@ import {
   Text,
   VStack,
   useColorModeValue,
+  useToast,
 } from "@chakra-ui/react";
 import {
   FiCheckCircle,
@@ -26,7 +27,8 @@ import {
   FiUsers,
   FiXCircle,
 } from "react-icons/fi";
-import { notExaminedStatusLabel } from "../utils/exportNotExaminedStudents";
+import { FaFileExcel } from "react-icons/fa";
+import { downloadNotExaminedExcel, notExaminedStatusLabel } from "../utils/exportNotExaminedStudents";
 import ExamReportGroupExportButtons from "./ExamReportGroupExportButtons";
 
 const NAVY = "#0E4C92";
@@ -172,6 +174,7 @@ export default function ExamEnrollmentSummary({
   const [examinedFilter, setExaminedFilter] = useState("all");
   const [examinedQuery, setExaminedQuery] = useState("");
   const [draftPass, setDraftPass] = useState(String(passPercentage ?? 50));
+  const toast = useToast();
 
   useEffect(() => {
     setDraftPass(String(passPercentage ?? 50));
@@ -227,6 +230,31 @@ export default function ExamEnrollmentSummary({
     if (!Number.isFinite(n)) return;
     setDraftPass(String(n));
     onPassPercentageChange?.(n);
+  };
+
+  const handleExportNotExaminedExcel = () => {
+    const groupLabel = groupName || "كل المجموعات";
+    const exported = downloadNotExaminedExcel(students, {
+      title: examTitle || "الطلاب الذين لم يسلّموا",
+      courseTitle,
+      groupName: groupLabel,
+      filename: examTitle
+        ? `لم-يسلموا-${groupLabel}-${examTitle}`
+        : `لم-يسلموا-${groupLabel}`,
+    });
+    if (exported) {
+      toast({
+        title: "تم تنزيل ملف Excel",
+        description: `${groupLabel} · ${students.length} طالب لم يسلّموا`,
+        status: "success",
+      });
+      return;
+    }
+    toast({
+      title: "لا يوجد طلاب للتنزيل",
+      description: "لا توجد أسماء في قائمة من لم يسلّموا.",
+      status: "warning",
+    });
   };
 
   return (
@@ -611,6 +639,16 @@ export default function ExamEnrollmentSummary({
               {groupName ? ` في مجموعة ${groupName}` : ""}
             </Text>
           </Box>
+          <Button
+            size="sm"
+            colorScheme="green"
+            variant="outline"
+            leftIcon={<Icon as={FaFileExcel} />}
+            onClick={handleExportNotExaminedExcel}
+            isDisabled={isRefreshing || students.length === 0}
+          >
+            تنزيل Excel
+          </Button>
         </Flex>
 
         <Box px={{ base: 4, md: 5 }} py={4}>

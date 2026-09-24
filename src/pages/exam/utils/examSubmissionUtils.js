@@ -19,6 +19,16 @@ function toFiniteNumber(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+export function pickWrongQuestionsList(raw) {
+  const camel = raw?.wrongQuestions;
+  const snake = raw?.wrong_questions;
+  if (Array.isArray(camel) && camel.length) return camel;
+  if (Array.isArray(snake) && snake.length) return snake;
+  if (Array.isArray(camel)) return camel;
+  if (Array.isArray(snake)) return snake;
+  return [];
+}
+
 function resolveOptionText(question, letter) {
   if (!letter || !question) return null;
   const key = `option${String(letter).trim().toUpperCase()}`;
@@ -32,22 +42,31 @@ export function normalizeGradeSubmission(raw) {
   const studentId = firstDefined(raw.student_id, raw.studentId, raw.user_id, raw.userId);
   const email = firstDefined(raw.email, raw.studentEmail, raw.student_email, "");
   const phone = firstDefined(raw.phone, raw.studentPhone, raw.student_phone, "");
-  const obtained = firstDefined(raw.obtained_grade, raw.obtainedGrade, raw.totalGrade);
+  const obtained = firstDefined(raw.obtained_grade, raw.obtainedGrade);
   const total = firstDefined(
     raw.max_grade,
     raw.maxGrade,
     raw.total_grade,
     raw.totalGrade,
   );
+  const wrongList = pickWrongQuestionsList(raw);
+  const inProgress =
+    raw.status === "in_progress" ||
+    raw.in_progress === true ||
+    raw.exam_status === "in_progress";
+
   return {
     ...raw,
     name,
+    studentName: name,
     student_id: studentId ?? raw.student_id,
     studentId: studentId ?? raw.studentId,
     email,
+    studentEmail: email,
     phone,
-    obtained_grade: obtained ?? raw.obtained_grade,
-    obtainedGrade: obtained ?? raw.obtainedGrade,
+    studentPhone: phone,
+    obtained_grade: inProgress ? null : obtained ?? raw.obtained_grade,
+    obtainedGrade: inProgress ? null : obtained ?? raw.obtainedGrade,
     max_grade: total ?? raw.max_grade,
     total_grade: total ?? raw.total_grade,
     maxGrade: total ?? raw.maxGrade,
@@ -56,7 +75,10 @@ export function normalizeGradeSubmission(raw) {
     attempt_number: firstDefined(raw.attempt_number, raw.attemptNumber, 1),
     submitted_at: firstDefined(raw.submitted_at, raw.submittedAt),
     started_at: firstDefined(raw.started_at, raw.startedAt),
-    percentage: raw.percentage,
+    percentage: inProgress ? null : raw.percentage,
+    in_progress: inProgress,
+    wrongQuestions: wrongList,
+    wrong_questions: wrongList,
   };
 }
 
@@ -104,35 +126,47 @@ export function formatSubmissionAnswer(letter, text, question) {
   return resolvedText || normalizedLetter;
 }
 
+function formatChoiceDisplay(choice, letter, text, question) {
+  if (choice && typeof choice === "object") {
+    const choiceText = choice.text ?? text;
+    if (choiceText != null && String(choiceText).trim()) return String(choiceText).trim();
+    if (choice.id != null && choice.id !== "") return String(choice.id);
+  }
+  return formatSubmissionAnswer(letter, text, question);
+}
+
 export function normalizeWrongQuestion(raw) {
   if (!raw || typeof raw !== "object") return null;
 
-  const yourLetter = raw.yourAnswer ?? raw.yourChoice?.id ?? null;
-  const correctLetter = raw.correctAnswer ?? raw.correctChoice?.id ?? null;
-  const yourText = raw.yourAnswerText ?? raw.yourChoice?.text ?? null;
-  const correctText = raw.correctAnswerText ?? raw.correctChoice?.text ?? null;
-  const unanswered = Boolean(
-    raw.unanswered ||
-      raw.unanswered === true ||
-      ((yourLetter == null || yourLetter === "") && (yourText == null || yourText === "")),
-  );
+  const yourChoice = raw.yourChoice ?? raw.your_choice ?? null;
+  const correctChoice = raw.correctChoice ?? raw.correct_choice ?? null;
+  const yourLetter = raw.yourAnswer ?? raw.your_answer ?? yourChoice?.id ?? null;
+  const correctLetter = raw.correctAnswer ?? raw.correct_answer ?? correctChoice?.id ?? null;
+  const yourText = raw.yourAnswerText ?? raw.your_answer_text ?? yourChoice?.text ?? null;
+  const correctText =
+    raw.correctAnswerText ?? raw.correct_answer_text ?? correctChoice?.text ?? null;
+  const unanswered = raw.unanswered === true || raw.unanswered === "true";
 
   return {
-    questionId: raw.questionId ?? raw.id,
-    questionText: raw.questionText ?? raw.text ?? "",
-    questionImage: raw.questionImage ?? raw.image ?? null,
+    questionId: raw.questionId ?? raw.question_id ?? raw.id,
+    questionText: raw.questionText ?? raw.question_text ?? raw.text ?? "",
+    questionImage: raw.questionImage ?? raw.question_image ?? raw.image ?? null,
     type: raw.type ?? "mcq",
     unanswered,
     yourAnswerDisplay: unanswered
       ? "لم يجب"
-      : formatSubmissionAnswer(yourLetter, yourText, raw),
-    correctAnswerDisplay: formatSubmissionAnswer(correctLetter, correctText, raw),
+      : formatChoiceDisplay(yourChoice, yourLetter, yourText, raw),
+    correctAnswerDisplay: formatChoiceDisplay(
+      correctChoice,
+      correctLetter,
+      correctText,
+      raw,
+    ),
   };
 }
 
 export function getWrongQuestions(submission) {
-  const list = submission?.wrong_questions ?? submission?.wrongQuestions ?? [];
-  if (!Array.isArray(list)) return [];
+  const list = pickWrongQuestionsList(submission);
   return list.map(normalizeWrongQuestion).filter(Boolean);
 }
 
@@ -221,8 +255,7 @@ export function resolveSubmissionOutcome(submission) {
     submission?.passed != null ? Boolean(submission.passed) : percentage >= 50;
   const wrongCount = getWrongQuestionsCount(submission);
   const unansweredCount = getUnansweredQuestionsCount(submission);
-  const inferredMisses = total > 0 ? Math.max(0, total - obtained) : 0;
-  const misses = Math.max(wrongCount, unansweredCount, inferredMisses);
+  const misses = Math.max(wrongCount, unansweredCount);
   const perfect = total > 0 && obtained >= total && misses === 0 && percentage >= 100;
 
   return {
@@ -236,6 +269,98 @@ export function resolveSubmissionOutcome(submission) {
     unansweredCount,
     misses,
   };
+}
+
+function examQuestionMeta(question, index = 0) {
+  if (!question || typeof question !== "object") return null;
+  const isPassageSub = question.type === "passage_sub";
+  const id = isPassageSub
+    ? question.sub_question?.id ?? question.id ?? question.questionId
+    : question.id ?? question.questionId;
+  if (id == null) return null;
+  const text = isPassageSub
+    ? question.sub_question?.text ?? question.text ?? question.questionText
+    : question.text ?? question.questionText;
+  const image = isPassageSub
+    ? question.sub_question?.image ?? question.image
+    : question.questionImage ?? question.image;
+  return {
+    questionId: id,
+    questionText: text || `سؤال ${index + 1}`,
+    questionImage: image || null,
+  };
+}
+
+/** لكل سؤال: مين جاوب صح / غلط / ساب فاضي — من تسليمات الواجب */
+export function buildQuestionLevelReport(examQuestions = [], submissions = []) {
+  const questionMap = new Map();
+
+  const ensureQuestion = (id, text, image, index) => {
+    const key = String(id);
+    if (!questionMap.has(key)) {
+      questionMap.set(key, {
+        questionId: id,
+        questionText: text || `سؤال ${index + 1}`,
+        questionImage: image || null,
+        correct: [],
+        wrong: [],
+        unanswered: [],
+      });
+      return;
+    }
+    const existing = questionMap.get(key);
+    if (text && (!existing.questionText || existing.questionText.startsWith("سؤال "))) {
+      existing.questionText = text;
+    }
+    if (image && !existing.questionImage) existing.questionImage = image;
+  };
+
+  (Array.isArray(examQuestions) ? examQuestions : []).forEach((question, index) => {
+    const meta = examQuestionMeta(question, index);
+    if (meta) ensureQuestion(meta.questionId, meta.questionText, meta.questionImage, index);
+  });
+
+  const completed = (Array.isArray(submissions) ? submissions : []).filter(
+    (submission) => !resolveSubmissionOutcome(submission).inProgress,
+  );
+
+  completed.forEach((submission) => {
+    getWrongQuestions(submission).forEach((item, index) => {
+      if (item.questionId == null) return;
+      ensureQuestion(item.questionId, item.questionText, item.questionImage, index);
+    });
+  });
+
+  completed.forEach((submission) => {
+    const student = {
+      studentId: submission.student_id ?? submission.studentId ?? null,
+      name: submission.name || "طالب",
+      email: submission.email || "",
+    };
+    const missed = new Map(
+      getWrongQuestions(submission)
+        .filter((item) => item.questionId != null)
+        .map((item) => [String(item.questionId), item]),
+    );
+    questionMap.forEach((question) => {
+      const miss = missed.get(String(question.questionId));
+      if (!miss) {
+        question.correct.push(student);
+        return;
+      }
+      if (miss.unanswered) {
+        question.unanswered.push(student);
+        return;
+      }
+      question.wrong.push({
+        ...student,
+        yourChoice: miss.yourAnswerDisplay,
+        correctChoice: miss.correctAnswerDisplay,
+      });
+    });
+  });
+
+  return Array.from(questionMap.values());
 }
 
 function escapeCsvCell(value) {

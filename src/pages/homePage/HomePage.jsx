@@ -64,6 +64,7 @@ import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import ScientificChatPanel from "../../components/scientificChat/ScientificChatPanel";
 import HomeProHero from "./components/HomeProHero";
 import HomeProQuickActions from "./components/HomeProQuickActions";
+import HomeProPointsSummary from "./components/HomeProPointsSummary";
 import HomeProMyCourses from "./components/HomeProMyCourses";
 import HomeProPlatformCourses from "./components/HomeProPlatformCourses";
 import StudentCourseGroupGate from "../../components/courseGroups/StudentCourseGroupGate";
@@ -1021,6 +1022,8 @@ const HomePage = () => {
         </Box>
 
         <HomeProQuickActions onCourseActivated={() => setCoursesRefreshKey((k) => k + 1)} />
+
+        <HomeProPointsSummary />
 
         <HomeProMyCourses
           teacherName={teacherDisplayName}

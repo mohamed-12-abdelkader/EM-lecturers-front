@@ -3,6 +3,7 @@ import {
   FaChalkboardTeacher,
   FaBookOpen,
   FaHome,
+  FaTrophy,
 } from "react-icons/fa";
 
 export const ACCENT = "#3182CE";
@@ -12,11 +13,13 @@ export const ACADEMY_NAV = [
   { to: "", label: "اللوحة", fullLabel: "لوحة التحكم", end: true, icon: FaChartPie },
   { to: "teachers", label: "المدرسون", fullLabel: "مدرسو الأكاديمية", icon: FaChalkboardTeacher },
   { to: "courses", label: "الكورسات", fullLabel: "كورسات الأكاديمية", icon: FaBookOpen },
+  { href: "/teacher-points", label: "النقاط", fullLabel: "النقاط والترتيب", icon: FaTrophy },
 ];
 
 export const ACADEMY_TEACHER_NAV = [
   { to: "", label: "لوحتي", fullLabel: "لوحة المدرس", end: true, icon: FaHome },
   { to: "courses", label: "كورساتي", fullLabel: "الكورسات المسندة", icon: FaBookOpen },
+  { href: "/teacher-points", label: "النقاط", fullLabel: "النقاط والترتيب", icon: FaTrophy },
 ];
 
 export function field(row, ...keys) {

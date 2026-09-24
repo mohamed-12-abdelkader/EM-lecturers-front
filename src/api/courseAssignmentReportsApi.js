@@ -28,7 +28,7 @@ export async function fetchCourseAssignmentReports(courseId, filters = {}) {
   };
 }
 
-function reportQueryConfig({ passPercentage, groupId } = {}) {
+function reportQueryConfig({ passPercentage, groupId, groupType } = {}) {
   const config = authConfig();
   const params = {};
   const pass = Number(passPercentage);
@@ -38,6 +38,9 @@ function reportQueryConfig({ passPercentage, groupId } = {}) {
   const gid = Number(groupId);
   if (Number.isFinite(gid) && gid > 0) {
     params.groupId = gid;
+  }
+  if (groupType === "study" || groupType === "course") {
+    params.groupType = groupType;
   }
   if (Object.keys(params).length) {
     config.params = params;
@@ -63,18 +66,50 @@ export async function fetchCourseLevelExamReport(examId, filters = {}) {
   return data;
 }
 
-/** GET /api/exams/:examId/grades?groupId= */
-export async function fetchExamGrades(examId, filters = {}) {
+/** GET /api/course/lecture-exam/:examId/submissions — نتائج الواجب / امتحان المحاضرة مع الأخطاء */
+export async function fetchLectureExamSubmissions(examId, filters = {}) {
   const { data } = await baseUrl.get(
-    `/api/exams/${examId}/grades`,
+    `/api/course/lecture-exam/${examId}/submissions`,
     reportQueryConfig({ groupId: filters.groupId }),
   );
   const payload = data?.data && !Array.isArray(data?.submissions) ? data.data : data;
-  const list =
-    payload?.submissions ??
-    payload?.grades ??
-    payload?.students ??
-    payload?.examinedStudents ??
-    (Array.isArray(payload) ? payload : []);
+  const list = payload?.submissions ?? (Array.isArray(payload) ? payload : []);
   return Array.isArray(list) ? list.map(normalizeGradeSubmission) : [];
+}
+
+function firstNonEmptyList(...candidates) {
+  for (const list of candidates) {
+    if (Array.isArray(list) && list.length) return list;
+  }
+  for (const list of candidates) {
+    if (Array.isArray(list)) return list;
+  }
+  return [];
+}
+
+/** GET /api/exams/:examId/grades?groupId=&groupType= */
+export async function fetchExamGrades(examId, filters = {}) {
+  const { data } = await baseUrl.get(
+    `/api/exams/${examId}/grades`,
+    reportQueryConfig({
+      groupId: filters.groupId,
+      groupType: filters.groupType,
+    }),
+  );
+  const payload = data?.data && !Array.isArray(data?.students) && !Array.isArray(data?.submissions)
+    ? data.data
+    : data;
+  const list = firstNonEmptyList(
+    payload?.students,
+    payload?.submissions,
+    payload?.grades,
+    payload?.examinedStudents,
+    Array.isArray(payload) ? payload : null,
+  );
+  return {
+    exam: payload?.exam || null,
+    groupFilter: payload?.groupFilter ?? payload?.group_filter ?? null,
+    statistics: payload?.statistics || null,
+    students: list.map(normalizeGradeSubmission),
+  };
 }

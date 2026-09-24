@@ -12,6 +12,11 @@ import {
 import { FaUniversity } from "react-icons/fa";
 import { ACCENT, BRAND_ORANGE } from "../academyUtils";
 
+function academyNavPath(item, basePath) {
+  if (item.href) return item.href;
+  return item.to ? `${basePath}/${item.to}` : basePath;
+}
+
 export default function AcademyLayout({ navItems, title, subtitle, basePath = "/academy" }) {
   const location = useLocation();
   const pageBg = useColorModeValue("#f8fafc", "gray.950");
@@ -51,9 +56,10 @@ export default function AcademyLayout({ navItems, title, subtitle, basePath = "/
 
           <Flex display={{ base: "none", md: "flex" }} gap={1.5} overflowX="auto" pb={0.5}>
             {navItems.map((item) => {
-              const path = item.to ? `${basePath}/${item.to}` : basePath;
+              const path = academyNavPath(item, basePath);
+              const end = Boolean(item.end || item.href);
               return (
-                <NavLink key={item.to || "home"} to={path} end={item.end} style={{ textDecoration: "none" }}>
+                <NavLink key={item.href || item.to || "home"} to={path} end={end} style={{ textDecoration: "none" }}>
                   {({ isActive }) => (
                     <HStack
                       spacing={2}
@@ -101,12 +107,19 @@ export default function AcademyLayout({ navItems, title, subtitle, basePath = "/
       >
         <HStack justify="space-around" py={2} px={1}>
           {navItems.map((item) => {
-            const path = item.to ? `${basePath}/${item.to}` : basePath;
+            const path = academyNavPath(item, basePath);
             const active = item.end
               ? location.pathname.replace(/\/$/, "") === basePath.replace(/\/$/, "")
-              : location.pathname.startsWith(path);
+              : item.href
+                ? location.pathname === item.href || location.pathname.startsWith(`${item.href}/`)
+                : location.pathname.startsWith(path);
             return (
-              <NavLink key={item.to || "home"} to={path} end={item.end} style={{ textDecoration: "none", flex: 1 }}>
+              <NavLink
+                key={item.href || item.to || "home"}
+                to={path}
+                end={Boolean(item.end || item.href)}
+                style={{ textDecoration: "none", flex: 1 }}
+              >
                 <VStack spacing={0.5} py={1} color={active ? ACCENT : muted}>
                   <Icon as={item.icon} boxSize={4} />
                   <Text fontSize="10px" fontWeight={active ? "bold" : "medium"}>

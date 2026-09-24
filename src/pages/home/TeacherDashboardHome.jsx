@@ -73,6 +73,7 @@ import {
   FaSync,
   FaBuilding,
   FaFire,
+  FaTrophy,
   FaCompass,
   FaTrashRestore,
 } from "react-icons/fa";
@@ -610,6 +611,14 @@ const TeacherDashboardHome = () => {
       icon: FaFire,
       color: "orange",
       link: "/teacher-daily-quizzes",
+    },
+    {
+      id: 14,
+      title: "النقاط والترتيب",
+      description: "إعداد النقاط وترتيب طلابك ومنح مكافآت",
+      icon: FaTrophy,
+      color: "orange",
+      link: "/teacher-points",
     },
     {
       id: 6,

@@ -22,6 +22,7 @@ import {
   MdBusiness,
   MdGroups,
   MdRestoreFromTrash,
+  MdEmojiEvents,
 } from "react-icons/md";
 import { FaAndroid, FaRobot, FaFolderOpen, FaWhatsapp } from "react-icons/fa";
 import { Link, useLocation } from "react-router-dom";
@@ -188,6 +189,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
         { to: "/admin/finance", Icon: MdAccountBalanceWallet, label: "الحسابات والمالية" },
         { to: "/admin/whatsapp/inbox", Icon: FaWhatsapp, label: "واتساب" },
         { to: "/admin/whatsapp/policy", Icon: FaWhatsapp, label: "تخصيص الدعم" },
+        { to: "/teacher-points", Icon: MdEmojiEvents, label: "النقاط والترتيب" },
         { to: "/all_students", Icon: MdPeople, label: "كل الطلاب" },
         {
           to: "/question-bank-dashboard",
@@ -226,6 +228,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
         { to: "/teacher-assignments", Icon: MdAssignment, label: "الواجبات" },
         { to: "/teacher-exams", Icon: MdQuiz, label: "الامتحانات" },
         { to: "/teacher-daily-quizzes", Icon: MdWhatshot, label: "المسابقات اليومية" },
+        { to: "/teacher-points", Icon: MdEmojiEvents, label: "النقاط والترتيب" },
         { to: "/exam-builder-chat", Icon: MdQuiz, label: "مساعد الامتحانات" },
         { to: "/teacher-free-lectures", Icon: MdVideoLibrary, label: "المحاضرات المجانية" },
         { to: "/teacher-whatsapp", Icon: FaWhatsapp, label: "واتساب المدرس" },
@@ -258,7 +261,8 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
       links: [
         { to: "/my-courses", Icon: MdCollectionsBookmark, label: "كورساتي" },
         { to: "/student-daily-quizzes", Icon: MdWhatshot, label: "المسابقات اليومية" },
-        { to: "/lectures_taple", Icon: MdSchedule, label: "جدول المحاضرات" },
+        { to: "/my-points", Icon: MdEmojiEvents, label: "نقاطي وترتيبي" },
+
         { to: "/exam_grades", Icon: MdGrading, label: "درجات الامتحانات" },
         { to: "/scientific-chat", Icon: FaRobot, label: "المساعد العلمي" },
       ],
@@ -272,6 +276,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
         { to: "/academy", Icon: MdDashboard, label: "لوحة الأكاديمية" },
         { to: "/academy/teachers", Icon: MdPeople, label: "مدرسو الأكاديمية" },
         { to: "/academy/courses", Icon: MdLibraryBooks, label: "كورسات الأكاديمية" },
+        { to: "/teacher-points", Icon: MdEmojiEvents, label: "النقاط والترتيب" },
       ],
     },
     {
@@ -296,6 +301,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
       links: [
         { to: "/teacher-exams", Icon: MdQuiz, label: "الامتحانات" },
         { to: "/teacher-assignments", Icon: MdAssignment, label: "الواجبات" },
+        { to: "/teacher-points", Icon: MdEmojiEvents, label: "النقاط والترتيب" },
         { to: "/teacher-my-files", Icon: FaFolderOpen, label: "ملفاتي" },
         { to: "/teacher-trash", Icon: MdRestoreFromTrash, label: "المحذوفات" },
       ],
