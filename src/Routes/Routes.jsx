@@ -190,6 +190,7 @@ const Match = lazyPage(() => import("../pages/league/Match"));
 const LecturesSchedule = lazyPage(() => import("../pages/lecturesSchedule/LecturesSchedule"));
 const FinanceManagementPage = lazyPage(() => import("../pages/finance/FinanceManagementPage"));
 const AdminAllStudentsPage = lazyPage(() => import("../pages/Admin/AdminAllStudentsPage"));
+const AdminYoutubeUploadsPage = lazyPage(() => import("../pages/Admin/AdminYoutubeUploadsPage"));
 const WhatsAppSessionsPage = lazyPage(() => import("../pages/Admin/whatsapp/WhatsAppSessionsPage"));
 const WhatsAppServicesPage = lazyPage(() => import("../pages/Admin/whatsapp/WhatsAppServicesPage"));
 const WhatsAppMonitorPage = lazyPage(() => import("../pages/Admin/whatsapp/WhatsAppMonitorPage"));
@@ -465,6 +466,7 @@ const AppRouter = () => {
           {/* Admin Only Routes */}
           <Route element={<ProtectedRoute auth={isAdmin} />}>
             <Route path="management" element={<AdminMange />} />
+            <Route path="youtube-uploads" element={<AdminYoutubeUploadsPage />} />
             <Route path="add_employees" element={<AddEmployees />} />
             <Route path="mange_employees" element={<MangeEmployees />} />
             <Route path="create_code" element={<AdminCreateCode />} />

@@ -2,7 +2,7 @@ import { useLocation, NavLink } from "react-router-dom";
 import { useEffect, useState } from "react";
 import UserType from "../../Hooks/auth/userType";
 // أيقونات من react-icons
-import { MdDashboard, MdPersonAdd, MdCode, MdAccountBalanceWallet, MdPhoneIphone, MdDateRange, MdOndemandVideo, MdPictureAsPdf, MdGroupAdd, MdPersonAddAlt, MdQuiz, MdListAlt, MdAssignment, MdQuestionAnswer, MdCheckCircle, MdViewList, MdBook, MdPeople } from "react-icons/md";
+import { MdDashboard, MdPersonAdd, MdCode, MdAccountBalanceWallet, MdPhoneIphone, MdDateRange, MdOndemandVideo, MdPictureAsPdf, MdGroupAdd, MdPersonAddAlt, MdQuiz, MdListAlt, MdAssignment, MdQuestionAnswer, MdCheckCircle, MdViewList, MdBook, MdPeople, MdCloudUpload } from "react-icons/md";
 import { FaWhatsapp } from "react-icons/fa";
 
 const AdminLinks = ({ currentLink, setCurrentLink }) => {
@@ -16,6 +16,12 @@ const AdminLinks = ({ currentLink, setCurrentLink }) => {
       link: "ادارة المنصة",
       path: "/admin/management",
       icon: <MdDashboard size={22} />,
+    },
+    {
+      id: Math.random(),
+      link: "رفع YouTube",
+      path: "/admin/youtube-uploads",
+      icon: <MdCloudUpload size={22} />,
     },
     {
       id: Math.random(),
