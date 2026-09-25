@@ -301,6 +301,13 @@ export function normalizeSingleExamQuestion(q) {
   if (!q || typeof q !== "object") return null;
 
   const questionId = q.id ?? q.questionId;
+  const passageText =
+    q.passageText ||
+    q.passage_text ||
+    q.passage?.passageText ||
+    q.passage?.text ||
+    q.passage?.content ||
+    null;
   const hasFlatOptions =
     q.type != null ||
     q.questionText != null ||
@@ -328,6 +335,8 @@ export function normalizeSingleExamQuestion(q) {
       image: q.questionImage ?? q.image ?? null,
       type: q.type || null,
       grade: q.grade ?? 1,
+      passageId: q.passageId ?? q.passage_id ?? q.passage?.id ?? null,
+      passageText: passageText ? String(passageText) : null,
       passage: q.passage || null,
       choices,
     };
@@ -354,6 +363,8 @@ export function normalizeSingleExamQuestion(q) {
     image: q.image ?? q.questionImage ?? null,
     type: q.type ?? null,
     grade: q.grade ?? 1,
+    passageId: q.passageId ?? q.passage_id ?? q.passage?.id ?? null,
+    passageText: passageText ? String(passageText) : null,
     passage: q.passage || null,
     choices: choices.filter((choice) => choice.text || choice.image),
   };

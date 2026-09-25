@@ -36,6 +36,7 @@ import { MdCheck, MdZoomIn } from "react-icons/md";
 
 import { examQuestionTextSx } from "../../../components/question/FormattedQuestionText";
 import { renderFormattedExamText } from "../../../utils/renderFormattedExamText";
+import { ExamPassageBlock } from "./ExamQuestionDisplay";
 
 
 
@@ -947,6 +948,14 @@ export function PlatformExamStudentCard({
 
       <Box px={4} py={4}>
 
+        {(question.passageText || question.passage?.content || question.passage?.text || question.passage?.passageText) ? (
+          <ExamPassageBlock
+            content={question.passageText || question.passage?.content || question.passage?.text || question.passage?.passageText}
+            variant="student"
+          />
+        ) : null}
+
+
         {isImageQuestion && hasImage && (
 
           <Box mb={hasText ? 3 : 0}>
@@ -1113,6 +1122,12 @@ export function PlatformExamTeacherCard({
 
           </Badge>
 
+          {(question.passageText || question.passage) ? (
+            <Badge variant="subtle" colorScheme="orange" fontSize="9px">
+              قطعة
+            </Badge>
+          ) : null}
+
           <Text fontSize="10px" color={muted}>
 
             {question.grade ?? 1} درجة
@@ -1128,6 +1143,14 @@ export function PlatformExamTeacherCard({
 
 
       <Box px={3} py={3}>
+
+        {(question.passageText || question.passage?.content || question.passage?.text || question.passage?.passageText) ? (
+          <ExamPassageBlock
+            content={question.passageText || question.passage?.content || question.passage?.text || question.passage?.passageText}
+            variant="teacher"
+          />
+        ) : null}
+
 
         {isImageQuestion && hasImage && (
 

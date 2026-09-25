@@ -108,7 +108,13 @@ function LibraryPassagePanel({
           </Flex>
           <Box minW={0}>
             <Text fontWeight="bold" fontSize="sm" color={textColor} noOfLines={2}>
-              {passage.title || `قطعة ${passageIndex + 1}`}
+              {passage.title ||
+                String(passage.content || "")
+                  .split(/\n/)
+                  .map((l) => l.trim())
+                  .find(Boolean)
+                  ?.slice(0, 60) ||
+                `قطعة ${passageIndex + 1}`}
             </Text>
             <HStack spacing={2} mt={1} flexWrap="wrap">
               <Text fontSize="xs" color={muted}>

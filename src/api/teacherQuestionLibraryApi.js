@@ -1,4 +1,5 @@
 import baseUrl from "./baseUrl";
+import { parseReadingPassageBulkText } from "../pages/Question Bank/utils/teacherLibraryQuestionUtils";
 
 const API = "/api/teacher/questions";
 
@@ -75,11 +76,8 @@ export async function bulkCreateTeacherLibraryQuestions({ lessonId, bulkText }) 
  * إنشاء / تحديث قطعة قراءة مع أسئلتها
  * POST /api/questions/reading-passage
  *
- * وضعان (أحدهما فقط):
- * 1) questions[] — كل الأسئلة دفعة واحدة في نفس الطلب (حد أقصى 50)
- * 2) questionsBulkText + correctAnswers — نص bulk
- *
- * تحديث: سؤال موجود → id، جديد → بدون id، محذوف → لا يُرسل
+ * يُفضَّل إرسال questions[] دفعة واحدة. يدعم أيضاً questionsBulkText.
+ * عند وجود نص Bulk يُحوَّل إلى questions[] قبل الإرسال لتجنب رفض السيرفر.
  */
 export async function saveReadingPassageQuestions({
   lessonId,
@@ -104,18 +102,17 @@ export async function saveReadingPassageQuestions({
   }
 
   const bulk = String(questionsBulkText || "").trim();
-  if (bulk) {
-    payload.questionsBulkText = bulk;
-    if (Array.isArray(correctAnswers) && correctAnswers.length) {
-      payload.correctAnswers = correctAnswers.map((a) =>
-        String(a || "").trim().toUpperCase(),
-      );
-    }
-  } else if (Array.isArray(questions)) {
-    if (questions.length > 50) {
+  let finalQuestions = Array.isArray(questions) ? questions : null;
+
+  if ((!finalQuestions || finalQuestions.length === 0) && bulk) {
+    finalQuestions = parseReadingPassageBulkText(bulk, correctAnswers);
+  }
+
+  if (Array.isArray(finalQuestions) && finalQuestions.length > 0) {
+    if (finalQuestions.length > 50) {
       throw new Error("الحد الأقصى 50 سؤالاً في الطلب الواحد");
     }
-    payload.questions = questions.map((q) => {
+    payload.questions = finalQuestions.map((q) => {
       const item = {
         questionText: String(q.questionText || q.question_text || "").trim(),
         options: (q.options || []).map((opt) => {
@@ -131,8 +128,19 @@ export async function saveReadingPassageQuestions({
       if (q.id != null && q.id !== "") item.id = Number(q.id);
       return item;
     });
+  } else if (bulk) {
+    // احتياطي إن فشل التحويل — نرسل النص كما هو بصيغتين
+    payload.questionsBulkText = bulk;
+    payload.questions_bulk_text = bulk;
+    if (Array.isArray(correctAnswers) && correctAnswers.length) {
+      const answers = correctAnswers.map((a) => String(a || "").trim().toUpperCase());
+      payload.correctAnswers = answers;
+      payload.correct_answers = answers;
+    }
   } else {
-    throw new Error("أضف أسئلة كمصفوفة أو كنص bulk");
+    throw new Error(
+      "يجب إرسال questions كمصفوفة أو لصق نص الأسئلة في خانة Bulk",
+    );
   }
 
   const { data } = await baseUrl.post("/api/questions/reading-passage", payload, {

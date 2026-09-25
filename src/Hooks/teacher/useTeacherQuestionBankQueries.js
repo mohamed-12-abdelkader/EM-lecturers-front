@@ -116,8 +116,26 @@ export async function fetchTeacherLibraryLessonContent(lessonId) {
     throw new Error("فشل تحميل محتوى الدرس");
   }
 
-  const passagesFromApi = passagesPayload?.passages || [];
-  let questions = normalizeLessonQuestionsResponse(questionsPayload?.questions || []);
+  const pickPassages = (payload) => {
+    if (!payload) return [];
+    if (Array.isArray(payload.passages)) return payload.passages;
+    if (Array.isArray(payload)) return payload;
+    return [];
+  };
+
+  // الـ questions endpoint قد يعيد { questions, passages } معاً
+  const passagesFromApi = [
+    ...pickPassages(passagesPayload),
+    ...pickPassages(questionsPayload),
+  ];
+
+  const rawQuestions = Array.isArray(questionsPayload?.questions)
+    ? questionsPayload.questions
+    : Array.isArray(questionsPayload)
+      ? questionsPayload
+      : [];
+
+  let questions = normalizeLessonQuestionsResponse(rawQuestions);
 
   const passages = buildPassagesFromLessonContent({
     questions,

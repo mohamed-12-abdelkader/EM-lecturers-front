@@ -15,6 +15,7 @@ import { MdCheck, MdZoomIn } from "react-icons/md";
 import { examQuestionTextSx } from "../../../components/question/FormattedQuestionText";
 import { renderFormattedExamText } from "../../../utils/renderFormattedExamText";
 import { isImageUrl } from "./PlatformExamQuestionCard";
+import { ExamPassageBlock } from "./ExamQuestionDisplay";
 
 const ARABIC_LETTERS = ["أ", "ب", "ج", "د"];
 const LETTER_KEYS = ["A", "B", "C", "D"];
@@ -385,6 +386,21 @@ export default function LectureExamStudentQuestionCard({
       </Flex>
 
       <Box px={{ base: 4, md: 5 }} py={{ base: 4, md: 5 }}>
+        {(question.passageText ||
+          question.passage?.content ||
+          question.passage?.text ||
+          question.passage?.passageText) && (
+          <ExamPassageBlock
+            content={
+              question.passageText ||
+              question.passage?.content ||
+              question.passage?.text ||
+              question.passage?.passageText
+            }
+            variant="student"
+          />
+        )}
+
         {isImageQuestion && hasImage && (
           <Box mb={hasText ? 4 : 0}>
             <QuestionMedia

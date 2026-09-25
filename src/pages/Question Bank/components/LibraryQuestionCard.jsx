@@ -1,4 +1,4 @@
-import React, { memo, useCallback } from "react";
+import React, { memo, useCallback, useState } from "react";
 import {
   Box,
   Flex,
@@ -12,8 +12,10 @@ import {
   Spinner,
   Icon,
   Circle,
+  Collapse,
+  Button,
 } from "@chakra-ui/react";
-import { FaEdit, FaTrash, FaCheck, FaSearchPlus, FaCheckCircle } from "react-icons/fa";
+import { FaEdit, FaTrash, FaCheck, FaSearchPlus, FaCheckCircle, FaBookOpen } from "react-icons/fa";
 import { renderFormattedExamText } from "../../../utils/renderFormattedExamText";
 import { ExamQuestionImage } from "../../exam/components/ExamQuestionDisplay";
 import { isPassageStatementQuestion } from "../utils/teacherLibraryQuestionUtils";
@@ -80,6 +82,14 @@ function LibraryQuestionCard({
   const imageUrl = question.image_url || question.imageUrl;
   const difficulty = difficultyMeta(question.difficulty_level);
   const canSelect = showSelect && typeof onToggleSelect === "function";
+  const passageText =
+    question.passageText ||
+    question.passage_text ||
+    question.passage?.content ||
+    question.passage?.text ||
+    "";
+  const [passageOpen, setPassageOpen] = useState(!inPassage);
+  const passageBg = useColorModeValue("orange.50", "gray.700");
 
   const toggleSelect = useCallback(
     (e) => {
@@ -287,6 +297,51 @@ function LibraryQuestionCard({
             )}
           </HStack>
         </Flex>
+
+        {/* passageText accompanying the question */}
+        {passageText ? (
+          <Box
+            mb={4}
+            borderRadius="2xl"
+            borderWidth="1px"
+            borderColor={borderColor}
+            borderRightWidth="4px"
+            borderRightColor="orange.400"
+            bg={passageBg}
+            overflow="hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Flex
+              align="center"
+              justify="space-between"
+              px={4}
+              py={2}
+              cursor="pointer"
+              onClick={() => setPassageOpen((v) => !v)}
+            >
+              <HStack spacing={2}>
+                <Icon as={FaBookOpen} color="orange.500" boxSize={3.5} />
+                <Text fontSize="xs" fontWeight="bold" color={muted}>
+                  نص القطعة (passageText)
+                </Text>
+              </HStack>
+              <Button size="xs" variant="ghost" colorScheme="orange">
+                {passageOpen ? "إخفاء" : "عرض"}
+              </Button>
+            </Flex>
+            <Collapse in={passageOpen} animateOpacity>
+              <Box px={4} pb={4} maxH="280px" overflowY="auto">
+                <FormattedText
+                  value={passageText}
+                  fontSize="sm"
+                  color={textColor}
+                  lineHeight="2"
+                  whiteSpace="pre-wrap"
+                />
+              </Box>
+            </Collapse>
+          </Box>
+        ) : null}
 
         {/* question stem */}
         <Box
