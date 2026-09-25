@@ -9,10 +9,11 @@ import {
   VStack,
   Collapse,
   Checkbox,
+  IconButton,
   useColorModeValue,
   Icon,
 } from "@chakra-ui/react";
-import { FaBookOpen, FaChevronDown, FaChevronUp } from "react-icons/fa";
+import { FaBookOpen, FaChevronDown, FaChevronUp, FaEdit } from "react-icons/fa";
 import { renderFormattedExamText } from "../../../utils/renderFormattedExamText";
 import LibraryQuestionCard from "./LibraryQuestionCard";
 
@@ -41,6 +42,7 @@ function LibraryPassagePanel({
   onZoomImage,
   selectedPassageIds,
   onTogglePassageSelect,
+  onEditPassage,
 }) {
   const cardBg = useColorModeValue("white", "gray.800");
   const borderColor = useColorModeValue("gray.200", "gray.700");
@@ -121,6 +123,20 @@ function LibraryPassagePanel({
           </Box>
         </HStack>
         <HStack spacing={2} flexShrink={0}>
+          {onEditPassage ? (
+            <IconButton
+              aria-label="تعديل القطعة"
+              icon={<FaEdit />}
+              size="sm"
+              variant="ghost"
+              colorScheme="orange"
+              borderRadius="lg"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEditPassage(passage);
+              }}
+            />
+          ) : null}
           <Badge colorScheme="orange" borderRadius="full" px={2}>
             {isExpanded ? "إخفاء" : "عرض"}
           </Badge>
@@ -190,6 +206,7 @@ function passagePanelPropsAreEqual(prev, next) {
     prev.onToggle === next.onToggle &&
     prev.onToggleSelect === next.onToggleSelect &&
     prev.onTogglePassageSelect === next.onTogglePassageSelect &&
+    prev.onEditPassage === next.onEditPassage &&
     prev.onEdit === next.onEdit &&
     prev.onDelete === next.onDelete &&
     prev.onSetCorrect === next.onSetCorrect &&

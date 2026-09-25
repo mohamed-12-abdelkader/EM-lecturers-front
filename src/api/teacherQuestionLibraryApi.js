@@ -71,4 +71,82 @@ export async function bulkCreateTeacherLibraryQuestions({ lessonId, bulkText }) 
   return data;
 }
 
+/**
+ * إنشاء / تحديث قطعة قراءة مع أسئلتها
+ * POST /api/questions/reading-passage
+ *
+ * وضعان (أحدهما فقط):
+ * 1) questions[] — كل الأسئلة دفعة واحدة في نفس الطلب (حد أقصى 50)
+ * 2) questionsBulkText + correctAnswers — نص bulk
+ *
+ * تحديث: سؤال موجود → id، جديد → بدون id، محذوف → لا يُرسل
+ */
+export async function saveReadingPassageQuestions({
+  lessonId,
+  passageText,
+  passageTitle,
+  passageId,
+  questions,
+  questionsBulkText,
+  correctAnswers,
+}) {
+  const payload = {
+    lessonId: Number(lessonId),
+    passageText: String(passageText || "").trim(),
+  };
+
+  if (passageTitle != null && String(passageTitle).trim()) {
+    payload.passageTitle = String(passageTitle).trim();
+    payload.title = String(passageTitle).trim();
+  }
+  if (passageId != null && passageId !== "") {
+    payload.passageId = Number(passageId);
+  }
+
+  const bulk = String(questionsBulkText || "").trim();
+  if (bulk) {
+    payload.questionsBulkText = bulk;
+    if (Array.isArray(correctAnswers) && correctAnswers.length) {
+      payload.correctAnswers = correctAnswers.map((a) =>
+        String(a || "").trim().toUpperCase(),
+      );
+    }
+  } else if (Array.isArray(questions)) {
+    if (questions.length > 50) {
+      throw new Error("الحد الأقصى 50 سؤالاً في الطلب الواحد");
+    }
+    payload.questions = questions.map((q) => {
+      const item = {
+        questionText: String(q.questionText || q.question_text || "").trim(),
+        options: (q.options || []).map((opt) => {
+          if (opt && typeof opt === "object" && "text" in opt) {
+            return {
+              text: String(opt.text || "").trim(),
+              isCorrect: Boolean(opt.isCorrect ?? opt.is_correct),
+            };
+          }
+          return { text: String(opt || "").trim(), isCorrect: false };
+        }),
+      };
+      if (q.id != null && q.id !== "") item.id = Number(q.id);
+      return item;
+    });
+  } else {
+    throw new Error("أضف أسئلة كمصفوفة أو كنص bulk");
+  }
+
+  const { data } = await baseUrl.post("/api/questions/reading-passage", payload, {
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+  });
+  return data;
+}
+
+/** المسار القديم للتوافق */
+export async function createTeacherLibraryPassageLegacy(payload) {
+  const { data } = await baseUrl.post(`${API}/passage`, payload, {
+    headers: authHeaders(),
+  });
+  return data;
+}
+
 export { API as TEACHER_LIBRARY_API, apiError as teacherLibraryApiError };

@@ -7,7 +7,7 @@ import {
 } from "../../api/questionBankApi";
 import {
   normalizeLessonQuestionsResponse,
-  normalizePassagesResponse,
+  buildPassagesFromLessonContent,
 } from "../../pages/Question Bank/utils/teacherLibraryQuestionUtils";
 
 import {
@@ -116,8 +116,13 @@ export async function fetchTeacherLibraryLessonContent(lessonId) {
     throw new Error("فشل تحميل محتوى الدرس");
   }
 
-  const passages = normalizePassagesResponse(passagesPayload?.passages || []);
+  const passagesFromApi = passagesPayload?.passages || [];
   let questions = normalizeLessonQuestionsResponse(questionsPayload?.questions || []);
+
+  const passages = buildPassagesFromLessonContent({
+    questions,
+    passages: passagesFromApi,
+  });
 
   if (!questions.length && passages.length) {
     questions = passages.flatMap((p) => p.questions || []);

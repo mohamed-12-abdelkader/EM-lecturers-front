@@ -38,6 +38,11 @@ import {
   InputGroup,
   InputLeftElement,
   InputRightElement,
+  Tabs,
+  TabList,
+  Tab,
+  TabPanels,
+  TabPanel,
 } from "@chakra-ui/react";
 import {
   FaBookOpen,
@@ -64,7 +69,7 @@ import {
   fetchCourseLevelExamsForLibrary,
   teacherLibraryExamErrorMessage,
 } from "../../api/teacherLibraryExamApi";
-import { bulkCreateTeacherLibraryQuestions } from "../../api/teacherQuestionLibraryApi";
+import { bulkCreateTeacherLibraryQuestions, saveReadingPassageQuestions } from "../../api/teacherQuestionLibraryApi";
 import {
   useInvalidateTeacherQuestionBank,
   useTeacherLibraryLessonContent,
@@ -90,6 +95,23 @@ function authHeaders() {
   const token = localStorage.getItem("token");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
+
+const emptyPassageQuestion = () => ({
+  id: undefined,
+  questionText: "",
+  options: ["", "", "", ""],
+  correctIndex: 0,
+});
+
+const emptyPassageForm = () => ({
+  passageId: null,
+  title: "",
+  content: "",
+  mode: "array", // "array" | "bulk"
+  questions: [emptyPassageQuestion()],
+  questionsBulkText: "",
+  correctAnswers: "",
+});
 
 const QuestionLibraryLessonPage = () => {
   const toast = useToast();
@@ -187,7 +209,7 @@ const QuestionLibraryLessonPage = () => {
   });
   const [deletingQuestion, setDeletingQuestion] = useState(null);
   const [bulkText, setBulkText] = useState("");
-  const [passageForm, setPassageForm] = useState({ title: "", content: "" });
+  const [passageForm, setPassageForm] = useState(() => emptyPassageForm());
   const [pendingAnswerId, setPendingAnswerId] = useState(null);
   const [selectedQuestions, setSelectedQuestions] = useState(() => new Set());
   const [selectedPassageIds, setSelectedPassageIds] = useState([]);
@@ -221,7 +243,7 @@ const QuestionLibraryLessonPage = () => {
   const { isOpen: isExtractOpen, onOpen: onExtractOpen, onClose: onExtractClose } = useDisclosure();
 
   const standaloneQuestions = useMemo(
-    () => allQuestions.filter((q) => !q.passage_id),
+    () => allQuestions.filter((q) => q.passage_id == null && !q.passage?.id),
     [allQuestions],
   );
 
@@ -543,30 +565,193 @@ const QuestionLibraryLessonPage = () => {
     }
   };
 
+  const openCreatePassage = () => {
+    setPassageForm(emptyPassageForm());
+    onPassageOpen();
+  };
+
+  const openEditPassage = (passage) => {
+    const qs = (passage.questions || []).map((q) => {
+      const options = [...(q.choices || [])];
+      while (options.length < 4) options.push("");
+      return {
+        id: q.id,
+        questionText: q.question_text || "",
+        options: options.slice(0, 4),
+        correctIndex:
+          q.correct_answer_index != null && q.correct_answer_index >= 0
+            ? Number(q.correct_answer_index)
+            : 0,
+      };
+    });
+    setPassageForm({
+      ...emptyPassageForm(),
+      passageId: passage.id,
+      title: passage.title || "",
+      content: passage.content || passage.text || "",
+      mode: "array",
+      questions: qs.length ? qs : [emptyPassageQuestion()],
+    });
+    onPassageOpen();
+  };
+
+  const updatePassageQuestionField = (index, patch) => {
+    setPassageForm((f) => ({
+      ...f,
+      questions: f.questions.map((q, i) => (i === index ? { ...q, ...patch } : q)),
+    }));
+  };
+
+  const updatePassageOption = (qIndex, optIndex, value) => {
+    setPassageForm((f) => ({
+      ...f,
+      questions: f.questions.map((q, i) => {
+        if (i !== qIndex) return q;
+        const options = [...q.options];
+        options[optIndex] = value;
+        return { ...q, options };
+      }),
+    }));
+  };
+
+  const addPassageQuestionRow = () => {
+    setPassageForm((f) => {
+      if (f.questions.length >= 50) {
+        toast({
+          title: "الحد الأقصى 50 سؤالاً",
+          status: "warning",
+          duration: 2500,
+          isClosable: true,
+        });
+        return f;
+      }
+      return {
+        ...f,
+        questions: [...f.questions, emptyPassageQuestion()],
+      };
+    });
+  };
+
+  const removePassageQuestionRow = (index) => {
+    setPassageForm((f) => ({
+      ...f,
+      questions: f.questions.length <= 1 ? f.questions : f.questions.filter((_, i) => i !== index),
+    }));
+  };
+
+  const parseCorrectAnswersInput = (raw) =>
+    String(raw || "")
+      .split(/[\s,،]+/)
+      .map((s) => s.trim().toUpperCase())
+      .filter((s) => /^[A-D]$/.test(s));
+
   const savePassage = async () => {
     if (!selectedLesson || !passageForm.content.trim()) return;
+
     setIsSavingPassage(true);
     try {
-      await baseUrl.post(
-        `${API}/passage`,
-        {
-          lesson_id: selectedLesson.id,
-          title: passageForm.title.trim() || null,
-          content: passageForm.content.trim(),
-          questions: [],
-        },
-        { headers: authHeaders() },
-      );
-      toast({ title: "تم الإنشاء", description: "تمت إضافة قطعة القراءة", status: "success", duration: 2000, isClosable: true });
-      setPassageForm({ title: "", content: "" });
+      if (passageForm.mode === "bulk") {
+        const bulk = passageForm.questionsBulkText.trim();
+        if (!bulk) {
+          toast({
+            title: "أدخل نص الأسئلة",
+            description: "الصق الأسئلة بنص Bulk داخل الحقل",
+            status: "warning",
+            duration: 3500,
+            isClosable: true,
+          });
+          return;
+        }
+        const correctAnswers = parseCorrectAnswersInput(passageForm.correctAnswers);
+        await saveReadingPassageQuestions({
+          lessonId: selectedLesson.id,
+          passageId: passageForm.passageId,
+          passageTitle: passageForm.title.trim() || undefined,
+          passageText: passageForm.content.trim(),
+          questionsBulkText: bulk,
+          correctAnswers: correctAnswers.length ? correctAnswers : undefined,
+        });
+      } else {
+        const validQuestions = passageForm.questions.filter(
+          (q) =>
+            q.questionText.trim() &&
+            (q.options || []).filter((o) => String(o).trim()).length >= 2,
+        );
+
+        if (validQuestions.length === 0) {
+          toast({
+            title: "أضف سؤالاً واحداً على الأقل",
+            description: "ضع كل الأسئلة داخل المصفوفة في نفس الطلب (حد أقصى 50)",
+            status: "warning",
+            duration: 3500,
+            isClosable: true,
+          });
+          return;
+        }
+
+        if (validQuestions.length > 50) {
+          toast({
+            title: "الحد الأقصى 50 سؤالاً",
+            status: "warning",
+            duration: 3000,
+            isClosable: true,
+          });
+          return;
+        }
+
+        for (const q of validQuestions) {
+          if (
+            q.correctIndex == null ||
+            q.correctIndex < 0 ||
+            !String(q.options[q.correctIndex] || "").trim()
+          ) {
+            toast({
+              title: "حدّد الإجابة الصحيحة",
+              description: "اختر الخيار الصحيح لكل سؤال",
+              status: "warning",
+              duration: 3500,
+              isClosable: true,
+            });
+            return;
+          }
+        }
+
+        await saveReadingPassageQuestions({
+          lessonId: selectedLesson.id,
+          passageId: passageForm.passageId,
+          passageTitle: passageForm.title.trim() || undefined,
+          passageText: passageForm.content.trim(),
+          questions: validQuestions.map((q) => ({
+            id: q.id,
+            questionText: q.questionText.trim(),
+            options: q.options
+              .map((text, idx) => ({
+                text: String(text).trim(),
+                isCorrect: idx === q.correctIndex,
+              }))
+              .filter((o) => o.text),
+          })),
+        });
+      }
+
+      toast({
+        title: passageForm.passageId ? "تم التحديث" : "تم الإنشاء",
+        description: "تم حفظ قطعة القراءة وكل أسئلتها في طلب واحد",
+        status: "success",
+        duration: 2500,
+        isClosable: true,
+      });
+      setPassageForm(emptyPassageForm());
       onPassageClose();
       fetchLessonContent(selectedLesson.id);
+      fetchLessons();
     } catch (err) {
       toast({
         title: "خطأ",
-        description: err.response?.data?.message || "فشل في إنشاء القطعة",
+        description:
+          err.response?.data?.message || err.message || "فشل في حفظ قطعة القراءة",
         status: "error",
-        duration: 3000,
+        duration: 4000,
         isClosable: true,
       });
     } finally {
@@ -850,7 +1035,7 @@ const QuestionLibraryLessonPage = () => {
             <Button size="sm" colorScheme="teal" variant="outline" leftIcon={<FaListAlt />} borderRadius="xl" onClick={onBulkOpen}>
               إضافة جماعية
             </Button>
-            <Button size="sm" colorScheme="orange" variant="outline" leftIcon={<FaParagraph />} borderRadius="xl" onClick={onPassageOpen}>
+            <Button size="sm" colorScheme="orange" variant="outline" leftIcon={<FaParagraph />} borderRadius="xl" onClick={openCreatePassage}>
               قطعة قراءة
             </Button>
             <Button size="sm" colorScheme="orange" variant="outline" leftIcon={<FaUpload />} borderRadius="xl" onClick={onExtractOpen}>
@@ -1105,7 +1290,7 @@ const QuestionLibraryLessonPage = () => {
                       >
                         <Text fontSize="sm" color={muted}>
                           {passages.length === 0
-                            ? "لا توجد قطع — أضف قطعة نصية ثم اربط الأسئلة بها"
+                            ? "لا توجد قطع — أضف قطعة مع أسئلتها من زر «قطعة قراءة»"
                             : "لا قطع مطابقة للبحث أو الفلتر"}
                         </Text>
                       </Box>
@@ -1132,6 +1317,7 @@ const QuestionLibraryLessonPage = () => {
                             onZoomImage={handleZoomImage}
                             selectedPassageIds={selectedPassageIds}
                             onTogglePassageSelect={togglePassageSelect}
+                            onEditPassage={openEditPassage}
                           />
                         ))}
                       </VStack>
@@ -1423,13 +1609,24 @@ const QuestionLibraryLessonPage = () => {
         </ModalContent>
       </Modal>
 
-      {/* Passage modal */}
-      <Modal isOpen={isPassageOpen} onClose={onPassageClose} size="lg" scrollBehavior="inside" isCentered>
-        <ModalOverlay />
-        <ModalContent borderRadius="xl">
-          <ModalHeader fontSize="md">قطعة قراءة جديدة</ModalHeader>
+      {/* Passage modal — POST /api/questions/reading-passage (questions[] أو questionsBulkText) */}
+      <Modal
+        isOpen={isPassageOpen}
+        onClose={() => {
+          setPassageForm(emptyPassageForm());
+          onPassageClose();
+        }}
+        size={{ base: "md", md: "xl" }}
+        scrollBehavior="inside"
+        isCentered
+      >
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
+        <ModalContent borderRadius="2xl" mx={4} maxH="85vh">
+          <ModalHeader fontSize="md" borderBottomWidth="1px">
+            {passageForm.passageId ? "تعديل قطعة قراءة" : "قطعة قراءة جديدة"}
+          </ModalHeader>
           <ModalCloseButton />
-          <ModalBody>
+          <ModalBody py={4}>
             <VStack spacing={4} align="stretch">
               <FormControl>
                 <FormLabel fontSize="sm">عنوان القطعة (اختياري)</FormLabel>
@@ -1437,33 +1634,215 @@ const QuestionLibraryLessonPage = () => {
                   value={passageForm.title}
                   onChange={(e) => setPassageForm((f) => ({ ...f, title: e.target.value }))}
                   dir="rtl"
+                  borderRadius="lg"
+                  placeholder="مثال: أهمية القراءة"
                 />
               </FormControl>
               <FormControl isRequired>
-                <FormLabel fontSize="sm">نص القطعة</FormLabel>
+                <FormLabel fontSize="sm">نص القطعة (passageText)</FormLabel>
                 <Textarea
                   value={passageForm.content}
                   onChange={(e) => setPassageForm((f) => ({ ...f, content: e.target.value }))}
-                  rows={8}
+                  rows={5}
                   dir="rtl"
+                  borderRadius="lg"
+                  placeholder="نص القطعة هنا..."
                 />
               </FormControl>
-              <Text fontSize="xs" color={muted}>
-                بعد إنشاء القطعة، أضف أسئلة مرتبطة بها من «سؤال جديد» واختر القطعة من القائمة.
-              </Text>
+
+              <Tabs
+                index={passageForm.mode === "bulk" ? 1 : 0}
+                onChange={(i) =>
+                  setPassageForm((f) => ({ ...f, mode: i === 1 ? "bulk" : "array" }))
+                }
+                variant="soft-rounded"
+                colorScheme="orange"
+                size="sm"
+              >
+                <TabList mb={3} gap={2} flexWrap="wrap">
+                  <Tab>مصفوفة أسئلة (دفعة واحدة)</Tab>
+                  <Tab>نص Bulk</Tab>
+                </TabList>
+                <TabPanels>
+                  <TabPanel px={0}>
+                    <Flex justify="space-between" align="center" mb={3}>
+                      <Text fontWeight="700" fontSize="sm">
+                        questions[] — حد أقصى 50
+                      </Text>
+                      <Button
+                        size="xs"
+                        leftIcon={<FaPlus />}
+                        colorScheme="orange"
+                        variant="outline"
+                        borderRadius="lg"
+                        onClick={addPassageQuestionRow}
+                        isDisabled={passageForm.questions.length >= 50}
+                      >
+                        إضافة سؤال
+                      </Button>
+                    </Flex>
+
+                    <VStack spacing={3} align="stretch">
+                      {passageForm.questions.map((q, qIdx) => (
+                        <Box
+                          key={q.id ?? `new-${qIdx}`}
+                          p={3.5}
+                          borderWidth="1px"
+                          borderColor={borderColor}
+                          borderRadius="xl"
+                          bg={filterInputBg}
+                        >
+                          <Flex justify="space-between" align="center" mb={3}>
+                            <Badge colorScheme="orange" borderRadius="full">
+                              سؤال {qIdx + 1}
+                              {q.id ? ` · #${q.id}` : " · جديد"}
+                            </Badge>
+                            {passageForm.questions.length > 1 ? (
+                              <IconButton
+                                aria-label="حذف السؤال"
+                                icon={<FaTrash />}
+                                size="xs"
+                                colorScheme="red"
+                                variant="ghost"
+                                onClick={() => removePassageQuestionRow(qIdx)}
+                              />
+                            ) : null}
+                          </Flex>
+                          <FormControl mb={3} isRequired>
+                            <FormLabel fontSize="xs">questionText</FormLabel>
+                            <Input
+                              value={q.questionText}
+                              onChange={(e) =>
+                                updatePassageQuestionField(qIdx, {
+                                  questionText: e.target.value,
+                                })
+                              }
+                              placeholder="السؤال 1؟"
+                              borderRadius="lg"
+                              size="sm"
+                              dir="rtl"
+                            />
+                          </FormControl>
+                          <FormControl>
+                            <FormLabel fontSize="xs">
+                              options — حدّد isCorrect
+                            </FormLabel>
+                            <VStack spacing={2} align="stretch">
+                              {(q.options || ["", "", "", ""]).map((opt, oIdx) => (
+                                <HStack key={oIdx} spacing={2}>
+                                  <Text
+                                    w="18px"
+                                    fontSize="xs"
+                                    fontWeight="bold"
+                                    color={muted}
+                                  >
+                                    {String.fromCharCode(65 + oIdx)}
+                                  </Text>
+                                  <Input
+                                    value={opt}
+                                    onChange={(e) =>
+                                      updatePassageOption(qIdx, oIdx, e.target.value)
+                                    }
+                                    placeholder={["أ", "ب", "ج", "د"][oIdx]}
+                                    size="sm"
+                                    borderRadius="lg"
+                                    dir="rtl"
+                                    flex={1}
+                                  />
+                                  <Checkbox
+                                    isChecked={q.correctIndex === oIdx}
+                                    onChange={() =>
+                                      updatePassageQuestionField(qIdx, {
+                                        correctIndex: oIdx,
+                                      })
+                                    }
+                                    colorScheme="green"
+                                    aria-label={`صحيح ${String.fromCharCode(65 + oIdx)}`}
+                                  />
+                                </HStack>
+                              ))}
+                            </VStack>
+                          </FormControl>
+                        </Box>
+                      ))}
+                    </VStack>
+                    <Text fontSize="xs" color={muted} mt={3}>
+                      كل الأسئلة تُرسل في نفس الطلب داخل questions. عند التعديل: احذف السؤال من
+                      القائمة ليحذف من السيرفر.
+                    </Text>
+                  </TabPanel>
+
+                  <TabPanel px={0}>
+                    <FormControl mb={3} isRequired>
+                      <FormLabel fontSize="sm">questionsBulkText</FormLabel>
+                      <Textarea
+                        value={passageForm.questionsBulkText}
+                        onChange={(e) =>
+                          setPassageForm((f) => ({
+                            ...f,
+                            questionsBulkText: e.target.value,
+                          }))
+                        }
+                        rows={12}
+                        dir="rtl"
+                        fontFamily="monospace"
+                        fontSize="sm"
+                        borderRadius="lg"
+                        placeholder={
+                          "1- السؤال الأول؟\n(أ) ...\n(ب) ...\n(ج) ...\n(د) ...\n\n2- السؤال الثاني؟\n(أ) ...\n(ب) ...\n(ج) ...\n(د) ..."
+                        }
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel fontSize="sm">correctAnswers (اختياري)</FormLabel>
+                      <Input
+                        value={passageForm.correctAnswers}
+                        onChange={(e) =>
+                          setPassageForm((f) => ({
+                            ...f,
+                            correctAnswers: e.target.value,
+                          }))
+                        }
+                        dir="ltr"
+                        textAlign="left"
+                        borderRadius="lg"
+                        placeholder='A, B أو A B'
+                      />
+                      <Text fontSize="xs" color={muted} mt={1}>
+                        حرف لكل سؤال بالترتيب (A–D). مثال: A, B يعني السؤال 1 = أ والسؤال 2 = ب.
+                      </Text>
+                    </FormControl>
+                    <Text fontSize="xs" color={muted} mt={3}>
+                      البديل عن المصفوفة: نص Bulk واحد في نفس الطلب. الحد الأقصى 50 سؤالاً.
+                    </Text>
+                  </TabPanel>
+                </TabPanels>
+              </Tabs>
             </VStack>
           </ModalBody>
-          <ModalFooter>
-            <Button variant="ghost" mr={2} onClick={onPassageClose}>
+          <ModalFooter borderTopWidth="1px" gap={2}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setPassageForm(emptyPassageForm());
+                onPassageClose();
+              }}
+            >
               إلغاء
             </Button>
             <Button
               colorScheme="orange"
               onClick={savePassage}
               isLoading={isSavingPassage}
-              isDisabled={!passageForm.content.trim()}
+              isDisabled={
+                !passageForm.content.trim() ||
+                (passageForm.mode === "bulk"
+                  ? !passageForm.questionsBulkText.trim()
+                  : false)
+              }
+              borderRadius="xl"
             >
-              حفظ القطعة
+              {passageForm.passageId ? "حفظ التعديلات" : "حفظ القطعة والأسئلة"}
             </Button>
           </ModalFooter>
         </ModalContent>
