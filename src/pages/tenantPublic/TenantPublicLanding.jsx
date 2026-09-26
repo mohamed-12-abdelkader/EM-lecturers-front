@@ -37,10 +37,16 @@ import {
 } from "../../utils/highQualityImageUrl";
 import TenantSeoHead from "./components/TenantSeoHead";
 import TenantLandingLoader from "./components/landing/TenantLandingLoader";
+import gamalsteinTeacherPortrait from "../../assets/tenant/gamalstein-teacher.png";
 
 const TENANT_FONT_LINK_ID = "tenant-public-arabic-fonts";
 const TENANT_FONT_BODY = "'Cairo', 'Segoe UI', Tahoma, sans-serif";
 const TENANT_FONT_HEADING = "'Cairo', 'Segoe UI', Tahoma, sans-serif";
+
+/** صور مدرّسين ثابتة حسب الـ subdomain (override لصورة الـ API) */
+const SUBDOMAIN_TEACHER_PORTRAITS = {
+  gamalstein: gamalsteinTeacherPortrait,
+};
 
 function useTenantArabicFonts() {
   useEffect(() => {
@@ -193,10 +199,14 @@ export default function TenantPublicLanding({ subdomain }) {
   }, [coursesResponse]);
 
   const teacherPortraitUrl = useMemo(() => {
+    const subdomainKey = String(subdomain || "").trim().toLowerCase();
+    const override = SUBDOMAIN_TEACHER_PORTRAITS[subdomainKey];
+    if (override) return override;
+
     const hero = landing?.hero || {};
     const raw = resolvePublicImageUrl(hero.image_url || tenant?.avatar_url || null);
     return raw ? getPortraitImageUrl(raw) : null;
-  }, [landing, tenant]);
+  }, [landing, tenant, subdomain]);
 
   // Preload LCP portrait as early as possible (absolute URL only — relative paths break preload)
   useEffect(() => {
