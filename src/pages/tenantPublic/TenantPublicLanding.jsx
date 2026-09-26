@@ -37,15 +37,14 @@ import {
 } from "../../utils/highQualityImageUrl";
 import TenantSeoHead from "./components/TenantSeoHead";
 import TenantLandingLoader from "./components/landing/TenantLandingLoader";
-import gamalsteinTeacherPortrait from "../../assets/tenant/gamalstein-teacher.png";
 
 const TENANT_FONT_LINK_ID = "tenant-public-arabic-fonts";
 const TENANT_FONT_BODY = "'Cairo', 'Segoe UI', Tahoma, sans-serif";
 const TENANT_FONT_HEADING = "'Cairo', 'Segoe UI', Tahoma, sans-serif";
 
-/** صور مدرّسين ثابتة حسب الـ subdomain (override لصورة الـ API) */
+/** صور مدرّسين ثابتة حسب الـ subdomain (مسار public مستقر للبروداكشن) */
 const SUBDOMAIN_TEACHER_PORTRAITS = {
-  gamalstein: gamalsteinTeacherPortrait,
+  gamalstein: "/tenant/gamalstein-teacher.png",
 };
 
 function useTenantArabicFonts() {

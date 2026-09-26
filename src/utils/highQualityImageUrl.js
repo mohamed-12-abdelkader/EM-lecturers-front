@@ -42,6 +42,20 @@ export function resolvePublicImageUrl(url) {
   } else if (!raw.startsWith("/")) {
     path = `/${raw}`;
   }
+
+  // أصول الفرونت (Vite / public) — لا تُحوَّل لأصل الـ API
+  if (
+    path.startsWith("/assets/") ||
+    path.startsWith("/tenant/") ||
+    path.startsWith("/static/") ||
+    path.startsWith("/favicon")
+  ) {
+    if (typeof window !== "undefined") {
+      return `${window.location.origin}${path}`;
+    }
+    return path;
+  }
+
   if (typeof window !== "undefined" && useDevViteProxy()) {
     return `${window.location.origin}${path}`;
   }
@@ -130,9 +144,12 @@ export function getCardImageUrl(url) {
 
 export function getPortraitImageSrcSet(url) {
   const resolved = resolvePublicImageUrl(url);
-  if (!resolved || (isCloudinaryUrl(resolved) && !cloudinaryTransformsEnabled())) {
-    return undefined;
-  }
+  if (!resolved) return undefined;
+  // srcset بعرض متعدد مفيد فقط لـ CDN يدعم تحويل المقاس
+  const canResize =
+    (isCloudinaryUrl(resolved) && cloudinaryTransformsEnabled()) ||
+    String(resolved).includes("images.unsplash.com");
+  if (!canResize) return undefined;
   return [480, 720, 960]
     .map((w) => `${getHighQualityImageUrl(url, { width: w, quality: 78 })} ${w}w`)
     .join(", ");
@@ -140,9 +157,11 @@ export function getPortraitImageSrcSet(url) {
 
 export function getHeroImageSrcSet(url) {
   const resolved = resolvePublicImageUrl(url);
-  if (!resolved || (isCloudinaryUrl(resolved) && !cloudinaryTransformsEnabled())) {
-    return undefined;
-  }
+  if (!resolved) return undefined;
+  const canResize =
+    (isCloudinaryUrl(resolved) && cloudinaryTransformsEnabled()) ||
+    String(resolved).includes("images.unsplash.com");
+  if (!canResize) return undefined;
   return [720, 1080, 1440]
     .map((w) => `${getHighQualityImageUrl(url, { width: w, quality: 80 })} ${w}w`)
     .join(", ");

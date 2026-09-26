@@ -622,7 +622,7 @@ function TeacherHeroAvatar({
           alt={alt}
           priority
           contain
-          className="relative z-[1] h-full w-full scale-[1.06]"
+          className="relative z-[1] h-full w-full scale-[1.14] translate-y-6 sm:translate-y-7 lg:translate-y-8"
         />
 
         {/* soft bottom shade so cutout sits into the circle */}
@@ -918,7 +918,7 @@ export default function TenantProHero({
       />
 
       {!isDesktop ? (
-        <div className="relative z-[2] pb-10 pt-14">
+        <div className="relative z-[2] pb-10 pt-32 sm:pt-28">
           <motion.div className={`relative ${tlContainer}`} style={{ y: imgY }}>
             <TeacherHeroAvatar
               src={teacherImageUrl}

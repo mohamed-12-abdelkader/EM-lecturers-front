@@ -70,7 +70,7 @@ function AboutAvatar({ src, alt }) {
             alt={alt}
             className="absolute inset-0 h-full w-full object-contain object-bottom"
             style={{
-              transform: "scale(1.06)",
+              transform: "scale(1.14) translateY(18px)",
               transformOrigin: "center bottom",
             }}
             loading="eager"
