@@ -72,3 +72,38 @@ export function formatPhoneForWhatsApp(phone) {
   else if (!digits.startsWith("20")) digits = `20${digits}`;
   return digits;
 }
+
+/** يستخرج معرف مجموعة الكورس للطالب من أشكال الريسبونس المختلفة */
+export function getManagedStudentCourseGroupId(student) {
+  if (!student) return null;
+  const raw =
+    student.course_group?.id ??
+    student.course_group_id ??
+    student.courseGroupId ??
+    student.courseGroup?.id ??
+    student.group?.id ??
+    student.group_id ??
+    student.groupId ??
+    null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** @deprecated استخدم getManagedStudentCourseGroupId */
+export function getManagedStudentGroupId(student) {
+  return getManagedStudentCourseGroupId(student);
+}
+
+export function formatStudyGroupOptionLabel(group) {
+  if (!group) return "مجموعة";
+  const parts = [group.name || "مجموعة"];
+  if (group.grade_name) parts.push(group.grade_name);
+  if (group.description) parts.push(String(group.description).slice(0, 40));
+  if (group.days) parts.push(group.days);
+  const time =
+    group.start_time && group.end_time
+      ? `${group.start_time} – ${group.end_time}`
+      : group.start_time || group.end_time || null;
+  if (time) parts.push(time);
+  return parts.join(" · ");
+}

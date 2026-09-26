@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Modal,
   ModalOverlay,
@@ -11,6 +11,7 @@ import {
   Button,
   FormControl,
   FormLabel,
+  FormHelperText,
   Input,
   Select,
   VStack,
@@ -19,6 +20,10 @@ import {
   Text,
   useColorModeValue,
 } from "@chakra-ui/react";
+import {
+  formatStudyGroupOptionLabel,
+  getManagedStudentCourseGroupId,
+} from "../managedStudentsUtils";
 
 const emptyForm = {
   name: "",
@@ -50,12 +55,13 @@ const StudentFormModal = ({
   useEffect(() => {
     if (!isOpen) return;
     if (isEdit && student) {
+      const groupId = getManagedStudentCourseGroupId(student);
       setForm({
         name: student.name || "",
         grade_id: student.grade?.id ? String(student.grade.id) : "",
         phone: student.phone || "",
         parent_phone: student.parent_phone || "",
-        group_id: student.group?.id ? String(student.group.id) : "",
+        group_id: groupId ? String(groupId) : "",
         password: "",
         use_phone_as_password: true,
         account_status: student.account_status || "active",
@@ -66,6 +72,37 @@ const StudentFormModal = ({
   }, [isOpen, isEdit, student]);
 
   const set = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
+
+  const availableGroups = useMemo(() => {
+    const list = Array.isArray(groups) ? groups : [];
+    if (!form.grade_id) return list;
+    const gradeId = String(form.grade_id);
+    const filtered = list.filter((g) => {
+      if (g.grade_id == null || g.grade_id === "") return true;
+      return String(g.grade_id) === gradeId;
+    });
+    // لو المجموعة الحالية مش ضمن فلتر الصف، سيّبها ظاهرة عشان المدرس يقدر يغيرها
+    const currentId = form.group_id ? String(form.group_id) : "";
+    if (currentId && !filtered.some((g) => String(g.id) === currentId)) {
+      const current = list.find((g) => String(g.id) === currentId);
+      if (current) return [current, ...filtered];
+    }
+    return filtered;
+  }, [groups, form.grade_id, form.group_id]);
+
+  const handleGradeChange = (value) => {
+    setForm((prev) => {
+      const next = { ...prev, grade_id: value };
+      if (!value || !prev.group_id) return next;
+      const stillValid = (groups || []).some((g) => {
+        if (String(g.id) !== String(prev.group_id)) return false;
+        if (g.grade_id == null || g.grade_id === "") return true;
+        return String(g.grade_id) === String(value);
+      });
+      if (!stillValid) next.group_id = "";
+      return next;
+    });
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -124,7 +161,7 @@ const StudentFormModal = ({
               <Select
                 placeholder="اختر الصف"
                 value={form.grade_id}
-                onChange={(e) => set("grade_id", e.target.value)}
+                onChange={(e) => handleGradeChange(e.target.value)}
                 borderRadius="lg"
               >
                 {grades.map((g) => (
@@ -163,19 +200,27 @@ const StudentFormModal = ({
             </FormControl>
 
             <FormControl>
-              <FormLabel fontSize="sm">مجموعة السنتر</FormLabel>
+              <FormLabel fontSize="sm">مجموعة الكورس</FormLabel>
               <Select
-                placeholder="بدون مجموعة"
+                placeholder={availableGroups.length ? "بدون مجموعة" : "لا توجد مجموعات كورس متاحة"}
                 value={form.group_id}
                 onChange={(e) => set("group_id", e.target.value)}
                 borderRadius="lg"
+                isDisabled={!availableGroups.length && !form.group_id}
               >
-                {groups.map((g) => (
+                {availableGroups.map((g) => (
                   <option key={g.id} value={g.id}>
-                    {g.name}
+                    {formatStudyGroupOptionLabel(g)}
                   </option>
                 ))}
               </Select>
+              <FormHelperText fontSize="xs">
+                {isEdit
+                  ? "المجموعات من صفحة مجموعات الكورس — اختر مجموعة لتغيير عضوية الطالب"
+                  : form.grade_id
+                    ? "تظهر مجموعات الكورس للصف المختار"
+                    : "نفس المجموعات الموجودة في صفحة مجموعات الكورس"}
+              </FormHelperText>
             </FormControl>
 
             {isEdit ? (

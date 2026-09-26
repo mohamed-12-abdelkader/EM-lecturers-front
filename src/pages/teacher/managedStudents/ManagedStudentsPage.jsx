@@ -47,9 +47,14 @@ import {
   updateManagedStudentStatus,
   importManagedStudentsCsv,
   fetchTeacherGrades,
-  fetchTeacherStudyGroups,
   apiErrorMessage,
 } from "../../../api/teacherManagedStudentsApi";
+import {
+  addCourseGroupStudent,
+  courseGroupsApiError,
+  fetchTeacherCourseGroups,
+  removeCourseGroupStudent,
+} from "../../../api/courseGroupsApi";
 import { resetStudentDevice } from "../../../api/deviceRestrictionApi";
 import RegistrationSettingsCard from "./components/RegistrationSettingsCard";
 import DeviceRestrictionSettingsCard from "./components/DeviceRestrictionSettingsCard";
@@ -58,7 +63,11 @@ import StudentFormModal from "./components/StudentFormModal";
 import ChangePasswordModal from "./components/ChangePasswordModal";
 import CredentialsModal from "./components/CredentialsModal";
 import ImportCsvModal from "./components/ImportCsvModal";
-import { formatStudentCode, isTeacherRegistrationMode } from "./managedStudentsUtils";
+import {
+  formatStudentCode,
+  getManagedStudentCourseGroupId,
+  isTeacherRegistrationMode,
+} from "./managedStudentsUtils";
 
 const ACCENT = "#0056b3";
 const WARM = "#c2410c";
@@ -129,10 +138,23 @@ const ManagedStudentsPage = () => {
     try {
       const [gradesData, groupsData] = await Promise.all([
         fetchTeacherGrades(),
-        fetchTeacherStudyGroups(),
+        fetchTeacherCourseGroups(),
       ]);
       setGrades(gradesData);
-      setGroups(groupsData);
+      const list = Array.isArray(groupsData) ? groupsData : [];
+      setGroups(
+        list
+          .filter((g) => g && g.status !== "inactive")
+          .map((g) => ({
+            id: g.id ?? g.group_id ?? g.groupId,
+            name: g.name || g.group_name || "مجموعة",
+            grade_id: g.grade_id ?? g.gradeId ?? g.grade?.id ?? null,
+            grade_name: g.grade_name || g.grade?.name || null,
+            description: g.description || null,
+            status: g.status || "active",
+          }))
+          .filter((g) => g.id != null),
+      );
     } catch (err) {
       console.error(err);
     }
@@ -144,6 +166,7 @@ const ManagedStudentsPage = () => {
       const data = await fetchManagedStudents({
         search: debouncedSearch || undefined,
         grade_id: gradeFilter || undefined,
+        course_group_id: groupFilter || undefined,
         group_id: groupFilter || undefined,
         account_status: statusFilter || undefined,
         page,
@@ -210,15 +233,59 @@ const ManagedStudentsPage = () => {
     });
   };
 
+  const syncStudentCourseGroup = async (studentId, prevGroupId, nextGroupId) => {
+    const prev = prevGroupId == null || prevGroupId === "" ? null : Number(prevGroupId);
+    const next = nextGroupId == null || nextGroupId === "" ? null : Number(nextGroupId);
+    if (prev === next) return;
+
+    if (prev && prev !== next) {
+      try {
+        await removeCourseGroupStudent(prev, studentId);
+      } catch (err) {
+        // لو الطالب مش أصلاً في المجموعة القديمة نكمّل إضافة الجديدة
+        console.warn("removeCourseGroupStudent", courseGroupsApiError(err));
+      }
+    }
+
+    if (next) {
+      await addCourseGroupStudent(next, studentId);
+    }
+  };
+
   const handleFormSubmit = async (payload) => {
     try {
       setSubmitting(true);
       if (selectedStudent) {
-        await updateManagedStudent(selectedStudent.id, payload);
+        const { group_id: nextGroupId, ...profilePayload } = payload || {};
+        await updateManagedStudent(selectedStudent.id, profilePayload);
+
+        const prevGroupId = getManagedStudentCourseGroupId(selectedStudent);
+        await syncStudentCourseGroup(selectedStudent.id, prevGroupId, nextGroupId);
+
         toast({ title: "تم تحديث بيانات الطالب", status: "success", duration: 3000 });
         formDisclosure.onClose();
       } else {
         const result = await createManagedStudent(payload);
+        const createdId = result?.student?.id || result?.id;
+        const requestedGroupId =
+          payload?.group_id === undefined || payload?.group_id === "" || payload?.group_id == null
+            ? null
+            : Number(payload.group_id);
+
+        if (createdId && requestedGroupId) {
+          try {
+            await syncStudentCourseGroup(createdId, null, requestedGroupId);
+          } catch (err) {
+            toast({
+              title: "تم إنشاء الطالب لكن تعذّر إضافته للمجموعة",
+              description: courseGroupsApiError(err),
+              status: "warning",
+              duration: 4500,
+              isClosable: true,
+            });
+          }
+        }
+
         formDisclosure.onClose();
         toast({ title: "تم إضافة الطالب", status: "success", duration: 3000 });
         if (result.credentials) {
@@ -232,7 +299,7 @@ const ManagedStudentsPage = () => {
     } catch (err) {
       toast({
         title: "فشلت العملية",
-        description: apiErrorMessage(err),
+        description: apiErrorMessage(err) || courseGroupsApiError(err),
         status: "error",
         duration: 4000,
         isClosable: true,
@@ -607,7 +674,7 @@ const ManagedStudentsPage = () => {
                   ))}
                 </Select>
                 <Select
-                  placeholder="كل المجموعات"
+                  placeholder="كل مجموعات الكورس"
                   value={groupFilter}
                   onChange={(e) => setGroupFilter(e.target.value)}
                   borderRadius="xl"
@@ -615,7 +682,7 @@ const ManagedStudentsPage = () => {
                 >
                   {groups.map((g) => (
                     <option key={g.id} value={g.id}>
-                      {g.name}
+                      {g.grade_name ? `${g.name} · ${g.grade_name}` : g.name}
                     </option>
                   ))}
                 </Select>

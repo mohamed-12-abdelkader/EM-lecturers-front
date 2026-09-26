@@ -185,7 +185,11 @@ export default function ManagedStudentCard({
 
           <SimpleMeta
             grade={student.grade?.name}
-            group={student.group?.name}
+            group={
+              student.course_group?.name ||
+              student.group?.name ||
+              student.study_group?.name
+            }
             phone={student.phone}
             parentPhone={student.parent_phone}
             textColor={textColor}

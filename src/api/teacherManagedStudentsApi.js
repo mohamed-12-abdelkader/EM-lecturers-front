@@ -159,5 +159,16 @@ export async function fetchTeacherStudyGroups() {
     headers: authHeaders(),
   });
   const payload = unwrap(data, "فشل تحميل المجموعات");
-  return payload?.groups ?? (Array.isArray(payload) ? payload : []);
+  const raw = payload?.groups ?? (Array.isArray(payload) ? payload : []);
+  return (Array.isArray(raw) ? raw : [])
+    .map((g) => ({
+      id: g?.id ?? g?.group_id ?? g?.groupId,
+      name: g?.name || g?.group_name || "مجموعة",
+      grade_id: g?.grade_id ?? g?.gradeId ?? g?.grade?.id ?? null,
+      grade_name: g?.grade_name || g?.grade?.name || null,
+      days: g?.days || null,
+      start_time: g?.start_time || g?.startTime || null,
+      end_time: g?.end_time || g?.endTime || null,
+    }))
+    .filter((g) => g.id != null);
 }
