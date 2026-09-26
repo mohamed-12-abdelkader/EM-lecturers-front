@@ -74,13 +74,6 @@ function buildTeacherTourSteps(meta) {
         "جولة تفصيلية على كل أزرار صفحة الكورس — سنتوقف عند كل زر، نشرح وظيفته، ونفتح النوافذ (الموديلات) لتوضيح الحقول. تستغرق 4–5 دقائق.",
     },
     {
-      targetId: "course-hero",
-      title: "بطاقة الكورس",
-      description:
-        "نظرة عامة: الغلاف، العنوان، الوصف، عدد الطلاب، التقييم، وعدد المحاضرات — قبل الدخول في أدوات الإدارة.",
-      onEnter: () => closeAllTeacherCourseTourModals(),
-    },
-    {
       targetId: "course-hero-activate",
       title: "زر «تفعيل طالب»",
       description:
@@ -349,9 +342,9 @@ function buildTeacherTourSteps(meta) {
   steps.push(
     {
       targetId: "course-create-stream-btn",
-      title: "زر «إنشاء جلسة»",
+      title: "زر «إنشاء محاضرة مباشرة»",
       description:
-        "يفتح نافذة لجدولة أو بدء بث مباشر للكورس — الطلاب يرون الجلسة في قسم «المحاضرات المباشرة».",
+        "يفتح نافذة لإنشاء محاضرة بث مباشر للكورس — الطلاب يرونها في قسم «المحاضرات المباشرة».",
       cardPlacement: "below-target",
       onEnter: () => {
         closeAllTeacherCourseTourModals();
@@ -362,9 +355,9 @@ function buildTeacherTourSteps(meta) {
     },
     {
       targetId: "course-create-stream-modal",
-      title: "نافذة إنشاء بث مباشر",
+      title: "نافذة إنشاء محاضرة مباشرة",
       description:
-        "«عنوان البث»: اسم الحصة (مثل: مراجعة امتحان). «بدء البث» ينشئ الغرفة — شارك الرابط مع الطلاب أو ادخل من زر «دخول الغرفة».",
+        "أدخل عنوان المحاضرة ثم أنشئها — بعدها يمكنك الانتقال للبث الآن أو لاحقاً من زر «دخول الغرفة».",
       onEnter: () => {
         setCourseTourSection("live");
         openCreateStreamForTour();

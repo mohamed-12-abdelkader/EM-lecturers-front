@@ -39,17 +39,24 @@ import TenantSeoHead from "./components/TenantSeoHead";
 import TenantLandingLoader from "./components/landing/TenantLandingLoader";
 
 const TENANT_FONT_LINK_ID = "tenant-public-arabic-fonts";
-const TENANT_FONT_BODY = "'Noto Sans Arabic', 'Segoe UI', Tahoma, sans-serif";
-const TENANT_FONT_HEADING = "'Noto Naskh Arabic', 'Noto Sans Arabic', sans-serif";
+const TENANT_FONT_BODY = "'Cairo', 'Segoe UI', Tahoma, sans-serif";
+const TENANT_FONT_HEADING = "'Cairo', 'Segoe UI', Tahoma, sans-serif";
 
 function useTenantArabicFonts() {
   useEffect(() => {
-    if (document.getElementById(TENANT_FONT_LINK_ID)) return;
+    const existing = document.getElementById(TENANT_FONT_LINK_ID);
+    const cairoHref =
+      "https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap";
+    if (existing) {
+      if (!String(existing.href || "").includes("Cairo")) {
+        existing.href = cairoHref;
+      }
+      return;
+    }
     const link = document.createElement("link");
     link.id = TENANT_FONT_LINK_ID;
     link.rel = "stylesheet";
-    link.href =
-      "https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@300;400;500;700&display=swap";
+    link.href = cairoHref;
     document.head.appendChild(link);
   }, []);
 }
@@ -452,10 +459,13 @@ export default function TenantPublicLanding({ subdomain }) {
         .tenant-public-page h1,
         .tenant-public-page h2,
         .tenant-public-page h3,
-        .tenant-public-page .font-heading {
+        .tenant-public-page .font-heading,
+        .tenant-public-page button,
+        .tenant-public-page a {
           font-family: ${TENANT_FONT_HEADING};
         }
         .tenant-public-page {
+          font-family: ${TENANT_FONT_BODY};
           background: var(--tl-page-bg) !important;
           color: var(--tl-fg);
         }
@@ -502,6 +512,7 @@ export default function TenantPublicLanding({ subdomain }) {
           whatsappHref={whatsappHref}
           showFreeVideos={showFreeLectures}
           teacherImageUrl={teacherPortraitUrl}
+          stats={heroStats}
         />
 
         <TenantProBentoWall

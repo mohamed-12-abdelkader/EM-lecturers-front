@@ -50,10 +50,9 @@ import {
 import { FaBookOpen } from "react-icons/fa";
 import AiQuestionExtractionModal from "./components/AiQuestionExtractionModal";
 import ExamReadyScreen from "./components/ExamReadyScreen";
-import ExamStudentProgress from "./components/ExamStudentProgress";
+import ExamStudentSessionHeader from "./components/ExamStudentSessionHeader";
 import ExamTakingActionBar from "./components/ExamTakingActionBar";
 import ExamResultPanel from "./components/ExamResultPanel";
-import { MdArrowBack } from "react-icons/md";
 import TeacherExamShell, {
   TeacherExamEmptyState,
 } from "./components/TeacherExamShell";
@@ -105,14 +104,6 @@ import {
 } from "../../utils/examAttemptProgress";
 import { normalizeExamAttemptResult } from "../../utils/examAttemptResultUtils";
 import ExamAttemptResultScreen from "./components/ExamAttemptResultScreen";
-
-function formatExamClock(value) {
-  if (value == null) return "--:--";
-  const s = Math.max(0, Number(value) || 0);
-  const m = Math.floor(s / 60).toString().padStart(2, "0");
-  const sec = (s % 60).toString().padStart(2, "0");
-  return `${m}:${sec}`;
-}
 
 function countLectureAnswered(questions, answers) {
   return (questions || []).filter((q) => {
@@ -201,6 +192,10 @@ const ComprehensiveExam = () => {
 
   // ألوان الصفحة
   const pageBg = useColorModeValue("#E8EEF5", "gray.950");
+  const studentTakingBg = useColorModeValue(
+    "linear-gradient(180deg, #EBF8FF 0%, #F7FAFC 28%, #EDF2F7 100%)",
+    "gray.900"
+  );
   const cardBg = useColorModeValue("white", "gray.900");
   const cardBorder = useColorModeValue("rgba(15,23,42,0.08)", "whiteAlpha.120");
   const headingColor = useColorModeValue("gray.900", "white");
@@ -2303,78 +2298,26 @@ const ComprehensiveExam = () => {
 
       return (
         <Box
-          bg={pageBg}
+          bg={studentTakingBg}
           minH="100dvh"
           dir="rtl"
           display="flex"
           flexDirection="column"
           style={{ fontFamily: "'Noto Sans Arabic', 'Segoe UI', sans-serif" }}
         >
-          <Box
-            position="sticky"
-            top={0}
-            zIndex={30}
-            bg={cardBg}
-            borderBottomWidth="1px"
-            borderColor={cardBorder}
-            boxShadow="sm"
-            pt="max(10px, env(safe-area-inset-top))"
-            px={{ base: 3, md: 4 }}
-            pb={3}
-          >
-            <Flex align="center" gap={2.5} mb={3}>
-              <IconButton
-                aria-label="العودة"
-                icon={<MdArrowBack />}
-                variant="ghost"
-                minW="44px"
-                h="44px"
-                borderRadius="xl"
-                onClick={() => navigate(-1)}
-                isDisabled={submitLoading}
-              />
-              <Box flex={1} minW={0}>
-                <Text fontWeight="800" fontSize={{ base: "sm", md: "lg" }} noOfLines={1}>
-                  {examData?.title || "امتحان المحاضرة"}
-                </Text>
-                <Text fontSize="xs" color="gray.500" fontWeight="600">
-                  سؤال {currentQuestionIndex + 1} من {questions.length}
-                  {lectureAnswered > 0 ? ` · ${lectureAnswered} مجاب` : ""}
-                </Text>
-              </Box>
-              {remainingSeconds != null ? (
-                <Badge
-                  px={3}
-                  py={2}
-                  minW="76px"
-                  textAlign="center"
-                  borderRadius="xl"
-                  fontSize={{ base: "md", md: "sm" }}
-                  fontFamily="mono"
-                  fontWeight="800"
-                  colorScheme={remainingSeconds < 300 ? "red" : "blue"}
-                >
-                  {formatExamClock(remainingSeconds)}
-                </Badge>
-              ) : (
-                <Badge px={3} py={2} borderRadius="xl" fontSize="xs" colorScheme="gray">
-                  بدون حد زمني
-                </Badge>
-              )}
-            </Flex>
-            <ExamStudentProgress
-              remainingSeconds={remainingSeconds}
-              answeredCount={lectureAnswered}
-              totalQuestions={questions.length}
-              questions={questions}
-              currentQuestionIndex={currentQuestionIndex}
-              studentAnswers={studentAnswers}
-              showPagination
-              onGoToQuestion={goToQuestion}
-              hasActiveAttempt={!!currentAttempt}
-              compact
-            />
-          </Box>
+          <ExamStudentSessionHeader
+            examTitle={examData?.title || "امتحان المحاضرة"}
+            currentIndex={currentQuestionIndex}
+            totalQuestions={questions.length}
+            answeredCount={lectureAnswered}
+            remainingSeconds={remainingSeconds}
+            questions={questions}
+            studentAnswers={studentAnswers}
+            onBack={() => navigate(-1)}
+            onGoToQuestion={goToQuestion}
+            backDisabled={submitLoading}
+            hasActiveAttempt={!!currentAttempt}
+          />
 
           <Box
             flex="1"

@@ -29,12 +29,19 @@ export const TENANT_SITE_NAV_LINKS = TENANT_NAV_LINKS.map(([href, label]) => [
 
 function useTenantArabicFonts() {
   useEffect(() => {
-    if (document.getElementById(TENANT_FONT_LINK_ID)) return;
+    const existing = document.getElementById(TENANT_FONT_LINK_ID);
+    const cairoHref =
+      "https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap";
+    if (existing) {
+      if (!String(existing.href || "").includes("Cairo")) {
+        existing.href = cairoHref;
+      }
+      return;
+    }
     const link = document.createElement("link");
     link.id = TENANT_FONT_LINK_ID;
     link.rel = "stylesheet";
-    link.href =
-      "https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@300;400;500;700&display=swap";
+    link.href = cairoHref;
     document.head.appendChild(link);
   }, []);
 }

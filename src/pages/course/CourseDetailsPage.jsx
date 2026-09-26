@@ -99,6 +99,7 @@ import {
   FaEnvelope,
   FaCalendar,
   FaKey,
+  FaCopy,
   FaLock, // New: For locked lectures
   FaUnlock, // For unlock
   FaBan, // For block
@@ -119,7 +120,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import baseUrl from "../../api/baseUrl";
 import UserType from "../../Hooks/auth/userType";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import CourseHeroSection from "./components/CourseHeroSection";
+import CourseTeacherActions from "./components/CourseTeacherActions";
 import CourseContentNav, { SectionPanelHeader } from "./components/CourseContentNav";
 import { crContainer } from "./courseTheme";
 import LectureCard from "./components/LectureCard";
@@ -836,9 +837,9 @@ const CourseDetailsPage = () => {
     refetchInterval: 15000,
     staleTime: 10_000,
   });
-  const hasActiveLiveStream = (courseStreamsData?.meetings || []).some(
-    (m) => m.status === "started",
-  );
+  const courseLiveMeetings = courseStreamsData?.meetings || [];
+  const hasActiveLiveStream = courseLiveMeetings.some((m) => m.status === "started");
+  const liveMeetingsCount = courseLiveMeetings.length;
 
   // لو بدأ بث مباشر، انتقل تلقائيًا لقسم البث (ما لم تكن جولة الإدارة نشطة)
   useEffect(() => {
@@ -2793,6 +2794,59 @@ D) has made`}
   };
 
   // دالة إرسال الأكواد
+  const copyActivationCode = async (codeValue) => {
+    const text = String(codeValue || "").trim();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({
+        title: "تم نسخ الكود",
+        description: text,
+        status: "success",
+        duration: 2000,
+        isClosable: true,
+      });
+    } catch {
+      toast({
+        title: "تعذّر نسخ الكود",
+        status: "error",
+        duration: 2500,
+        isClosable: true,
+      });
+    }
+  };
+
+  const copyAllActivationCodes = async () => {
+    const list = (filteredCodes.length ? filteredCodes : activationCodes)
+      .map((c) => c.code)
+      .filter(Boolean);
+    if (!list.length) {
+      toast({
+        title: "لا توجد أكواد للنسخ",
+        status: "warning",
+        duration: 2000,
+        isClosable: true,
+      });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(list.join("\n"));
+      toast({
+        title: `تم نسخ ${list.length} كود`,
+        status: "success",
+        duration: 2500,
+        isClosable: true,
+      });
+    } catch {
+      toast({
+        title: "تعذّر نسخ الأكواد",
+        status: "error",
+        duration: 2500,
+        isClosable: true,
+      });
+    }
+  };
+
   const handleCreateCodes = async (e) => {
     e.preventDefault();
     setCodeLoading(true);
@@ -3375,13 +3429,12 @@ display:block;
   }
 
   const { course, lectures } = courseData;
-  const mockCompletionPercent = 62;
 
   // أقسام محتوى الكورس — قائمة التنقل الجانبية
   const courseContentSections = [
     {
       id: "lectures",
-      label: "المحاضرات",
+      label: "المحاضرات المسجلة",
       desc: isCourseBasedAssignments
         ? "الفيديوهات والملفات"
         : "الفيديوهات والملفات والواجبات",
@@ -3408,6 +3461,7 @@ display:block;
       icon: hasActiveLiveStream ? FaBroadcastTower : FaVideo,
       colorKey: hasActiveLiveStream ? "red" : "green",
       live: hasActiveLiveStream,
+      count: liveMeetingsCount,
     },
     {
       id: "exams",
@@ -3443,16 +3497,6 @@ display:block;
 
   return (
     <Box minH="100vh" bg={pageBg} dir="rtl" overflowX="hidden" mt={0} pt={0}>
-      {/* Hero Section - Full Width Image with Overlay */}
-      <CourseHeroSection
-        course={course}
-        isTeacher={isTeacher}
-        isAdmin={isAdmin}
-        completionPercent={mockCompletionPercent}
-        showProgress={!isTeacher && !isAdmin}
-        lecturesCount={lectures?.length || 0}
-      />
-
       {/* Video Player */}
       <VideoPlayer
         videoUrl={videoPlayer.videoUrl}
@@ -3462,44 +3506,25 @@ display:block;
         onToggleVisibility={handleToggleVideoVisibility}
         isTeacher={isTeacher}
       />
-      {/* Course Insights (Mock UI) */}
 
-      {/* زر إنشاء أكواد للمدرس فقط */}
-      {isTeacher && (
-        <Box className={crContainer} dir="rtl" py={3}>
-          <Flex
-            justify={{ base: "stretch", md: "flex-end" }}
-            align="center"
-            gap={3}
-            flexWrap="wrap"
-          >
-            <Button
-              data-tour-id="course-create-codes-btn"
-              colorScheme="orange"
-              leftIcon={<FaKey />}
-              borderRadius="xl"
-              onClick={() => setCodeModalOpen(true)}
-              w={{ base: "full", sm: "auto" }}
-              size="sm"
-            >
-              إنشاء أكواد
-            </Button>
-            <Button
-              data-tour-id="course-view-codes-btn"
-              colorScheme="blue"
-              variant="outline"
-              leftIcon={<FaKey />}
-              borderRadius="xl"
-              onClick={() => {
-                setShowCodesModal(true);
-                fetchActivationCodes();
-              }}
-              w={{ base: "full", sm: "auto" }}
-              size="sm"
-            >
-              عرض أكواد الكورس
-            </Button>
-          </Flex>
+      {/* أدوات المدرس */}
+      {(isTeacher || isAdmin) && (
+        <Box className={crContainer} dir="rtl" py={{ base: 2, md: 3 }}>
+          <CourseTeacherActions
+            course={course}
+            isTeacher={isTeacher}
+            isAdmin={isAdmin}
+            onCreateCodes={isTeacher ? () => setCodeModalOpen(true) : undefined}
+            onViewCodes={
+              isTeacher
+                ? () => {
+                    setShowCodesModal(true);
+                    fetchActivationCodes();
+                  }
+                : undefined
+            }
+            onStartTour={() => setCourseTourOpen(true)}
+          />
         </Box>
       )}
       {/* مودال إنشاء الأكواد */}
@@ -3507,25 +3532,26 @@ display:block;
         isOpen={codeModalOpen}
         onClose={() => setCodeModalOpen(false)}
         isCentered
-        size={{ base: "full", md: "md" }}
+        size={{ base: "sm", md: "md" }}
         scrollBehavior="inside"
       >
-        <ModalOverlay />
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
         <ModalContent
           data-tour-id="course-create-codes-modal"
-          mx={{ base: 0, md: 4 }}
-          borderRadius={{ base: "none", md: "xl" }}
-          maxH={{ base: "100vh", md: "90vh" }}
+          mx={4}
+          my={4}
+          borderRadius="2xl"
+          maxH="85vh"
         >
           <ModalHeader
-            p={{ base: 3, md: 4 }}
+            p={{ base: 3.5, md: 4 }}
             fontSize={{ base: "md", md: "lg" }}
           >
             إنشاء أكواد تفعيل للكورس
           </ModalHeader>
           <ModalCloseButton />
           <form onSubmit={handleCreateCodes}>
-            <ModalBody p={{ base: 3, md: 4 }}>
+            <ModalBody p={{ base: 3.5, md: 4 }}>
               <VStack spacing={{ base: 4, md: 5 }} align="stretch">
                 <FormControl isRequired>
                   <FormLabel>عدد الأكواد</FormLabel>
@@ -3548,7 +3574,7 @@ display:block;
                 </FormControl>
               </VStack>
             </ModalBody>
-            <ModalFooter p={{ base: 3, md: 4 }} flexWrap="wrap" gap={2}>
+            <ModalFooter p={{ base: 3.5, md: 4 }} flexWrap="wrap" gap={2}>
               <Button
                 variant="ghost"
                 onClick={() => setCodeModalOpen(false)}
@@ -3577,17 +3603,18 @@ display:block;
           setShowCodesModal(false);
           setSearchCode("");
         }}
-        size={{ base: "full", md: "4xl", lg: "6xl" }}
+        size={{ base: "md", md: "4xl", lg: "6xl" }}
         isCentered
         scrollBehavior="inside"
       >
-        <ModalOverlay />
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
         <ModalContent
           data-tour-id="course-view-codes-modal"
-          borderRadius={{ base: "none", md: "2xl" }}
+          borderRadius="2xl"
           overflow="hidden"
-          mx={{ base: 0, md: 4 }}
-          maxH={{ base: "100vh", md: "90vh" }}
+          mx={4}
+          my={4}
+          maxH="85vh"
         >
           <Box h="1" w="full" bg="blue.500" />
           <ModalHeader
@@ -3598,7 +3625,21 @@ display:block;
             p={{ base: 3, md: 4 }}
             fontSize={{ base: "sm", md: "lg" }}
           >
-            أكواد تفعيل الكورس
+            <Flex align="center" justify="space-between" gap={2} pe={8} flexWrap="wrap">
+              <Text>أكواد تفعيل الكورس</Text>
+              {activationCodes.length > 0 ? (
+                <Button
+                  size="sm"
+                  colorScheme="blue"
+                  variant="outline"
+                  leftIcon={<Icon as={FaCopy} />}
+                  onClick={copyAllActivationCodes}
+                  borderRadius="lg"
+                >
+                  نسخ الكل
+                </Button>
+              ) : null}
+            </Flex>
           </ModalHeader>
           <ModalCloseButton />
           <ModalBody p={{ base: 3, md: 4 }} overflowX="auto">
@@ -3835,25 +3876,44 @@ display:block;
                           >
                             كود التفعيل
                           </Text>
-                          <Text
-                            fontFamily="mono"
-                            fontSize="md"
-                            fontWeight="800"
-                            color="blue.800"
-                            _dark={{ color: "blue.100", bg: "whiteAlpha.100" }}
-                            letterSpacing="2px"
-                            display="inline-block"
-                            w="fit-content"
-                            maxW="100%"
-                            px={3}
-                            py={2}
-                            bg="blue.50"
-                            borderRadius="lg"
-                            borderLeft="4px solid"
-                            borderColor="blue.500"
-                          >
-                            {code.code}
-                          </Text>
+                          <HStack justify="center" spacing={1.5} flexWrap="wrap">
+                            <Text
+                              as="button"
+                              type="button"
+                              onClick={() => copyActivationCode(code.code)}
+                              fontFamily="mono"
+                              fontSize="md"
+                              fontWeight="800"
+                              color="blue.800"
+                              _dark={{ color: "blue.100", bg: "whiteAlpha.100" }}
+                              letterSpacing="2px"
+                              display="inline-block"
+                              w="fit-content"
+                              maxW="100%"
+                              px={3}
+                              py={2}
+                              bg="blue.50"
+                              borderRadius="lg"
+                              borderLeft="4px solid"
+                              borderColor="blue.500"
+                              cursor="pointer"
+                              title="اضغط للنسخ"
+                              _hover={{ bg: "blue.100" }}
+                            >
+                              {code.code}
+                            </Text>
+                            <Tooltip label="نسخ الكود" hasArrow>
+                              <IconButton
+                                aria-label="نسخ الكود"
+                                icon={<FaCopy />}
+                                size="sm"
+                                colorScheme="blue"
+                                variant="solid"
+                                borderRadius="lg"
+                                onClick={() => copyActivationCode(code.code)}
+                              />
+                            </Tooltip>
+                          </HStack>
                         </Box>
                         {/* QR */}
                         {code.qr_code ? (
@@ -4157,7 +4217,7 @@ display:block;
         </ModalContent>
       </Modal>
 
-      <Box className={crContainer} py={{ base: 4, md: 8 }} dir="rtl" w="full">
+      <Box className={crContainer} py={{ base: 2, md: 6 }} dir="rtl" w="full">
         <MotionBox
           initial="hidden"
           animate="visible"
@@ -4166,22 +4226,7 @@ display:block;
           minW={0}
           overflowX="hidden"
         >
-          <VStack spacing={{ base: 3, md: 5 }} align="stretch" w="full">
-            {(isTeacher || isAdmin) && (
-              <Flex justify="flex-end">
-                <Button
-                  data-tour-id="course-tour-restart"
-                  size="sm"
-                  variant="outline"
-                  colorScheme="orange"
-                  leftIcon={<FaCompass />}
-                  borderRadius="xl"
-                  onClick={() => setCourseTourOpen(true)}
-                >
-                  جولة الإدارة
-                </Button>
-              </Flex>
-            )}
+          <VStack spacing={{ base: 2, md: 5 }} align="stretch" w="full">
             {/* شريط أقسام المحتوى — أعلى الصفحة */}
             <Box data-tour-id="course-content-nav">
               <CourseContentNav

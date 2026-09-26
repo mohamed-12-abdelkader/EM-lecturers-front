@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { VStack, Heading, Center, Spinner, Text, Icon, SimpleGrid, Box, HStack, Image, Button, useToast, Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton, FormControl, FormLabel, Input, NumberInput, NumberInputField, AlertDialog, AlertDialogOverlay, AlertDialogContent, AlertDialogHeader, AlertDialogBody, AlertDialogFooter, IconButton, Tooltip, Flex, useColorModeValue, Badge, InputGroup, InputRightElement, Switch, Divider, Tabs, TabList, TabPanels, Tab, TabPanel, RadioGroup, Radio, Textarea } from "@chakra-ui/react";
-import { FaGraduationCap, FaLightbulb, FaBookOpen, FaClock, FaStar, FaEdit, FaTrash, FaPlus, FaEye, FaEyeSlash, FaRegFileAlt, FaCalendarAlt, FaCog, FaTimes, FaCheck, FaCamera, FaChartBar, FaUsers } from "react-icons/fa";
+import { FaGraduationCap, FaLightbulb, FaBookOpen, FaClock, FaStar, FaEdit, FaTrash, FaPlus, FaEye, FaEyeSlash, FaRegFileAlt, FaCog, FaTimes, FaCheck, FaCamera, FaChartBar } from "react-icons/fa";
 import baseUrl from "../../../api/baseUrl";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -166,24 +166,6 @@ function DurationMinutesFields({ minutes, unlimited, onChange, isDisabled }) {
   );
 }
 
-/** صف معلومة داخل كارت الامتحان */
-const ExamInfoRow = ({ icon, label, value, valueColor }) => {
-  const muted = useColorModeValue("gray.500", "gray.400");
-  const textColor = useColorModeValue("gray.800", "white");
-
-  return (
-    <HStack spacing={2} align="flex-start" fontSize="xs">
-      <Icon as={icon} boxSize={3.5} color={muted} mt="2px" flexShrink={0} />
-      <Box minW={0}>
-        <Text color={muted}>{label}</Text>
-        <Text color={valueColor || textColor} fontWeight="semibold" noOfLines={2}>
-          {value}
-        </Text>
-      </Box>
-    </HStack>
-  );
-};
-
 /** كارت امتحان شامل — متوافق مع course-level-exams.md */
 const ExamModalSection = ({ icon, title, accent = "blue", children }) => {
   const border = useColorModeValue("gray.200", "gray.600");
@@ -246,7 +228,7 @@ const ExamSwitchRow = ({ label, hint, isChecked, onChange, colorScheme = "blue" 
   );
 };
 
-/** كارت امتحان شامل — متوافق مع course-level-exams.md */
+/** كارت امتحان شامل — تصميم بسيط وإبداعي */
 const ExamCard = ({
   exam: rawExam,
   isTeacher,
@@ -264,30 +246,32 @@ const ExamCard = ({
   const toast = useToast();
   const [startingExam, setStartingExam] = useState(false);
   const cardBg = useColorModeValue("white", "gray.800");
-  const border = useColorModeValue("gray.200", "gray.700");
-  const panelBg = useColorModeValue("gray.50", "whiteAlpha.50");
-  const titleColor = useColorModeValue("gray.900", "white");
-  const muted = useColorModeValue("gray.500", "gray.400");
+  const border = useColorModeValue("blackAlpha.100", "whiteAlpha.150");
+  const titleColor = useColorModeValue("slate.800", "white");
+  const muted = useColorModeValue("slate.500", "gray.400");
+  const metaBg = useColorModeValue("slate.50", "whiteAlpha.50");
   const availability = getCourseExamAvailabilityStatus(exam);
   const answersInfo = getAnswersVisibilityInfo(exam);
   const studentCta = getStudentExamCta(exam);
   const visible = !!exam.is_visible_to_students;
   const visibilityEnd = parseDateSafe(exam.visibility_end_date);
+  const accent = availability.colorScheme === "green" ? "#3182CE" : "#DD6B20";
 
-  const stats = [
-    { label: "سؤال", value: exam.questions_count ?? "—", icon: FaBookOpen, color: "blue.500" },
-    { label: "المدة", value: formatCourseExamDurationLabel(exam), icon: FaClock, color: "orange.500" },
+  const metaChips = [
     {
-      label: "عرض الأسئلة",
-      value: getQuestionDisplayModeLabel(exam.question_display_mode),
-      icon: FaCog,
-      color: "purple.500",
+      key: "q",
+      icon: FaBookOpen,
+      text: exam.questions_count != null ? `${exam.questions_count} سؤال` : "—",
     },
     {
-      label: "محاولات",
-      value: formatAttemptLimitLabel(exam, { isTeacher }),
+      key: "d",
+      icon: FaClock,
+      text: formatCourseExamDurationLabel(exam),
+    },
+    {
+      key: "a",
       icon: FaStar,
-      color: "purple.500",
+      text: formatAttemptLimitLabel(exam, { isTeacher }),
     },
   ];
 
@@ -330,6 +314,103 @@ const ExamCard = ({
     }
   };
 
+  const primaryButton = (() => {
+    if (isTeacher) {
+      return (
+        <Link to={`/exam/${exam.id}`} style={{ display: "block", textDecoration: "none" }}>
+          <Button
+            w="full"
+            bg="#3182CE"
+            color="white"
+            borderRadius="xl"
+            fontWeight="700"
+            size="md"
+            h="44px"
+            leftIcon={<Icon as={FaGraduationCap} />}
+            _hover={{ bg: "blue.600" }}
+          >
+            إدارة الامتحان
+          </Button>
+        </Link>
+      );
+    }
+    if (studentCta.kind === "start") {
+      return (
+        <>
+          <Button
+            w="full"
+            bg="#3182CE"
+            color="white"
+            borderRadius="xl"
+            fontWeight="700"
+            size="md"
+            h="44px"
+            leftIcon={<Icon as={FaGraduationCap} />}
+            onClick={handleStudentStart}
+            isLoading={startingExam}
+            loadingText="جاري بدء الامتحان..."
+            _hover={{ bg: "blue.600" }}
+          >
+            {studentCta.label}
+          </Button>
+          {hasCompletedCourseExamAttempt(exam) ? (
+            <Button
+              as={Link}
+              to={`/exam/${exam.id}/report`}
+              state={{ courseId: courseId || exam.course_id || exam.courseId || null }}
+              w="full"
+              mt={2}
+              size="sm"
+              variant="ghost"
+              colorScheme="teal"
+              borderRadius="xl"
+              leftIcon={<Icon as={FaChartBar} />}
+            >
+              عرض التقرير
+            </Button>
+          ) : null}
+        </>
+      );
+    }
+    if (studentCta.kind === "report" && !studentCta.disabled) {
+      return (
+        <Link
+          to={`/exam/${exam.id}/report`}
+          state={{ courseId: courseId || exam.course_id || exam.courseId || null }}
+          style={{ display: "block", textDecoration: "none" }}
+        >
+          <Button
+            w="full"
+            bg="teal.500"
+            color="white"
+            borderRadius="xl"
+            fontWeight="700"
+            size="md"
+            h="44px"
+            leftIcon={<Icon as={FaChartBar} />}
+            _hover={{ bg: "teal.600" }}
+          >
+            {studentCta.label}
+          </Button>
+        </Link>
+      );
+    }
+    return (
+      <Button
+        w="full"
+        colorScheme="gray"
+        borderRadius="xl"
+        fontWeight="700"
+        size="md"
+        h="44px"
+        leftIcon={<Icon as={FaGraduationCap} />}
+        isDisabled
+      >
+        {studentCta.label}
+      </Button>
+    );
+  })();
+
   return (
     <Box
       bg={cardBg}
@@ -339,293 +420,215 @@ const ExamCard = ({
       overflow="hidden"
       display="flex"
       flexDirection="column"
-      transition="all 0.2s ease"
+      position="relative"
+      transition="all 0.22s ease"
+      boxShadow="0 10px 28px -20px rgba(15,23,42,0.35)"
       _hover={{
-        borderColor: "blue.300",
-        boxShadow: "0 12px 28px rgba(49,130,206,0.12)",
-        transform: "translateY(-2px)",
+        borderColor: "blue.200",
+        boxShadow: "0 16px 36px -18px rgba(49,130,206,0.28)",
+        transform: "translateY(-3px)",
       }}
     >
-      <Box h="4px" bgGradient="linear(to-l, blue.500, orange.400)" />
+      <Box h="3px" bgGradient="linear(to-l, #3182CE, #DD6B20)" />
+      <Box
+        position="absolute"
+        insetY={0}
+        right={0}
+        w="4px"
+        bg={accent}
+        opacity={0.85}
+        aria-hidden
+      />
 
-      <Flex align="flex-start" gap={3} px={4} pt={4}>
+      <Flex align="flex-start" gap={3} px={4} pt={4} pe={5}>
         <Center
-          w="44px"
-          h="44px"
+          w="42px"
+          h="42px"
           borderRadius="xl"
-          bgGradient="linear(135deg, blue.500, blue.400)"
+          bg="#3182CE"
           color="white"
           flexShrink={0}
-          boxShadow="0 6px 14px rgba(49,130,206,0.35)"
         >
-          <Icon as={FaGraduationCap} boxSize={5} />
+          <Icon as={FaGraduationCap} boxSize={4} />
         </Center>
         <Box minW={0} flex={1}>
-          <Text fontWeight="800" color={titleColor} fontSize="md" noOfLines={2} lineHeight="1.4">
+          <Text
+            fontWeight="800"
+            color={titleColor}
+            fontSize={{ base: "sm", md: "md" }}
+            noOfLines={2}
+            lineHeight="1.35"
+            letterSpacing="-0.01em"
+          >
             {exam.title}
           </Text>
-          <HStack spacing={1.5} mt={1.5} flexWrap="wrap">
-            <Badge colorScheme={availability.colorScheme} variant="subtle" borderRadius="full" px={2} fontSize="11px">
+          <HStack spacing={1.5} mt={2} flexWrap="wrap">
+            <Badge
+              colorScheme={availability.colorScheme}
+              variant="subtle"
+              borderRadius="full"
+              px={2.5}
+              py={0.5}
+              fontSize="10px"
+              fontWeight="bold"
+            >
               {availability.label}
             </Badge>
             {isTeacher ? (
-              <Badge colorScheme={visible ? "green" : "gray"} variant="subtle" borderRadius="full" px={2} fontSize="11px">
-                {visible ? "ظاهر للطلاب" : "مخفي"}
+              <Badge
+                colorScheme={visible ? "green" : "gray"}
+                variant="subtle"
+                borderRadius="full"
+                px={2.5}
+                py={0.5}
+                fontSize="10px"
+                fontWeight="bold"
+              >
+                {visible ? "ظاهر" : "مخفي"}
               </Badge>
             ) : null}
             {!exam.is_active ? (
-              <Badge colorScheme="red" variant="subtle" borderRadius="full" px={2} fontSize="11px">
+              <Badge colorScheme="red" variant="subtle" borderRadius="full" px={2.5} py={0.5} fontSize="10px" fontWeight="bold">
                 غير نشط
               </Badge>
             ) : null}
             {!isTeacher && hasExhaustedCourseExamAttempts(exam) ? (
-              <Badge colorScheme="red" variant="subtle" borderRadius="full" px={2} fontSize="11px">
+              <Badge colorScheme="red" variant="subtle" borderRadius="full" px={2.5} py={0.5} fontSize="10px" fontWeight="bold">
                 استنفدت المحاولات
               </Badge>
             ) : null}
-            <Badge colorScheme={answersInfo.colorScheme} variant="subtle" borderRadius="full" px={2} fontSize="11px">
-              إجابات: {answersInfo.label}
-            </Badge>
           </HStack>
         </Box>
       </Flex>
 
-      <SimpleGrid columns={3} spacing={2} px={4} mt={4}>
-        {stats.map((stat) => (
-          <VStack
-            key={stat.label}
-            spacing={0.5}
-            bg={panelBg}
-            borderRadius="xl"
-            py={2.5}
-            px={1}
-            borderWidth="1px"
-            borderColor={border}
-            minH="78px"
-            justify="center"
-          >
-            <Icon as={stat.icon} boxSize={3.5} color={stat.color} />
-            <Text fontWeight="800" fontSize="xs" color={titleColor} dir="ltr" textAlign="center" noOfLines={2}>
-              {stat.value}
-            </Text>
-            <Text fontSize="10px" color={muted}>
-              {stat.label}
+      {/* ميتا مضغوطة — صف واحد بدل شبكة صناديق */}
+      <HStack
+        mx={4}
+        mt={3.5}
+        spacing={0}
+        bg={metaBg}
+        borderRadius="xl"
+        overflow="hidden"
+        sx={{
+          "& > *": { flex: 1 },
+          "& > *:not(:last-child)": {
+            borderInlineEndWidth: "1px",
+            borderColor: border,
+          },
+        }}
+      >
+        {metaChips.map((chip) => (
+          <VStack key={chip.key} spacing={0.5} py={2.5} px={2} minW={0}>
+            <Icon as={chip.icon} boxSize={3} color="#3182CE" />
+            <Text
+              fontWeight="800"
+              fontSize="11px"
+              color={titleColor}
+              textAlign="center"
+              noOfLines={1}
+              dir="auto"
+            >
+              {chip.text}
             </Text>
           </VStack>
         ))}
-      </SimpleGrid>
+      </HStack>
 
-      <Box mx={4} mt={3} p={3} borderRadius="xl" bg={panelBg} borderWidth="1px" borderColor={border}>
-        <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={3}>
-          {isTeacher ? (
-            <>
-              <ExamInfoRow
-                icon={FaEye}
-                label="انتهاء الظهور"
-                value={
-                  visibilityEnd
-                    ? formatDate
-                      ? formatDate(exam.visibility_end_date)
-                      : visibilityEnd.toLocaleString("ar-EG")
-                    : "بدون موعد محدد"
-                }
-              />
-              <ExamInfoRow
-                icon={FaCalendarAlt}
-                label="إظهار الإجابات"
-                value={
-                  answersInfo.date
-                    ? formatDate
-                      ? formatDate(exam.answers_visible_at)
-                      : answersInfo.date.toLocaleString("ar-EG")
-                    : answersInfo.label
-                }
-              />
-            </>
-          ) : (
-            <>
-              <ExamInfoRow
-                icon={FaUsers}
-                label="محاولاتك"
-                value={formatAttemptLimitLabel(exam, { isTeacher: false })}
-              />
-              <ExamInfoRow
-                icon={FaRegFileAlt}
-                label="آخر محاولة"
-                value={
-                  exam.last_attempt_number
-                    ? `المحاولة ${exam.last_attempt_number}`
-                    : "لم تبدأ بعد"
-                }
-              />
-            </>
-          )}
-        </SimpleGrid>
-      </Box>
+      {/* تفاصيل إضافية خفيفة للمدرس فقط */}
+      {isTeacher ? (
+        <Text mx={4} mt={2.5} fontSize="11px" color={muted} noOfLines={2}>
+          إجابات: {answersInfo.label}
+          {visibilityEnd
+            ? ` · ينتهي ${
+                formatDate
+                  ? formatDate(exam.visibility_end_date)
+                  : visibilityEnd.toLocaleString("ar-EG")
+              }`
+            : ""}
+          {" · "}
+          {getQuestionDisplayModeLabel(exam.question_display_mode)}
+        </Text>
+      ) : exam.last_attempt_number ? (
+        <Text mx={4} mt={2.5} fontSize="11px" color={muted}>
+          آخر محاولة: المحاولة {exam.last_attempt_number}
+        </Text>
+      ) : null}
 
-      <Box px={4} pt={4} pb={3} mt="auto">
-        {isTeacher ? (
-          <Link to={`/exam/${exam.id}`} style={{ display: "block", textDecoration: "none" }}>
-            <Button
-              w="full"
-              colorScheme="blue"
-              borderRadius="xl"
-              fontWeight="700"
-              size="md"
-              leftIcon={<Icon as={FaGraduationCap} />}
-            >
-              إدارة الامتحان
-            </Button>
-          </Link>
-        ) : studentCta.kind === "start" ? (
-          <>
-            <Button
-              w="full"
-              colorScheme="blue"
-              borderRadius="xl"
-              fontWeight="700"
-              size="md"
-              leftIcon={<Icon as={FaGraduationCap} />}
-              onClick={handleStudentStart}
-              isLoading={startingExam}
-              loadingText="جاري بدء الامتحان..."
-            >
-              {studentCta.label}
-            </Button>
-            {hasCompletedCourseExamAttempt(exam) ? (
-              <Button
-                as={Link}
-                to={`/exam/${exam.id}/report`}
-                state={{ courseId: courseId || exam.course_id || exam.courseId || null }}
-                w="full"
-                mt={2}
-                size="sm"
-                variant="outline"
-                colorScheme="teal"
-                borderRadius="xl"
-                leftIcon={<Icon as={FaChartBar} />}
-              >
-                عرض التقرير
-              </Button>
-            ) : null}
-          </>
-        ) : studentCta.kind === "report" && !studentCta.disabled ? (
-          <Link
-            to={`/exam/${exam.id}/report`}
-            state={{ courseId: courseId || exam.course_id || exam.courseId || null }}
-            style={{ display: "block", textDecoration: "none" }}
-          >
-            <Button
-              w="full"
-              colorScheme="teal"
-              borderRadius="xl"
-              fontWeight="700"
-              size="md"
-              leftIcon={<Icon as={FaChartBar} />}
-            >
-              {studentCta.label}
-            </Button>
-          </Link>
-        ) : (
-          <Button
-            w="full"
-            colorScheme="gray"
-            borderRadius="xl"
-            fontWeight="700"
-            size="md"
-            leftIcon={<Icon as={FaGraduationCap} />}
-            isDisabled
-          >
-            {studentCta.label}
-          </Button>
-        )}
+      <Box px={4} pt={3.5} pb={3.5} mt="auto">
+        {primaryButton}
 
         {isTeacher ? (
-          <>
-            <HStack spacing={2} mt={2}>
-              <Button
+          <HStack spacing={1.5} mt={2.5} justify="center">
+            <Tooltip label="التقرير" hasArrow>
+              <IconButton
                 as={Link}
                 to={`/exam/${exam.id}/report`}
+                aria-label="التقرير"
+                icon={<Icon as={FaChartBar} />}
                 size="sm"
-                variant="outline"
+                variant="ghost"
                 colorScheme="indigo"
                 borderRadius="lg"
-                flex={1}
-                leftIcon={<Icon as={FaChartBar} />}
-              >
-                التقرير
-              </Button>
-              <Button
+              />
+            </Tooltip>
+            <Tooltip label="إضافة أسئلة" hasArrow>
+              <IconButton
+                aria-label="إضافة أسئلة"
+                icon={<Icon as={FaPlus} />}
                 size="sm"
-                variant="outline"
+                variant="ghost"
                 colorScheme="green"
                 borderRadius="lg"
-                flex={1}
-                leftIcon={<Icon as={FaPlus} />}
                 onClick={onAddQuestions}
-              >
-                أسئلة
-              </Button>
-              <Button
+              />
+            </Tooltip>
+            <Tooltip label="أسئلة بصور" hasArrow>
+              <IconButton
+                aria-label="أسئلة بصور"
+                icon={<Icon as={FaCamera} />}
                 size="sm"
-                variant="outline"
+                variant="ghost"
                 colorScheme="purple"
                 borderRadius="lg"
-                flex={1}
-                leftIcon={<Icon as={FaCamera} />}
                 onClick={onAddImageQuestions}
-              >
-                صور
-              </Button>
-            </HStack>
-            <HStack spacing={1.5} mt={2}>
-              <Tooltip label={visible ? "إخفاء عن الطلاب" : "إظهار للطلاب"} hasArrow>
-                <IconButton
-                  aria-label="تبديل الظهور"
-                  icon={<Icon as={visible ? FaEye : FaEyeSlash} />}
-                  size="sm"
-                  variant="outline"
-                  colorScheme={visible ? "blue" : "gray"}
-                  borderRadius="lg"
-                  flex={1}
-                  isLoading={actionLoading}
-                  onClick={onToggleVisibility}
-                />
-              </Tooltip>
-              <Tooltip label="تعديل الإعدادات" hasArrow>
-                <IconButton
-                  aria-label="تعديل الامتحان"
-                  icon={<Icon as={FaEdit} />}
-                  size="sm"
-                  variant="outline"
-                  colorScheme="orange"
-                  borderRadius="lg"
-                  flex={1}
-                  onClick={onEdit}
-                />
-              </Tooltip>
-              <Tooltip label="حذف الامتحان" hasArrow>
-                <IconButton
-                  aria-label="حذف الامتحان"
-                  icon={<Icon as={FaTrash} />}
-                  size="sm"
-                  variant="outline"
-                  colorScheme="red"
-                  borderRadius="lg"
-                  flex={1}
-                  onClick={onDelete}
-                />
-              </Tooltip>
-            </HStack>
-          </>
+              />
+            </Tooltip>
+            <Tooltip label={visible ? "إخفاء عن الطلاب" : "إظهار للطلاب"} hasArrow>
+              <IconButton
+                aria-label="تبديل الظهور"
+                icon={<Icon as={visible ? FaEye : FaEyeSlash} />}
+                size="sm"
+                variant="ghost"
+                colorScheme={visible ? "blue" : "gray"}
+                borderRadius="lg"
+                isLoading={actionLoading}
+                onClick={onToggleVisibility}
+              />
+            </Tooltip>
+            <Tooltip label="تعديل" hasArrow>
+              <IconButton
+                aria-label="تعديل الامتحان"
+                icon={<Icon as={FaEdit} />}
+                size="sm"
+                variant="ghost"
+                colorScheme="orange"
+                borderRadius="lg"
+                onClick={onEdit}
+              />
+            </Tooltip>
+            <Tooltip label="حذف" hasArrow>
+              <IconButton
+                aria-label="حذف الامتحان"
+                icon={<Icon as={FaTrash} />}
+                size="sm"
+                variant="ghost"
+                colorScheme="red"
+                borderRadius="lg"
+                onClick={onDelete}
+              />
+            </Tooltip>
+          </HStack>
         ) : null}
-
-        <Text fontSize="11px" color={muted} mt={2.5} textAlign="center">
-          أُنشئ {formatDate ? formatDate(exam.created_at) : exam.created_at}
-          {exam.updated_at && exam.updated_at !== exam.created_at
-            ? ` · آخر تحديث ${formatDate ? formatDate(exam.updated_at) : exam.updated_at}`
-            : ""}
-        </Text>
       </Box>
     </Box>
   );

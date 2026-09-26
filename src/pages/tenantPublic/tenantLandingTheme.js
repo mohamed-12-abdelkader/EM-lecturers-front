@@ -47,6 +47,34 @@ export function getTenantThemeCssVars(isDark) {
       "--tl-btn-outline-fg": "#FFFFFF",
       "--tl-shadow": "0 12px 40px -16px rgba(0,0,0,0.45)",
       "--tl-overlay": "rgba(10,22,40,0.45)",
+      /* hero — blue.500 family only */
+      "--tl-hero-bg":
+        "linear-gradient(145deg, #0B1524 0%, #0E1C30 40%, #122840 72%, #0B1524 100%)",
+      "--tl-hero-fg": "#F7FAFC",
+      "--tl-hero-muted": "#A0C4DE",
+      "--tl-hero-chip-bg": "rgba(49,130,206,0.2)",
+      "--tl-hero-chip-border": "rgba(99,179,237,0.4)",
+      "--tl-hero-chip-fg": "#EBF8FF",
+      "--tl-hero-stat-bg": "rgba(49,130,206,0.12)",
+      "--tl-hero-stat-border": "rgba(99,179,237,0.28)",
+      "--tl-hero-btn-outline-bg": "rgba(49,130,206,0.12)",
+      "--tl-hero-btn-outline-border": "rgba(144,205,244,0.4)",
+      "--tl-hero-btn-outline-fg": "#EBF8FF",
+      "--tl-hero-frame-border": "rgba(99,179,237,0.35)",
+      "--tl-hero-frame-shadow": "0 28px 56px -18px rgba(49,130,206,0.45)",
+      "--tl-hero-icon-opacity": "0.15",
+      "--tl-hero-watermark-opacity": "0.08",
+      "--tl-hero-support-from": "#EBF8FF",
+      "--tl-hero-accent": "#63B3ED",
+      "--tl-hero-wa-bg": "rgba(37,211,102,0.14)",
+      "--tl-hero-wa-border": "rgba(37,211,102,0.4)",
+      "--tl-hero-wa-fg": "#9AE6B4",
+      "--tl-hero-photo-fade": "linear-gradient(to top, rgba(11,21,36,0.4) 0%, transparent 42%)",
+      "--tl-hero-orb-a": "rgba(49,130,206,0.08)",
+      "--tl-hero-orb-b": "rgba(43,108,176,0.05)",
+      "--tl-hero-orb-c": "rgba(99,179,237,0.04)",
+      "--tl-hero-mesh":
+        "radial-gradient(ellipse 55% 50% at 82% 30%, rgba(49,130,206,0.07) 0%, transparent 60%), radial-gradient(ellipse 45% 40% at 12% 75%, rgba(43,108,176,0.04) 0%, transparent 55%), radial-gradient(ellipse 35% 30% at 50% 10%, rgba(99,179,237,0.03) 0%, transparent 50%)",
     };
   }
   return {
@@ -67,6 +95,34 @@ export function getTenantThemeCssVars(isDark) {
     "--tl-btn-outline-fg": TL_LIGHT_FG,
     "--tl-shadow": "0 12px 36px -18px rgba(15,23,42,0.18)",
     "--tl-overlay": "rgba(15,23,42,0.35)",
+    /* hero — soft blue daylight */
+    "--tl-hero-bg":
+      "linear-gradient(145deg, #FAFCFE 0%, #F6F9FC 45%, #F4F8FB 100%)",
+    "--tl-hero-fg": "#1A365D",
+    "--tl-hero-muted": "#4A5568",
+    "--tl-hero-chip-bg": "rgba(49,130,206,0.1)",
+    "--tl-hero-chip-border": "rgba(49,130,206,0.28)",
+    "--tl-hero-chip-fg": "#2B6CB0",
+    "--tl-hero-stat-bg": "#FFFFFF",
+    "--tl-hero-stat-border": "rgba(49,130,206,0.18)",
+    "--tl-hero-btn-outline-bg": "#FFFFFF",
+    "--tl-hero-btn-outline-border": "rgba(49,130,206,0.3)",
+    "--tl-hero-btn-outline-fg": "#1A365D",
+    "--tl-hero-frame-border": "rgba(49,130,206,0.25)",
+    "--tl-hero-frame-shadow": "0 24px 48px -16px rgba(49,130,206,0.32)",
+    "--tl-hero-icon-opacity": "0.12",
+    "--tl-hero-watermark-opacity": "0.07",
+    "--tl-hero-support-from": "#2B6CB0",
+    "--tl-hero-accent": "#3182CE",
+    "--tl-hero-wa-bg": "rgba(37,211,102,0.1)",
+    "--tl-hero-wa-border": "rgba(56,161,105,0.35)",
+    "--tl-hero-wa-fg": "#276749",
+    "--tl-hero-photo-fade": "linear-gradient(to top, rgba(235,244,252,0.35) 0%, transparent 40%)",
+    "--tl-hero-orb-a": "rgba(49,130,206,0.04)",
+    "--tl-hero-orb-b": "rgba(66,153,225,0.03)",
+    "--tl-hero-orb-c": "rgba(144,205,244,0.03)",
+    "--tl-hero-mesh":
+      "radial-gradient(ellipse 60% 55% at 85% 28%, rgba(49,130,206,0.035) 0%, transparent 60%), radial-gradient(ellipse 50% 45% at 10% 78%, rgba(43,108,176,0.025) 0%, transparent 55%), radial-gradient(ellipse 40% 35% at 48% 8%, rgba(99,179,237,0.025) 0%, transparent 50%)",
   };
 }
 

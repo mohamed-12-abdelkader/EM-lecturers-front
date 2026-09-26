@@ -8,21 +8,24 @@ import {
   FaTrophy,
 } from "react-icons/fa";
 import { MdSchedule } from "react-icons/md";
-import { hpContainer, hpEyebrow, hpSectionTitle } from "../homeTheme";
+import { hpContainer } from "../homeTheme";
 import HomeProActivateCourse from "./HomeProActivateCourse";
+
+const BLUE = "#3182CE";
+const ORANGE = "#DD6B20";
 
 const ACTIONS = [
   {
     key: "activate",
     label: "تفعيل كورس",
-    desc: "فعل كورس باستخدام كود الاشتراك",
+    desc: "كود الاشتراك أو QR",
     icon: FaKey,
     featured: true,
   },
   {
     to: "/exam_grades",
     label: "امتحاناتي",
-    desc: "نتائج ودرجات امتحاناتك",
+    desc: "النتائج والدرجات",
     icon: FaClipboardList,
     tone: "blue",
   },
@@ -31,177 +34,145 @@ const ACTIONS = [
     label: "الجدول",
     desc: "مواعيد المحاضرات",
     icon: MdSchedule,
-    tone: "violet",
+    tone: "blue",
   },
   {
     to: "/student-daily-quizzes",
     label: "المسابقة",
-    desc: "المسابقة اليومية وترتيبك",
+    desc: "التحدي اليومي",
     icon: FaFire,
     tone: "orange",
   },
   {
     to: "/my-points",
     label: "نقاطي",
-    desc: "رصيدك وترتيبك في الصف",
+    desc: "رصيدك في الصف",
     icon: FaTrophy,
     tone: "orange",
   },
   {
     to: "/my-courses",
     label: "كورساتي",
-    desc: "كورساتك المشترك بها",
+    desc: "المحتوى المشترك",
     icon: FaBookOpen,
-    tone: "emerald",
+    tone: "blue",
   },
 ];
 
-const TONE_STYLES = {
-  blue: {
-    icon: "bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400",
-    hover: "hover:border-blue-200 dark:hover:border-blue-800",
-  },
-  violet: {
-    icon: "bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-400",
-    hover: "hover:border-violet-200 dark:hover:border-violet-800",
-  },
-  orange: {
-    icon: "bg-orange-50 text-orange-600 dark:bg-orange-950/50 dark:text-orange-400",
-    hover: "hover:border-orange-200 dark:hover:border-orange-800",
-  },
-  emerald: {
-    icon: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400",
-    hover: "hover:border-emerald-200 dark:hover:border-emerald-800",
-  },
-};
-
-const CAROUSEL_CARD =
-  "min-w-[58vw] max-w-[58vw] shrink-0 snap-start sm:min-w-[190px] sm:max-w-[190px] md:min-w-0 md:max-w-none";
-
-function ActionCard({ item, onActivateClick, layout = "grid" }) {
+function ActionCard({ item, onActivateClick }) {
   const Icon = item.icon;
-  const isActivate = item.key === "activate";
-  const tone = TONE_STYLES[item.tone] || TONE_STYLES.blue;
-  const isCarousel = layout === "carousel";
+  const featured = item.featured;
+  const orange = item.tone === "orange";
+  const accent = featured || orange ? ORANGE : BLUE;
 
-  const baseClass = isActivate
-    ? `group relative flex flex-col overflow-hidden border border-blue-200/80 bg-gradient-to-l from-blue-600 to-blue-500 text-right text-white shadow-md shadow-blue-600/20 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-600/30 ${
-        isCarousel
-          ? `min-h-[108px] rounded-xl p-3 ${CAROUSEL_CARD}`
-          : "min-h-[132px] rounded-2xl p-4"
-      }`
-    : `group flex flex-col border border-slate-200/90 bg-white text-right shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 ${tone.hover} ${
-        isCarousel
-          ? `min-h-[108px] rounded-xl p-3 ${CAROUSEL_CARD}`
-          : "min-h-[132px] rounded-2xl p-4"
-      }`;
-
-  const iconWrapClass = isCarousel
-    ? "mb-2 flex h-8 w-8 items-center justify-center rounded-lg"
-    : "mb-3 flex h-10 w-10 items-center justify-center rounded-xl";
-
-  const titleClass = isCarousel
-    ? "text-[13px] font-bold leading-snug"
-    : "text-sm font-bold sm:text-base";
-
-  const descClass = isCarousel
-    ? "mt-1 text-[10px] leading-relaxed"
-    : "mt-1.5 text-xs leading-relaxed";
-
-  const body = isActivate ? (
-    <>
-      <span
-        className="pointer-events-none absolute -left-4 -top-4 h-16 w-16 rounded-full bg-white/10"
-        aria-hidden
-      />
-      <span className={`relative bg-white/20 text-white ${iconWrapClass}`}>
-        <Icon className={isCarousel ? "text-sm" : "text-base"} />
-      </span>
-      <div className="relative min-w-0 flex-1">
-        <h3 className={titleClass}>{item.label}</h3>
-        <p className={`${descClass} text-blue-100`}>{item.desc}</p>
-      </div>
-    </>
-  ) : (
-    <>
-      <span className={`${tone.icon} ${iconWrapClass}`}>
-        <Icon className={isCarousel ? "text-sm" : "text-base"} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <h3 className={`${titleClass} text-slate-900 dark:text-white`}>{item.label}</h3>
-        <p className={`${descClass} text-slate-500 dark:text-slate-400`}>{item.desc}</p>
-      </div>
-      {!isCarousel ? (
-      <FaChevronLeft
-        className="mt-2 self-end text-[10px] text-slate-300 opacity-0 transition-all group-hover:opacity-100 dark:text-slate-600"
-        aria-hidden
-      />
-      ) : null}
-    </>
-  );
-
-  if (isActivate) {
+  if (featured) {
     return (
-      <button type="button" onClick={onActivateClick} className={baseClass}>
-        {body}
+      <button
+        type="button"
+        onClick={onActivateClick}
+        className="group relative flex h-full min-h-[96px] w-full flex-col overflow-hidden rounded-2xl p-3 text-right text-white shadow-[0_10px_24px_-12px_rgba(221,107,32,0.5)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_28px_-12px_rgba(221,107,32,0.55)] sm:min-h-[108px] sm:p-3.5"
+        style={{ background: `linear-gradient(135deg, ${ORANGE} 0%, #C05621 100%)` }}
+      >
+        <Icon
+          aria-hidden
+          className="pointer-events-none absolute -bottom-2 -left-1 rotate-[-18deg] text-[4rem] text-white/20 transition duration-300 group-hover:rotate-[-6deg] group-hover:scale-110"
+        />
+        <span className="relative z-[1] mb-auto flex h-8 w-8 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
+          <Icon className="text-sm" />
+        </span>
+        <div className="relative z-[1] mt-2.5">
+          <h3 className="font-cairo text-sm font-extrabold">{item.label}</h3>
+          <p className="mt-0.5 text-[10px] leading-4 text-orange-50/90">{item.desc}</p>
+          <span className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold">
+            ابدأ الآن
+            <FaChevronLeft className="text-[8px] transition group-hover:-translate-x-0.5" />
+          </span>
+        </div>
       </button>
     );
   }
 
   return (
-    <Link to={item.to} className={`${baseClass} hover:no-underline`}>
-      {body}
+    <Link
+      to={item.to}
+      className="group relative flex min-h-[96px] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-3 text-right shadow-[0_8px_22px_-18px_rgba(15,23,42,0.35)] transition duration-300 hover:-translate-y-0.5 hover:border-transparent hover:shadow-[0_14px_28px_-16px_rgba(49,130,206,0.3)] hover:no-underline dark:border-slate-700 dark:bg-slate-900 sm:min-h-[108px] sm:p-3.5"
+    >
+      <span
+        className="absolute inset-x-0 top-0 h-[2px]"
+        style={{ background: accent }}
+        aria-hidden
+      />
+      <Icon
+        aria-hidden
+        className="pointer-events-none absolute -bottom-3 -left-2 rotate-[-16deg] text-[3.75rem] opacity-[0.07] transition duration-300 group-hover:rotate-[-6deg] group-hover:scale-110 group-hover:opacity-[0.12]"
+        style={{ color: accent }}
+      />
+
+      <span
+        className={`relative z-[1] mb-auto flex h-8 w-8 items-center justify-center rounded-xl ${
+          orange
+            ? "bg-orange-50 text-[#DD6B20] dark:bg-orange-950/40"
+            : "bg-blue-50 text-[#3182CE] dark:bg-blue-950/40"
+        }`}
+      >
+        <Icon className="text-sm" />
+      </span>
+
+      <div className="relative z-[1] mt-2.5">
+        <h3 className="font-cairo text-[13px] font-extrabold text-slate-900 dark:text-white">
+          {item.label}
+        </h3>
+        <p className="mt-0.5 text-[10px] leading-4 text-slate-500 dark:text-slate-400">{item.desc}</p>
+        <span
+          className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold"
+          style={{ color: accent }}
+        >
+          ادخل
+          <FaChevronLeft className="text-[8px] transition group-hover:-translate-x-0.5" />
+        </span>
+      </div>
     </Link>
   );
 }
 
-function renderAction(item, onCourseActivated, layout) {
-  if (item.key === "activate") {
-    return (
-      <HomeProActivateCourse
-        key={item.key}
-        onActivated={onCourseActivated}
-        renderTrigger={(open) => (
-          <ActionCard item={item} onActivateClick={open} layout={layout} />
-        )}
-      />
-    );
-  }
-
-  return <ActionCard key={item.to} item={item} layout={layout} />;
-}
-
-export default function HomeProQuickActions({ onCourseActivated }) {
+export default function HomeProQuickActions({ onCourseActivated, enrolledCourseIds = [] }) {
   return (
-    <section className="py-4 sm:py-6" dir="rtl" data-tour-id="home-quick-actions">
+    <section className="hidden py-7 sm:block" dir="rtl" data-tour-id="home-quick-actions">
       <div className={hpContainer}>
-        <div className="mb-3 flex flex-col gap-2 sm:mb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mb-5 flex items-end justify-between gap-3">
           <div>
-            <span className={hpEyebrow}>اختصارات</span>
-            <h2 className={`${hpSectionTitle} mt-2`}>ابدأ من هنا</h2>
+            <span className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-[#3182CE] dark:bg-blue-950/50 dark:text-blue-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#DD6B20]" />
+              اختصارات
+            </span>
+            <h2 className="mt-2 font-cairo text-lg font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-xl">
+              ابدأ من هنا
+            </h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               وصول سريع لأهم أقسام المنصة
             </p>
           </div>
-          <p className="text-xs text-slate-400 dark:text-slate-500 md:hidden">
-            اسحب للتنقل بين الأقسام ←
-          </p>
-          <p className="hidden text-xs text-slate-400 dark:text-slate-500 md:block">
-            {ACTIONS.length} أقسام
-          </p>
+          <span className="hidden rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400 sm:inline-flex">
+            {ACTIONS.length} أدوات
+          </span>
         </div>
 
-        {/* موبايل / تابلت صغير: كarousel أفقي */}
-        <div
-          className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-2 snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:hidden"
-          aria-label="اختصارات المنصة"
-        >
-          {ACTIONS.map((item) => renderAction(item, onCourseActivated, "carousel"))}
-        </div>
-
-        {/* ديسكتوب: شبكة */}
-        <div className="hidden gap-3 md:grid md:grid-cols-3 lg:grid-cols-6">
-          {ACTIONS.map((item) => renderAction(item, onCourseActivated, "grid"))}
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
+          {ACTIONS.map((item) =>
+            item.key === "activate" ? (
+              <div key={item.key} className="col-span-2 h-full sm:col-span-1">
+                <HomeProActivateCourse
+                  onActivated={onCourseActivated}
+                  enrolledCourseIds={enrolledCourseIds}
+                  renderTrigger={(open) => (
+                    <ActionCard item={item} onActivateClick={open} />
+                  )}
+                />
+              </div>
+            ) : (
+              <ActionCard key={item.to} item={item} />
+            ),
+          )}
         </div>
       </div>
     </section>

@@ -1,6 +1,11 @@
 /**
  * Axios Instance — Authorization من localStorage.token (origin الحالي فقط).
  * بدون withCredentials / بدون cookie refresh.
+ *
+ * Base URL:
+ * - DEV  → http://localhost:8000  (غالباً عبر Vite proxy "/")
+ * - PROD → https://api.em-online.online/
+ * يُحدَّد تلقائياً من getApiBaseURL() حسب وضع التشغيل.
  */
 import axios from "axios";
 import {

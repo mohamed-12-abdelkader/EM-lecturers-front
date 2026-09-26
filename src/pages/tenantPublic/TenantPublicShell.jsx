@@ -13,12 +13,19 @@ const TENANT_FONT_LINK_ID = "tenant-public-arabic-fonts";
 
 function useTenantArabicFonts() {
   useEffect(() => {
-    if (document.getElementById(TENANT_FONT_LINK_ID)) return;
+    const existing = document.getElementById(TENANT_FONT_LINK_ID);
+    const cairoHref =
+      "https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap";
+    if (existing) {
+      if (!String(existing.href || "").includes("family=Cairo:wght@400")) {
+        existing.href = cairoHref;
+      }
+      return;
+    }
     const link = document.createElement("link");
     link.id = TENANT_FONT_LINK_ID;
     link.rel = "stylesheet";
-    link.href =
-      "https://fonts.googleapis.com/css2?family=Cairo:wght@600;700&family=Tajawal:wght@400;500;700&display=swap";
+    link.href = cairoHref;
     document.head.appendChild(link);
   }, []);
 }

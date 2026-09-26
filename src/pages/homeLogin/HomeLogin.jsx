@@ -11,8 +11,6 @@ import {
   Badge,
   HStack,
   Icon,
-  Divider,
-  Tooltip,
 } from "@chakra-ui/react";
 import { FaAndroid } from "react-icons/fa";
 import { MdVerified } from "react-icons/md";
@@ -20,6 +18,10 @@ import Links from "../../components/links/Links";
 import { getRoleLabel } from "../../utils/authRoles";
 import UserType from "../../Hooks/auth/userType";
 import { SHELL_DESKTOP_BP } from "../../theme/chakraTheme";
+
+const BRAND_BLUE = "#3182CE";
+const BRAND_BLUE_DARK = "#2B6CB0";
+const BRAND_ORANGE = "#DD6B20";
 
 function getUserDisplayName(user) {
   if (!user) return "مستخدم";
@@ -29,86 +31,119 @@ function getUserDisplayName(user) {
 }
 
 function getRoleMeta(user, isAdmin, isTeacher, isAcademy, isAcademyTeacher) {
-  if (isAdmin) return { label: "مشرف النظام", colorScheme: "purple" };
-  if (isAcademy) return { label: "مالك أكاديمية", colorScheme: "blue" };
-  if (isAcademyTeacher) return { label: "مدرس أكاديمية", colorScheme: "cyan" };
-  if (isTeacher) return { label: "مدرس", colorScheme: "blue" };
-  return { label: getRoleLabel(user?.role) || "طالب", colorScheme: "green" };
+  if (isAdmin) return { label: "مشرف النظام" };
+  if (isAcademy) return { label: "مالك أكاديمية" };
+  if (isAcademyTeacher) return { label: "مدرس أكاديمية" };
+  if (isTeacher) return { label: "مدرس" };
+  return { label: getRoleLabel(user?.role) || "طالب" };
 }
 
-function SidebarUserCard({ user, isAdmin, isTeacher, isAcademy, isAcademyTeacher, isExpanded }) {
-  const cardBg = useColorModeValue("gray.50", "whiteAlpha.50");
-  const cardBorder = useColorModeValue("gray.100", "gray.700");
-  const nameColor = useColorModeValue("gray.800", "white");
-  const emailColor = useColorModeValue("gray.500", "gray.400");
-  const avatarBorder = useColorModeValue("white", "gray.700");
+function SidebarBrandHeader() {
+  return (
+    <Box px={4} pt={5} pb={3} flexShrink={0}>
+      <HStack spacing={3} align="center">
+        <Flex
+          w="42px"
+          h="42px"
+          borderRadius="14px"
+          align="center"
+          justify="center"
+          bgGradient={`linear(135deg, ${BRAND_BLUE}, ${BRAND_BLUE_DARK})`}
+          color="white"
+          fontWeight="black"
+          fontSize="sm"
+          boxShadow="0 10px 24px rgba(49,130,206,0.35)"
+        >
+          EM
+        </Flex>
+        <Box minW={0}>
+          <Text fontSize="md" fontWeight="extrabold" color="gray.900" letterSpacing="-0.02em" _dark={{ color: "white" }}>
+            EM Academy
+          </Text>
+          <Text fontSize="11px" fontWeight="medium" color="gray.500">
+            منصة التعلم الذكية
+          </Text>
+        </Box>
+      </HStack>
+    </Box>
+  );
+}
+
+function SidebarUserCard({ user, isAdmin, isTeacher, isAcademy, isAcademyTeacher }) {
   const role = getRoleMeta(user, isAdmin, isTeacher, isAcademy, isAcademyTeacher);
   const displayName = getUserDisplayName(user);
 
-  if (!isExpanded) {
-    return (
-      <Flex justify="center" py={3} px={2} flexShrink={0}>
-        <Tooltip label={displayName} placement="left" hasArrow openDelay={300}>
+  return (
+    <Box mx={3} mb={3} flexShrink={0}>
+      <Box
+        position="relative"
+        overflow="hidden"
+        borderRadius="2xl"
+        p={3.5}
+        bgGradient={`linear(135deg, ${BRAND_BLUE} 0%, ${BRAND_BLUE_DARK} 55%, #1A365D 100%)`}
+        color="white"
+        boxShadow="0 14px 32px rgba(49,130,206,0.28)"
+      >
+        <Box
+          position="absolute"
+          top="-18px"
+          left="-12px"
+          w="90px"
+          h="90px"
+          borderRadius="full"
+          bg="whiteAlpha.200"
+          pointerEvents="none"
+        />
+        <Box
+          position="absolute"
+          bottom="-28px"
+          right="-20px"
+          w="110px"
+          h="110px"
+          borderRadius="full"
+          bg={`${BRAND_ORANGE}33`}
+          pointerEvents="none"
+        />
+
+        <HStack spacing={3} align="center" position="relative" zIndex={1}>
           <Avatar
-            size="sm"
+            size="md"
             name={displayName}
-            bg="blue.500"
+            bg={BRAND_ORANGE}
             color="white"
             fontWeight="bold"
-            cursor="default"
+            borderWidth="2px"
+            borderColor="whiteAlpha.700"
           />
-        </Tooltip>
-      </Flex>
-    );
-  }
-
-  return (
-    <Box
-      mx={3}
-      mt={4}
-      mb={2}
-      p={3}
-      borderRadius="2xl"
-      bg={cardBg}
-      borderWidth="1px"
-      borderColor={cardBorder}
-    >
-      <HStack spacing={3} align="center">
-        <Avatar
-          size="md"
-          name={displayName}
-          bg="blue.500"
-          color="white"
-          fontWeight="bold"
-          borderWidth="2px"
-          borderColor={avatarBorder}
-          boxShadow="sm"
-        />
-        <VStack align="start" spacing={1} flex={1} minW={0}>
-          <Text fontSize="sm" fontWeight="bold" color={nameColor} noOfLines={1}>
-            {displayName}
-          </Text>
-          {user?.email ? (
-            <Text fontSize="xs" color={emailColor} noOfLines={1}>
-              {user.email}
+          <VStack align="start" spacing={1} flex={1} minW={0}>
+            <Text fontSize="sm" fontWeight="extrabold" noOfLines={1}>
+              {displayName}
             </Text>
-          ) : null}
-          <Badge
-            colorScheme={role.colorScheme}
-            variant="subtle"
-            borderRadius="full"
-            px={2}
-            py={0.5}
-            fontSize="10px"
-            display="flex"
-            alignItems="center"
-            gap={1}
-          >
-            <Icon as={MdVerified} boxSize={3} />
-            {role.label}
-          </Badge>
-        </VStack>
-      </HStack>
+            {user?.email ? (
+              <Text fontSize="11px" color="whiteAlpha.800" noOfLines={1}>
+                {user.email}
+              </Text>
+            ) : null}
+            <Badge
+              bg="whiteAlpha.200"
+              color="white"
+              borderRadius="full"
+              px={2}
+              py={0.5}
+              fontSize="10px"
+              fontWeight="bold"
+              display="inline-flex"
+              alignItems="center"
+              gap={1}
+              border="1px solid"
+              borderColor="whiteAlpha.300"
+            >
+              <Icon as={MdVerified} boxSize={3} color="orange.200" />
+              {role.label}
+            </Badge>
+          </VStack>
+        </HStack>
+      </Box>
     </Box>
   );
 }
@@ -124,19 +159,12 @@ const HomeLogin = () => {
   const [, isAdmin, isTeacher, student, isAcademy, isAcademyTeacher] = UserType();
   const location = useLocation();
 
-  const sidebarBg = useColorModeValue("white", "gray.900");
-  const sidebarBorder = useColorModeValue("gray.200", "gray.700");
-  const sidebarGlow = useColorModeValue(
-    "0 0 0 1px rgba(15,23,42,0.04), 0 20px 40px rgba(15,23,42,0.08)",
-    "0 0 0 1px rgba(255,255,255,0.04), 0 20px 40px rgba(0,0,0,0.35)",
-  );
+  const sidebarBg = useColorModeValue("#F8FAFC", "gray.900");
+  const sidebarBorder = useColorModeValue("blackAlpha.100", "whiteAlpha.100");
   const mainBg = useColorModeValue("gray.50", "gray.900");
-  const scrollbarThumb = useColorModeValue("gray.300", "gray.600");
+  const scrollbarThumb = useColorModeValue("blackAlpha.200", "whiteAlpha.300");
   const panelBg = useColorModeValue("white", "gray.800");
   const pagePanel = useColorModeValue("gray.100", "gray.800");
-  const footerBg = useColorModeValue("gray.50", "gray.900");
-  const footerMutedColor = useColorModeValue("gray.400", "gray.500");
-  const accentGradient = "linear(to-l, blue.600, orange.500)";
 
   const isHomeLike =
     location.pathname === "/home" ||
@@ -153,7 +181,7 @@ const HomeLogin = () => {
     location.pathname.toLowerCase().includes("question_bank") ||
     location.pathname.toLowerCase().includes("teacher_subjects");
 
-  const sidebarWidth = "288px";
+  const sidebarWidth = "300px";
 
   return (
     <Flex
@@ -175,77 +203,82 @@ const HomeLogin = () => {
           bg={sidebarBg}
           borderLeftWidth="1px"
           borderColor={sidebarBorder}
-          boxShadow={sidebarGlow}
+          boxShadow={useColorModeValue(
+            "-12px 0 40px rgba(15,23,42,0.06)",
+            "-12px 0 40px rgba(0,0,0,0.35)",
+          )}
           overflow="hidden"
           className="sidebar-container"
         >
-          <Box h="3px" bgGradient={accentGradient} flexShrink={0} />
-
-          <SidebarUserCard
-            user={user}
-            isAdmin={isAdmin}
-            isTeacher={isTeacher}
-            isAcademy={isAcademy}
-            isAcademyTeacher={isAcademyTeacher}
-            isExpanded
+          <Box
+            position="absolute"
+            inset={0}
+            pointerEvents="none"
+            opacity={0.55}
+            backgroundImage={`radial-gradient(circle at 12% 18%, ${BRAND_BLUE}18 0, transparent 42%), radial-gradient(circle at 88% 82%, ${BRAND_ORANGE}14 0, transparent 40%)`}
           />
 
-          <Divider borderColor={sidebarBorder} opacity={0.7} />
+          <Box position="relative" zIndex={1} display="flex" flexDirection="column" h="full">
+            <SidebarBrandHeader />
 
-          <Box
-            flex={1}
-            overflowY="auto"
-            overflowX="hidden"
-            px={2}
-            py={3}
-            sx={{
-              "&::-webkit-scrollbar": { width: "5px" },
-              "&::-webkit-scrollbar-track": { bg: "transparent" },
-              "&::-webkit-scrollbar-thumb": {
-                bg: scrollbarThumb,
-                borderRadius: "full",
-              },
-            }}
-          >
-            <Links isSidebarOpen />
-          </Box>
+            <SidebarUserCard
+              user={user}
+              isAdmin={isAdmin}
+              isTeacher={isTeacher}
+              isAcademy={isAcademy}
+              isAcademyTeacher={isAcademyTeacher}
+            />
 
-          <Box
-            p={3}
-            borderTopWidth="1px"
-            borderColor={sidebarBorder}
-            bg={footerBg}
-            flexShrink={0}
-          >
-            <Button
-              as="a"
-              href="https://www.mediafire.com/file/f3afz741f5hohts/E-M+Online.apk/file"
-              target="_blank"
-              rel="noopener noreferrer"
-              w="full"
-              size="md"
-              variant="outline"
-              colorScheme="orange"
-              borderRadius="xl"
-              borderWidth="2px"
-              fontWeight="bold"
-              fontSize="sm"
-              h="48px"
-              rightIcon={<FaAndroid />}
-              _hover={{
-                bg: "orange.500",
-                color: "white",
-                borderColor: "orange.500",
-                transform: "translateY(-1px)",
-                boxShadow: "0 8px 20px rgba(237, 137, 54, 0.28)",
+            <Box
+              flex={1}
+              overflowY="auto"
+              overflowX="hidden"
+              px={2.5}
+              py={1}
+              sx={{
+                "&::-webkit-scrollbar": { width: "4px" },
+                "&::-webkit-scrollbar-track": { bg: "transparent" },
+                "&::-webkit-scrollbar-thumb": {
+                  bg: scrollbarThumb,
+                  borderRadius: "full",
+                },
               }}
-              transition="all 0.2s ease"
             >
-              تحميل تطبيق أندرويد
-            </Button>
-            <Text fontSize="10px" color={footerMutedColor} textAlign="center" mt={2}>
-              EM Online · تعلم في أي وقت
-            </Text>
+              <Links isSidebarOpen />
+            </Box>
+
+            <Box px={3} py={3} flexShrink={0}>
+              <Box
+                borderRadius="2xl"
+                overflow="hidden"
+                bgGradient={`linear(135deg, ${BRAND_ORANGE}, #C05621)`}
+                boxShadow="0 12px 28px rgba(221,107,32,0.28)"
+              >
+                <Button
+                  as="a"
+                  href="https://www.mediafire.com/file/f3afz741f5hohts/E-M+Online.apk/file"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  w="full"
+                  h="52px"
+                  variant="unstyled"
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                  gap={2}
+                  color="white"
+                  fontWeight="extrabold"
+                  fontSize="sm"
+                  rightIcon={<FaAndroid />}
+                  _hover={{ opacity: 0.94 }}
+                >
+                  تحميل تطبيق أندرويد
+                </Button>
+              </Box>
+              <Text fontSize="10px" color="gray.500" textAlign="center" mt={2.5} fontWeight="medium">
+                EM Online · تعلم في أي وقت
+              </Text>
+            </Box>
           </Box>
         </Box>
       )}

@@ -4,13 +4,13 @@ import HomePlatformCourseCard from "./HomePlatformCourseCard";
 
 function CourseSkeleton() {
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white dark:border-slate-700 dark:bg-slate-900">
-      <div className="h-40 animate-pulse bg-slate-200 dark:bg-slate-800" />
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+      <div className="h-44 animate-pulse bg-slate-200 dark:bg-slate-800" />
       <div className="space-y-3 p-4">
         <div className="h-4 w-3/4 animate-pulse rounded-md bg-slate-200 dark:bg-slate-800" />
         <div className="h-3 w-1/2 animate-pulse rounded-md bg-slate-200 dark:bg-slate-800" />
-        <div className="h-3 w-full animate-pulse rounded-md bg-slate-100 dark:bg-slate-800/80" />
         <div className="h-10 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />
+        <div className="h-10 animate-pulse rounded-xl bg-slate-100 dark:bg-slate-800/70" />
       </div>
     </div>
   );
@@ -38,11 +38,11 @@ export default function HomeProPlatformCourses({
       <div className={hpContainer}>
         <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="font-heading text-lg font-bold text-slate-900 dark:text-white sm:text-xl">
+            <h2 className="font-cairo text-lg font-extrabold text-slate-900 dark:text-white sm:text-xl">
               كورسات المنصة
             </h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              اكتشف المحتوى المتاح للاشتراك والتفعيل
+              تصفّح الكورسات، جرّب معاينة مجانية، أو فعّل بالكود
             </p>
           </div>
 
@@ -52,7 +52,7 @@ export default function HomeProPlatformCourses({
               جاري التحميل…
             </span>
           ) : count > 0 ? (
-            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-[#3182CE] dark:bg-blue-950/50 dark:text-blue-300">
               {count.toLocaleString("ar-EG")} كورس
             </span>
           ) : null}
@@ -80,6 +80,7 @@ export default function HomeProPlatformCourses({
                   onEnter={() => onEnter?.(course)}
                   onSubscribe={() => onSubscribe?.(course)}
                   onActivateFree={() => onActivateFree?.(course)}
+                  onPreview={() => onEnter?.(course)}
                 />
               );
             })}

@@ -471,7 +471,7 @@ const CourseStreamsList = ({ courseId, onCreateClick }) => {
               size="sm"
               onClick={onCreateClick}
             >
-              إنشاء جلسة
+              إنشاء محاضرة مباشرة
             </Button>
           ) : null}
         </Center>
@@ -481,10 +481,10 @@ const CourseStreamsList = ({ courseId, onCreateClick }) => {
         isOpen={!!editingStream}
         onClose={() => setEditingStream(null)}
         loading={savingEdit}
-        size={{ base: "full", md: "md" }}
+        size={{ base: "sm", md: "md" }}
         icon={FaEdit}
         accent="blue"
-        title="تعديل عنوان الجلسة"
+        title="تعديل عنوان المحاضرة"
         subtitle="حدّث العنوان ليظهر للطلاب بشكل أوضح"
         onSubmit={handleUpdateTitle}
         submitLabel="حفظ التغييرات"

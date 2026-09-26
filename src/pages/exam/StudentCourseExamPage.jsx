@@ -2,19 +2,15 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   AlertIcon,
-  Badge,
   Box,
   Button,
   Center,
-  Flex,
-  IconButton,
   Image,
   Modal,
   ModalBody,
   ModalContent,
   ModalOverlay,
   Spinner,
-  Text,
   VStack,
   useColorModeValue,
   useToast,
@@ -29,7 +25,7 @@ import {
   translateCourseExamStudentError,
 } from "../../api/courseExamsApi";
 import ExamAttemptResultScreen from "./components/ExamAttemptResultScreen";
-import ExamStudentProgress from "./components/ExamStudentProgress";
+import ExamStudentSessionHeader from "./components/ExamStudentSessionHeader";
 import ExamTakingActionBar from "./components/ExamTakingActionBar";
 import LectureExamStudentQuestionCard from "./components/LectureExamStudentQuestionCard";
 import {
@@ -53,14 +49,6 @@ import {
   writeExamProgress,
 } from "../../utils/examAttemptProgress";
 import { normalizeExamAttemptResult } from "../../utils/examAttemptResultUtils";
-
-function formatRemainingTime(value) {
-  if (value == null) return "--:--";
-  const s = Math.max(0, value);
-  const m = Math.floor(s / 60).toString().padStart(2, "0");
-  const sec = (s % 60).toString().padStart(2, "0");
-  return `${m}:${sec}`;
-}
 
 export default function StudentCourseExamPage() {
   const { examId } = useParams();
@@ -94,9 +82,10 @@ export default function StudentCourseExamPage() {
   const sessionAppliedAtRef = useRef(0);
   const allowTimerSubmitRef = useRef(false);
 
-  const pageBg = useColorModeValue("gray.100", "gray.900");
-  const headerBg = useColorModeValue("white", "gray.800");
-  const headerBorder = useColorModeValue("gray.200", "gray.600");
+  const pageBg = useColorModeValue(
+    "linear-gradient(180deg, #EBF8FF 0%, #F7FAFC 28%, #EDF2F7 100%)",
+    "gray.900"
+  );
 
   const persistProgress = useCallback((overrides = {}) => {
     const id = toPositiveAttemptId(attemptIdRef.current);
@@ -480,72 +469,19 @@ export default function StudentCourseExamPage() {
       display="flex"
       flexDirection="column"
     >
-      <Box
-        position="sticky"
-        top={0}
-        zIndex={30}
-        bg={headerBg}
-        borderBottomWidth="1px"
-        borderColor={headerBorder}
-        boxShadow="sm"
-        pt="max(10px, env(safe-area-inset-top))"
-        px={{ base: 3, md: 4 }}
-        pb={3}
-      >
-        <Flex align="center" gap={2.5} mb={3}>
-          <IconButton
-            aria-label="العودة"
-            icon={<MdArrowBack />}
-            variant="ghost"
-            minW="44px"
-            h="44px"
-            borderRadius="xl"
-            onClick={goToCourseExams}
-            isDisabled={submitLoading}
-          />
-          <Box flex={1} minW={0}>
-            <Text fontWeight="800" fontSize={{ base: "sm", md: "lg" }} noOfLines={1}>
-              {examMeta?.examTitle || "امتحان شامل"}
-            </Text>
-            <Text fontSize="xs" color="gray.500" fontWeight="600">
-              سؤال {current + 1} من {questions.length}
-              {answeredCount > 0 ? ` · ${answeredCount} مجاب` : ""}
-            </Text>
-          </Box>
-          {remainingSeconds != null ? (
-            <Badge
-              px={3}
-              py={2}
-              minW="76px"
-              textAlign="center"
-              borderRadius="xl"
-              fontSize={{ base: "md", md: "sm" }}
-              fontFamily="mono"
-              fontWeight="800"
-              colorScheme={remainingSeconds < 300 ? "red" : "blue"}
-            >
-              {formatRemainingTime(remainingSeconds)}
-            </Badge>
-          ) : (
-            <Badge px={3} py={2} borderRadius="xl" fontSize="xs" colorScheme="gray">
-              بدون حد زمني
-            </Badge>
-          )}
-        </Flex>
-
-        <ExamStudentProgress
-          remainingSeconds={remainingSeconds}
-          answeredCount={answeredCount}
-          totalQuestions={questions.length}
-          questions={questions}
-          currentQuestionIndex={current}
-          studentAnswers={studentAnswers}
-          showPagination
-          hasActiveAttempt
-          compact
-          onGoToQuestion={goToQuestion}
-        />
-      </Box>
+      <ExamStudentSessionHeader
+        examTitle={examMeta?.examTitle || "امتحان شامل"}
+        currentIndex={current}
+        totalQuestions={questions.length}
+        answeredCount={answeredCount}
+        remainingSeconds={remainingSeconds}
+        questions={questions}
+        studentAnswers={studentAnswers}
+        onBack={goToCourseExams}
+        onGoToQuestion={goToQuestion}
+        backDisabled={submitLoading}
+        hasActiveAttempt
+      />
 
       {currentQuestion ? (
         <>

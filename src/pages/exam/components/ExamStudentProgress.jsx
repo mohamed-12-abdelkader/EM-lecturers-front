@@ -19,26 +19,23 @@ export default function ExamStudentProgress({
   onGoToQuestion,
   hasActiveAttempt,
   compact = false,
+  onDarkSurface = false,
 }) {
-  const muted = useColorModeValue("gray.500", "gray.400");
-  const heading = useColorModeValue("gray.700", "gray.200");
-  const pillBg = useColorModeValue("gray.100", "gray.700");
-  const trackBg = useColorModeValue("gray.100", "gray.700");
-  const pillActive = useColorModeValue("blue.500", "blue.400");
-  const pillAnswered = useColorModeValue("green.500", "green.400");
+  const mutedLight = useColorModeValue("gray.500", "gray.400");
+  const headingLight = useColorModeValue("gray.700", "gray.200");
+  const pillBgLight = useColorModeValue("gray.100", "gray.700");
+  const trackBgLight = useColorModeValue("gray.100", "gray.700");
+  const pillAnsweredLight = useColorModeValue("green.500", "green.400");
+
+  const muted = onDarkSurface ? "whiteAlpha.700" : mutedLight;
+  const heading = onDarkSurface ? "white" : headingLight;
+  const pillBg = onDarkSurface ? "whiteAlpha.200" : pillBgLight;
+  const trackBg = onDarkSurface ? "whiteAlpha.250" : trackBgLight;
+  const pillAnswered = onDarkSurface ? "green.300" : pillAnsweredLight;
   const scrollerRef = useRef(null);
 
   const progressPct =
     totalQuestions > 0 ? Math.round((answeredCount / totalQuestions) * 100) : 0;
-  const isUrgent = remainingSeconds != null && remainingSeconds < 300;
-
-  const formatTime = (seconds) => {
-    const m = Math.floor(seconds / 60)
-      .toString()
-      .padStart(2, "0");
-    const s = (seconds % 60).toString().padStart(2, "0");
-    return `${m}:${s}`;
-  };
 
   useEffect(() => {
     const scroller = scrollerRef.current;
@@ -56,21 +53,12 @@ export default function ExamStudentProgress({
           <Text fontSize="sm" fontWeight="semibold" color={heading}>
             سؤال {currentQuestionIndex + 1} من {totalQuestions}
           </Text>
-          <Flex gap={3} align="center">
-            <Text fontSize="xs" color={muted}>
-              {answeredCount} مجاب
-            </Text>
-            {hasActiveAttempt && remainingSeconds != null && remainingSeconds >= 0 && (
-              <Text
-                fontSize="sm"
-                fontWeight="bold"
-                fontFamily="mono"
-                color={isUrgent ? "red.500" : muted}
-              >
-                {formatTime(remainingSeconds)}
-              </Text>
-            )}
-          </Flex>
+          <Text fontSize="xs" color={muted}>
+            {answeredCount} مجاب
+            {hasActiveAttempt && remainingSeconds != null && remainingSeconds >= 0
+              ? ` · وقت متبقٍ`
+              : ""}
+          </Text>
         </Flex>
       )}
 
@@ -80,6 +68,11 @@ export default function ExamStudentProgress({
         colorScheme={progressPct === 100 ? "green" : "blue"}
         borderRadius="full"
         bg={trackBg}
+        sx={
+          onDarkSurface
+            ? { "& > div": { bg: progressPct === 100 ? "#68D391" : "#90CDF4" } }
+            : undefined
+        }
       />
 
       {showPagination && totalQuestions > 1 && (
@@ -111,20 +104,32 @@ export default function ExamStudentProgress({
                 key={index}
                 data-q-index={index}
                 flexShrink={0}
-                minW={{ base: "44px", md: "36px" }}
-                h={{ base: "44px", md: "36px" }}
+                minW={{ base: "40px", md: "36px" }}
+                h={{ base: "40px", md: "36px" }}
                 p={0}
-                borderRadius="xl"
+                borderRadius="full"
                 fontWeight="800"
                 fontSize="sm"
                 variant="unstyled"
                 display="flex"
                 alignItems="center"
                 justifyContent="center"
-                bg={isCurrent ? pillActive : isAnswered ? pillAnswered : pillBg}
-                color={isCurrent || isAnswered ? "white" : muted}
-                boxShadow={isCurrent ? "0 6px 16px rgba(49,130,206,0.35)" : "none"}
-                transform={isCurrent ? "scale(1.04)" : "none"}
+                bg={isCurrent ? "white" : isAnswered ? pillAnswered : pillBg}
+                color={
+                  isCurrent
+                    ? "blue.700"
+                    : isAnswered
+                      ? onDarkSurface
+                        ? "#0B1F3A"
+                        : "white"
+                      : onDarkSurface
+                        ? "whiteAlpha.900"
+                        : muted
+                }
+                borderWidth={isCurrent ? "0" : onDarkSurface ? "1px" : "0"}
+                borderColor="whiteAlpha.350"
+                boxShadow={isCurrent ? "0 8px 18px rgba(0,0,0,0.2)" : "none"}
+                transform={isCurrent ? "scale(1.06)" : "none"}
                 onClick={() => onGoToQuestion(index)}
                 aria-label={`السؤال ${index + 1}${isAnswered ? " — تمت الإجابة" : ""}`}
                 aria-current={isCurrent ? "step" : undefined}

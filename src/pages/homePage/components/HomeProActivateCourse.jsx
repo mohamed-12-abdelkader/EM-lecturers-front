@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaCheckCircle, FaExclamationTriangle, FaKey, FaQrcode } from "react-icons/fa";
+import {
+  FaCheckCircle,
+  FaExclamationTriangle,
+  FaInfoCircle,
+  FaKey,
+  FaQrcode,
+  FaWhatsapp,
+} from "react-icons/fa";
 import { Html5Qrcode } from "html5-qrcode";
 import {
   Box,
@@ -22,11 +29,21 @@ import {
 } from "@chakra-ui/react";
 import baseUrl from "../../../api/baseUrl";
 import { readAuthToken } from "../../../utils/authStorage";
+import {
+  buildActivationSupportWhatsAppUrl,
+  extractCourseFromActivationError,
+  getActivationSuccessCopy,
+  resolveActivationErrorCopy,
+} from "../../../utils/courseActivationMessages";
 import { HP_BLUE, HP_ORANGE } from "../homeTheme";
 
 const QR_READER_ID = "hero-qr-reader";
 
-export default function HomeProActivateCourse({ onActivated, renderTrigger }) {
+export default function HomeProActivateCourse({
+  onActivated,
+  renderTrigger,
+  enrolledCourseIds = [],
+}) {
   const navigate = useNavigate();
   const toast = useToast();
   const mainModal = useDisclosure();
@@ -65,23 +82,60 @@ export default function HomeProActivateCourse({ onActivated, renderTrigger }) {
     mainModal.onOpen();
   };
 
-  const showSuccess = (message, course) => {
+  const showSuccess = (course) => {
+    const copy = getActivationSuccessCopy(course);
     setActivationResult({
       success: true,
-      message: message || "تم تفعيل الكورس بنجاح",
+      title: copy.title,
+      message: copy.message,
       course,
     });
     resultModal.onOpen();
     onActivated?.(course);
   };
 
-  const showError = (message, reason) => {
+  const showError = (copy, course = null, usedCode = "") => {
+    const alreadyEnrolled = copy.kind === "already_enrolled";
+    const codeExhausted = copy.kind === "code_exhausted";
     setActivationResult({
       success: false,
-      message: message || "حدث خطأ في تفعيل الكورس",
-      reason: reason || "يرجى المحاولة مرة أخرى",
+      alreadyEnrolled,
+      codeExhausted,
+      title: alreadyEnrolled
+        ? "أنت مشترك بالفعل"
+        : codeExhausted
+          ? "كود التفعيل مستنفذ"
+          : "فشل تفعيل الكورس",
+      message: alreadyEnrolled
+        ? "أنت مشترك في هذا الكورس بالفعل."
+        : copy.message,
+      reason: alreadyEnrolled
+        ? "اضغط «انتقل للكورس» للمتابعة مباشرة."
+        : copy.reason,
+      course: course || null,
+      canGoToCourse: alreadyEnrolled,
+      usedCode: String(usedCode || "").trim(),
+      supportWhatsAppUrl: codeExhausted
+        ? buildActivationSupportWhatsAppUrl(usedCode)
+        : null,
     });
     resultModal.onOpen();
+  };
+
+  const handleActivationFailure = (error, usedCode = "") => {
+    const course = extractCourseFromActivationError(error);
+    const errorData = error?.response?.data || {};
+    const copy = resolveActivationErrorCopy({
+      apiMessage: errorData.message,
+      apiReason: errorData.reason,
+      errorData,
+      course,
+      enrolledCourseIds,
+    });
+    mainModal.onClose();
+    setStep("choice");
+    setActivationCode("");
+    showError(copy, course, usedCode);
   };
 
   const activateByCode = async () => {
@@ -111,14 +165,9 @@ export default function HomeProActivateCourse({ onActivated, renderTrigger }) {
 
       const course = res?.data?.course;
       closeMainModal();
-      showSuccess(res?.data?.message, course);
+      showSuccess(course);
     } catch (error) {
-      toast({
-        title: error?.response?.data?.message || "فشل تفعيل الكورس بالكود",
-        status: "error",
-        duration: 4000,
-        isClosable: true,
-      });
+      handleActivationFailure(error, code);
     } finally {
       setIsActivatingCode(false);
     }
@@ -137,21 +186,10 @@ export default function HomeProActivateCourse({ onActivated, renderTrigger }) {
           id: response.data.course_id,
           title: response.data.course_name || response.data.course?.title,
         };
-        showSuccess(response.data.message || "تم تفعيل الكورس بنجاح!", course);
+        showSuccess(course);
       }
     } catch (error) {
-      let errorMessage =
-        error.response?.data?.message || "حدث خطأ في تفعيل الكورس";
-      let errorReason =
-        error.response?.data?.reason || "يرجى المحاولة مرة أخرى";
-      if (
-        errorMessage.includes("Activation code has been fully used") ||
-        errorMessage.includes("fully used")
-      ) {
-        errorMessage = "هذا الكود مستخدم من قبل";
-        errorReason = "تم استخدام كود التفعيل هذا مسبقاً.";
-      }
-      showError(errorMessage, errorReason);
+      handleActivationFailure(error, qrData);
     }
   };
 
@@ -232,14 +270,16 @@ export default function HomeProActivateCourse({ onActivated, renderTrigger }) {
     if (!isQrOpen && qrScanner) closeQrScanner();
   }, [isQrOpen]);
 
-  const handleResultClose = () => {
+  const handleResultClose = ({ goToCourse = false } = {}) => {
     const courseId = activationResult?.course?.id;
-    const wasSuccess = activationResult?.success;
     resultModal.onClose();
     setActivationResult(null);
-    if (wasSuccess && courseId) {
+    if (!goToCourse) return;
+    if (courseId) {
       navigate(`/CourseDetailsPage/${courseId}`);
+      return;
     }
+    navigate("/my-courses");
   };
 
   const openQrStep = () => {
@@ -267,46 +307,44 @@ export default function HomeProActivateCourse({ onActivated, renderTrigger }) {
         isOpen={mainModal.isOpen}
         onClose={closeMainModal}
         isCentered
-        size={{ base: "full", md: "md" }}
+        size="sm"
+        motionPreset="scale"
       >
-        <ModalOverlay bg="blackAlpha.500" backdropFilter="blur(6px)" />
+        <ModalOverlay bg="blackAlpha.500" backdropFilter="blur(4px)" />
         <ModalContent
-          mx={{ base: 0, md: 4 }}
-          my={{ base: 0, md: 6 }}
-          borderRadius={{ base: 0, md: "2xl" }}
+          mx={4}
+          maxW="360px"
+          borderRadius="2xl"
           bg={modalBg}
           borderWidth="1px"
           borderColor={modalBorder}
           dir="rtl"
+          boxShadow="xl"
         >
-          <ModalHeader
-            bg={useColorModeValue("blue.50", "blue.900")}
-            borderBottomWidth="1px"
-            borderColor={modalBorder}
-          >
-            <Text fontWeight="black" color={useColorModeValue("blue.700", "blue.200")}>
+          <ModalHeader pb={2} pt={4} px={4}>
+            <Text fontSize="md" fontWeight="bold" color={useColorModeValue("slate.800", "white")}>
               {step === "code" ? "تفعيل بالكود" : "تفعيل كورس"}
             </Text>
-            <Text fontSize="xs" color={modalTextMuted} mt={1}>
+            <Text fontSize="xs" color={modalTextMuted} mt={0.5} fontWeight="normal">
               {step === "choice"
-                ? "اختر طريقة التفعيل المناسبة"
-                : "أدخل كود التفعيل المرفق مع الكورس"}
+                ? "اختر طريقة التفعيل"
+                : "أدخل كود الاشتراك"}
             </Text>
           </ModalHeader>
-          <ModalCloseButton left={3} right="auto" />
+          <ModalCloseButton left={3} right="auto" size="sm" top={3} />
 
-          <ModalBody py={5}>
+          <ModalBody px={4} py={3}>
             {step === "choice" ? (
-              <VStack spacing={3} align="stretch">
+              <VStack spacing={2.5} align="stretch">
                 <Button
                   w="full"
-                  h="auto"
-                  py={4}
+                  h="44px"
                   bg="orange.500"
                   color="white"
                   _hover={{ bg: "orange.600" }}
                   borderRadius="xl"
-                  fontWeight="black"
+                  fontWeight="bold"
+                  fontSize="sm"
                   leftIcon={<Icon as={FaKey} />}
                   onClick={() => setStep("code")}
                 >
@@ -315,27 +353,27 @@ export default function HomeProActivateCourse({ onActivated, renderTrigger }) {
 
                 <Button
                   w="full"
-                  h="auto"
-                  py={4}
+                  h="44px"
                   variant="outline"
                   borderColor={useColorModeValue("blue.300", "blue.500")}
                   color={useColorModeValue("blue.700", "blue.200")}
                   _hover={{ bg: useColorModeValue("blue.50", "blue.900") }}
                   borderRadius="xl"
                   fontWeight="bold"
+                  fontSize="sm"
                   leftIcon={<Icon as={FaQrcode} />}
                   onClick={openQrStep}
                 >
-                  تفعيل بالـ QR Code
+                  تفعيل بالـ QR
                 </Button>
               </VStack>
             ) : (
-              <VStack spacing={4} align="stretch">
+              <VStack spacing={3} align="stretch">
                 <Input
                   value={activationCode}
                   onChange={(e) => setActivationCode(e.target.value)}
-                  placeholder="أدخل كود التفعيل"
-                  size="lg"
+                  placeholder="كود التفعيل"
+                  size="md"
                   borderRadius="xl"
                   borderColor={useColorModeValue("orange.300", "orange.400")}
                   bg={useColorModeValue("white", "gray.700")}
@@ -352,8 +390,8 @@ export default function HomeProActivateCourse({ onActivated, renderTrigger }) {
                   onClick={activateByCode}
                   isLoading={isActivatingCode}
                   borderRadius="xl"
-                  fontWeight="black"
-                  size="lg"
+                  fontWeight="bold"
+                  size="md"
                 >
                   تأكيد التفعيل
                 </Button>
@@ -369,84 +407,120 @@ export default function HomeProActivateCourse({ onActivated, renderTrigger }) {
             )}
           </ModalBody>
 
-          <ModalFooter borderTopWidth="1px" borderColor={modalBorder}>
-            <Button variant="ghost" onClick={closeMainModal}>
+          <ModalFooter pt={1} pb={3} px={4}>
+            <Button variant="ghost" size="sm" onClick={closeMainModal}>
               إلغاء
             </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
 
-      <Modal isOpen={isQrOpen} onClose={closeQrScanner} isCentered size={{ base: "full", md: "lg" }}>
-        <ModalOverlay bg="blackAlpha.650" />
+      <Modal isOpen={isQrOpen} onClose={closeQrScanner} isCentered size="sm" motionPreset="scale">
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
         <ModalContent
-          mx={{ base: 0, md: 4 }}
-          my={{ base: 0, md: 6 }}
-          borderRadius={{ base: 0, md: "2xl" }}
+          mx={4}
+          maxW="360px"
+          borderRadius="2xl"
           bg={modalBg}
           borderWidth="1px"
           borderColor={modalBorder}
           dir="rtl"
         >
-          <ModalHeader borderBottomWidth="1px" borderColor={modalBorder}>
-            <Text fontWeight="black">تفعيل الكورس عبر QR</Text>
+          <ModalHeader pb={2} pt={4} px={4}>
+            <Text fontSize="md" fontWeight="bold">مسح QR</Text>
           </ModalHeader>
-          <ModalBody py={4}>
+          <ModalCloseButton left={3} right="auto" size="sm" top={3} />
+          <ModalBody px={4} py={3}>
             <VStack spacing={3}>
               <Box
                 id={QR_READER_ID}
                 w="full"
-                maxW="420px"
-                minH={{ base: "340px", md: "320px" }}
+                maxW="280px"
+                minH="240px"
                 borderRadius="xl"
                 overflow="hidden"
                 borderWidth="1px"
                 borderColor={useColorModeValue("gray.200", "gray.700")}
                 bg={useColorModeValue("gray.50", "gray.800")}
               />
-              <Text fontSize="xs" color={modalTextMuted}>
+              <Text fontSize="xs" color={modalTextMuted} textAlign="center">
                 {isScanning
-                  ? "وجّه الكاميرا إلى كود QR الخاص بالتفعيل"
+                  ? "وجّه الكاميرا إلى كود QR"
                   : "جاري تشغيل الكاميرا…"}
               </Text>
             </VStack>
           </ModalBody>
-          <ModalFooter borderTopWidth="1px" borderColor={modalBorder}>
-            <Button variant="ghost" onClick={closeQrScanner}>
+          <ModalFooter pt={1} pb={3} px={4}>
+            <Button variant="ghost" size="sm" onClick={closeQrScanner}>
               إغلاق
             </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
 
-      <Modal isOpen={resultModal.isOpen} onClose={handleResultClose} isCentered size="sm">
+      <Modal
+        isOpen={resultModal.isOpen}
+        onClose={() => handleResultClose({ goToCourse: false })}
+        isCentered
+        size="sm"
+      >
         <ModalOverlay bg="blackAlpha.500" backdropFilter="blur(4px)" />
-        <ModalContent borderRadius="2xl" bg={modalBg} dir="rtl">
+        <ModalContent borderRadius="2xl" bg={modalBg} dir="rtl" mx={4}>
           <ModalBody py={8} px={6}>
             <VStack spacing={4} textAlign="center">
               <Icon
-                as={activationResult?.success ? FaCheckCircle : FaExclamationTriangle}
+                as={
+                  activationResult?.success
+                    ? FaCheckCircle
+                    : activationResult?.alreadyEnrolled
+                      ? FaInfoCircle
+                      : FaExclamationTriangle
+                }
                 boxSize={12}
-                color={activationResult?.success ? "green.400" : "red.400"}
+                color={
+                  activationResult?.success
+                    ? "green.400"
+                    : activationResult?.alreadyEnrolled
+                      ? "blue.400"
+                      : "red.400"
+                }
               />
-              <Text fontWeight="black" fontSize="lg">
-                {activationResult?.success ? "تم التفعيل!" : "فشل التفعيل"}
+              <Text
+                fontWeight="black"
+                fontSize="lg"
+                color={
+                  activationResult?.success
+                    ? "green.600"
+                    : activationResult?.alreadyEnrolled
+                      ? "blue.600"
+                      : undefined
+                }
+              >
+                {activationResult?.title ||
+                  (activationResult?.success ? "تم تفعيل الكورس بنجاح" : "فشل تفعيل الكورس")}
               </Text>
-              <Text fontSize="sm" color={modalTextMuted}>
+              <Text fontSize="sm" color={modalTextMuted} lineHeight="1.8">
                 {activationResult?.message}
               </Text>
-              {activationResult?.success && activationResult?.course?.title ? (
+              {(activationResult?.success || activationResult?.alreadyEnrolled) &&
+              activationResult?.course?.title ? (
                 <Box
                   w="full"
                   borderRadius="xl"
                   px={4}
                   py={3}
-                  bg={useColorModeValue("blue.50", "blue.900")}
+                  bg={useColorModeValue(
+                    activationResult?.alreadyEnrolled ? "blue.50" : "green.50",
+                    activationResult?.alreadyEnrolled ? "blue.900" : "green.900",
+                  )}
                   borderWidth="1px"
-                  borderColor={useColorModeValue("blue.100", "blue.700")}
+                  borderColor={useColorModeValue(
+                    activationResult?.alreadyEnrolled ? "blue.200" : "green.200",
+                    activationResult?.alreadyEnrolled ? "blue.700" : "green.700",
+                  )}
                 >
                   <Text fontSize="xs" color={modalTextMuted} mb={1}>
-                    الكورس
+                    اسم الكورس
                   </Text>
                   <Text fontWeight="bold" color={useColorModeValue(HP_BLUE, "blue.200")}>
                     {activationResult.course.title}
@@ -454,19 +528,89 @@ export default function HomeProActivateCourse({ onActivated, renderTrigger }) {
                 </Box>
               ) : null}
               {!activationResult?.success && activationResult?.reason ? (
-                <Text fontSize="xs" color={modalTextMuted}>
+                <Text fontSize="xs" color={modalTextMuted} lineHeight="1.8">
                   {activationResult.reason}
                 </Text>
               ) : null}
-              <Button
-                w="full"
-                colorScheme={activationResult?.success ? "blue" : "gray"}
-                borderRadius="xl"
-                fontWeight="bold"
-                onClick={handleResultClose}
-              >
-                {activationResult?.success ? "الذهاب للكورس" : "حسناً"}
-              </Button>
+
+              {activationResult?.codeExhausted ? (
+                <Box
+                  w="full"
+                  borderRadius="xl"
+                  px={3.5}
+                  py={3}
+                  bg={useColorModeValue("orange.50", "orange.900")}
+                  borderWidth="1px"
+                  borderColor={useColorModeValue("orange.200", "orange.700")}
+                  textAlign="right"
+                >
+                  <Text fontSize="sm" fontWeight="bold" color={useColorModeValue("orange.800", "orange.100")} mb={1}>
+                    تنبيه مهم
+                  </Text>
+                  <Text fontSize="xs" color={modalTextMuted} lineHeight="1.8">
+                    راسل الدعم الفني على واتساب لحل الخطأ ومتابعة حالة الكود
+                    {activationResult.usedCode ? ` (${activationResult.usedCode})` : ""}.
+                  </Text>
+                </Box>
+              ) : null}
+
+              {activationResult?.success || activationResult?.alreadyEnrolled ? (
+                <VStack w="full" spacing={2}>
+                  <Button
+                    w="full"
+                    colorScheme="blue"
+                    borderRadius="xl"
+                    fontWeight="bold"
+                    h="46px"
+                    onClick={() => handleResultClose({ goToCourse: true })}
+                  >
+                    انتقل للكورس
+                  </Button>
+                  <Button
+                    w="full"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleResultClose({ goToCourse: false })}
+                  >
+                    إغلاق
+                  </Button>
+                </VStack>
+              ) : activationResult?.codeExhausted && activationResult?.supportWhatsAppUrl ? (
+                <VStack w="full" spacing={2}>
+                  <Button
+                    as="a"
+                    href={activationResult.supportWhatsAppUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    w="full"
+                    colorScheme="green"
+                    borderRadius="xl"
+                    fontWeight="bold"
+                    h="46px"
+                    leftIcon={<Icon as={FaWhatsapp} />}
+                  >
+                    تواصل عبر واتساب
+                  </Button>
+                  <Button
+                    w="full"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleResultClose({ goToCourse: false })}
+                  >
+                    إغلاق
+                  </Button>
+                </VStack>
+              ) : (
+                <Button
+                  w="full"
+                  colorScheme="gray"
+                  borderRadius="xl"
+                  fontWeight="bold"
+                  onClick={() => handleResultClose({ goToCourse: false })}
+                >
+                  حسناً
+                </Button>
+              )}
             </VStack>
           </ModalBody>
         </ModalContent>

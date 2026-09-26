@@ -161,8 +161,6 @@ const Profile = () => {
     phone: "",
     parent_phone: "",
     password: "",
-    group_id: "",
-    course_group_id: "",
   });
   const [selectedAvatarFile, setSelectedAvatarFile] = useState(null);
   const [selectedAvatarPreview, setSelectedAvatarPreview] = useState(null);
@@ -236,8 +234,6 @@ const Profile = () => {
       phone: user?.phone || "",
       parent_phone: user?.parent_phone || "",
       password: "",
-      group_id: user?.study_group?.id ?? "",
-      course_group_id: user?.course_group?.id ?? "",
     });
     setSelectedAvatarFile(null);
     setSelectedAvatarPreview(null);
@@ -315,23 +311,6 @@ const Profile = () => {
       }
       if (editForm.password?.trim()) {
         payload.password = editForm.password.trim();
-      }
-
-      if (user?.can_choose_study_group) {
-        const nextGroupId = editForm.group_id === "" ? null : Number(editForm.group_id);
-        const currentGroupId = user?.study_group?.id ?? null;
-        if (nextGroupId && nextGroupId !== currentGroupId) {
-          payload.group_id = nextGroupId;
-        }
-      }
-
-      if (user?.can_choose_course_group) {
-        const nextCourseGroupId =
-          editForm.course_group_id === "" ? null : Number(editForm.course_group_id);
-        const currentCourseGroupId = user?.course_group?.id ?? null;
-        if (nextCourseGroupId && nextCourseGroupId !== currentCourseGroupId) {
-          payload.course_group_id = nextCourseGroupId;
-        }
       }
 
       const avatarOnly = Boolean(selectedAvatarFile) && Object.keys(payload).length === 0;
@@ -518,29 +497,23 @@ const Profile = () => {
               </div>
             </section>
 
-            {/* Groups */}
+            {/* Groups — عرض فقط؛ تغيير المجموعة من صلاحية المنصة / المدرس */}
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
               <GroupCard
                 title="المجموعة الدراسية"
                 icon={FaUsers}
                 group={user.study_group}
                 emptyText="لست منضمًا لمجموعة دراسية بعد"
-                canChoose={Boolean(user.can_choose_study_group)}
+                canChoose={false}
               />
               <GroupCard
                 title="مجموعة الكورس"
                 icon={FaBookOpen}
                 group={user.course_group}
                 emptyText="لست منضمًا لمجموعة كورس بعد"
-                canChoose={Boolean(user.can_choose_course_group)}
+                canChoose={false}
               />
             </div>
-
-            {(user.can_choose_study_group || user.can_choose_course_group) && (
-              <p className="text-center text-sm text-slate-500">
-                لتغيير مجموعتك، اضغط «تعديل البيانات» واختر المجموعة المناسبة ثم احفظ.
-              </p>
-            )}
 
             {/* Edit Modal */}
             {editModalVisible && (
@@ -647,61 +620,6 @@ const Profile = () => {
                         onChange={(e) => setEditForm((p) => ({ ...p, password: e.target.value }))}
                       />
                     </label>
-
-                    {user.can_choose_study_group ? (
-                      <label className="block">
-                        <span className="mb-1.5 flex items-center gap-2 text-xs font-bold text-slate-600">
-                          <FaUsers className="text-[#0E4C92]" /> المجموعة الدراسية
-                        </span>
-                        <select
-                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-[#0E4C92] focus:ring-2 focus:ring-[#0E4C92]/15"
-                          value={editForm.group_id}
-                          onChange={(e) =>
-                            setEditForm((p) => ({
-                              ...p,
-                              group_id: e.target.value ? Number(e.target.value) : "",
-                            }))
-                          }
-                        >
-                          <option value="">— اختر مجموعة —</option>
-                          {(user.available_study_groups || []).map((g) => (
-                            <option key={g.id} value={g.id}>
-                              {g.name}
-                              {g.days ? ` · ${g.days}` : ""}
-                              {formatTimeRange(g.start_time, g.end_time)
-                                ? ` · ${formatTimeRange(g.start_time, g.end_time)}`
-                                : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : null}
-
-                    {user.can_choose_course_group ? (
-                      <label className="block">
-                        <span className="mb-1.5 flex items-center gap-2 text-xs font-bold text-slate-600">
-                          <FaBookOpen className="text-[#0E4C92]" /> مجموعة الكورس
-                        </span>
-                        <select
-                          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-[#0E4C92] focus:ring-2 focus:ring-[#0E4C92]/15"
-                          value={editForm.course_group_id}
-                          onChange={(e) =>
-                            setEditForm((p) => ({
-                              ...p,
-                              course_group_id: e.target.value ? Number(e.target.value) : "",
-                            }))
-                          }
-                        >
-                          <option value="">— اختر مجموعة —</option>
-                          {(user.available_course_groups || []).map((g) => (
-                            <option key={g.id} value={g.id}>
-                              {g.name}
-                              {g.grade_name ? ` · ${g.grade_name}` : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : null}
                   </div>
 
                   {error ? <p className="mt-4 text-center text-sm font-semibold text-red-600">{error}</p> : null}

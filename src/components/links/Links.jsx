@@ -16,7 +16,6 @@ import {
   MdLogout,
   MdHome,
   MdPublic,
-  MdSchedule,
   MdCollectionsBookmark,
   MdDescription,
   MdBusiness,
@@ -24,11 +23,10 @@ import {
   MdRestoreFromTrash,
   MdEmojiEvents,
 } from "react-icons/md";
-import { FaAndroid, FaRobot, FaFolderOpen, FaWhatsapp } from "react-icons/fa";
+import { FaRobot, FaFolderOpen, FaWhatsapp } from "react-icons/fa";
 import { Link, useLocation } from "react-router-dom";
 import {
   VStack,
-  HStack,
   Text,
   Icon,
   Box,
@@ -40,21 +38,22 @@ import {
 import UserType from "../../Hooks/auth/userType";
 import { performLogout } from "../../utils/performLogout";
 
+const BRAND_BLUE = "#3182CE";
+const BRAND_ORANGE = "#DD6B20";
+
 const NavLinkItem = ({ to, Icon: LinkIcon, label, onClick, isSidebarOpen }) => {
   const location = useLocation();
   const isActive =
     location.pathname === to ||
     (to !== "/home" && location.pathname.startsWith(`${to}/`));
 
-  const activeBg = useColorModeValue("blue.50", "whiteAlpha.100");
-  const activeColor = useColorModeValue("blue.700", "blue.200");
-  const hoverBg = useColorModeValue("gray.50", "whiteAlpha.50");
+  const idleBg = useColorModeValue("transparent", "transparent");
+  const activeBg = useColorModeValue("white", "whiteAlpha.100");
+  const hoverBg = useColorModeValue("white", "whiteAlpha.50");
   const textColor = useColorModeValue("gray.600", "gray.300");
-  const hoverTextColor = useColorModeValue("gray.800", "white");
-  const iconWrapIdle = useColorModeValue("gray.100", "whiteAlpha.100");
-  const iconWrapActive = useColorModeValue("blue.500", "blue.400");
-  const iconIdleColor = useColorModeValue("blue.500", "blue.300");
-  const accentBar = useColorModeValue("blue.500", "blue.300");
+  const activeColor = useColorModeValue("gray.900", "white");
+  const iconIdleBg = useColorModeValue("blue.50", "whiteAlpha.100");
+  const iconIdleColor = useColorModeValue(BRAND_BLUE, "blue.300");
 
   const content = (
     <Flex
@@ -62,31 +61,39 @@ const NavLinkItem = ({ to, Icon: LinkIcon, label, onClick, isSidebarOpen }) => {
       gap={3}
       px={isSidebarOpen ? 2.5 : 2}
       py={2}
-      borderRadius="xl"
-      bg={isActive ? activeBg : "transparent"}
+      borderRadius="2xl"
+      bg={isActive ? activeBg : idleBg}
       color={isActive ? activeColor : textColor}
+      boxShadow={isActive ? "0 8px 20px rgba(15,23,42,0.06)" : "none"}
+      borderWidth="1px"
+      borderColor={isActive ? "blackAlpha.50" : "transparent"}
       position="relative"
       overflow="hidden"
       _hover={{
         bg: isActive ? activeBg : hoverBg,
-        color: isActive ? activeColor : hoverTextColor,
+        color: activeColor,
+        boxShadow: "0 8px 18px rgba(15,23,42,0.05)",
       }}
-      transition="all 0.2s ease"
+      transition="all 0.18s ease"
       w="full"
-      minH="44px"
+      minH="46px"
       justify={isSidebarOpen ? "flex-start" : "center"}
       cursor="pointer"
       role="group"
+      _dark={{
+        borderColor: isActive ? "whiteAlpha.200" : "transparent",
+        boxShadow: isActive ? "0 8px 20px rgba(0,0,0,0.25)" : "none",
+      }}
     >
       {isActive && isSidebarOpen ? (
         <Box
           position="absolute"
           right={0}
-          top="18%"
-          bottom="18%"
+          top="20%"
+          bottom="20%"
           w="3px"
           borderRadius="full"
-          bg={accentBar}
+          bg={BRAND_BLUE}
         />
       ) : null}
 
@@ -96,24 +103,24 @@ const NavLinkItem = ({ to, Icon: LinkIcon, label, onClick, isSidebarOpen }) => {
         flexShrink={0}
         align="center"
         justify="center"
-        borderRadius="lg"
-        bg={isActive ? iconWrapActive : iconWrapIdle}
+        borderRadius="xl"
+        bg={isActive ? BRAND_BLUE : iconIdleBg}
         color={isActive ? "white" : iconIdleColor}
-        transition="all 0.2s ease"
+        transition="all 0.18s ease"
+        boxShadow={isActive ? "0 8px 16px rgba(49,130,206,0.35)" : "none"}
         _groupHover={{
-          transform: isSidebarOpen ? "scale(1.04)" : "none",
+          transform: isSidebarOpen ? "translateY(-1px)" : "none",
         }}
       >
-        <Icon as={LinkIcon} boxSize="18px" />
+        <Icon as={LinkIcon} boxSize="17px" />
       </Flex>
 
       {isSidebarOpen ? (
         <Text
           flex={1}
           fontSize="sm"
-          fontWeight={isActive ? "bold" : "medium"}
+          fontWeight={isActive ? "extrabold" : "semibold"}
           noOfLines={1}
-          letterSpacing="0.01em"
         >
           {label}
         </Text>
@@ -132,27 +139,26 @@ const NavLinkItem = ({ to, Icon: LinkIcon, label, onClick, isSidebarOpen }) => {
 
 function NavSection({ title, children, isSidebarOpen }) {
   const sectionColor = useColorModeValue("gray.400", "gray.500");
-  const divider = useColorModeValue("gray.100", "gray.700");
+  const divider = useColorModeValue("blackAlpha.100", "whiteAlpha.100");
 
   return (
     <Box w="full">
       {isSidebarOpen && title ? (
-        <Text
-          px={3}
-          pt={3}
-          pb={1.5}
-          fontSize="10px"
-          fontWeight="bold"
-          letterSpacing="0.12em"
-          textTransform="uppercase"
-          color={sectionColor}
-        >
-          {title}
-        </Text>
+        <Flex align="center" gap={2} px={3} pt={3.5} pb={1.5}>
+          <Box w="6px" h="6px" borderRadius="full" bg={BRAND_ORANGE} flexShrink={0} />
+          <Text
+            fontSize="10px"
+            fontWeight="extrabold"
+            letterSpacing="0.08em"
+            color={sectionColor}
+          >
+            {title}
+          </Text>
+        </Flex>
       ) : isSidebarOpen ? null : (
         <Box h="1px" bg={divider} my={2} mx={2} />
       )}
-      <VStack spacing={0.5} align="stretch" w="full">
+      <VStack spacing={1} align="stretch" w="full">
         {children}
       </VStack>
     </Box>
@@ -172,10 +178,10 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
     void performLogout();
   };
 
-  const logoutBorder = useColorModeValue("gray.100", "gray.700");
   const logoutHover = useColorModeValue("red.50", "whiteAlpha.50");
   const logoutColor = useColorModeValue("red.600", "red.300");
   const logoutIconBg = useColorModeValue("red.50", "whiteAlpha.100");
+  const logoutBorder = useColorModeValue("blackAlpha.100", "whiteAlpha.100");
 
   const adminSections = [
     {
@@ -216,7 +222,6 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
       title: "التواصل",
       links: [
         { to: "/TeacherChat", Icon: MdForum, label: "الرسائل" },
-
         { to: "/social", Icon: MdPublic, label: "EM Social" },
       ],
     },
@@ -262,7 +267,6 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
         { to: "/my-courses", Icon: MdCollectionsBookmark, label: "كورساتي" },
         { to: "/student-daily-quizzes", Icon: MdWhatshot, label: "المسابقات اليومية" },
         { to: "/my-points", Icon: MdEmojiEvents, label: "نقاطي وترتيبي" },
-
         { to: "/exam_grades", Icon: MdGrading, label: "درجات الامتحانات" },
         { to: "/scientific-chat", Icon: FaRobot, label: "المساعد العلمي" },
       ],
@@ -321,7 +325,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
             : [{ title: "عام", links: [{ to: "/home", Icon: MdHome, label: "الصفحة الرئيسية" }] }];
 
   return (
-    <VStack spacing={1} align="stretch" w="full" pb={2} data-tour-id="student-nav-links">
+    <VStack spacing={0.5} align="stretch" w="full" pb={2} data-tour-id="student-nav-links">
       {sections.map((section) => (
         <NavSection key={section.title} title={section.title} isSidebarOpen={isSidebarOpen}>
           {section.links.map((link) => (
@@ -349,10 +353,10 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
               onClick={handleLogout}
               w="full"
               h="auto"
-              minH="44px"
+              minH="46px"
               px={isSidebarOpen ? 2.5 : 2}
               py={2}
-              borderRadius="xl"
+              borderRadius="2xl"
               color={logoutColor}
               _hover={{ bg: logoutHover }}
             >
@@ -368,13 +372,13 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
                   flexShrink={0}
                   align="center"
                   justify="center"
-                  borderRadius="lg"
+                  borderRadius="xl"
                   bg={logoutIconBg}
                 >
-                  <Icon as={MdLogout} boxSize="18px" />
+                  <Icon as={MdLogout} boxSize="17px" />
                 </Flex>
                 {isSidebarOpen ? (
-                  <Text fontSize="sm" fontWeight="bold">
+                  <Text fontSize="sm" fontWeight="extrabold">
                     تسجيل الخروج
                   </Text>
                 ) : null}

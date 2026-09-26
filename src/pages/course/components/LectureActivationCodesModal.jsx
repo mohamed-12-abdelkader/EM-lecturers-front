@@ -135,19 +135,25 @@ export default function LectureActivationCodesModal({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size={{ base: "full", md: "xl" }} scrollBehavior="inside">
-      <ModalOverlay backdropFilter="blur(4px)" />
-      <ModalContent borderRadius={{ base: "none", md: "2xl" }} mx={{ base: 0, md: 4 }}>
-        <ModalHeader>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      size={{ base: "md", md: "xl" }}
+      isCentered
+      scrollBehavior="inside"
+    >
+      <ModalOverlay backdropFilter="blur(4px)" bg="blackAlpha.600" />
+      <ModalContent borderRadius="2xl" mx={4} my={4} maxH="85vh">
+        <ModalHeader py={3.5} fontSize="md">
           <HStack spacing={2}>
             <FaKey />
-            <Text>أكواد تفعيل — {lecture?.title || "المحاضرة"}</Text>
+            <Text noOfLines={1}>أكواد تفعيل — {lecture?.title || "المحاضرة"}</Text>
           </HStack>
         </ModalHeader>
         <ModalCloseButton />
-        <ModalBody>
+        <ModalBody pb={5}>
           <VStack align="stretch" spacing={4}>
-            <Box className="rounded-xl border border-purple-100 bg-purple-50/50 p-4 dark:border-purple-900/40 dark:bg-purple-950/20">
+            <Box className="rounded-xl border border-purple-100 bg-purple-50/50 p-3.5 dark:border-purple-900/40 dark:bg-purple-950/20">
               <Text fontWeight="semibold" mb={3} fontSize="sm">
                 إنشاء كود جديد
               </Text>
@@ -160,12 +166,16 @@ export default function LectureActivationCodesModal({
                     placeholder="يُولَّد تلقائياً إن تُرك فارغاً"
                     dir="ltr"
                     textAlign="left"
+                    size="sm"
+                    borderRadius="lg"
                   />
                 </FormControl>
                 <HStack spacing={3} align="flex-end" flexWrap="wrap">
-                  <FormControl flex={1} minW="140px">
+                  <FormControl flex={1} minW="120px">
                     <FormLabel fontSize="sm">المدة (ساعات)</FormLabel>
                     <Select
+                      size="sm"
+                      borderRadius="lg"
                       value={String(durationHours)}
                       onChange={(e) => setDurationHours(Number(e.target.value))}
                     >
@@ -176,10 +186,15 @@ export default function LectureActivationCodesModal({
                       ))}
                     </Select>
                   </FormControl>
-                  <FormControl flex={1} minW="120px">
+                  <FormControl flex={1} minW="100px">
                     <FormLabel fontSize="sm">حد الاستخدام</FormLabel>
-                    <NumberInput min={0} value={maxUses} onChange={(_, v) => setMaxUses(v || 0)}>
-                      <NumberInputField />
+                    <NumberInput
+                      min={0}
+                      size="sm"
+                      value={maxUses}
+                      onChange={(_, v) => setMaxUses(v || 0)}
+                    >
+                      <NumberInputField borderRadius="lg" />
                     </NumberInput>
                     <Text fontSize="xs" color="gray.500" mt={1}>
                       0 = غير محدود
@@ -190,9 +205,10 @@ export default function LectureActivationCodesModal({
                   leftIcon={<FaPlus />}
                   colorScheme="purple"
                   borderRadius="xl"
+                  size="sm"
                   onClick={handleCreate}
                   isLoading={saving}
-                  alignSelf="flex-start"
+                  alignSelf="stretch"
                 >
                   إنشاء كود
                 </Button>

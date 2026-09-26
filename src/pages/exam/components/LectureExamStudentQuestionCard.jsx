@@ -331,13 +331,13 @@ export default function LectureExamStudentQuestionCard({
   return (
     <Box
       bg={cardBg}
-      borderRadius="2xl"
+      borderRadius="3xl"
       borderWidth="1px"
       borderColor={border}
       overflow="hidden"
-      boxShadow="lg"
+      boxShadow="0 18px 40px rgba(15, 23, 42, 0.08)"
     >
-      <Box h="3px" bgGradient="linear(to-r, blue.500, orange.500)" />
+      <Box h="3px" bgGradient="linear(to-r, blue.500, blue.300, cyan.300)" />
 
       <Flex
         align="center"
@@ -354,21 +354,21 @@ export default function LectureExamStudentQuestionCard({
             w={10}
             h={10}
             borderRadius="xl"
-            bgGradient="linear(135deg, blue.500, blue.600)"
+            bg="blue.500"
             color="white"
             align="center"
             justify="center"
-            fontWeight="bold"
+            fontWeight="900"
             fontSize="md"
-            boxShadow="0 4px 14px rgba(49,130,206,0.35)"
+            boxShadow="0 8px 18px rgba(49,130,206,0.35)"
           >
             {questionIndex + 1}
           </Flex>
           <VStack align="start" spacing={0}>
-            <Text fontSize="xs" color={muted}>
+            <Text fontSize="xs" color={muted} fontWeight="700">
               سؤال {questionIndex + 1} من {totalQuestions}
             </Text>
-            <Text fontSize="xs" color="blue.500" fontWeight="semibold">
+            <Text fontSize="xs" color="blue.500" fontWeight="800">
               اختر إجابة واحدة فقط
             </Text>
           </VStack>
@@ -416,14 +416,14 @@ export default function LectureExamStudentQuestionCard({
           <Box
             mb={hasImage && !isImageQuestion ? 4 : 0}
             p={4}
-            borderRadius="xl"
+            borderRadius="2xl"
             bg={questionBg}
             borderRightWidth="4px"
             borderColor="blue.400"
           >
             <Text
-            fontSize={{ base: "lg", md: "lg" }}
-              fontWeight="semibold"
+              fontSize={{ base: "lg", md: "lg" }}
+              fontWeight="700"
               color={textColor}
               lineHeight="2"
               whiteSpace="pre-wrap"

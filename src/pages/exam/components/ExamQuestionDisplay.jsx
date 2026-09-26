@@ -392,42 +392,79 @@ function ExamChoicesSection({
           w="full"
           direction="column"
           gap={2}
-          p={{ base: 4, md: 2.5 }}
+          p={{ base: 4, md: 3.5 }}
           minH={{ base: "56px", md: "auto" }}
           borderRadius="2xl"
           borderWidth={isSelected ? "2px" : "1px"}
           borderColor={isSelected ? selectedBorder : border}
           bg={isSelected ? selectedBg : cardBg}
           cursor="pointer"
-          transition="all 0.15s"
+          transition="all 0.18s ease"
+          position="relative"
+          overflow="hidden"
+          boxShadow={isSelected ? "0 10px 28px rgba(49,130,206,0.14)" : "none"}
           sx={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
           _hover={{
             borderColor: isSelected ? selectedBorder : "blue.300",
             bg: isSelected ? selectedBg : hoverBg,
+            transform: "translateY(-1px)",
           }}
           h="full"
           textAlign="right"
         >
-          <Flex align="center" gap={2}>
+          {isSelected && (
+            <Box
+              position="absolute"
+              top={0}
+              right={0}
+              bottom={0}
+              w="4px"
+              bg="blue.500"
+            />
+          )}
+          <Flex align="center" gap={3}>
             <Flex
-              w={{ base: 11, md: 7 }}
-              h={{ base: 11, md: 7 }}
+              w={{ base: 11, md: 9 }}
+              h={{ base: 11, md: 9 }}
               flexShrink={0}
-              borderRadius="md"
+              borderRadius="xl"
               bg={isSelected ? "blue.500" : letterBg}
               color={isSelected ? "white" : letterColor}
               align="center"
               justify="center"
-              fontSize={{ base: "md", md: "xs" }}
-              fontWeight="bold"
+              fontSize={{ base: "md", md: "sm" }}
+              fontWeight="900"
+              boxShadow={isSelected ? "0 4px 12px rgba(49,130,206,0.35)" : "none"}
             >
               {letter}
             </Flex>
             {choice.text && (
-              <Text flex={1} fontSize={{ base: "md", md: "sm" }} fontWeight={isSelected ? "semibold" : "500"} color={headingColor} lineHeight="1.75" sx={examQuestionTextSx}>
+              <Text
+                flex={1}
+                fontSize={{ base: "md", md: "sm" }}
+                fontWeight={isSelected ? "700" : "500"}
+                color={headingColor}
+                lineHeight="1.85"
+                sx={examQuestionTextSx}
+              >
                 {renderFormattedExamText(choice.text)}
               </Text>
             )}
+            <Flex
+              w={5}
+              h={5}
+              borderRadius="full"
+              borderWidth="2px"
+              borderColor={isSelected ? "blue.500" : border}
+              bg={isSelected ? "blue.500" : "transparent"}
+              align="center"
+              justify="center"
+              flexShrink={0}
+            >
+              {isSelected && (
+                <Box w={1.5} h={1.5} borderRadius="full" bg="white" />
+              )}
+            </Flex>
           </Flex>
           {choice.image && (
             <ChoiceImageFrame
@@ -453,9 +490,20 @@ function ExamChoicesSection({
 
   return (
     <Box mt={mode === "student" ? 4 : 0}>
-      <Text fontSize="xs" fontWeight="bold" color={muted} mb={2.5}>
-        {mode === "student" ? "اختر الإجابة الصحيحة" : "الاختيارات — اضغط لتعيين الصحيحة"}
-      </Text>
+      {mode === "student" ? (
+        <Flex justify="space-between" align="center" mb={3} gap={3}>
+          <Text fontSize="sm" fontWeight="800" color={headingColor || muted}>
+            الاختيارات
+          </Text>
+          <Text fontSize="xs" color={muted} fontWeight="600">
+            {normalized.length} خيارات متاحة
+          </Text>
+        </Flex>
+      ) : (
+        <Text fontSize="xs" fontWeight="bold" color={muted} mb={2.5}>
+          الاختيارات — اضغط لتعيين الصحيحة
+        </Text>
+      )}
 
       {mode === "student" ? (
         <RadioGroup
@@ -676,55 +724,111 @@ export function StudentQuestionPanel({
 }) {
   const border = cardBorder || useColorModeValue("gray.200", "gray.600");
   const bg = cardBg || useColorModeValue("white", "gray.800");
-  const headerBg = useColorModeValue("blue.50", "whiteAlpha.50");
+  const headerBg = useColorModeValue(
+    "linear-gradient(135deg, #EBF8FF 0%, #F7FAFC 100%)",
+    "whiteAlpha.50"
+  );
   const muted = subtextColor || useColorModeValue("gray.500", "gray.400");
   const textColor = headingColor || useColorModeValue("gray.800", "white");
+  const questionBg = useColorModeValue("blue.50", "whiteAlpha.50");
+  const isAnswered = !!studentAnswers[questionId];
 
   return (
-    <Box bg={bg} borderRadius="2xl" borderWidth="1px" borderColor={border} overflow="hidden" boxShadow="sm">
+    <Box
+      bg={bg}
+      borderRadius="3xl"
+      borderWidth="1px"
+      borderColor={border}
+      overflow="hidden"
+      boxShadow="0 18px 40px rgba(15, 23, 42, 0.08)"
+    >
+      <Box h="3px" bgGradient="linear(to-r, blue.500, blue.300, cyan.300)" />
+
       <Flex
         align="center"
         justify="space-between"
-        px={4}
+        px={{ base: 4, md: 5 }}
         py={3}
         bg={headerBg}
         borderBottomWidth="1px"
         borderColor={border}
         display={compactHeader ? { base: "none", md: "flex" } : "flex"}
       >
-        <HStack spacing={2}>
-          <Flex w={8} h={8} borderRadius="lg" bg="blue.500" color="white" align="center" justify="center" fontWeight="bold" fontSize="sm">
+        <HStack spacing={3}>
+          <Flex
+            w={10}
+            h={10}
+            borderRadius="xl"
+            bg="blue.500"
+            color="white"
+            align="center"
+            justify="center"
+            fontWeight="900"
+            fontSize="md"
+            boxShadow="0 8px 18px rgba(49,130,206,0.35)"
+          >
             {questionIndex + 1}
           </Flex>
           <Box>
-            <Text fontSize="xs" color={muted}>
+            <Text fontSize="xs" color={muted} fontWeight="700">
               السؤال {questionIndex + 1} من {totalQuestions}
+            </Text>
+            <Text fontSize="xs" color="blue.500" fontWeight="800">
+              اختر إجابة واحدة فقط
             </Text>
           </Box>
         </HStack>
-        <Badge colorScheme={studentAnswers[questionId] ? "green" : "gray"} variant="subtle" fontSize="10px">
-          {studentAnswers[questionId] ? "تم الإجابة" : "بانتظار الإجابة"}
+        <Badge
+          colorScheme={isAnswered ? "green" : "gray"}
+          variant={isAnswered ? "solid" : "subtle"}
+          fontSize="xs"
+          borderRadius="full"
+          px={3}
+          py={1}
+        >
+          {isAnswered ? "تمت الإجابة" : "بانتظار الإجابة"}
         </Badge>
       </Flex>
 
       <Box p={{ base: 4, md: 5 }}>
         {passageContent && <ExamPassageBlock content={passageContent} variant="student" />}
 
-        <Grid
-          templateColumns={questionImage && questionText ? { base: "1fr", md: "1fr 1fr" } : "1fr"}
-          gap={4}
-          mb={2}
-          alignItems="start"
-        >
-          {questionText && (
-            <Text fontSize={{ base: "sm", md: "md" }} fontWeight="semibold" color={textColor} lineHeight="1.9" sx={examQuestionTextSx}>
-              {renderFormattedExamText(questionText)}
-            </Text>
-          )}
-          {questionImage && (
-            <ExamQuestionImage src={questionImage} onZoom={onZoomImage} maxH={{ base: "280px", md: "320px" }} compact={!!questionText} />
-          )}
-        </Grid>
+        {(questionText || questionImage) && (
+          <Box
+            mb={4}
+            p={4}
+            borderRadius="2xl"
+            bg={questionBg}
+            borderRightWidth="4px"
+            borderColor="blue.400"
+          >
+            <Grid
+              templateColumns={questionImage && questionText ? { base: "1fr", md: "1fr 1fr" } : "1fr"}
+              gap={4}
+              alignItems="start"
+            >
+              {questionText && (
+                <Text
+                  fontSize={{ base: "md", md: "lg" }}
+                  fontWeight="700"
+                  color={textColor}
+                  lineHeight="2"
+                  sx={examQuestionTextSx}
+                >
+                  {renderFormattedExamText(questionText)}
+                </Text>
+              )}
+              {questionImage && (
+                <ExamQuestionImage
+                  src={questionImage}
+                  onZoom={onZoomImage}
+                  maxH={{ base: "280px", md: "320px" }}
+                  compact={!!questionText}
+                />
+              )}
+            </Grid>
+          </Box>
+        )}
 
         <ExamChoicesSection
           choices={questionChoices}

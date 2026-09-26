@@ -3,7 +3,7 @@ import {
   Box, VStack, Heading, Text, Spinner, Center, Alert, AlertIcon, IconButton, HStack, useToast,
   Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton,
   Button, Input, Tooltip, InputGroup, InputRightElement, Image, useColorModeValue, Flex,
-  SimpleGrid, Textarea, Select,
+  SimpleGrid, Textarea, Select, Badge,
 } from "@chakra-ui/react";
 import { AiFillEdit, AiFillDelete, AiOutlineCloseCircle, AiOutlineRobot } from "react-icons/ai";
 import baseUrl from "../../api/baseUrl";
@@ -419,12 +419,15 @@ const Exam = () => {
     }
   };
 
+  const pageBg = useColorModeValue("#F4F7FB", "gray.950");
   const teacherCardBg = useColorModeValue("white", "gray.800");
-  const teacherCardBorder = useColorModeValue("gray.200", "gray.600");
-  const teacherHeadingColor = useColorModeValue("blue.700", "blue.200");
-  const teacherAccent = useColorModeValue("blue.500", "blue.400");
+  const teacherCardBorder = useColorModeValue("gray.200", "gray.700");
+  const teacherHeadingColor = useColorModeValue("gray.900", "white");
+  const mutedText = useColorModeValue("gray.500", "gray.400");
   const previewBg = useColorModeValue("gray.50", "gray.900");
   const previewBorder = useColorModeValue("gray.200", "gray.700");
+  const softBlue = useColorModeValue("blue.50", "whiteAlpha.100");
+  const BLUE = "#3182CE";
 
   if (!isStaff) {
     if (!student) {
@@ -460,117 +463,205 @@ const Exam = () => {
     );
   }
 
+  const examTitle = examMeta?.examTitle || "امتحان شامل";
+  const durationLabel =
+    examMeta?.durationMinutes != null && Number(examMeta.durationMinutes) > 0
+      ? `${examMeta.durationMinutes} دقيقة`
+      : "بدون حد زمني";
+
   return (
     <Box
-      maxW="6xl"
-      mx="auto"
-      py={{ base: 6, md: 10 }}
-      px={{ base: 3, sm: 4, md: 6 }}
-      className="mt-[80px]"
+      minH="100vh"
+      bg={pageBg}
+      dir="rtl"
+      fontFamily="'Cairo', 'Segoe UI', Tahoma, sans-serif"
+      pb={{ base: 10, md: 14 }}
     >
+      {/* Hero */}
       <Box
         data-tour-id="platform-exam-hero"
-        mb={{ base: 6, md: 8 }}
-        borderRadius="xl"
-        borderWidth="1px"
-        borderColor={teacherCardBorder}
-        bg={teacherCardBg}
-        shadow="sm"
+        position="relative"
         overflow="hidden"
+        bg={`linear-gradient(125deg, #0B1F3A 0%, ${BLUE} 55%, #2B6CB0 100%)`}
+        pt={{ base: "4.75rem", md: "5.25rem" }}
+        pb={{ base: 6, md: 7 }}
       >
-        <Box h="3px" bg={teacherAccent} />
-        <Flex
-          direction={{ base: "column", sm: "row" }}
-          align={{ base: "stretch", sm: "center" }}
-          justify="space-between"
-          gap={4}
-          p={{ base: 4, md: 5 }}
-        >
-          <VStack align={{ base: "center", sm: "flex-start" }} spacing={1}>
-            <Heading size={{ base: "md", md: "lg" }} color={teacherHeadingColor} display="flex" alignItems="center" gap={2}>
-              <FaBookOpen />
-              أسئلة الامتحان الشامل
-            </Heading>
-            <Text fontSize="sm" color="gray.500">
-              {questions.length} سؤال — يدعم LaTeX والكسور والرموز الكيميائية
-            </Text>
-          </VStack>
-          <HStack spacing={2} flexWrap="wrap" justify={{ base: "center", sm: "flex-end" }}>
-            <Button
-              data-tour-id="platform-exam-tour-btn"
-              variant="outline"
-              colorScheme="orange"
-              size={{ base: "sm", md: "md" }}
-              leftIcon={<FaCompass />}
-              onClick={() => {
-                setShowGrades(false);
-                setExamTourOpen(true);
-              }}
-              borderRadius="xl"
-              fontWeight="600"
-            >
-              جولة الإدارة
-            </Button>
-            <Button
-              data-tour-id="platform-exam-ai"
-              variant="outline"
-              borderColor="purple.400"
-              color="purple.600"
-              size={{ base: "sm", md: "md" }}
-              leftIcon={<AiOutlineRobot />}
-              onClick={() => setAiExtractionModalOpen(true)}
-              borderRadius="xl"
-              fontWeight="600"
-              _hover={{ bg: "purple.50" }}
-            >
-              استخراج بالذكاء الاصطناعي
-            </Button>
-            <Button
-              data-tour-id="platform-exam-grades"
-              colorScheme={showGrades ? "gray" : "blue"}
-              size={{ base: "sm", md: "md" }}
-              leftIcon={<FaUser />}
-              onClick={() => {
-                if (!showGrades && gradesData.length === 0) fetchGrades();
-                setShowGrades((prev) => !prev);
-              }}
-              borderRadius="xl"
-              fontWeight="600"
-            >
-              {showGrades ? "عرض الأسئلة" : "عرض درجات الطلاب"}
-            </Button>
-            <Button
-              data-tour-id="platform-exam-report"
-              variant="outline"
-              colorScheme="blue"
-              size={{ base: "sm", md: "md" }}
-              leftIcon={<FaChartBar />}
-              onClick={() => navigate(`/exam/${examId}/report`)}
-              borderRadius="xl"
-              fontWeight="600"
-            >
-              تقرير الأسئلة
-            </Button>
-          </HStack>
-        </Flex>
+        <Box
+          position="absolute"
+          inset={0}
+          opacity={0.25}
+          pointerEvents="none"
+          style={{
+            backgroundImage:
+              "radial-gradient(rgba(255,255,255,0.35) 1px, transparent 1px)",
+            backgroundSize: "22px 22px",
+            maskImage: "radial-gradient(ellipse 70% 60% at 70% 40%, black, transparent)",
+          }}
+        />
+        <Box maxW="6xl" mx="auto" px={{ base: 4, md: 6 }} position="relative" zIndex={1}>
+          <Flex
+            direction={{ base: "column", md: "row" }}
+            align={{ base: "stretch", md: "flex-start" }}
+            justify="space-between"
+            gap={4}
+          >
+            <Box minW={0} flex={1}>
+              <HStack spacing={2} mb={2} flexWrap="wrap">
+                <Badge
+                  bg="whiteAlpha.200"
+                  color="white"
+                  borderRadius="full"
+                  px={2.5}
+                  py={0.5}
+                  fontSize="11px"
+                  fontWeight="800"
+                >
+                  امتحان شامل
+                </Badge>
+                <Badge
+                  bg="whiteAlpha.150"
+                  color="whiteAlpha.900"
+                  borderRadius="full"
+                  px={2.5}
+                  fontSize="11px"
+                >
+                  {questions.length} سؤال
+                </Badge>
+              </HStack>
+              <Heading
+                as="h1"
+                fontSize={{ base: "xl", md: "2xl" }}
+                fontWeight="800"
+                color="white"
+                letterSpacing="-0.02em"
+                lineHeight="1.3"
+                noOfLines={2}
+              >
+                {examTitle}
+              </Heading>
+              <Text mt={2} fontSize="sm" color="whiteAlpha.800">
+                {durationLabel}
+                {examMeta?.courseTitle ? `  ·  ${examMeta.courseTitle}` : ""}
+                {"  ·  "}يدعم LaTeX والرموز الكيميائية
+              </Text>
+            </Box>
+
+            <HStack spacing={2} flexWrap="wrap" justify={{ base: "flex-start", md: "flex-end" }}>
+              <Button
+                data-tour-id="platform-exam-tour-btn"
+                size="sm"
+                variant="ghost"
+                color="white"
+                borderRadius="lg"
+                leftIcon={<FaCompass />}
+                onClick={() => {
+                  setShowGrades(false);
+                  setExamTourOpen(true);
+                }}
+                _hover={{ bg: "whiteAlpha.200" }}
+              >
+                جولة
+              </Button>
+              <Button
+                data-tour-id="platform-exam-ai"
+                size="sm"
+                bg="whiteAlpha.200"
+                color="white"
+                borderRadius="lg"
+                leftIcon={<AiOutlineRobot />}
+                onClick={() => setAiExtractionModalOpen(true)}
+                _hover={{ bg: "whiteAlpha.300" }}
+              >
+                ذكاء اصطناعي
+              </Button>
+              <Button
+                data-tour-id="platform-exam-grades"
+                size="sm"
+                bg={showGrades ? "white" : "orange.400"}
+                color={showGrades ? "blue.700" : "white"}
+                borderRadius="lg"
+                leftIcon={<FaUser />}
+                onClick={() => {
+                  if (!showGrades && gradesData.length === 0) fetchGrades();
+                  setShowGrades((prev) => !prev);
+                }}
+                _hover={{ opacity: 0.92 }}
+              >
+                {showGrades ? "الأسئلة" : "الدرجات"}
+              </Button>
+              <Button
+                data-tour-id="platform-exam-report"
+                size="sm"
+                bg="whiteAlpha.200"
+                color="white"
+                borderRadius="lg"
+                leftIcon={<FaChartBar />}
+                onClick={() => navigate(`/exam/${examId}/report`)}
+                _hover={{ bg: "whiteAlpha.300" }}
+              >
+                التقرير
+              </Button>
+            </HStack>
+          </Flex>
+
+          {/* mini stats strip */}
+          <SimpleGrid columns={{ base: 2, sm: 3 }} spacing={2} mt={5} maxW="lg">
+            {[
+              { label: "الأسئلة", value: questions.length },
+              { label: "المدة", value: examMeta?.durationMinutes || "—" },
+              { label: "العرض", value: showGrades ? "درجات" : "أسئلة" },
+            ].map((item) => (
+              <Box
+                key={item.label}
+                bg="whiteAlpha.150"
+                borderWidth="1px"
+                borderColor="whiteAlpha.250"
+                borderRadius="xl"
+                px={3}
+                py={2.5}
+              >
+                <Text fontSize="10px" color="whiteAlpha.700" fontWeight="600">
+                  {item.label}
+                </Text>
+                <Text fontSize="md" fontWeight="800" color="white" mt={0.5}>
+                  {item.value}
+                </Text>
+              </Box>
+            ))}
+          </SimpleGrid>
+        </Box>
       </Box>
 
+      <Box maxW="6xl" mx="auto" px={{ base: 3, sm: 4, md: 6 }} mt={{ base: -3, md: -4 }} position="relative" zIndex={2}>
       {showGrades ? (
-        <Box w="full" maxW="4xl" mx="auto" px={{ base: 2, sm: 4 }}>
+        <Box
+          w="full"
+          bg={teacherCardBg}
+          borderWidth="1px"
+          borderColor={teacherCardBorder}
+          borderRadius="2xl"
+          shadow="sm"
+          p={{ base: 4, md: 5 }}
+        >
           <Flex
             direction={{ base: "column", sm: "row" }}
             align={{ base: "stretch", sm: "center" }}
             justify="space-between"
             gap={3}
-            mb={{ base: 4, md: 6 }}
+            mb={{ base: 4, md: 5 }}
           >
-            <Heading textAlign={{ base: "center", sm: "start" }} color="blue.600" fontSize={{ base: "xl", sm: "2xl", md: "3xl" }}>
-              {examMeta?.examTitle || "درجات الطلاب في الامتحان"}
-            </Heading>
-            <HStack spacing={2} flexWrap="wrap" justify={{ base: "center", sm: "flex-end" }}>
+            <Box>
+              <Text fontSize="xs" fontWeight="700" color={BLUE} mb={1}>
+                نتائج الطلاب
+              </Text>
+              <Heading size="md" color={teacherHeadingColor}>
+                {examMeta?.examTitle || "درجات الطلاب في الامتحان"}
+              </Heading>
+            </Box>
+            <HStack spacing={2} flexWrap="wrap" justify={{ base: "flex-start", sm: "flex-end" }}>
               <Select
-                size={{ base: "sm", md: "md" }}
-                maxW="220px"
+                size="sm"
+                maxW="200px"
                 value={String(gradesGroupId ?? "")}
                 onChange={(e) => {
                   const value = e.target.value;
@@ -579,7 +670,7 @@ const Exam = () => {
                   fetchGrades(value);
                 }}
                 isDisabled={gradesLoading}
-                borderRadius="xl"
+                borderRadius="lg"
               >
                 <option value="">كل المجموعات</option>
                 {studyGroups.map((group) => (
@@ -593,52 +684,49 @@ const Exam = () => {
                   <Button
                     colorScheme="green"
                     variant="outline"
-                    size={{ base: "sm", md: "md" }}
+                    size="sm"
                     leftIcon={<FiDownload />}
                     onClick={handleExportGrades}
-                    borderRadius="xl"
-                    fontWeight="600"
+                    borderRadius="lg"
                   >
-                    تصدير Excel
+                    Excel
                   </Button>
                   <Button
                     colorScheme="red"
                     variant="outline"
-                    size={{ base: "sm", md: "md" }}
+                    size="sm"
                     leftIcon={<FaFilePdf />}
                     onClick={handleExportGradesPdf}
                     isLoading={isExportingGradesPdf}
-                    loadingText="جاري التصدير..."
-                    borderRadius="xl"
-                    fontWeight="600"
+                    loadingText="..."
+                    borderRadius="lg"
                   >
-                    تصدير PDF
+                    PDF
                   </Button>
                 </>
               )}
               <Button
                 colorScheme="blue"
-                size={{ base: "sm", md: "md" }}
+                size="sm"
                 leftIcon={<FaChartBar />}
                 onClick={() => navigate(`/exam/${examId}/report`)}
-                borderRadius="xl"
-                fontWeight="600"
+                borderRadius="lg"
               >
                 تقرير الأسئلة
               </Button>
             </HStack>
           </Flex>
-          <Box w="full" maxW={{ base: "100%", sm: "400px" }} mx="auto" mb={{ base: 4, md: 6 }}>
-            <InputGroup size="lg">
+          <Box w="full" maxW={{ base: "100%", sm: "420px" }} mb={{ base: 4, md: 5 }}>
+            <InputGroup size="md">
               <Input
                 placeholder="ابحث بالاسم أو الإيميل أو الهاتف أو رقم الطالب..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                borderRadius="full"
-                bg="gray.50"
-                borderColor="gray.200"
+                borderRadius="xl"
+                bg={softBlue}
+                borderColor={teacherCardBorder}
                 _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px var(--chakra-colors-blue-500)" }}
-                fontSize={{ base: "sm", md: "md" }}
+                fontSize="sm"
               />
               <InputRightElement pointerEvents="none" height="100%">
                 <BiSearch color="gray.400" boxSize={5} />
@@ -646,34 +734,48 @@ const Exam = () => {
             </InputGroup>
           </Box>
           {gradesStats ? (
-            <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3} mb={{ base: 4, md: 6 }}>
-              <Box bg={teacherCardBg} borderWidth="1px" borderColor={teacherCardBorder} borderRadius="xl" p={4} textAlign="center">
-                <Text fontSize="xs" color="gray.500" fontWeight="600" mb={1}>عدد الطلاب</Text>
-                <Text fontSize="2xl" fontWeight="800" color="blue.600">{gradesStats.totalStudents ?? gradesData.length}</Text>
-              </Box>
-              <Box bg={teacherCardBg} borderWidth="1px" borderColor={teacherCardBorder} borderRadius="xl" p={4} textAlign="center">
-                <Text fontSize="xs" color="gray.500" fontWeight="600" mb={1}>متوسط النسبة</Text>
-                <Text fontSize="2xl" fontWeight="800" color="purple.600">
-                  {gradesStats.averageGrade != null ? `${Math.round(Number(gradesStats.averageGrade))}%` : "—"}
-                </Text>
-              </Box>
-              <Box bg={teacherCardBg} borderWidth="1px" borderColor={teacherCardBorder} borderRadius="xl" p={4} textAlign="center">
-                <Text fontSize="xs" color="gray.500" fontWeight="600" mb={1}>أعلى درجة</Text>
-                <Text fontSize="2xl" fontWeight="800" color="green.600">
-                  {gradesStats.maxGrade ?? "—"}
-                  {gradesStats.totalGrade != null ? (
-                    <Text as="span" fontSize="md" color="gray.500" fontWeight="600"> / {gradesStats.totalGrade}</Text>
-                  ) : null}
-                </Text>
-              </Box>
-              <Box bg={teacherCardBg} borderWidth="1px" borderColor={teacherCardBorder} borderRadius="xl" p={4} textAlign="center">
-                <Text fontSize="xs" color="gray.500" fontWeight="600" mb={1}>أقل درجة</Text>
-                <Text fontSize="2xl" fontWeight="800" color="orange.500">{gradesStats.minGrade ?? "—"}</Text>
-              </Box>
+            <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3} mb={{ base: 4, md: 5 }}>
+              {[
+                { label: "عدد الطلاب", value: gradesStats.totalStudents ?? gradesData.length, color: "blue.600" },
+                {
+                  label: "متوسط النسبة",
+                  value: gradesStats.averageGrade != null ? `${Math.round(Number(gradesStats.averageGrade))}%` : "—",
+                  color: "blue.500",
+                },
+                {
+                  label: "أعلى درجة",
+                  value: gradesStats.maxGrade ?? "—",
+                  suffix: gradesStats.totalGrade != null ? ` / ${gradesStats.totalGrade}` : null,
+                  color: "green.600",
+                },
+                { label: "أقل درجة", value: gradesStats.minGrade ?? "—", color: "orange.500" },
+              ].map((stat) => (
+                <Box
+                  key={stat.label}
+                  bg={softBlue}
+                  borderWidth="1px"
+                  borderColor={teacherCardBorder}
+                  borderRadius="xl"
+                  p={3.5}
+                  textAlign="center"
+                >
+                  <Text fontSize="xs" color={mutedText} fontWeight="600" mb={1}>
+                    {stat.label}
+                  </Text>
+                  <Text fontSize="xl" fontWeight="800" color={stat.color}>
+                    {stat.value}
+                    {stat.suffix ? (
+                      <Text as="span" fontSize="sm" color={mutedText} fontWeight="600">
+                        {stat.suffix}
+                      </Text>
+                    ) : null}
+                  </Text>
+                </Box>
+              ))}
             </SimpleGrid>
           ) : null}
           {examMeta?.courseTitle ? (
-            <Text fontSize="sm" color="gray.500" textAlign="center" mb={4}>
+            <Text fontSize="sm" color={mutedText} textAlign="center" mb={4}>
               الكورس: {examMeta.courseTitle}
             </Text>
           ) : null}
@@ -688,20 +790,20 @@ const Exam = () => {
             </Alert>
           ) : gradesData.length === 0 ? (
             <Center py={12}>
-              <Text fontSize="lg" color="gray.600" fontWeight="medium">
+              <Text fontSize="md" color={mutedText} fontWeight="medium">
                 لا توجد درجات بعد
               </Text>
             </Center>
           ) : (
-            <VStack spacing={{ base: 4, md: 5 }} align="stretch">
+            <VStack spacing={{ base: 3, md: 4 }} align="stretch">
               {filteredGrades.length === 0 ? (
                 <Center py={8}>
-                  <Text color="gray.500" fontSize="md">لا توجد نتائج مطابقة للبحث</Text>
+                  <Text color={mutedText} fontSize="md">لا توجد نتائج مطابقة للبحث</Text>
                 </Center>
               ) : (
                 <>
                   {filteredGrades.length > GRADES_PAGE_SIZE && (
-                    <Text fontSize="sm" color="gray.500" textAlign="center">
+                    <Text fontSize="sm" color={mutedText} textAlign="center">
                       عرض {gradesPageRangeStart}–{gradesPageRangeEnd} من {filteredGrades.length} طالب
                     </Text>
                   )}
@@ -738,17 +840,42 @@ const Exam = () => {
             id="question-image-upload"
           />
           {questions.length === 0 ? (
-            <Center py={16} px={4} data-tour-id="platform-exam-empty">
+            <Center
+              py={16}
+              px={4}
+              data-tour-id="platform-exam-empty"
+              bg={teacherCardBg}
+              borderWidth="1px"
+              borderColor={teacherCardBorder}
+              borderRadius="2xl"
+              shadow="sm"
+            >
               <VStack spacing={4}>
-                <Box p={4} borderRadius="full" bg="blue.50" color="blue.500">
-                  <FaBookOpen size={48} />
-                </Box>
-                <Text fontSize="lg" fontWeight="600" color="gray.600">
+                <Flex
+                  w={16}
+                  h={16}
+                  borderRadius="2xl"
+                  align="center"
+                  justify="center"
+                  color="white"
+                  style={{ background: `linear-gradient(135deg, ${BLUE}, #2B6CB0)` }}
+                >
+                  <FaBookOpen size={28} />
+                </Flex>
+                <Text fontSize="lg" fontWeight="700" color={teacherHeadingColor}>
                   لا توجد أسئلة بعد
                 </Text>
-                <Text fontSize="sm" color="gray.500" textAlign="center">
-                  أضف أسئلة من صفحة تفاصيل الكورس (تبويب الامتحانات)
+                <Text fontSize="sm" color={mutedText} textAlign="center" maxW="sm">
+                  أضف أسئلة من صفحة تفاصيل الكورس (تبويب الامتحانات) أو استخرجها بالذكاء الاصطناعي
                 </Text>
+                <Button
+                  colorScheme="blue"
+                  borderRadius="xl"
+                  leftIcon={<AiOutlineRobot />}
+                  onClick={() => setAiExtractionModalOpen(true)}
+                >
+                  استخراج بالذكاء الاصطناعي
+                </Button>
               </VStack>
             </Center>
           ) : (
@@ -802,6 +929,7 @@ const Exam = () => {
           )}
         </>
       )}
+      </Box>
 
       <Modal isOpen={editModal.open} onClose={() => setEditModal({ open: false, question: null })} size="xl" isCentered scrollBehavior="inside">
         <ModalOverlay />

@@ -503,10 +503,10 @@ const TeacherStudents = () => {
           )}
         </VStack>
 
-        <Modal isOpen={isOpen} onClose={onClose} size={{ base: "full", sm: "md" }} isCentered>
-          <ModalOverlay />
-          <ModalContent borderRadius={{ base: "none", sm: "xl" }} m={{ base: 0, sm: 4 }}>
-            <ModalHeader borderBottomWidth="1px" borderColor={borderColor} py={4}>
+        <Modal isOpen={isOpen} onClose={onClose} size={{ base: "sm", sm: "md" }} isCentered scrollBehavior="inside">
+          <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
+          <ModalContent borderRadius="2xl" mx={4} my={4} maxH="85vh">
+            <ModalHeader borderBottomWidth="1px" borderColor={borderColor} py={3.5}>
               <HStack spacing={2}>
                 <Icon as={FiCheckCircle} color="blue.500" />
                 <Text fontSize="md" fontWeight="semibold">
@@ -584,7 +584,7 @@ const TeacherStudents = () => {
 
             <ModalFooter borderTopWidth="1px" borderColor={borderColor}>
               <HStack spacing={2}>
-                <Button variant="ghost" onClick={onClose}>
+                <Button variant="ghost" onClick={onClose} size="sm">
                   إلغاء
                 </Button>
                 <Button

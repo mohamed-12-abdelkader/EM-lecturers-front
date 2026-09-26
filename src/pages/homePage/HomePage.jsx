@@ -17,6 +17,7 @@ import {
   ModalOverlay,
   ModalContent,
   ModalHeader,
+  ModalCloseButton,
   ModalBody,
   ModalFooter,
   VStack,
@@ -37,6 +38,10 @@ import {
   FaLightbulb,
   FaRocket,
   FaQrcode,
+  FaKey,
+  FaInfoCircle,
+  FaExclamationTriangle,
+  FaWhatsapp,
   FaCamera,
   FaGift,
   FaBell,
@@ -55,6 +60,12 @@ import baseUrl from "../../api/baseUrl";
 import { getTenantSubdomain } from "../../utils/tenantHost";
 import { getSocketEndpoint, getSocketClientOptions } from "../../utils/socketEndpoint";
 import { readAuthToken, readStoredUser } from "../../utils/authStorage";
+import {
+  buildActivationSupportWhatsAppUrl,
+  extractCourseFromActivationError,
+  getActivationSuccessCopy,
+  resolveActivationErrorCopy,
+} from "../../utils/courseActivationMessages";
 import { useAuth } from "../../contexts/AuthContext";
 import { Html5Qrcode } from "html5-qrcode";
 import { io } from "socket.io-client";
@@ -64,7 +75,6 @@ import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import ScientificChatPanel from "../../components/scientificChat/ScientificChatPanel";
 import HomeProHero from "./components/HomeProHero";
 import HomeProQuickActions from "./components/HomeProQuickActions";
-import HomeProPointsSummary from "./components/HomeProPointsSummary";
 import HomeProMyCourses from "./components/HomeProMyCourses";
 import HomeProPlatformCourses from "./components/HomeProPlatformCourses";
 import StudentCourseGroupGate from "../../components/courseGroups/StudentCourseGroupGate";
@@ -366,16 +376,30 @@ const HomePage = () => {
         { headers: authHeader },
       );
       markCourseEnrolled(course.id);
+      const successCopy = getActivationSuccessCopy(course);
       toast({
-        title: "تم تفعيل الكورس المجاني بنجاح",
+        title: successCopy.title,
+        description: successCopy.message,
         status: "success",
+        duration: 4000,
+        isClosable: true,
       });
       navigate(`/CourseDetailsPage/${course.id}`);
     } catch (error) {
+      const errorData = error?.response?.data || {};
+      const errCopy = resolveActivationErrorCopy({
+        apiMessage: errorData.message,
+        apiReason: errorData.reason,
+        errorData,
+        course,
+        enrolledCourseIds,
+      });
       toast({
-        title: "فشل الدخول للكورس",
-        description: error?.response?.data?.message || "حاول مجدداً.",
-        status: "error",
+        title: errCopy.message,
+        description: errCopy.reason,
+        status: errCopy.kind === "already_enrolled" ? "info" : "error",
+        duration: 4000,
+        isClosable: true,
       });
     } finally {
       setActivatingFreeCourseId(null);
@@ -413,18 +437,70 @@ const HomePage = () => {
         },
       );
       markCourseEnrolled(courseId);
+      const successCopy = getActivationSuccessCopy(
+        res?.data?.course || selectedCourseForActivation,
+      );
       toast({
-        title: res?.data?.message || "تم تفعيل الكورس بنجاح",
+        title: successCopy.title,
+        description: successCopy.message,
         status: "success",
+        duration: 4000,
+        isClosable: true,
       });
       onClose();
       setActivationCode("");
       setSelectedCourseForActivation(null);
       navigate(`/CourseDetailsPage/${courseId}`);
     } catch (error) {
+      const errorData = error?.response?.data || {};
+      const courseFromError = extractCourseFromActivationError(error);
+      const course =
+        courseFromError ||
+        selectedCourseForActivation ||
+        availableCourses.find((c) => String(c.id) === String(courseId)) ||
+        null;
+      const errCopy = resolveActivationErrorCopy({
+        apiMessage: errorData.message,
+        apiReason: errorData.reason,
+        errorData,
+        course: course || { id: courseId },
+        enrolledCourseIds,
+      });
+      if (errCopy.kind === "already_enrolled") {
+        onClose();
+        setActivationCode("");
+        setActivationResult({
+          alreadyEnrolled: true,
+          title: "أنت مشترك بالفعل",
+          message: "أنت مشترك في هذا الكورس بالفعل.",
+          reason: "اضغط «انتقل للكورس» للمتابعة مباشرة.",
+          course: course || selectedCourseForActivation,
+        });
+        setShowErrorModal(true);
+        return;
+      }
+      if (errCopy.kind === "code_exhausted") {
+        const usedCode = code;
+        onClose();
+        setActivationCode("");
+        setActivationResult({
+          codeExhausted: true,
+          title: "كود التفعيل مستنفذ",
+          message: errCopy.message,
+          reason: errCopy.reason,
+          usedCode,
+          supportWhatsAppUrl: buildActivationSupportWhatsAppUrl(usedCode),
+          course: course || selectedCourseForActivation,
+        });
+        setShowErrorModal(true);
+        return;
+      }
       toast({
-        title: error?.response?.data?.message || "فشل تفعيل الكورس بالكود",
+        title: errCopy.message,
+        description: errCopy.reason,
         status: "error",
+        duration: 4000,
+        isClosable: true,
       });
     } finally {
       setIsActivatingCode(false);
@@ -490,32 +566,75 @@ const HomePage = () => {
         { headers: authHeader },
       );
       if (response.data.success) {
+        const course = response.data.course || {
+          id: response.data.course_id,
+          title: response.data.course_name || response.data.course?.title,
+        };
+        const successCopy = getActivationSuccessCopy(course);
         setActivationResult({
           success: true,
-          message: response.data.message || "تم تفعيل الكورس بنجاح!",
-          courseName: response.data.course_name || "الكورس الجديد",
+          title: successCopy.title,
+          message: successCopy.message,
+          courseName: course.title || "الكورس",
         });
         setShowSuccessModal(true);
+        toast({
+          title: successCopy.title,
+          description: successCopy.message,
+          status: "success",
+          duration: 4000,
+          isClosable: true,
+        });
         setTimeout(() => window.location.reload(), 3000);
       }
     } catch (error) {
-      let errorMessage =
-        error.response?.data?.message || "حدث خطأ في تفعيل الكورس";
-      let errorReason =
-        error.response?.data?.reason || "يرجى المحاولة مرة أخرى";
-      if (
-        errorMessage.includes("Activation code has been fully used") ||
-        errorMessage.includes("fully used")
-      ) {
-        errorMessage = "هذا الكود مستخدم من قبل";
-        errorReason = "تم استخدام كود التفعيل هذا مسبقاً.";
+      const errorData = error?.response?.data || {};
+      const course = extractCourseFromActivationError(error);
+      const errCopy = resolveActivationErrorCopy({
+        apiMessage: errorData.message,
+        apiReason: errorData.reason,
+        errorData,
+        course,
+        enrolledCourseIds,
+      });
+      if (errCopy.kind === "already_enrolled") {
+        setActivationResult({
+          alreadyEnrolled: true,
+          title: "أنت مشترك بالفعل",
+          message: "أنت مشترك في هذا الكورس بالفعل.",
+          reason: "اضغط «انتقل للكورس» للمتابعة مباشرة.",
+          course,
+        });
+        setShowErrorModal(true);
+        return;
+      }
+      if (errCopy.kind === "code_exhausted") {
+        setActivationResult({
+          codeExhausted: true,
+          title: "كود التفعيل مستنفذ",
+          message: errCopy.message,
+          reason: errCopy.reason,
+          usedCode: String(qrData || "").trim(),
+          supportWhatsAppUrl: buildActivationSupportWhatsAppUrl(qrData),
+          course,
+        });
+        setShowErrorModal(true);
+        return;
       }
       setActivationResult({
         success: false,
-        message: errorMessage,
-        reason: errorReason,
+        title: "فشل تفعيل الكورس",
+        message: errCopy.message,
+        reason: errCopy.reason,
       });
       setShowErrorModal(true);
+      toast({
+        title: errCopy.message,
+        description: errCopy.reason,
+        status: "error",
+        duration: 4000,
+        isClosable: true,
+      });
     }
   };
 
@@ -884,6 +1003,11 @@ const HomePage = () => {
   const errorTextColor = useColorModeValue("red.600", "red.300");
   const enrolledCount = availableCourses.filter((c) => c?.is_enrolled).length;
   const availableToJoin = availableCourses.filter((c) => !c?.is_enrolled).length;
+  const enrolledCourseIds = useMemo(
+    () =>
+      availableCourses.filter((c) => c?.is_enrolled && c?.id != null).map((c) => c.id),
+    [availableCourses],
+  );
   const studentId =
     user?.id ?? userData?.id ?? user?.student_id ?? userData?.student_id ?? null;
   const pageBgColor = useColorModeValue("#F8FAFC", "gray.950");
@@ -1017,30 +1141,53 @@ const HomePage = () => {
             enrolledCount={enrolledCount}
             coursesCount={availableCourses.length}
             availableToJoin={availableToJoin}
+            enrolledCourseIds={enrolledCourseIds}
             onCourseActivated={() => setCoursesRefreshKey((k) => k + 1)}
           />
         </Box>
 
-        <HomeProQuickActions onCourseActivated={() => setCoursesRefreshKey((k) => k + 1)} />
-
-        <HomeProPointsSummary />
-
-        <HomeProMyCourses
-          teacherName={teacherDisplayName}
-          limit={3}
-          refreshKey={coursesRefreshKey}
+        <HomeProQuickActions
+          enrolledCourseIds={enrolledCourseIds}
+          onCourseActivated={() => setCoursesRefreshKey((k) => k + 1)}
         />
 
-        <HomeProPlatformCourses
-          courses={availableCourses}
-          loading={coursesLoading}
-          teacherName={teacherDisplayName}
-          isCourseFree={isCourseFree}
-          activatingCourseId={activatingFreeCourseId}
-          onEnter={(course) => navigate(`/CourseDetailsPage/${course.id}`)}
-          onSubscribe={openCourseActivationModal}
-          onActivateFree={handleActivateFreeCourse}
-        />
+        {enrolledCount > 0 ? (
+          <>
+            <HomeProMyCourses
+              teacherName={teacherDisplayName}
+              limit={3}
+              refreshKey={coursesRefreshKey}
+            />
+            <HomeProPlatformCourses
+              courses={availableCourses}
+              loading={coursesLoading}
+              teacherName={teacherDisplayName}
+              isCourseFree={isCourseFree}
+              activatingCourseId={activatingFreeCourseId}
+              onEnter={(course) => navigate(`/CourseDetailsPage/${course.id}`)}
+              onSubscribe={openCourseActivationModal}
+              onActivateFree={handleActivateFreeCourse}
+            />
+          </>
+        ) : (
+          <>
+            <HomeProPlatformCourses
+              courses={availableCourses}
+              loading={coursesLoading}
+              teacherName={teacherDisplayName}
+              isCourseFree={isCourseFree}
+              activatingCourseId={activatingFreeCourseId}
+              onEnter={(course) => navigate(`/CourseDetailsPage/${course.id}`)}
+              onSubscribe={openCourseActivationModal}
+              onActivateFree={handleActivateFreeCourse}
+            />
+            <HomeProMyCourses
+              teacherName={teacherDisplayName}
+              limit={3}
+              refreshKey={coursesRefreshKey}
+            />
+          </>
+        )}
       </VStack>
 
       {/* Floating scientific support chat — desktop only; mobile/tablet use bottom nav */}
@@ -1159,98 +1306,84 @@ const HomePage = () => {
         </VStack>
       </Box>
 
-      {/* Course activation modal */}
-      <Modal isOpen={isOpen} onClose={onClose} isCentered size={{ base: "full", md: "md" }}>
-        <ModalOverlay bg="blackAlpha.500" backdropFilter="blur(6px)" />
+      {/* Course activation modal — compact card, not full-screen */}
+      <Modal isOpen={isOpen} onClose={onClose} isCentered size="sm" motionPreset="scale">
+        <ModalOverlay bg="blackAlpha.500" backdropFilter="blur(4px)" />
         <ModalContent
-          mx={{ base: 0, md: 4 }}
-          my={{ base: 0, md: 6 }}
-          borderRadius={{ base: 0, md: "2xl" }}
+          mx={4}
+          maxW="360px"
+          borderRadius="2xl"
           bg={modalBg}
           borderWidth="1px"
           borderColor={modalBorder}
+          dir="rtl"
+          boxShadow="xl"
         >
-          <ModalHeader
-            bg={useColorModeValue("blue.50", "blue.900")}
-            borderBottomWidth="1px"
-            borderColor={modalBorder}
-          >
-            <Text fontWeight="black" color={useColorModeValue("blue.700", "blue.200")}>
+          <ModalHeader pb={2} pt={4} px={4}>
+            <Text fontSize="md" fontWeight="bold" color={useColorModeValue("slate.800", "white")}>
               تفعيل الكورس
             </Text>
-            <Text fontSize="xs" color={modalTextMuted} mt={1}>
-              {selectedCourseForActivation?.title || "اختر طريقة التفعيل المناسبة"}
+            <Text fontSize="xs" color={modalTextMuted} mt={0.5} fontWeight="normal" noOfLines={1}>
+              {selectedCourseForActivation?.title || "أدخل الكود أو امسح QR"}
             </Text>
           </ModalHeader>
-          <ModalBody py={5}>
-            <VStack spacing={4} align="stretch">
-              <Box
-                borderWidth="1px"
-                borderColor={useColorModeValue("orange.200", "orange.500")}
-                bg={useColorModeValue("orange.50", "orange.900")}
-                borderRadius="xl"
-                p={3}
-              >
-                <Text fontSize="sm" color={useColorModeValue("orange.800", "orange.100")} fontWeight="black" mb={2}>
-                  1) التفعيل بكود الاشتراك
+          <ModalCloseButton left={3} right="auto" size="sm" top={3} />
+          <ModalBody px={4} py={3}>
+            <VStack spacing={3} align="stretch">
+              <Box>
+                <Text fontSize="xs" fontWeight="bold" color={modalTextMuted} mb={1.5}>
+                  كود الاشتراك
                 </Text>
                 <Input
                   value={activationCode}
                   onChange={(e) => setActivationCode(e.target.value)}
                   placeholder="أدخل كود التفعيل"
+                  size="md"
+                  borderRadius="xl"
                   borderColor={useColorModeValue("orange.300", "orange.400")}
                   bg={useColorModeValue("white", "gray.700")}
                   _focus={{ borderColor: "orange.500", boxShadow: "0 0 0 1px #dd6b20" }}
-                  mb={2.5}
+                  mb={2}
                 />
                 <Button
                   w="full"
+                  h="42px"
                   bg="orange.500"
                   color="white"
                   _hover={{ bg: "orange.600" }}
                   onClick={activateCourseWithCode}
                   isLoading={isActivatingCode}
-                  borderRadius="lg"
-                  fontWeight="black"
+                  borderRadius="xl"
+                  fontWeight="bold"
+                  fontSize="sm"
+                  leftIcon={<Icon as={FaKey} />}
                 >
-                  تفعيل بالكود الآن
+                  تفعيل بالكود
                 </Button>
               </Box>
 
-              <Box
-                borderWidth="1px"
-                borderColor={useColorModeValue("blue.200", "blue.500")}
-                bg={useColorModeValue("blue.50", "blue.900")}
+              <Button
+                w="full"
+                h="42px"
+                variant="outline"
+                borderColor={useColorModeValue("blue.300", "blue.500")}
+                color={useColorModeValue("blue.700", "blue.200")}
+                _hover={{ bg: useColorModeValue("blue.50", "blue.900") }}
+                onClick={() => {
+                  onClose();
+                  setIsQrScannerOpen(true);
+                }}
+                leftIcon={<Icon as={FaQrcode} />}
                 borderRadius="xl"
-                p={3}
+                fontWeight="bold"
+                fontSize="sm"
               >
-                <Text fontSize="sm" color={useColorModeValue("blue.800", "blue.100")} fontWeight="black" mb={2}>
-                  2) التفعيل عبر QR
-                </Text>
-                <Text fontSize="xs" color={modalTextMuted} mb={2.5}>
-                  استخدم الكاميرا لمسح كود الـ QR الخاص بالكورس مباشرة.
-                </Text>
-                <Button
-                  w="full"
-                  variant="outline"
-                  borderColor={useColorModeValue("blue.300", "blue.500")}
-                  color={useColorModeValue("blue.700", "blue.200")}
-                  _hover={{ bg: useColorModeValue("blue.100", "blue.800") }}
-                  onClick={() => {
-                    onClose();
-                    setIsQrScannerOpen(true);
-                  }}
-                  leftIcon={<Icon as={FaQrcode} />}
-                  borderRadius="lg"
-                  fontWeight="bold"
-                >
-                  فتح الماسح بالكاميرا
-                </Button>
-              </Box>
+                تفعيل بالـ QR
+              </Button>
             </VStack>
           </ModalBody>
-          <ModalFooter borderTopWidth="1px" borderColor={modalBorder}>
-            <Button variant="ghost" onClick={onClose}>
+          <ModalFooter pt={1} pb={3} px={4}>
+            <Button variant="ghost" size="sm" onClick={onClose}>
               إلغاء
             </Button>
           </ModalFooter>
@@ -1258,42 +1391,176 @@ const HomePage = () => {
       </Modal>
 
       {/* QR scanner modal */}
-      <Modal isOpen={isQrScannerOpen} onClose={closeQrScanner} isCentered size={{ base: "full", md: "lg" }}>
-        <ModalOverlay bg="blackAlpha.650" />
+      <Modal isOpen={isQrScannerOpen} onClose={closeQrScanner} isCentered size="sm" motionPreset="scale">
+        <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(4px)" />
         <ModalContent
-          mx={{ base: 0, md: 4 }}
-          my={{ base: 0, md: 6 }}
-          borderRadius={{ base: 0, md: "2xl" }}
+          mx={4}
+          maxW="360px"
+          borderRadius="2xl"
           bg={modalBg}
           borderWidth="1px"
           borderColor={modalBorder}
+          dir="rtl"
         >
-          <ModalHeader borderBottomWidth="1px" borderColor={modalBorder}>
-            <Text fontWeight="black">تفعيل الكورس عبر QR</Text>
+          <ModalHeader pb={2} pt={4} px={4}>
+            <Text fontSize="md" fontWeight="bold">مسح QR</Text>
           </ModalHeader>
-          <ModalBody py={4}>
+          <ModalCloseButton left={3} right="auto" size="sm" top={3} />
+          <ModalBody px={4} py={3}>
             <VStack spacing={3}>
               <Box
                 id="qr-reader"
                 w="full"
-                maxW="420px"
-                minH={{ base: "340px", md: "320px" }}
+                maxW="280px"
+                minH="240px"
                 borderRadius="xl"
                 overflow="hidden"
                 borderWidth="1px"
                 borderColor={useColorModeValue("gray.200", "gray.700")}
                 bg={useColorModeValue("gray.50", "gray.800")}
               />
-              <Text fontSize="xs" color={modalTextMuted}>
-                وجّه الكاميرا إلى كود QR الخاص بالتفعيل
+              <Text fontSize="xs" color={modalTextMuted} textAlign="center">
+                وجّه الكاميرا إلى كود QR
               </Text>
             </VStack>
           </ModalBody>
-          <ModalFooter borderTopWidth="1px" borderColor={modalBorder}>
-            <Button variant="ghost" onClick={closeQrScanner}>
+          <ModalFooter pt={1} pb={3} px={4}>
+            <Button variant="ghost" size="sm" onClick={closeQrScanner}>
               إغلاق
             </Button>
           </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* مشترك بالفعل / كود مستنفذ — مودال واضح */}
+      <Modal
+        isOpen={
+          showErrorModal &&
+          (activationResult?.alreadyEnrolled || activationResult?.codeExhausted)
+        }
+        onClose={() => {
+          setShowErrorModal(false);
+          setActivationResult(null);
+        }}
+        isCentered
+        size="sm"
+        motionPreset="scale"
+      >
+        <ModalOverlay bg="blackAlpha.500" backdropFilter="blur(4px)" />
+        <ModalContent mx={4} maxW="360px" borderRadius="2xl" bg={modalBg} dir="rtl">
+          <ModalBody py={8} px={6}>
+            <VStack spacing={4} textAlign="center">
+              <Icon
+                as={activationResult?.codeExhausted ? FaExclamationTriangle : FaInfoCircle}
+                boxSize={12}
+                color={activationResult?.codeExhausted ? "red.400" : "blue.400"}
+              />
+              <Text
+                fontWeight="black"
+                fontSize="lg"
+                color={activationResult?.codeExhausted ? undefined : "blue.600"}
+              >
+                {activationResult?.title ||
+                  (activationResult?.codeExhausted
+                    ? "كود التفعيل مستنفذ"
+                    : "أنت مشترك بالفعل")}
+              </Text>
+              <Text fontSize="sm" color={modalTextMuted} lineHeight="1.8">
+                {activationResult?.message}
+              </Text>
+              {activationResult?.alreadyEnrolled && activationResult?.course?.title ? (
+                <Box
+                  w="full"
+                  borderRadius="xl"
+                  px={4}
+                  py={3}
+                  bg={useColorModeValue("blue.50", "blue.900")}
+                  borderWidth="1px"
+                  borderColor={useColorModeValue("blue.200", "blue.700")}
+                >
+                  <Text fontSize="xs" color={modalTextMuted} mb={1}>
+                    اسم الكورس
+                  </Text>
+                  <Text fontWeight="bold" color={useColorModeValue("blue.700", "blue.200")}>
+                    {activationResult.course.title}
+                  </Text>
+                </Box>
+              ) : null}
+              <Text fontSize="xs" color={modalTextMuted} lineHeight="1.8">
+                {activationResult?.reason}
+              </Text>
+              {activationResult?.codeExhausted ? (
+                <Box
+                  w="full"
+                  borderRadius="xl"
+                  px={3.5}
+                  py={3}
+                  bg={useColorModeValue("orange.50", "orange.900")}
+                  borderWidth="1px"
+                  borderColor={useColorModeValue("orange.200", "orange.700")}
+                  textAlign="right"
+                >
+                  <Text
+                    fontSize="sm"
+                    fontWeight="bold"
+                    color={useColorModeValue("orange.800", "orange.100")}
+                    mb={1}
+                  >
+                    تنبيه مهم
+                  </Text>
+                  <Text fontSize="xs" color={modalTextMuted} lineHeight="1.8">
+                    راسل الدعم الفني على واتساب لحل الخطأ ومتابعة حالة الكود
+                    {activationResult.usedCode ? ` (${activationResult.usedCode})` : ""}.
+                  </Text>
+                </Box>
+              ) : null}
+              {activationResult?.codeExhausted && activationResult?.supportWhatsAppUrl ? (
+                <Button
+                  as="a"
+                  href={activationResult.supportWhatsAppUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  w="full"
+                  colorScheme="green"
+                  borderRadius="xl"
+                  fontWeight="bold"
+                  h="46px"
+                  leftIcon={<Icon as={FaWhatsapp} />}
+                >
+                  تواصل عبر واتساب
+                </Button>
+              ) : null}
+              {activationResult?.alreadyEnrolled ? (
+                <Button
+                  w="full"
+                  colorScheme="blue"
+                  borderRadius="xl"
+                  fontWeight="bold"
+                  h="46px"
+                  onClick={() => {
+                    const courseId = activationResult?.course?.id;
+                    setShowErrorModal(false);
+                    setActivationResult(null);
+                    if (courseId) navigate(`/CourseDetailsPage/${courseId}`);
+                    else navigate("/my-courses");
+                  }}
+                >
+                  انتقل للكورس
+                </Button>
+              ) : null}
+              <Button
+                w="full"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowErrorModal(false);
+                  setActivationResult(null);
+                }}
+              >
+                إغلاق
+              </Button>
+            </VStack>
+          </ModalBody>
         </ModalContent>
       </Modal>
 

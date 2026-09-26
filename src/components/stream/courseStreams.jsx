@@ -126,7 +126,7 @@ function CourseStreams({ courseId }) {
               المحاضرات المباشرة
             </Heading>
             <Text fontSize="sm" color={muted}>
-              أنشئ جلسة بث أو انضم للجلسة الجارية
+              أنشئ محاضرة مباشرة أو انضم للبث الجاري
             </Text>
           </VStack>
         </HStack>
@@ -188,7 +188,7 @@ function CourseStreams({ courseId }) {
               fontWeight="700"
               size="sm"
             >
-              إنشاء جلسة
+              إنشاء محاضرة مباشرة
             </Button>
           )}
         </Box>
@@ -201,7 +201,6 @@ function CourseStreams({ courseId }) {
         isOpen={isOpen}
         onClose={onClose}
         onSuccess={() => {
-          onClose();
           refetch();
         }}
       />

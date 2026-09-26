@@ -10,12 +10,6 @@ import {
   useColorModeValue,
 } from "@chakra-ui/react";
 
-/**
- * تنقّل محتوى الكورس — تخطيط dashboard:
- * قائمة جانبية (يمين في RTL) بعناصر كبيرة واضحة (أيقونة + اسم + وصف + عداد)،
- * وعلى الموبايل بتتحول لكروت أفقية قابلة للتمرير.
- */
-
 const SECTION_COLORS = {
   red: { accent: "#E53E3E", scheme: "red" },
   blue: { accent: "#3182CE", scheme: "blue" },
@@ -30,7 +24,7 @@ function getColors(colorKey) {
 
 function LiveDot() {
   return (
-    <Box position="relative" w={2.5} h={2.5} flexShrink={0}>
+    <Box position="relative" w={2} h={2} flexShrink={0}>
       <Box
         position="absolute"
         inset={0}
@@ -45,6 +39,24 @@ function LiveDot() {
       />
       <Box position="absolute" inset={0} borderRadius="full" bg="red.500" />
     </Box>
+  );
+}
+
+function CountBadge({ section, isActive, colors, ...props }) {
+  if (section.count == null) return null;
+  return (
+    <Badge
+      colorScheme={isActive ? colors.scheme : "gray"}
+      variant={isActive ? "solid" : "subtle"}
+      borderRadius="full"
+      px={2}
+      py={0.5}
+      fontSize={{ base: "10px", md: "xs" }}
+      flexShrink={0}
+      {...props}
+    >
+      {section.count}
+    </Badge>
   );
 }
 
@@ -65,23 +77,24 @@ function NavItem({ section, isActive, onClick }) {
       onClick={onClick}
       w="full"
       minW={0}
-      align="center"
-      gap={{ base: 2, md: 3 }}
-      px={{ base: 2.5, md: 3.5 }}
-      py={{ base: 2.5, md: 3 }}
+      direction={{ base: "column", md: "row" }}
+      align={{ base: "stretch", md: "center" }}
+      gap={{ base: 1.5, md: 3 }}
+      px={{ base: 2, md: 3.5 }}
+      py={{ base: 2, md: 3 }}
       bg={cardBg}
       border="2px solid"
       borderColor={isActive ? colors.accent : border}
-      borderRadius="2xl"
+      borderRadius="xl"
       cursor="pointer"
       textAlign="start"
       position="relative"
       overflow="hidden"
       transition="all 0.18s ease"
-      boxShadow={isActive ? `0 8px 20px ${colors.accent}30` : "none"}
+      boxShadow={isActive ? `0 6px 16px ${colors.accent}28` : "sm"}
       _hover={{
         borderColor: isActive ? colors.accent : hoverBorder,
-        transform: "translateY(-1px)",
+        transform: { md: "translateY(-1px)" },
       }}
     >
       {isActive ? (
@@ -90,61 +103,84 @@ function NavItem({ section, isActive, onClick }) {
           top={0}
           bottom={0}
           right={0}
-          w="5px"
+          w="4px"
           bg={colors.accent}
+          display={{ base: "none", md: "block" }}
         />
       ) : null}
 
+      {/* Mobile header row: icon + count */}
       <Flex
-        w={{ base: "36px", md: "42px" }}
-        h={{ base: "36px", md: "42px" }}
+        display={{ base: "flex", md: "none" }}
         align="center"
-        justify="center"
-        borderRadius="xl"
-        bg={isActive ? colors.accent : idleIconBg}
-        color={isActive ? "white" : idleIconColor}
-        flexShrink={0}
-        transition="all 0.18s ease"
+        justify="space-between"
+        w="full"
       >
-        <Icon as={section.icon} boxSize={{ base: 4, md: 5 }} />
-      </Flex>
-
-      <Box flex={1} minW={0}>
-        <HStack spacing={1.5}>
-          <Text
-            fontWeight="800"
-            fontSize={{ base: "xs", md: "sm" }}
-            color={isActive ? colors.accent : titleColor}
-            noOfLines={1}
-          >
-            {section.label}
-          </Text>
-          {section.live ? <LiveDot /> : null}
-        </HStack>
-        <Text
-          fontSize="xs"
-          color={descColor}
-          noOfLines={1}
-          mt={0.5}
-          display={{ base: "none", sm: "block" }}
-        >
-          {section.desc}
-        </Text>
-      </Box>
-
-      {section.count != null ? (
-        <Badge
-          colorScheme={isActive ? colors.scheme : "gray"}
-          variant={isActive ? "solid" : "subtle"}
-          borderRadius="full"
-          px={2}
-          py={0.5}
-          fontSize="xs"
+        <Flex
+          w="30px"
+          h="30px"
+          align="center"
+          justify="center"
+          borderRadius="lg"
+          bg={isActive ? colors.accent : idleIconBg}
+          color={isActive ? "white" : idleIconColor}
           flexShrink={0}
         >
-          {section.count}
-        </Badge>
-      ) : null}
+          <Icon as={section.icon} boxSize={3.5} />
+        </Flex>
+        <HStack spacing={1.5}>
+          {section.live ? <LiveDot /> : null}
+          <CountBadge section={section} isActive={isActive} colors={colors} />
+        </HStack>
+      </Flex>
+
+      <Text
+        display={{ base: "block", md: "none" }}
+        fontWeight="800"
+        fontSize="11px"
+        color={isActive ? colors.accent : titleColor}
+        lineHeight="1.35"
+        whiteSpace="normal"
+        wordBreak="break-word"
+      >
+        {section.label}
+      </Text>
+
+      {/* Desktop row */}
+      <Flex display={{ base: "none", md: "flex" }} align="center" gap={3} w="full" minW={0}>
+        <Flex
+          w="42px"
+          h="42px"
+          align="center"
+          justify="center"
+          borderRadius="xl"
+          bg={isActive ? colors.accent : idleIconBg}
+          color={isActive ? "white" : idleIconColor}
+          flexShrink={0}
+        >
+          <Icon as={section.icon} boxSize={5} />
+        </Flex>
+
+        <Box flex={1} minW={0}>
+          <HStack spacing={1.5}>
+            <Text
+              fontWeight="800"
+              fontSize="sm"
+              color={isActive ? colors.accent : titleColor}
+              noOfLines={2}
+              lineHeight="1.35"
+            >
+              {section.label}
+            </Text>
+            {section.live ? <LiveDot /> : null}
+          </HStack>
+          <Text fontSize="xs" color={descColor} noOfLines={1} mt={0.5}>
+            {section.desc}
+          </Text>
+        </Box>
+
+        <CountBadge section={section} isActive={isActive} colors={colors} />
+      </Flex>
     </Flex>
   );
 }
@@ -164,7 +200,6 @@ export default function CourseContentNav({ sections, activeId, onChange }) {
   );
 }
 
-/** هيدر بسيط أعلى محتوى القسم النشط */
 export function SectionPanelHeader({ section }) {
   const colors = getColors(section.colorKey);
   const titleColor = useColorModeValue("gray.900", "white");
@@ -175,14 +210,14 @@ export function SectionPanelHeader({ section }) {
     <Flex
       align="center"
       gap={3}
-      pb={4}
-      mb={5}
+      pb={3}
+      mb={4}
       borderBottom="1px solid"
       borderColor={border}
     >
       <Flex
-        w="44px"
-        h="44px"
+        w={{ base: "38px", md: "44px" }}
+        h={{ base: "38px", md: "44px" }}
         align="center"
         justify="center"
         borderRadius="xl"
@@ -191,15 +226,16 @@ export function SectionPanelHeader({ section }) {
         flexShrink={0}
         boxShadow={`0 6px 16px ${colors.accent}40`}
       >
-        <Icon as={section.icon} boxSize={5} />
+        <Icon as={section.icon} boxSize={{ base: 4, md: 5 }} />
       </Flex>
       <Box minW={0}>
         <HStack spacing={2} flexWrap="wrap">
           <Text
             fontWeight="800"
-            fontSize={{ base: "lg", md: "xl" }}
+            fontSize={{ base: "md", md: "xl" }}
             color={titleColor}
             fontFamily="heading"
+            lineHeight="1.35"
           >
             {section.label}
           </Text>
@@ -215,12 +251,7 @@ export function SectionPanelHeader({ section }) {
             </Badge>
           ) : null}
           {section.count != null ? (
-            <Badge
-              colorScheme={colors.scheme}
-              variant="subtle"
-              borderRadius="full"
-              px={2.5}
-            >
+            <Badge colorScheme={colors.scheme} variant="subtle" borderRadius="full" px={2.5}>
               {section.count}
             </Badge>
           ) : null}

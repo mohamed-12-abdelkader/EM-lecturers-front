@@ -42,18 +42,14 @@ import EditCourseFileModal from "./EditCourseFileModal";
 import UploadCourseFileModal from "./UploadCourseFileModal";
 import { buildExamReportPath } from "../../exam/utils/examReportUtils";
 import {
-  crBtnSecondary,
   crCard,
   crEyebrow,
-  lcBadge,
   lcBody,
   lcBodySm,
-  lcBtn,
   lcCaption,
   lcIndex,
   lcLabel,
   lcRoot,
-  lcTitle,
   lcTitleSm,
 } from "../courseTheme";
 import {
@@ -90,34 +86,22 @@ function StudentFileCard({ file, courseId }) {
   const name = getCourseFileDisplayName(file);
   const sizeLabel = formatCourseFileSize(file.fileSize);
   const viewPath = buildCourseFileViewPath(courseId, file);
-  const description = file.description?.trim();
 
   const inner = (
     <div
-      className="block rounded-2xl border-2 border-violet-200 bg-white p-3.5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-violet-400 hover:shadow-md sm:p-4 dark:border-violet-800 dark:bg-slate-900 dark:hover:border-violet-500"
+      className="flex items-center gap-2.5 rounded-xl border border-violet-100 bg-white px-2.5 py-2 transition-colors hover:border-violet-300 dark:border-violet-900/50 dark:bg-slate-900 dark:hover:border-violet-700"
       dir="rtl"
     >
-      <div className="flex items-start gap-3 sm:gap-4">
-        <div className="flex h-[4.25rem] w-[4.25rem] shrink-0 flex-col items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-violet-700 text-white shadow-sm sm:h-20 sm:w-20">
-          <FaFilePdf className="text-xl sm:text-2xl" />
-          <span className="mt-1 text-[10px] font-bold tracking-wide">PDF</span>
-        </div>
-        <div className="min-w-0 flex-1 text-right">
-          <span className={`mb-1.5 inline-flex rounded-full bg-violet-50 px-2 py-0.5 ${lcBadge} text-violet-700 dark:bg-violet-950/40 dark:text-violet-300`}>
-            ملف المحاضرة
-          </span>
-          <h5 className={`break-words ${lcTitleSm} !text-[0.95rem] sm:!text-base`}>{name}</h5>
-          <p className={`mt-1 ${lcCaption}`}>
-            {sizeLabel ? `حجم الملف: ${sizeLabel}` : "اضغط لفتح الملف داخل المنصة"}
-          </p>
-          {description ? (
-            <p className={`mt-1 line-clamp-2 ${lcBodySm}`}>{description}</p>
-          ) : null}
-        </div>
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-600 text-white">
+        <FaFilePdf className="text-xs" />
       </div>
-      <span className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-violet-700">
-        <FaEye className="text-xs" />
-        افتح الملف
+      <div className="min-w-0 flex-1 text-right">
+        <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">{name}</p>
+        {sizeLabel ? <p className={`mt-0.5 ${lcLabel}`}>{sizeLabel}</p> : null}
+      </div>
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-violet-600 px-2.5 py-1.5 text-[11px] font-bold text-white">
+        <FaEye className="text-[9px]" />
+        فتح
       </span>
     </div>
   );
@@ -144,45 +128,41 @@ function LecturePdfRow({ file, courseId, canManage, onEdit, onDelete }) {
 
   return (
     <div
-      className="flex flex-col gap-3 rounded-xl border border-violet-100 bg-white p-3 transition-colors hover:border-violet-300 sm:flex-row sm:items-center sm:gap-3 sm:px-3.5 sm:py-2.5 dark:border-violet-900/50 dark:bg-slate-900 dark:hover:border-violet-700"
+      className="flex items-center gap-2 rounded-xl border border-violet-100 bg-white px-2.5 py-2 transition-colors hover:border-violet-300 dark:border-violet-900/50 dark:bg-slate-900 dark:hover:border-violet-700"
       dir="rtl"
     >
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white shadow-sm">
-          <FaFilePdf className="text-sm" />
-        </div>
-        <div className="min-w-0 text-right">
-          <p className={`truncate ${lcBodySm} font-bold text-slate-800 dark:text-slate-100`}>{name}</p>
-          {sizeLabel ? <p className={`mt-0.5 ${lcLabel}`}>{sizeLabel}</p> : null}
-        </div>
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-600 text-white">
+        <FaFilePdf className="text-xs" />
       </div>
-      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+      <div className="min-w-0 flex-1 text-right">
+        <p className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">{name}</p>
+        {sizeLabel ? <p className={`mt-0.5 ${lcLabel}`}>{sizeLabel}</p> : null}
+      </div>
+      <div className="flex shrink-0 items-center gap-0.5">
         {viewPath ? (
           <Link
             to={viewPath}
-            className={`${crBtnSecondary} w-full !border-violet-200 !text-violet-700 hover:!bg-violet-50 sm:w-auto dark:!border-violet-800 dark:!text-violet-300`}
+            aria-label={`عرض ${name}`}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-950/40"
           >
-            <FaEye />
-            عرض الملف
+            <FaEye className="text-xs" />
           </Link>
         ) : null}
         <button
           type="button"
           aria-label={`تعديل ${name}`}
-          className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-lg border border-slate-200 px-3 text-blue-600 hover:bg-blue-50 sm:h-auto sm:w-auto dark:border-slate-700 dark:hover:bg-blue-950/40"
+          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
           onClick={() => onEdit(file)}
         >
           <FaEdit className="text-xs" />
-          <span className="ms-1.5 text-xs font-bold sm:hidden">تعديل</span>
         </button>
         <button
           type="button"
           aria-label={`حذف ${name}`}
-          className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-lg px-3 text-red-500 hover:bg-red-50 sm:h-auto sm:w-auto dark:hover:bg-red-950/40"
+          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40"
           onClick={() => onDelete(file)}
         >
           <FaTrash className="text-xs" />
-          <span className="ms-1.5 text-xs font-bold sm:hidden">حذف</span>
         </button>
       </div>
     </div>
@@ -246,64 +226,37 @@ function ProgressRing({ percent }) {
 }
 
 /** عنوان قسم داخل جسم المحاضرة (الفيديوهات / الملفات / الواجبات) */
-function SectionHeading({ icon: IconComp, label, count, accent = "blue", hint, action }) {
+function SectionHeading({ icon: IconComp, label, count, accent = "blue", action }) {
   const tones = {
     blue: {
-      icon: "bg-blue-500 shadow-[0_6px_14px_rgba(59,130,246,0.28)]",
+      icon: "bg-blue-500",
       badge: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
     },
     purple: {
-      icon: "bg-violet-600 shadow-[0_6px_14px_rgba(124,58,237,0.28)]",
+      icon: "bg-violet-600",
       badge: "bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300",
     },
     orange: {
-      icon: "bg-orange-500 shadow-[0_6px_14px_rgba(249,115,22,0.28)]",
+      icon: "bg-orange-500",
       badge: "bg-orange-50 text-orange-700 dark:bg-orange-950/50 dark:text-orange-300",
     },
   };
   const tone = tones[accent] || tones.blue;
 
   return (
-    <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-      <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex min-w-0 items-center gap-2">
         <div
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white sm:h-10 sm:w-10 ${tone.icon}`}
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white ${tone.icon}`}
         >
-          <IconComp className="text-sm" />
+          <IconComp className="text-[11px]" />
         </div>
-        <div className="min-w-0 text-right">
-          <div className="flex flex-wrap items-center gap-2">
-            <h4 className={`${lcTitleSm} !text-sm sm:!text-base`}>{label}</h4>
-            <span className={`rounded-full px-2.5 py-0.5 ${lcBadge} ${tone.badge}`}>
-              {count}
-            </span>
-          </div>
-          {hint ? <p className={`mt-0.5 ${lcCaption}`}>{hint}</p> : null}
-        </div>
+        <h4 className="text-xs font-extrabold text-slate-800 dark:text-slate-100 sm:text-sm">{label}</h4>
+        <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${tone.badge}`}>
+          {count}
+        </span>
       </div>
-      {action ? <div className="w-full sm:w-auto">{action}</div> : null}
-    </div>
-  );
-}
-
-function StudentPathStep({ step, title, detail, done, tone = "blue" }) {
-  const tones = {
-    blue: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-300",
-    purple:
-      "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
-    orange:
-      "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-300",
-  };
-
-  return (
-    <div className={`flex items-start gap-2.5 rounded-xl border px-3 py-2.5 ${tones[tone] || tones.blue}`}>
-      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-black shadow-sm dark:bg-slate-900">
-        {done ? <FaCheckCircle className="text-xs text-emerald-500" /> : step}
-      </span>
-      <div className="min-w-0 text-right">
-        <p className="text-xs font-black">{title}</p>
-        <p className="mt-0.5 text-[11px] font-semibold opacity-80">{detail}</p>
-      </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   );
 }
@@ -311,11 +264,9 @@ function StudentPathStep({ step, title, detail, done, tone = "blue" }) {
 /** لوحة قسم بمحتوى واضح داخل المحاضرة */
 function ContentSection({ accent = "blue", children, className = "", ...rest }) {
   const tones = {
-    blue: "border-blue-200/80 bg-gradient-to-b from-blue-50/90 to-white dark:border-blue-900/60 dark:from-blue-950/30 dark:to-slate-900",
-    purple:
-      "border-violet-200/80 bg-gradient-to-b from-violet-50/90 to-white dark:border-violet-900/60 dark:from-violet-950/30 dark:to-slate-900",
-    orange:
-      "border-orange-200/80 bg-gradient-to-b from-orange-50/90 to-white dark:border-orange-900/60 dark:from-orange-950/30 dark:to-slate-900",
+    blue: "border-blue-100 dark:border-blue-900/50",
+    purple: "border-violet-100 dark:border-violet-900/50",
+    orange: "border-orange-100 dark:border-orange-900/50",
   };
   const bar = {
     blue: "bg-blue-500",
@@ -325,14 +276,14 @@ function ContentSection({ accent = "blue", children, className = "", ...rest }) 
 
   return (
     <section
-      className={`relative overflow-hidden rounded-2xl border p-3.5 sm:p-4 ${tones[accent] || tones.blue} ${className}`}
+      className={`relative overflow-hidden rounded-xl border bg-white p-2.5 dark:bg-slate-900 ${tones[accent] || tones.blue} ${className}`}
       {...rest}
     >
       <span
-        className={`absolute inset-y-3 start-0 w-1 rounded-full ${bar[accent] || bar.blue}`}
+        className={`absolute inset-y-2 start-0 w-0.5 rounded-full ${bar[accent] || bar.blue}`}
         aria-hidden
       />
-      <div className="space-y-3 ps-2 sm:ps-3">{children}</div>
+      <div className="space-y-2 ps-2">{children}</div>
     </section>
   );
 }
@@ -353,11 +304,11 @@ function ContentChip({ icon: IconComp, label, count, tone = "blue", active = tru
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold sm:text-xs ${tones[tone]}`}
+      className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-bold sm:gap-1.5 sm:rounded-full sm:px-2.5 sm:text-xs ${tones[tone]}`}
     >
       <IconComp className="text-[10px]" />
-      <span>{count}</span>
-      <span className="opacity-80">{label}</span>
+      <span className="tabular-nums">{count}</span>
+      <span className="hidden opacity-80 sm:inline">{label}</span>
     </span>
   );
 }
@@ -399,65 +350,56 @@ function videoWatchState(video) {
 function StudentVideoCard({ video, index, recommended }) {
   const state = videoWatchState(video);
   const CtaIcon = state.icon;
+  const isDone = state.key === "done";
+  const isStarted = state.key === "started";
 
   return (
     <Link
       to={`/video/${video.id}`}
-      className={`group block rounded-2xl border-2 bg-white p-3.5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md sm:p-4 dark:bg-slate-900 ${
-        recommended ? "border-blue-400 ring-2 ring-blue-100 dark:border-blue-500 dark:ring-blue-900/50" : state.accent
+      className={`flex items-center gap-2.5 rounded-xl border bg-white px-2.5 py-2 transition-colors dark:bg-slate-900 ${
+        recommended
+          ? "border-blue-300 dark:border-blue-600"
+          : "border-slate-200 hover:border-blue-300 dark:border-slate-700 dark:hover:border-blue-700"
       }`}
       dir="rtl"
     >
-      <div className="flex items-start gap-3 sm:gap-4">
-        <div
-          className={`relative flex h-[4.25rem] w-[4.25rem] shrink-0 items-center justify-center overflow-hidden rounded-2xl text-white shadow-sm sm:h-20 sm:w-20 ${
-            state.key === "done"
-              ? "bg-emerald-500"
-              : "bg-gradient-to-br from-blue-500 to-blue-700"
-          }`}
-        >
-          {state.key === "done" ? (
-            <FaCheckCircle className="text-lg sm:text-xl" />
-          ) : (
-            <FaPlay className="ms-0.5 text-lg sm:text-xl" />
-          )}
-          <span className="absolute bottom-1 start-1 rounded-md bg-black/45 px-1.5 py-px text-[10px] font-bold">
-            {index + 1}
-          </span>
-        </div>
-        <div className="min-w-0 flex-1 text-right">
-          <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-            <span className={`rounded-full px-2 py-0.5 ${lcBadge} ${state.chip}`}>{state.label}</span>
-            {recommended ? (
-              <span className={`rounded-full bg-orange-50 px-2 py-0.5 ${lcBadge} text-orange-600 dark:bg-orange-950/40 dark:text-orange-300`}>
-                التالي
-              </span>
-            ) : null}
-          </div>
-          <h5 className={`break-words ${lcTitleSm} !text-[0.95rem] sm:!text-base`}>
+      <span
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold text-white ${
+          isDone ? "bg-emerald-500" : isStarted ? "bg-blue-500" : "bg-blue-500"
+        }`}
+      >
+        {isDone ? <FaCheckCircle className="text-xs" /> : <FaPlay className="ms-px text-[10px]" />}
+      </span>
+      <div className="min-w-0 flex-1 text-right">
+        <div className="flex items-center gap-1.5">
+          <h5 className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">
             {video.title || `الفيديو ${index + 1}`}
           </h5>
-          {video.duration ? (
-            <p className={`mt-1 inline-flex items-center gap-1 ${lcCaption}`}>
-              <FaClock className="text-[10px]" />
-              المدة: {video.duration}
-            </p>
-          ) : (
-            <p className={`mt-1 ${lcCaption}`}>اضغط للمشاهدة داخل المحاضرة</p>
-          )}
+          {recommended ? (
+            <span className="shrink-0 rounded bg-orange-50 px-1 py-px text-[9px] font-bold text-orange-600 dark:bg-orange-950/40 dark:text-orange-300">
+              التالي
+            </span>
+          ) : null}
         </div>
+        <p className={`mt-0.5 ${lcLabel}`}>
+          {video.duration ? video.duration : state.label}
+        </p>
       </div>
       <span
-        className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-colors ${state.button}`}
+        className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-bold ${
+          isDone
+            ? "border border-emerald-500 text-emerald-700 dark:text-emerald-300"
+            : "bg-blue-500 text-white"
+        }`}
       >
-        <CtaIcon className="text-xs" />
-        {state.cta}
+        <CtaIcon className="text-[9px]" />
+        {isDone ? "إعادة" : isStarted ? "متابعة" : "شاهد"}
       </span>
     </Link>
   );
 }
 
-/** صف فيديو — عمودي على الموبايل، أفقي من sm */
+/** صف فيديو — مضغوط للطالب والمدرس */
 function VideoRow({ video, index, canManage, handleDeleteVideo, recommended = false }) {
   if (!canManage) {
     return <StudentVideoCard video={video} index={index} recommended={recommended} />;
@@ -468,57 +410,53 @@ function VideoRow({ video, index, canManage, handleDeleteVideo, recommended = fa
 
   return (
     <div
-      className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 transition-colors hover:border-blue-300 sm:flex-row sm:items-center sm:gap-3 sm:px-3.5 sm:py-2.5 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-700"
+      className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 transition-colors hover:border-blue-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-blue-700"
       dir="rtl"
     >
-      <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
-        <span
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold sm:h-8 sm:w-8 ${
-            isDone
-              ? "bg-emerald-500 text-white"
-              : isStarted
-                ? "bg-blue-500 text-white"
-                : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-          }`}
-        >
-          {isDone ? <FaCheckCircle className="text-sm" /> : index + 1}
-        </span>
+      <span
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[11px] font-bold ${
+          isDone
+            ? "bg-emerald-500 text-white"
+            : isStarted
+              ? "bg-blue-500 text-white"
+              : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+        }`}
+      >
+        {isDone ? <FaCheckCircle className="text-xs" /> : index + 1}
+      </span>
 
-        <div className="min-w-0 flex-1 text-right">
-          <h5 className={`break-words ${lcTitleSm} !text-sm sm:truncate`}>
-            {video.title || `الفيديو ${index + 1}`}
-          </h5>
-          {video.duration ? (
-            <span className={`mt-0.5 inline-flex items-center gap-1 ${lcCaption}`}>
-              <FaClock className="text-[9px]" />
-              {video.duration}
-            </span>
-          ) : null}
-        </div>
+      <div className="min-w-0 flex-1 text-right">
+        <h5 className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">
+          {video.title || `الفيديو ${index + 1}`}
+        </h5>
+        {video.duration ? (
+          <span className={`mt-0.5 inline-flex items-center gap-1 ${lcLabel}`}>
+            <FaClock className="text-[8px]" />
+            {video.duration}
+          </span>
+        ) : null}
       </div>
 
-      <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto sm:justify-end">
+      <div className="flex shrink-0 items-center gap-1">
         <Link
           to={`/video/${video.id}`}
-          className={`inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 sm:flex-initial sm:py-1.5 ${lcBtn} transition-colors ${
+          className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition-colors ${
             isDone || isStarted
               ? "border border-blue-500 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40"
               : "bg-blue-500 text-white hover:bg-blue-600"
           }`}
         >
-          {isDone ? <FaRedo className="text-[10px]" /> : <FaPlay className="text-[10px]" />}
+          {isDone ? <FaRedo className="text-[9px]" /> : <FaPlay className="text-[9px]" />}
           مشاهدة
         </Link>
-        {canManage ? (
-          <button
-            type="button"
-            aria-label="حذف الفيديو"
-            className="inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg text-red-500 transition-colors hover:bg-red-50 sm:h-auto sm:w-auto sm:p-2 dark:hover:bg-red-950/40"
-            onClick={() => handleDeleteVideo(video.id, video.title || "فيديو")}
-          >
-            <FaTrash className="text-xs" />
-          </button>
-        ) : null}
+        <button
+          type="button"
+          aria-label="حذف الفيديو"
+          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/40"
+          onClick={() => handleDeleteVideo(video.id, video.title || "فيديو")}
+        >
+          <FaTrash className="text-xs" />
+        </button>
       </div>
     </div>
   );
@@ -578,43 +516,37 @@ function StudentAssignmentCard({ exam }) {
   const StatusIcon = examStatus.icon;
 
   const meta = [
-    exam.total_grade != null ? `الدرجة الكاملة: ${exam.total_grade}` : null,
-    score != null ? `درجتك: ${score}` : null,
-    remaining ? `متبقٍ ${remaining}` : formatLectureExamDurationLabel(exam)
-      ? `المدة: ${formatLectureExamDurationLabel(exam)}`
-      : null,
+    exam.total_grade != null ? `${exam.total_grade} درجة` : null,
+    score != null ? `درجتك ${score}` : null,
+    remaining ? `متبقٍ ${remaining}` : formatLectureExamDurationLabel(exam) || null,
   ].filter(Boolean);
 
   const inner = (
     <div
-      className={`rounded-2xl border-2 bg-white p-3.5 shadow-sm sm:p-4 dark:bg-slate-900 ${visual.accent} ${
-        closed ? "" : "transition-all hover:-translate-y-0.5 hover:shadow-md"
+      className={`flex items-center gap-2.5 rounded-xl border-2 bg-white px-2.5 py-2 dark:bg-slate-900 ${visual.accent} ${
+        closed ? "opacity-80" : "transition-colors hover:shadow-sm"
       }`}
       dir="rtl"
     >
-      <div className="flex items-start gap-3 sm:gap-4">
-        <div className={`flex h-[4.25rem] w-[4.25rem] shrink-0 items-center justify-center rounded-2xl text-white shadow-sm sm:h-20 sm:w-20 ${visual.iconWrap}`}>
-          <StatusIcon className="text-lg sm:text-xl" />
-        </div>
-        <div className="min-w-0 flex-1 text-right">
-          <span className={`mb-1.5 inline-flex rounded-full px-2 py-0.5 ${lcBadge} ${visual.chip}`}>
-            {examStatus.label}
-          </span>
-          <h5 className={`break-words ${lcTitleSm} !text-[0.95rem] sm:!text-base`}>
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white ${visual.iconWrap}`}>
+        <StatusIcon className="text-xs" />
+      </span>
+      <div className="min-w-0 flex-1 text-right">
+        <div className="flex items-center gap-1.5">
+          <h5 className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">
             {exam.title || "واجب المحاضرة"}
           </h5>
-          {meta.length ? (
-            <p className={`mt-1 ${lcCaption}`}>{meta.join(" • ")}</p>
-          ) : (
-            <p className={`mt-1 ${lcCaption}`}>حل التمرين بعد مشاهدة الفيديوهات</p>
-          )}
+          <span className={`shrink-0 rounded px-1 py-px text-[9px] font-bold ${visual.chip}`}>
+            {examStatus.label}
+          </span>
         </div>
+        {meta.length ? <p className={`mt-0.5 ${lcLabel}`}>{meta.join(" · ")}</p> : null}
       </div>
       <span
-        className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold ${visual.button}`}
+        className={`inline-flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-bold ${visual.button}`}
       >
-        <StatusIcon className="text-xs" />
-        {examStatus.cta}
+        <StatusIcon className="text-[9px]" />
+        {examStatus.tone === "done" ? "النتيجة" : examStatus.tone === "active" ? "متابعة" : "ابدأ"}
       </span>
     </div>
   );
@@ -645,60 +577,57 @@ function AssignmentRow({
 
   return (
     <div
-      className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 transition-colors hover:border-orange-300 sm:flex-row sm:items-center sm:gap-3 sm:px-3.5 sm:py-2.5 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-orange-700"
+      className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 transition-colors hover:border-orange-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-orange-700"
       dir="rtl"
     >
-      <div className="flex min-w-0 flex-1 items-start gap-3 sm:items-center">
-        <span
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white sm:h-8 sm:w-8 ${
-            solved ? "bg-emerald-500" : "bg-orange-500"
-          }`}
-        >
-          <examStatus.icon className="text-xs" />
-        </span>
+      <span
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white ${
+          solved ? "bg-emerald-500" : "bg-orange-500"
+        }`}
+      >
+        <examStatus.icon className="text-xs" />
+      </span>
 
-        <div className="min-w-0 flex-1 text-right">
-          <h5 className={`break-words ${lcTitleSm} !text-sm sm:truncate`}>
-            {exam.title || "واجب المحاضرة"}
-          </h5>
-          <p className={`mt-0.5 break-words ${lcCaption}`}>
-            الدرجة: {exam.total_grade ?? "—"} • المدة: {formatLectureExamDurationLabel(exam)}
-          </p>
-        </div>
+      <div className="min-w-0 flex-1 text-right">
+        <h5 className="truncate text-xs font-bold text-slate-800 dark:text-slate-100">
+          {exam.title || "واجب المحاضرة"}
+        </h5>
+        <p className={`mt-0.5 truncate ${lcLabel}`}>
+          {exam.total_grade ?? "—"} · {formatLectureExamDurationLabel(exam)}
+        </p>
       </div>
 
-      <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end sm:gap-1.5">
+      <div className="flex shrink-0 items-center gap-0.5">
         <Link
           to={`/ComprehensiveExam/${exam.id}`}
-          className="inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-blue-500 px-3 py-2.5 text-xs font-bold text-blue-500 transition-colors hover:bg-blue-50 sm:w-auto sm:py-1.5 dark:hover:bg-blue-950/40"
+          aria-label="إدارة الواجب"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40"
         >
-          <FaCog className="text-[10px]" />
-          إدارة
+          <FaCog className="text-xs" />
         </Link>
         <Link
           to={buildExamReportPath(exam.id, { from: "lecture" })}
-          className="inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-indigo-500 px-3 py-2.5 text-xs font-bold text-indigo-600 transition-colors hover:bg-indigo-50 sm:w-auto sm:py-1.5 dark:hover:bg-indigo-950/40"
+          aria-label="تقرير الواجب"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
         >
-          <FaChartBar className="text-[10px]" />
-          التقرير
+          <FaChartBar className="text-xs" />
         </Link>
         <button
           type="button"
-          className="inline-flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-blue-500 px-3 py-2.5 text-xs font-bold text-white transition-colors hover:bg-blue-600 sm:w-auto sm:py-1.5"
+          aria-label="تعديل الواجب"
+          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40"
           onClick={() => openExamModal("edit", exam)}
         >
-          <FaEdit className="text-[10px]" />
-          تعديل
+          <FaEdit className="text-xs" />
         </button>
         <button
           type="button"
           aria-label="حذف الواجب"
-          className="inline-flex h-10 w-full cursor-pointer items-center justify-center rounded-lg p-2 text-red-500 hover:bg-red-50 disabled:opacity-50 sm:h-auto sm:w-auto dark:hover:bg-red-950/40"
+          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-red-500 hover:bg-red-50 disabled:opacity-50 dark:hover:bg-red-950/40"
           disabled={examActionLoading}
           onClick={() => openDeleteExamDialog(exam)}
         >
           {examActionLoading ? <Spinner size="sm" /> : <FaTrash className="text-xs" />}
-          <span className="ms-1.5 text-xs font-bold sm:hidden">حذف</span>
         </button>
       </div>
     </div>
@@ -951,7 +880,6 @@ const LectureCard = ({
   const nextVideoId = !canManage
     ? (lecture.videos || []).find((video) => !video.is_completed)?.id
     : null;
-  const assignmentStatusForPath = hasAssignments ? getExamStatus(assignments[0]) : null;
 
   return (
     <motion.article
@@ -965,30 +893,33 @@ const LectureCard = ({
     >
       {/* ── Header ── */}
       <div className="relative border-b border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900">
-        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-l from-blue-500 to-orange-500" aria-hidden />
+        <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-l from-blue-500 to-orange-500 sm:h-1" aria-hidden />
 
-        <div className="space-y-3 p-3.5 sm:p-5">
-          <div className="flex items-start gap-3 sm:gap-4">
-            <div className="flex shrink-0 items-center gap-2.5 sm:gap-3">
-              <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-500 ${lcIndex} text-base text-white shadow-[0_8px_20px_rgba(49,130,206,0.25)] sm:h-14 sm:w-14 sm:rounded-2xl sm:text-lg`}>
+        <div className="space-y-2.5 p-3 sm:space-y-3 sm:p-5">
+          {/* الصف الرئيسي: رقم + عنوان + فتح */}
+          <div className="flex items-start gap-2.5 sm:gap-4">
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500 text-sm font-bold tabular-nums text-white shadow-sm sm:h-14 sm:w-14 sm:rounded-2xl sm:text-lg ${lcIndex}`}>
                 {lectureIndex + 1}
               </div>
-              {!canManage && videosCount > 0 && <ProgressRing percent={progressPercent} />}
+              {!canManage && videosCount > 0 && (
+                <div className="hidden sm:block">
+                  <ProgressRing percent={progressPercent} />
+                </div>
+              )}
             </div>
 
             <div className="min-w-0 flex-1 text-right">
-              <div className="mb-1.5 flex flex-wrap items-center gap-1.5 sm:mb-2 sm:gap-2">
-                <span
-                  className={`rounded-full px-2 py-0.5 ${lcBadge} sm:px-2.5 ${accessMeta.badgeClass}`}
-                >
+              <div className="mb-1 flex flex-wrap items-center gap-1 sm:mb-2 sm:gap-2">
+                <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold sm:rounded-full sm:px-2.5 sm:text-[11px] ${accessMeta.badgeClass}`}>
                   {canManage
                     ? lecture.locked
-                      ? "مغلق للطلاب"
+                      ? "مغلق"
                       : "مفتوح"
                     : accessMeta.label}
                 </span>
                 {canManage ? (
-                  <span className={`rounded-full bg-violet-50 px-2 py-0.5 ${lcBadge} text-violet-600 sm:px-2.5 dark:bg-violet-950/40 dark:text-violet-400`}>
+                  <span className="hidden rounded-full bg-violet-50 px-2.5 py-0.5 text-[11px] font-semibold text-violet-600 sm:inline-flex dark:bg-violet-950/40 dark:text-violet-400">
                     {getLectureAccessModeLabel(lectureAccessMode)}
                   </span>
                 ) : null}
@@ -996,38 +927,44 @@ const LectureCard = ({
                 lectureAccessMode === "groups" &&
                 Array.isArray(lecture.group_ids) &&
                 lecture.group_ids.length > 0 ? (
-                  <span className={`rounded-full bg-amber-50 px-2 py-0.5 ${lcBadge} text-amber-700 sm:px-2.5`}>
+                  <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 sm:rounded-full sm:px-2.5 sm:text-[11px]">
                     {lecture.group_ids.length} مجموعة
                   </span>
                 ) : null}
                 {!canManage && lecture.open_via_group === true ? (
-                  <span className={`rounded-full bg-teal-50 px-2 py-0.5 ${lcBadge} text-teal-700 sm:px-2.5 dark:bg-teal-950/40 dark:text-teal-300`}>
-                    مفتوحة عبر مجموعتك
+                  <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-[10px] font-bold text-teal-700 sm:rounded-full sm:px-2.5 sm:text-[11px] dark:bg-teal-950/40 dark:text-teal-300">
+                    عبر مجموعتك
                   </span>
                 ) : null}
                 {expiresLabel ? (
-                  <span className={`inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 ${lcBadge} text-amber-700 sm:px-2.5 dark:bg-amber-950/40 dark:text-amber-300`}>
-                    <FaClock className="text-[10px]" />
-                    ينتهي {expiresLabel}
+                  <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 sm:rounded-full sm:px-2.5 sm:text-[11px] dark:bg-amber-950/40 dark:text-amber-300">
+                    <FaClock className="text-[9px]" />
+                    <span className="max-w-[9rem] truncate sm:max-w-none">{expiresLabel}</span>
                   </span>
                 ) : null}
                 {canManage && (
-                  <span className={`rounded-full px-2 py-0.5 ${lcBadge} sm:px-2.5 ${isVisible ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-500"}`}>
+                  <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold sm:rounded-full sm:px-2.5 sm:text-[11px] ${isVisible ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-500"}`}>
                     {isVisible ? "ظاهر" : "مخفي"}
                   </span>
                 )}
                 {!canManage && isLectureComplete && (
-                  <span className={`rounded-full bg-emerald-50 px-2 py-0.5 ${lcBadge} text-emerald-600 sm:px-2.5 dark:bg-emerald-950/40 dark:text-emerald-400`}>مكتملة</span>
+                  <span className="rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-600 sm:rounded-full sm:px-2.5 sm:text-[11px] dark:bg-emerald-950/40 dark:text-emerald-400">
+                    مكتملة
+                  </span>
                 )}
-                <span className={`${crEyebrow} !px-2 !py-0.5 !text-[10px] sm:!px-3 sm:!py-1 sm:!text-[11px]`}>محاضرة {lectureIndex + 1}</span>
+                <span className="hidden sm:inline-flex">
+                  <span className={`${crEyebrow} !px-3 !py-1 !text-[11px]`}>محاضرة {lectureIndex + 1}</span>
+                </span>
               </div>
 
-              <h3 className={`${lcTitle} break-words`}>{lecture.title}</h3>
-              {lectureDescription && (
-                <p className={`mt-1 line-clamp-2 sm:mt-1.5 ${lcBody}`}>{lectureDescription}</p>
-              )}
-              {/* ملخص عناصر المحاضرة */}
-              <div className="mt-2.5 flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <h3 className="font-heading text-[0.95rem] font-extrabold leading-snug tracking-tight text-slate-900 dark:text-white sm:text-[1.125rem] md:text-xl">
+                {lecture.title}
+              </h3>
+              {lectureDescription && lectureDescription !== lecture.title ? (
+                <p className={`mt-0.5 line-clamp-1 sm:mt-1.5 sm:line-clamp-2 ${lcBody}`}>{lectureDescription}</p>
+              ) : null}
+
+              <div className="mt-2 flex flex-wrap items-center gap-1 sm:mt-2.5 sm:gap-2">
                 <ContentChip
                   icon={FaVideo}
                   label="فيديو"
@@ -1049,80 +986,89 @@ const LectureCard = ({
                   tone="orange"
                   active={!hideLectureAssignments && assignmentsCount > 0}
                 />
-              </div>
-
-              {/* زر فتح / إغلاق المحاضرة */}
-              <button
-                type="button"
-                onClick={() => setExpanded((v) => !v)}
-                className={`mt-3 inline-flex cursor-pointer items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-all duration-200 ${
-                  expanded
-                    ? "border-2 border-blue-500 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40"
-                    : "bg-blue-500 text-white shadow-sm hover:bg-blue-600"
-                }`}
-              >
-                <FaChevronDown
-                  className={`text-xs transition-transform duration-300 ${expanded ? "rotate-180" : ""}`}
-                />
-                {expanded ? "إغلاق المحاضرة" : "فتح المحاضرة"}
-              </button>
-            </div>
-
-            {canManage && (
-              <div className="flex shrink-0 flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-1">
-                <Tooltip label="تعديل المحاضرة">
-                  <IconButton
-                    aria-label="تعديل المحاضرة"
-                    icon={<Icon as={FaEdit} />}
-                    size="sm"
-                    colorScheme="blue"
-                    variant="ghost"
-                    borderRadius="xl"
-                    onClick={() => handleEditLecture?.(lecture)}
-                    data-tour-id={isTourTarget ? "course-lecture-edit" : undefined}
-                  />
-                </Tooltip>
-                <Tooltip label="حذف المحاضرة">
-                  <IconButton
-                    aria-label="حذف المحاضرة"
-                    icon={<Icon as={FaTrash} />}
-                    size="sm"
-                    colorScheme="red"
-                    variant="ghost"
-                    borderRadius="xl"
-                    onClick={() => handleDeleteLecture?.(lecture.id, lecture.title || "المحاضرة")}
-                    data-tour-id={isTourTarget ? "course-lecture-delete" : undefined}
-                  />
-                </Tooltip>
-                <Tooltip label={isVisible ? "إخفاء عن الطلاب" : "إظهار للطلاب"}>
-                  <IconButton
-                    aria-label="تبديل الظهور"
-                    icon={<Icon as={isVisible ? FaEye : FaEyeSlash} />}
-                    isLoading={visibilityLoading}
-                    size="sm"
-                    colorScheme="blue"
-                    variant="ghost"
-                    borderRadius="xl"
-                    onClick={handleToggleVisibility}
-                    data-tour-id={isTourTarget ? "course-lecture-visibility" : undefined}
-                  />
-                </Tooltip>
-                {lectureSupportsActivationCodes(lecture) ? (
-                  <Tooltip label="أكواد التفعيل">
-                    <IconButton
-                      aria-label="أكواد التفعيل"
-                      icon={<FaKey />}
-                      size="sm"
-                      colorScheme="purple"
-                      variant="ghost"
-                      borderRadius="xl"
-                      onClick={codesModal.onOpen}
-                    />
-                  </Tooltip>
+                {!canManage && videosCount > 0 ? (
+                  <span className="inline-flex items-center rounded-lg bg-slate-100 px-2 py-1 text-[10px] font-bold tabular-nums text-slate-600 sm:hidden dark:bg-slate-800 dark:text-slate-300">
+                    {progressPercent}%
+                  </span>
                 ) : null}
               </div>
-            )}
+            </div>
           </div>
+
+          {/* أزرار المدرس — صف أفقي على الموبايل */}
+          {canManage && (
+            <div className="flex items-center gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:justify-end [&::-webkit-scrollbar]:hidden">
+              <Tooltip label="تعديل المحاضرة">
+                <IconButton
+                  aria-label="تعديل المحاضرة"
+                  icon={<Icon as={FaEdit} />}
+                  size="sm"
+                  colorScheme="blue"
+                  variant="ghost"
+                  borderRadius="lg"
+                  minW="36px"
+                  onClick={() => handleEditLecture?.(lecture)}
+                  data-tour-id={isTourTarget ? "course-lecture-edit" : undefined}
+                />
+              </Tooltip>
+              <Tooltip label="حذف المحاضرة">
+                <IconButton
+                  aria-label="حذف المحاضرة"
+                  icon={<Icon as={FaTrash} />}
+                  size="sm"
+                  colorScheme="red"
+                  variant="ghost"
+                  borderRadius="lg"
+                  minW="36px"
+                  onClick={() => handleDeleteLecture?.(lecture.id, lecture.title || "المحاضرة")}
+                  data-tour-id={isTourTarget ? "course-lecture-delete" : undefined}
+                />
+              </Tooltip>
+              <Tooltip label={isVisible ? "إخفاء عن الطلاب" : "إظهار للطلاب"}>
+                <IconButton
+                  aria-label="تبديل الظهور"
+                  icon={<Icon as={isVisible ? FaEye : FaEyeSlash} />}
+                  isLoading={visibilityLoading}
+                  size="sm"
+                  colorScheme="blue"
+                  variant="ghost"
+                  borderRadius="lg"
+                  minW="36px"
+                  onClick={handleToggleVisibility}
+                  data-tour-id={isTourTarget ? "course-lecture-visibility" : undefined}
+                />
+              </Tooltip>
+              {lectureSupportsActivationCodes(lecture) ? (
+                <Tooltip label="أكواد التفعيل">
+                  <IconButton
+                    aria-label="أكواد التفعيل"
+                    icon={<FaKey />}
+                    size="sm"
+                    colorScheme="purple"
+                    variant="ghost"
+                    borderRadius="lg"
+                    minW="36px"
+                    onClick={codesModal.onOpen}
+                  />
+                </Tooltip>
+              ) : null}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className={`inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold transition-all duration-200 sm:w-auto ${
+              expanded
+                ? "border-2 border-blue-500 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+                : "bg-blue-500 text-white shadow-sm hover:bg-blue-600"
+            }`}
+          >
+            <FaChevronDown
+              className={`text-xs transition-transform duration-300 ${expanded ? "rotate-180" : ""}`}
+            />
+            {expanded ? "إغلاق المحاضرة" : "فتح المحاضرة"}
+          </button>
         </div>
       </div>
 
@@ -1137,9 +1083,9 @@ const LectureCard = ({
             transition={{ duration: 0.35, ease: EASE }}
             className="overflow-hidden"
           >
-            <div className="bg-slate-50 p-3.5 dark:bg-slate-950/50 sm:p-5">
+            <div className="bg-slate-50/80 p-2.5 dark:bg-slate-950/50 sm:p-4">
               {isLockedForViewer ? (
-                <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center sm:flex-row sm:items-center sm:gap-4 sm:p-6 sm:text-right dark:border-slate-600 dark:bg-slate-900">
+                <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-slate-300 bg-white p-4 text-center sm:flex-row sm:gap-4 sm:text-right dark:border-slate-600 dark:bg-slate-900">
                   {needsActivationCode ? (
                     <div className="w-full max-w-md space-y-3 text-right">
                       <LectureActivateCodeForm
@@ -1148,8 +1094,8 @@ const LectureCard = ({
                     </div>
                   ) : (
                     <>
-                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-500 text-white sm:h-14 sm:w-14">
-                        <FaLock className="text-lg sm:text-xl" />
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-500 text-white">
+                        <FaLock className="text-sm" />
                       </div>
                       <div className="min-w-0">
                         <p className={`${lcTitleSm} text-slate-800 dark:text-slate-200`}>
@@ -1166,49 +1112,7 @@ const LectureCard = ({
                   )}
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {canManage ? (
-                    <p className={`${lcCaption} px-0.5`}>
-                      عناصر المحاضرة: فيديوهات · ملفات · واجبات
-                    </p>
-                  ) : (
-                    <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                      <p className={`${lcCaption} mb-2 px-0.5`}>مسار الدراسة داخل المحاضرة</p>
-                      <div className={`grid grid-cols-1 gap-2 ${hideLectureAssignments ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}>
-                        <StudentPathStep
-                          step={1}
-                          title="شاهد الفيديوهات"
-                          detail={
-                            videosCount
-                              ? `${watchedVideos} من ${videosCount} مشاهدة`
-                              : "لا توجد فيديوهات بعد"
-                          }
-                          done={videosCount > 0 && watchedVideos >= videosCount}
-                          tone="blue"
-                        />
-                        <StudentPathStep
-                          step={2}
-                          title="راجع الملفات"
-                          detail={filesCount ? `${filesCount} ملف للمراجعة` : "لا توجد ملفات بعد"}
-                          done={false}
-                          tone="purple"
-                        />
-                        {!hideLectureAssignments ? (
-                          <StudentPathStep
-                            step={3}
-                            title="حل الواجب"
-                            detail={
-                              assignmentStatusForPath?.label ||
-                              (hasAssignments ? "واجب جاهز للحل" : "لا يوجد واجب بعد")
-                            }
-                            done={hasAssignments && allAssignmentsPassed}
-                            tone="orange"
-                          />
-                        ) : null}
-                      </div>
-                    </div>
-                  )}
-
+                <div className="space-y-2.5">
                   {/* الفيديوهات */}
                   <ContentSection
                     accent="blue"
@@ -1219,33 +1123,26 @@ const LectureCard = ({
                       label="الفيديوهات"
                       count={videosCount}
                       accent="blue"
-                      hint={
-                        canManage
-                          ? "شاهد دروس المحاضرة بالترتيب"
-                          : "اضغط على الفيديو للمشاهدة — الزر يوضح إنك بدأت أو خلّصت"
-                      }
                       action={
                         canManage ? (
                           <button
                             type="button"
-                            className={`${crBtnSecondary} w-full !px-3.5 !py-2.5 !text-xs sm:w-auto sm:!py-2`}
+                            className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-white px-2 py-1 text-[10px] font-bold text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:bg-slate-900 dark:text-blue-300"
                             onClick={() => handleAddVideo(lecture.id)}
                             data-tour-id={isTourTarget ? "course-lecture-add-video" : undefined}
                           >
-                            <FaPlus />
-                            إضافة فيديو
+                            <FaPlus className="text-[8px]" />
+                            إضافة
                           </button>
                         ) : null
                       }
                     />
                     {videosCount === 0 ? (
-                      <p className={`rounded-xl border border-dashed border-blue-200 bg-white/70 px-3 py-5 text-center ${lcLabel} dark:border-blue-900 dark:bg-slate-950/40`}>
-                        {canManage
-                          ? "لم تُضف فيديوهات بعد — ابدأ بإضافة أول فيديو"
-                          : "لا توجد فيديوهات في هذه المحاضرة بعد"}
+                      <p className={`rounded-lg border border-dashed border-blue-200 px-2.5 py-3 text-center ${lcLabel} dark:border-blue-900`}>
+                        {canManage ? "لا توجد فيديوهات بعد" : "لا توجد فيديوهات"}
                       </p>
                     ) : (
-                      <div className="grid grid-cols-1 gap-2.5">
+                      <div className="grid grid-cols-1 gap-1.5">
                         {(lecture.videos || []).map((video, index) => (
                           <VideoRow
                             key={video.id}
@@ -1270,33 +1167,26 @@ const LectureCard = ({
                       label="الملفات"
                       count={filesCount}
                       accent="purple"
-                      hint={
-                        canManage
-                          ? "ملفات PDF ومرفقات المحاضرة"
-                          : "افتح الملف لقراءته داخل المنصة"
-                      }
                       action={
                         canManageFiles ? (
                           <button
                             type="button"
-                            className={`${crBtnSecondary} w-full !border-violet-200 !px-3.5 !py-2.5 !text-xs !text-violet-700 hover:!bg-violet-50 sm:w-auto sm:!py-2 dark:!border-violet-800 dark:!text-violet-300`}
+                            className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-white px-2 py-1 text-[10px] font-bold text-violet-700 hover:bg-violet-50 dark:border-violet-800 dark:bg-slate-900 dark:text-violet-300"
                             onClick={uploadPdfModal.onOpen}
                             data-tour-id={isTourTarget ? "course-lecture-add-file" : undefined}
                           >
-                            <FaPlus />
-                            إضافة ملف
+                            <FaPlus className="text-[8px]" />
+                            إضافة
                           </button>
                         ) : null
                       }
                     />
                     {filesCount === 0 ? (
-                      <p className={`rounded-xl border border-dashed border-violet-200 bg-white/70 px-3 py-5 text-center ${lcLabel} dark:border-violet-900 dark:bg-slate-950/40`}>
-                        {canManageFiles
-                          ? "لم تُضف ملفات بعد — اضغط «إضافة ملف»"
-                          : "لا توجد ملفات في هذه المحاضرة بعد"}
+                      <p className={`rounded-lg border border-dashed border-violet-200 px-2.5 py-3 text-center ${lcLabel} dark:border-violet-900`}>
+                        {canManageFiles ? "لا توجد ملفات بعد" : "لا توجد ملفات"}
                       </p>
                     ) : (
-                      <div className="grid grid-cols-1 gap-2.5">
+                      <div className="grid grid-cols-1 gap-1.5">
                         {lectureFiles.map((file) => (
                           <LecturePdfRow
                             key={file.id}
@@ -1322,16 +1212,11 @@ const LectureCard = ({
                         label="الواجبات"
                         count={assignmentsCount}
                         accent="orange"
-                        hint={
-                          canManage
-                            ? "تمارين واختبارات خاصة بهذه المحاضرة"
-                            : "الحالة والزر يوضحان إنك تبدأ أو تتابع أو تشوف النتيجة"
-                        }
                         action={
                           canManage ? (
                             <button
                               type="button"
-                              className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-orange-500 px-3.5 py-2.5 text-xs font-bold text-white shadow-sm transition-all duration-200 hover:bg-orange-600 sm:w-auto sm:py-2"
+                              className="inline-flex items-center gap-1 rounded-lg bg-orange-500 px-2 py-1 text-[10px] font-bold text-white hover:bg-orange-600"
                               onClick={() =>
                                 openExamModal("add", {
                                   title: suggestedAssignmentTitle,
@@ -1343,14 +1228,14 @@ const LectureCard = ({
                               }
                               data-tour-id={isTourTarget ? "course-lecture-add-assignment" : undefined}
                             >
-                              <FaPlus />
-                              إضافة واجب
+                              <FaPlus className="text-[8px]" />
+                              إضافة
                             </button>
                           ) : null
                         }
                       />
                       {hasAssignments ? (
-                        <div className="grid grid-cols-1 gap-2.5">
+                        <div className="grid grid-cols-1 gap-1.5">
                           {assignments.map((assignment) => (
                             <AssignmentRow
                               key={assignment.id}
@@ -1365,8 +1250,8 @@ const LectureCard = ({
                         </div>
                       ) : (
                         canManage && (
-                          <p className={`rounded-xl border border-dashed border-orange-200 bg-white/70 px-3 py-5 text-center ${lcLabel} dark:border-orange-900 dark:bg-slate-950/40`}>
-                            لم يُنشأ أي واجب بعد — يمكنك إضافة أكثر من واجب لنفس المحاضرة
+                          <p className={`rounded-lg border border-dashed border-orange-200 px-2.5 py-3 text-center ${lcLabel} dark:border-orange-900`}>
+                            لا توجد واجبات بعد
                           </p>
                         )
                       )}
@@ -1374,15 +1259,15 @@ const LectureCard = ({
                   )}
 
                   {/* Footer meta */}
-                  <div className={`flex flex-col gap-1.5 border-t border-slate-200 pt-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-2 ${lcCaption} dark:border-slate-800`}>
+                  <div className={`flex flex-col gap-1 border-t border-slate-200 pt-2 sm:flex-row sm:items-center sm:justify-between ${lcCaption} dark:border-slate-800`}>
                     <span>{formatDate ? formatDate(lecture.created_at) : lecture.created_at}</span>
                     {!canManage && progress && videosCount > 0 && (
                       <span>
                         {progress.watched_videos}/{progress.total_videos} فيديو
                         {hasAssignments &&
                           (allAssignmentsPassed
-                            ? " • الواجبات مكتملة"
-                            : " • توجد واجبات غير مكتملة")}
+                            ? " · الواجبات مكتملة"
+                            : " · واجبات غير مكتملة")}
                       </span>
                     )}
                   </div>

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   Box,
   Container,
@@ -67,8 +67,6 @@ import {
   FaFilter,
   FaSearch,
   FaSortAmountDown,
-  FaChevronLeft,
-  FaChevronRight,
   FaFolderOpen,
   FaSync,
   FaBuilding,
@@ -147,239 +145,94 @@ function KpiCard({ icon, label, value, accent = "blue" }) {
   );
 }
 
-function QuickLinkCard({ link, isSlide = false }) {
+function QuickLinkCard({ link }) {
   const borderColor = useColorModeValue("gray.200", "gray.700");
   const bg = useColorModeValue("white", "gray.800");
   const titleColor = useColorModeValue("gray.800", "white");
-  const muted = useColorModeValue("gray.500", "gray.400");
   const isOrange = link.color === "orange";
   const accent = isOrange ? "#DD6B20" : "#3182CE";
-  const iconBg = isOrange ? "orange.50" : "blue.50";
+  const iconBg = useColorModeValue(
+    isOrange ? "orange.50" : "blue.50",
+    "whiteAlpha.100",
+  );
   const iconColor = isOrange ? "orange.500" : "blue.500";
-  const iconDark = isOrange
-    ? "linear(to-br, #F6AD55, #DD6B20)"
-    : "linear(to-br, #63B3ED, #2B6CB0)";
-  const chevronBg = useColorModeValue("gray.50", "whiteAlpha.100");
 
   return (
     <Box
-      p={isSlide ? 5 : 4}
+      px={{ base: 2, md: 2.5 }}
+      py={{ base: 2.5, md: 3 }}
       bg={bg}
       borderWidth="1px"
       borderColor={borderColor}
-      borderRadius={isSlide ? "2xl" : "xl"}
+      borderRadius="xl"
       h="full"
-      minH={isSlide ? "168px" : undefined}
       cursor="pointer"
-      position="relative"
-      overflow="hidden"
-      transition="all 0.25s ease"
+      transition="border-color 0.15s ease, transform 0.15s ease"
       _hover={{
         borderColor: accent,
-        transform: "translateY(-3px)",
-        boxShadow: `0 16px 32px -16px ${accent}aa`,
+        transform: "translateY(-1px)",
       }}
+      _active={{ transform: "scale(0.98)" }}
     >
-      <Box
-        position="absolute"
-        top={0}
-        insetInlineEnd={0}
-        w="88px"
-        h="88px"
-        bg={accent}
-        opacity={0.06}
-        borderBottomStartRadius="full"
-        pointerEvents="none"
-      />
-      <Flex align="center" justify="space-between" mb={isSlide ? 4 : 3}>
+      <VStack spacing={{ base: 1.5, md: 2 }} align="center" textAlign="center">
         <Flex
-          w={isSlide ? 12 : 10}
-          h={isSlide ? 12 : 10}
-          borderRadius="xl"
-          bg={isSlide ? undefined : iconBg}
-          bgGradient={isSlide ? iconDark : undefined}
-          color={isSlide ? "white" : iconColor}
+          w={{ base: 8, md: 9 }}
+          h={{ base: 8, md: 9 }}
+          borderRadius="lg"
+          bg={iconBg}
+          color={iconColor}
           align="center"
           justify="center"
-          boxShadow={isSlide ? `0 10px 18px -10px ${accent}` : "none"}
+          flexShrink={0}
         >
-          <Icon as={link.icon} boxSize={isSlide ? 5 : 4} />
+          <Icon as={link.icon} boxSize={{ base: 3.5, md: 4 }} />
         </Flex>
-        <Flex
-          w={8}
-          h={8}
-          borderRadius="full"
-          bg={chevronBg}
-          color={muted}
-          align="center"
-          justify="center"
+        <Text
+          fontWeight="700"
+          fontSize={{ base: "10px", md: "xs" }}
+          color={titleColor}
+          noOfLines={2}
+          lineHeight="1.35"
         >
-          <Icon as={FaChevronLeft} boxSize={3} />
-        </Flex>
-      </Flex>
-      <Text fontWeight="800" fontSize={isSlide ? "md" : "sm"} color={titleColor} noOfLines={1} mb={1}>
-        {link.title}
-      </Text>
-      <Text fontSize="xs" color={muted} noOfLines={2} lineHeight="1.7">
-        {link.description}
-      </Text>
+          {link.title}
+        </Text>
+      </VStack>
     </Box>
   );
 }
 
-function QuickLinksSlider({ links }) {
-  const scrollerRef = useRef(null);
-  const [active, setActive] = useState(0);
-  const trackBg = useColorModeValue("blackAlpha.100", "whiteAlpha.200");
-  const arrowBg = useColorModeValue("white", "gray.700");
-  const arrowBorder = useColorModeValue("gray.200", "gray.600");
-
-  const updateActive = useCallback(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    const cards = el.querySelectorAll("[data-quick-card]");
-    if (!cards.length) return;
-    const parentCenter = el.getBoundingClientRect().left + el.clientWidth / 2;
-    let best = 0;
-    let bestDist = Infinity;
-    cards.forEach((card, i) => {
-      const rect = card.getBoundingClientRect();
-      const dist = Math.abs(rect.left + rect.width / 2 - parentCenter);
-      if (dist < bestDist) {
-        bestDist = dist;
-        best = i;
-      }
-    });
-    setActive(best);
-  }, []);
-
-  useEffect(() => {
-    const el = scrollerRef.current;
-    if (!el) return undefined;
-    updateActive();
-    el.addEventListener("scroll", updateActive, { passive: true });
-    window.addEventListener("resize", updateActive);
-    return () => {
-      el.removeEventListener("scroll", updateActive);
-      window.removeEventListener("resize", updateActive);
-    };
-  }, [updateActive, links.length]);
-
-  const scrollToIndex = (index) => {
-    const next = Math.max(0, Math.min(links.length - 1, index));
-    const el = scrollerRef.current;
-    const card = el?.querySelectorAll("[data-quick-card]")[next];
-    card?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-  };
-
+function QuickLinksGrid({ links }) {
   return (
-    <Box position="relative" role="region" aria-roledescription="carousel" aria-label="الوصول السريع">
-      <IconButton
-        aria-label="السابق"
-        icon={<FaChevronRight />}
-        size="md"
-        display={{ base: "none", md: "inline-flex" }}
-        position="absolute"
-        top="40%"
-        insetInlineStart={1}
-        transform="translateY(-50%)"
-        zIndex={2}
-        bg={arrowBg}
-        border="1px solid"
-        borderColor={arrowBorder}
-        borderRadius="full"
-        boxShadow="lg"
-        isDisabled={active <= 0}
-        onClick={() => scrollToIndex(active - 1)}
-      />
-      <IconButton
-        aria-label="التالي"
-        icon={<FaChevronLeft />}
-        size="md"
-        display={{ base: "none", md: "inline-flex" }}
-        position="absolute"
-        top="40%"
-        insetInlineEnd={1}
-        transform="translateY(-50%)"
-        zIndex={2}
-        bg={arrowBg}
-        border="1px solid"
-        borderColor={arrowBorder}
-        borderRadius="full"
-        boxShadow="lg"
-        isDisabled={active >= links.length - 1}
-        onClick={() => scrollToIndex(active + 1)}
-      />
-
-      <Box
-        ref={scrollerRef}
-        display="flex"
-        overflowX="auto"
-        gap={{ base: 3, md: 4 }}
-        px={{ base: 1, md: 10 }}
-        py={1}
-        mx={-1}
-        scrollSnapType="x mandatory"
-        scrollPaddingInline="12px"
-        sx={{
-          WebkitOverflowScrolling: "touch",
-          scrollbarWidth: "none",
-          msOverflowStyle: "none",
-          "&::-webkit-scrollbar": { display: "none" },
-        }}
-      >
-        {links.map((link) => (
-          <Box
-            key={link.id}
-            data-quick-card
-            flex={{ base: "0 0 78%", sm: "0 0 52%", md: "0 0 36%", lg: "0 0 23.5%" }}
-            maxW={{ base: "320px", lg: "none" }}
-            scrollSnapAlign="start"
+    <Box
+      display="flex"
+      overflowX="auto"
+      gap={{ base: 2, md: 2.5 }}
+      pb={1}
+      mx={-1}
+      px={1}
+      role="navigation"
+      aria-label="الوصول السريع"
+      sx={{
+        WebkitOverflowScrolling: "touch",
+        scrollbarWidth: "none",
+        msOverflowStyle: "none",
+        "&::-webkit-scrollbar": { display: "none" },
+      }}
+    >
+      {links.map((link) => (
+        <Box
+          key={link.id}
+          flex="0 0 auto"
+          w={{ base: "88px", sm: "96px", md: "104px" }}
+        >
+          <Link
+            to={link.link}
+            style={{ textDecoration: "none", display: "block", height: "100%" }}
           >
-            <Link to={link.link} style={{ textDecoration: "none", display: "block", height: "100%" }}>
-              <QuickLinkCard link={link} isSlide />
-            </Link>
-          </Box>
-        ))}
-      </Box>
-
-      <Flex align="center" justify="center" gap={3} mt={4}>
-        <IconButton
-          aria-label="السابق"
-          icon={<FaChevronRight />}
-          size="sm"
-          variant="ghost"
-          borderRadius="full"
-          display={{ base: "inline-flex", md: "none" }}
-          isDisabled={active <= 0}
-          onClick={() => scrollToIndex(active - 1)}
-        />
-        <HStack spacing={1.5}>
-          {links.map((link, i) => (
-            <Box
-              key={link.id}
-              as="button"
-              aria-label={`البطاقة ${i + 1}`}
-              onClick={() => scrollToIndex(i)}
-              w={i === active ? 6 : 2}
-              h={2}
-              borderRadius="full"
-              bg={i === active ? "#3182CE" : trackBg}
-              transition="all 0.2s"
-            />
-          ))}
-        </HStack>
-        <IconButton
-          aria-label="التالي"
-          icon={<FaChevronLeft />}
-          size="sm"
-          variant="ghost"
-          borderRadius="full"
-          display={{ base: "inline-flex", md: "none" }}
-          isDisabled={active >= links.length - 1}
-          onClick={() => scrollToIndex(active + 1)}
-        />
-      </Flex>
+            <QuickLinkCard link={link} />
+          </Link>
+        </Box>
+      ))}
     </Box>
   );
 }
@@ -1218,78 +1071,11 @@ const TeacherDashboardHome = () => {
                   >
                     {teacherGreeting}، {teacherDisplayName}
                   </Heading>
-                  <Text mt={2} fontSize={{ base: "sm", md: "md" }} color="whiteAlpha.850" noOfLines={2} maxW="lg">
-                    أدِر كورساتك وموادك وتواصل مع طلابك من لوحة واحدة واضحة واحترافية.
-                  </Text>
+                 
                 </Box>
               </HStack>
 
-              <Flex
-                gap={2}
-                flexWrap="wrap"
-                align="center"
-                bg={{ base: "whiteAlpha.100", lg: "whiteAlpha.150" }}
-                border="1px solid"
-                borderColor="whiteAlpha.250"
-                borderRadius="2xl"
-                p={{ base: 3, md: 3.5 }}
-                backdropFilter="blur(10px)"
-              >
-                <Button
-                  data-tour-id="teacher-create-course-trigger"
-                  leftIcon={<FaPlus />}
-                  size="sm"
-                  bg="#DD6B20"
-                  color="white"
-                  borderRadius="xl"
-                  fontWeight="800"
-                  cursor="pointer"
-                  onClick={onOpen}
-                  _hover={{ bg: "#C05621" }}
-                  flex={{ base: 1, sm: "initial" }}
-                  shadow="0 10px 20px -12px rgba(221,107,32,0.9)"
-                >
-                  كورس جديد
-                </Button>
-                <Button
-                  leftIcon={<FaSync />}
-                  size="sm"
-                  variant="ghost"
-                  color="white"
-                  borderRadius="xl"
-                  fontWeight="700"
-                  cursor="pointer"
-                  onClick={handleRefreshDashboard}
-                  isLoading={alertRefreshing}
-                  _hover={{ bg: "whiteAlpha.200" }}
-                  flex={{ base: 1, sm: "initial" }}
-                >
-                  تحديث
-                </Button>
-                <InstallPWAButton
-                  label="تثبيت التطبيق"
-                  variant="hero"
-                  className="!w-auto !py-2 !px-4 !text-xs !rounded-xl flex-[1] sm:flex-initial"
-                />
-                <Button
-                  data-tour-id="teacher-tour-restart"
-                  leftIcon={<FaCompass />}
-                  size="sm"
-                  variant="ghost"
-                  color="white"
-                  borderRadius="xl"
-                  fontWeight="700"
-                  cursor="pointer"
-                  onClick={() => {
-                    resetTeacherDashboardTour();
-                    setDashboardTourOpen(true);
-                  }}
-                  _hover={{ bg: "whiteAlpha.200" }}
-                  flex={{ base: 1, sm: "initial" }}
-                >
-                  جولة المنصة
-                </Button>
-              </Flex>
+             
             </Flex>
           </Box>
 
@@ -1302,11 +1088,7 @@ const TeacherDashboardHome = () => {
           </Box>
 
           {/* KPIs */}
-          <SimpleGrid columns={{ base: 1, sm: 3 }} spacing={3} data-tour-id="teacher-kpis">
-            <KpiCard icon={FaBookOpen} label="كورساتي" value={courses.length} accent="blue" />
-            <KpiCard icon={FaUsers} label="المواد الدراسية" value={subjects.length} accent="orange" />
-            <KpiCard icon={MdAssignment} label="المجموعات" value={totalGroups} accent="green" />
-          </SimpleGrid>
+        
 
           {/* Quick Links */}
           <Box
@@ -1314,20 +1096,15 @@ const TeacherDashboardHome = () => {
             bg={sectionCardBg}
             borderWidth="1px"
             borderColor={sectionBorder}
-            borderRadius="2xl"
-            p={{ base: 4, md: 5 }}
+            borderRadius={{ base: "xl", md: "2xl" }}
+            p={{ base: 3, md: 4 }}
             overflow="hidden"
           >
-            <Flex align="end" justify="space-between" mb={{ base: 3, md: 4 }} gap={3}>
-              <Box>
-                <SectionTitle>الوصول السريع</SectionTitle>
-                <Text fontSize="xs" color={mutedTextColor} mt={1}>
-                  اسحب أو استخدم الأسهم للتنقل بين أدوات التدريس
-                </Text>
-              </Box>
-            </Flex>
+            <Box mb={{ base: 2.5, md: 3 }}>
+              <SectionTitle>الوصول السريع</SectionTitle>
+            </Box>
 
-            <QuickLinksSlider links={quickLinks} />
+            <QuickLinksGrid links={quickLinks} />
           </Box>
 
           {/* Courses */}

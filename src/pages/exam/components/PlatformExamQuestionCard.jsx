@@ -1084,9 +1084,9 @@ export function PlatformExamTeacherCard({
 
   return (
 
-    <Box data-tour-id={isTourTarget ? "exam-question-card" : undefined} bg={cardBg} borderRadius="lg" borderWidth="1px" borderColor={border} overflow="hidden" boxShadow="sm" h="full">
+    <Box data-tour-id={isTourTarget ? "exam-question-card" : undefined} bg={cardBg} borderRadius="2xl" borderWidth="1px" borderColor={border} overflow="hidden" boxShadow="sm" h="full" transition="border-color 0.15s ease, box-shadow 0.15s ease" _hover={{ borderColor: "blue.300", boxShadow: "md" }}>
 
-      <Box h="2px" bg={accentBar} />
+      <Box h="3px" bg="blue.500" />
 
 
 

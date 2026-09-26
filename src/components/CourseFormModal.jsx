@@ -109,6 +109,9 @@ export default function CourseFormModal({
     </ModalBody>
   );
 
+  const isFullMobile =
+    size === "full" || (typeof size === "object" && size?.base === "full");
+
   return (
     <Modal
       isOpen={isOpen}
@@ -121,15 +124,15 @@ export default function CourseFormModal({
       <ModalOverlay bg="blackAlpha.600" backdropFilter="blur(6px)" />
       <ModalContent
         data-tour-id={tourTargetId}
-        borderRadius={{ base: "none", md: "2xl" }}
+        borderRadius={isFullMobile ? { base: "none", md: "2xl" } : "2xl"}
         overflow="hidden"
         bg={cardBg}
         borderWidth="1px"
         borderColor={border}
         boxShadow="xl"
-        mx={{ base: 0, md: 4 }}
-        maxH={{ base: "100vh", md: "90vh" }}
-        my={{ base: 0, md: 4 }}
+        mx={isFullMobile ? { base: 0, md: 4 } : 4}
+        maxH={isFullMobile ? { base: "100vh", md: "90vh" } : "85vh"}
+        my={isFullMobile ? { base: 0, md: 4 } : 4}
         display="flex"
         flexDirection="column"
       >
