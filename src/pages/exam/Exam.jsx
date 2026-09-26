@@ -26,6 +26,10 @@ import { MdArrowBack } from "react-icons/md";
 import { normalizeExamQuestionsFromApi } from "../../utils/examFlowUtils";
 import TeacherExamTour from "../../components/onboarding/TeacherExamTour";
 import {
+  patchCourseExamQuestionCorrectAnswers,
+  normalizeCorrectAnswerLetters,
+} from "../../api/courseExamsApi";
+import {
   TOUR_CLOSE_AI,
   TOUR_CLOSE_ALL,
   TOUR_CLOSE_DELETE,
@@ -36,6 +40,39 @@ import {
 } from "../../utils/teacherExamTour";
 
 const GRADES_PAGE_SIZE = 20;
+const LETTER_KEYS = ["A", "B", "C", "D"];
+
+function getChoiceLetter(choice, index = 0) {
+  const raw = choice?.letter || LETTER_KEYS[index] || String.fromCharCode(65 + index);
+  return String(raw).trim().toUpperCase();
+}
+
+function getQuestionCorrectLetters(question) {
+  if (!question?.choices?.length) return [];
+  const fromFlags = question.choices
+    .map((c, i) => (c.is_correct ? getChoiceLetter(c, i) : null))
+    .filter(Boolean);
+  if (fromFlags.length) return normalizeCorrectAnswerLetters(fromFlags);
+  if (Array.isArray(question.correctAnswers)) {
+    return normalizeCorrectAnswerLetters(question.correctAnswers);
+  }
+  if (question.correctAnswer) {
+    return normalizeCorrectAnswerLetters([question.correctAnswer]);
+  }
+  return [];
+}
+
+function applyCorrectLettersToQuestion(question, letters) {
+  const set = new Set(normalizeCorrectAnswerLetters(letters));
+  return {
+    ...question,
+    correctAnswers: [...set],
+    choices: (question.choices || []).map((c, i) => ({
+      ...c,
+      is_correct: set.has(getChoiceLetter(c, i)),
+    })),
+  };
+}
 
 const Exam = () => {
   const { examId } = useParams();
@@ -53,10 +90,11 @@ const Exam = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editModal, setEditModal] = useState({ open: null });
-  const [editForm, setEditForm] = useState({ text: "", choices: [] });
+  const [editForm, setEditForm] = useState({ text: "", choices: [], correctLetters: [] });
   const [deleteModal, setDeleteModal] = useState({ open: false, qid: null });
   const [deleting, setDeleting] = useState(false);
   const [pendingCorrect, setPendingCorrect] = useState({});
+  const [draftCorrectLetters, setDraftCorrectLetters] = useState({});
   const toast = useToast();
   const [showGrades, setShowGrades] = useState(false);
   const [gradesLoading, setGradesLoading] = useState(false);
@@ -260,12 +298,16 @@ const Exam = () => {
   };
 
   const openEditModal = (q) => {
+    const correctLetters = getQuestionCorrectLetters(q);
     setEditForm({
       text: q.text,
-      choices: q.choices.map((c) => ({
+      choices: q.choices.map((c, i) => ({
         ...c,
         text: c.text || c.image || "",
+        letter: getChoiceLetter(c, i),
+        is_correct: correctLetters.includes(getChoiceLetter(c, i)),
       })),
+      correctLetters,
     });
     setEditModal({ open: true, question: q });
   };
@@ -316,50 +358,152 @@ const Exam = () => {
 
   const handleEditSave = async () => {
     const { question } = editModal;
+    const correctLetters = normalizeCorrectAnswerLetters(
+      editForm.correctLetters?.length
+        ? editForm.correctLetters
+        : editForm.choices.filter((c) => c.is_correct).map((c, i) => getChoiceLetter(c, i)),
+    );
+
+    if (correctLetters.length !== 2) {
+      toast({
+        title: "حدد إجابتين صحيحتين",
+        description: "يجب اختيار حرفين مختلفين من A–D قبل الحفظ",
+        status: "warning",
+      });
+      return;
+    }
+
     try {
       await baseUrl.put(
         `/api/course/course-exam/question/${question.id}`,
         { text: editForm.text, choices: editForm.choices.map((c) => ({ id: c.id, text: c.text })) },
         token ? { headers: { Authorization: `Bearer ${token}` } } : {}
       );
-      setQuestions((prev) => prev.map((q) =>
-        q.id === question.id
-          ? { ...q, text: editForm.text, choices: editForm.choices.map((c) => ({ ...c })) }
-          : q
-      ));
-      toast({ title: "تم التعديل بنجاح", status: "success" });
+
+      const patchRes = await patchCourseExamQuestionCorrectAnswers(
+        question.id,
+        correctLetters,
+        token,
+      );
+
+      setQuestions((prev) =>
+        prev.map((q) =>
+          q.id === question.id
+            ? applyCorrectLettersToQuestion(
+                {
+                  ...q,
+                  text: editForm.text,
+                  choices: editForm.choices.map((c) => ({ ...c })),
+                },
+                patchRes?.correctAnswers || correctLetters,
+              )
+            : q,
+        ),
+      );
+      setDraftCorrectLetters((prev) => {
+        const next = { ...prev };
+        delete next[question.id];
+        return next;
+      });
+
+      const regrade = patchRes?.regrade;
+      toast({
+        title: patchRes?.message || "تم التعديل بنجاح",
+        description: regrade
+          ? `تمت مراجعة ${regrade.answersReviewed ?? 0} إجابة · تحديث ${regrade.attemptsUpdated ?? 0} محاولة`
+          : undefined,
+        status: "success",
+        duration: 5000,
+      });
       setEditModal({ open: false, question: null });
-    } catch {
-      toast({ title: "فشل التعديل", status: "error" });
+    } catch (err) {
+      toast({
+        title: "فشل التعديل",
+        description: err?.response?.data?.message || err?.message,
+        status: "error",
+      });
     }
   };
 
   const handleSetCorrect = async (qid, cid) => {
-    setPendingCorrect((prev) => ({ ...prev, [qid]: cid }));
-    setQuestions((prev) => prev.map((q) =>
-      q.id === qid
-        ? { ...q, choices: q.choices.map((c) => ({ ...c, is_correct: c.id === cid })) }
-        : q
-    ));
+    const question = questions.find((q) => q.id === qid);
+    if (!question) return;
+
+    const choiceIndex = (question.choices || []).findIndex((c) => c.id === cid);
+    if (choiceIndex < 0) return;
+    const letter = getChoiceLetter(question.choices[choiceIndex], choiceIndex);
+
+    const current =
+      draftCorrectLetters[qid] ?? getQuestionCorrectLetters(question);
+    let next;
+    if (current.includes(letter)) {
+      next = current.filter((l) => l !== letter);
+    } else if (current.length >= 2) {
+      next = [current[1], letter];
+    } else {
+      next = [...current, letter];
+    }
+    next = normalizeCorrectAnswerLetters(next);
+
+    setDraftCorrectLetters((prev) => ({ ...prev, [qid]: next }));
+    setQuestions((prev) =>
+      prev.map((q) => (q.id === qid ? applyCorrectLettersToQuestion(q, next) : q)),
+    );
+
+    if (next.length !== 2) {
+      toast({
+        title: `اختر إجابتين صحيحتين (${next.length}/2)`,
+        description: "بعد اختيار الحرف الثاني سيتم الحفظ وإعادة التصحيح تلقائياً",
+        status: "info",
+        duration: 2500,
+      });
+      return;
+    }
+
+    setPendingCorrect((prev) => ({ ...prev, [qid]: true }));
     try {
-      await baseUrl.patch(
-        `/api/course/course-exam/question/${qid}/correct-answer`,
-        { correct_choice_id: cid },
-        token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+      const patchRes = await patchCourseExamQuestionCorrectAnswers(qid, next, token);
+      const saved = normalizeCorrectAnswerLetters(
+        patchRes?.correctAnswers || next,
       );
-      toast({ title: "تم تحديد الإجابة الصحيحة", status: "success" });
-      setPendingCorrect((prev) => {
+      setQuestions((prev) =>
+        prev.map((q) =>
+          q.id === qid ? applyCorrectLettersToQuestion(q, saved) : q,
+        ),
+      );
+      setDraftCorrectLetters((prev) => {
         const copy = { ...prev };
         delete copy[qid];
         return copy;
       });
-    } catch {
-      toast({ title: "فشل تحديد الإجابة", status: "error" });
-      setQuestions((prev) => prev.map((q) =>
-        q.id === qid
-          ? { ...q, choices: q.choices.map((c) => ({ ...c, is_correct: false })) }
-          : q
-      ));
+      const regrade = patchRes?.regrade;
+      toast({
+        title: patchRes?.message || "تم تحديث الإجابتين الصحيحتين",
+        description: regrade
+          ? `مراجعة ${regrade.answersReviewed ?? 0} · تحديث ${regrade.attemptsUpdated ?? 0} محاولة`
+          : undefined,
+        status: "success",
+        duration: 5000,
+      });
+    } catch (err) {
+      toast({
+        title: "فشل تحديث الإجابات الصحيحة",
+        description: err?.response?.data?.message || err?.message,
+        status: "error",
+      });
+      setQuestions((prev) =>
+        prev.map((q) =>
+          q.id === qid
+            ? applyCorrectLettersToQuestion(q, getQuestionCorrectLetters(question))
+            : q,
+        ),
+      );
+      setDraftCorrectLetters((prev) => {
+        const copy = { ...prev };
+        delete copy[qid];
+        return copy;
+      });
+    } finally {
       setPendingCorrect((prev) => {
         const copy = { ...prev };
         delete copy[qid];
@@ -957,24 +1101,68 @@ const Exam = () => {
                 )}
               </Box>
               <Box>
-                <Text mb={2} fontWeight="600" fontSize="sm" color="gray.600">الاختيارات</Text>
+                <Flex justify="space-between" align="center" mb={2} gap={3}>
+                  <Text fontWeight="600" fontSize="sm" color="gray.600">الاختيارات</Text>
+                  <Badge colorScheme={(editForm.correctLetters || []).length === 2 ? "green" : "orange"} borderRadius="full">
+                    إجابتان صحيحتان: {(editForm.correctLetters || []).length}/2
+                  </Badge>
+                </Flex>
+                <Text fontSize="xs" color="gray.500" mb={3}>
+                  اختر حرفين مختلفين من A–D كإجابتين صحيحتين (سيتم إعادة تصحيح المحاولات السابقة)
+                </Text>
                 <VStack spacing={3}>
-                  {editForm.choices.map((choice, idx) => (
+                  {editForm.choices.map((choice, idx) => {
+                    const letter = getChoiceLetter(choice, idx);
+                    const selected = (editForm.correctLetters || []).includes(letter);
+                    return (
                     <Box key={choice.id} w="full">
-                      <Text fontSize="xs" color="gray.500" mb={1}>
-                        {String.fromCharCode(65 + idx)}
-                      </Text>
+                      <Flex justify="space-between" align="center" mb={1} gap={2}>
+                        <Text fontSize="xs" color="gray.500">
+                          {letter}
+                        </Text>
+                        <Button
+                          size="xs"
+                          variant={selected ? "solid" : "outline"}
+                          colorScheme={selected ? "green" : "gray"}
+                          borderRadius="full"
+                          onClick={() =>
+                            setEditForm((prev) => {
+                              const current = normalizeCorrectAnswerLetters(prev.correctLetters || []);
+                              let next;
+                              if (current.includes(letter)) {
+                                next = current.filter((l) => l !== letter);
+                              } else if (current.length >= 2) {
+                                next = [current[1], letter];
+                              } else {
+                                next = [...current, letter];
+                              }
+                              next = normalizeCorrectAnswerLetters(next);
+                              return {
+                                ...prev,
+                                correctLetters: next,
+                                choices: prev.choices.map((c, i) => ({
+                                  ...c,
+                                  is_correct: next.includes(getChoiceLetter(c, i)),
+                                })),
+                              };
+                            })
+                          }
+                        >
+                          {selected ? "صحيحة ✓" : "تعيين كصحيحة"}
+                        </Button>
+                      </Flex>
                       <Textarea
                         value={choice.text}
                         onChange={(e) => setEditForm((prev) => {
                           const choices = [...prev.choices];
-                          choices[idx].text = e.target.value;
+                          choices[idx] = { ...choices[idx], text: e.target.value };
                           return { ...prev, choices };
                         })}
-                        placeholder={`اختيار ${String.fromCharCode(65 + idx)} — يدعم الرموز الرياضية والكيميائية`}
+                        placeholder={`اختيار ${letter} — يدعم الرموز الرياضية والكيميائية`}
                         borderRadius="lg"
                         minH="60px"
                         fontSize="sm"
+                        borderColor={selected ? "green.300" : undefined}
                       />
                       {choice.text?.trim() && (
                         <Box mt={2} p={2} borderRadius="md" bg={previewBg} borderWidth="1px" borderColor={previewBorder}>
@@ -982,7 +1170,8 @@ const Exam = () => {
                         </Box>
                       )}
                     </Box>
-                  ))}
+                    );
+                  })}
                 </VStack>
               </Box>
             </VStack>

@@ -181,3 +181,42 @@ export function courseExamsErrorMessage(
   }
   return err?.response?.data?.message || err?.message || fallback;
 }
+
+const VALID_CORRECT_LETTERS = new Set(["A", "B", "C", "D"]);
+
+export function normalizeCorrectAnswerLetters(letters) {
+  const unique = [];
+  for (const raw of Array.isArray(letters) ? letters : []) {
+    const letter = String(raw || "").trim().toUpperCase();
+    if (!VALID_CORRECT_LETTERS.has(letter) || unique.includes(letter)) continue;
+    unique.push(letter);
+  }
+  return unique;
+}
+
+/**
+ * PATCH /api/course/course-exam/question/:questionId/correct-answers
+ * Body: { correctAnswers: ["A", "B"] } — حرفان مختلفان من A–D فقط.
+ */
+export async function patchCourseExamQuestionCorrectAnswers(
+  questionId,
+  correctAnswers,
+  token,
+) {
+  const answers = normalizeCorrectAnswerLetters(correctAnswers);
+  if (answers.length !== 2) {
+    throw new Error("يجب اختيار حرفين مختلفين من A–D فقط");
+  }
+  const { data } = await baseUrl.patch(
+    `/api/course/course-exam/question/${questionId}/correct-answers`,
+    { correctAnswers: answers },
+    {
+      headers: {
+        ...authHeaders(token),
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+    },
+  );
+  return data;
+}

@@ -315,7 +315,17 @@ export function normalizeSingleExamQuestion(q) {
     q.optionB != null;
 
   if (hasFlatOptions) {
-    const correctLetter = String(q.correctAnswer || "").toUpperCase();
+    const correctLetters = (() => {
+      if (Array.isArray(q.correctAnswers) && q.correctAnswers.length) {
+        return q.correctAnswers.map((a) => String(a || "").toUpperCase()).filter(Boolean);
+      }
+      if (Array.isArray(q.correct_answers) && q.correct_answers.length) {
+        return q.correct_answers.map((a) => String(a || "").toUpperCase()).filter(Boolean);
+      }
+      const single = String(q.correctAnswer || q.correct_answer || "").toUpperCase();
+      return single ? [single] : [];
+    })();
+    const correctSet = new Set(correctLetters);
     const choices = LETTER_KEYS.map((letter, idx) => {
       const raw = q[`option${letter}`];
       const val = raw != null ? String(raw).trim() : "";
@@ -325,7 +335,7 @@ export function normalizeSingleExamQuestion(q) {
         letter,
         text: img ? "" : val,
         image: img ? val : null,
-        is_correct: letter === correctLetter,
+        is_correct: correctSet.has(letter),
       };
     }).filter((choice) => choice.text || choice.image);
 
@@ -338,6 +348,7 @@ export function normalizeSingleExamQuestion(q) {
       passageId: q.passageId ?? q.passage_id ?? q.passage?.id ?? null,
       passageText: passageText ? String(passageText) : null,
       passage: q.passage || null,
+      correctAnswers: correctLetters,
       choices,
     };
   }
@@ -357,6 +368,25 @@ export function normalizeSingleExamQuestion(q) {
     };
   });
 
+  const correctFromChoices = choices
+    .filter((c) => c.is_correct)
+    .map((c) => String(c.letter).toUpperCase());
+  const correctAnswers = (() => {
+    if (Array.isArray(q.correctAnswers) && q.correctAnswers.length) {
+      return q.correctAnswers.map((a) => String(a || "").toUpperCase()).filter(Boolean);
+    }
+    if (Array.isArray(q.correct_answers) && q.correct_answers.length) {
+      return q.correct_answers.map((a) => String(a || "").toUpperCase()).filter(Boolean);
+    }
+    return correctFromChoices;
+  })();
+  if (correctAnswers.length && !correctFromChoices.length) {
+    const set = new Set(correctAnswers);
+    choices.forEach((c) => {
+      c.is_correct = set.has(String(c.letter).toUpperCase());
+    });
+  }
+
   return {
     id: questionId,
     text: q.text ?? q.questionText ?? "",
@@ -366,6 +396,7 @@ export function normalizeSingleExamQuestion(q) {
     passageId: q.passageId ?? q.passage_id ?? q.passage?.id ?? null,
     passageText: passageText ? String(passageText) : null,
     passage: q.passage || null,
+    correctAnswers,
     choices: choices.filter((choice) => choice.text || choice.image),
   };
 }

@@ -47,6 +47,15 @@ const SUBDOMAIN_TEACHER_PORTRAITS = {
   gamalstein: "/tenant/gamalstein-teacher.png",
 };
 
+/** نصوص هيرو مخصّصة حسب الـ subdomain */
+const SUBDOMAIN_HERO_COPY = {
+  gamalstein: {
+    title: "منصتك الأولى لتعلم\nوفهم الفيزياء بأسلوب\nبسيط وممتع",
+    tagline:
+      "اهلاً بيك في بيتك التاني!\nسواء كنت في أولى، تانية، أو تالتة ثانوي، هنا هتلاقي كل اللي تحتاجه علشان تتفوق في الفيزياء، وتفهمها صح، وتطبقها بسهولة.",
+  },
+};
+
 function useTenantArabicFonts() {
   useEffect(() => {
     const existing = document.getElementById(TENANT_FONT_LINK_ID);
@@ -317,7 +326,10 @@ export default function TenantPublicLanding({ subdomain }) {
   const brandName = tenant.display_name || tenant.subdomain || subdomain;
   const teacherName = teacher?.name || brandName;
   const specialty = tenant?.specialty || teacher?.subject || "";
+  const subdomainKey = String(subdomain || "").trim().toLowerCase();
+  const heroCopyOverride = SUBDOMAIN_HERO_COPY[subdomainKey];
   const heroTitle =
+    heroCopyOverride?.title ||
     (hero.title && hero.title.trim()) ||
     (specialty ? `احترف ${specialty} مع ${teacherName}` : `تعلّم مع ${teacherName}`);
 
@@ -328,6 +340,7 @@ export default function TenantPublicLanding({ subdomain }) {
     "شرح منظم، متابعة مستمرة، وتدريب مكثف يساعدك تحقق أفضل النتائج.";
 
   const heroTagline =
+    heroCopyOverride?.tagline ||
     (hero.subtitle && String(hero.subtitle).trim()) ||
     (about.tagline && String(about.tagline).trim()) ||
     "";

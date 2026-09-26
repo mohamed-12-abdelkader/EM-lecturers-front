@@ -29,29 +29,29 @@ function AboutAvatar({ src, alt }) {
   const srcSet = src ? getPortraitImageSrcSet(src) : undefined;
 
   return (
-    <div className="relative mx-auto w-[min(100%,320px)] sm:w-[360px]">
+    <div className="relative mx-auto w-[min(100%,320px)] px-3 pt-10 pb-6 sm:w-[360px] sm:pt-12">
       <div
-        className="absolute -inset-6 rounded-full opacity-35 blur-3xl [.tenant-light_&]:opacity-20"
+        className="absolute inset-x-0 top-6 -bottom-2 -inset-x-4 rounded-full opacity-35 blur-3xl [.tenant-light_&]:opacity-20 sm:-inset-x-6"
         style={{ background: `radial-gradient(circle, ${BLUE}70 0%, transparent 68%)` }}
         aria-hidden
       />
 
       {!reduceMotion ? (
         <motion.div
-          className="absolute -inset-5 rounded-full border border-dashed border-[#3182CE]/28"
+          className="absolute inset-x-1 top-8 bottom-2 rounded-full border border-dashed border-[#3182CE]/28 sm:inset-x-0"
           animate={{ rotate: 360 }}
           transition={{ duration: 32, repeat: Infinity, ease: "linear" }}
           aria-hidden
         />
       ) : (
         <div
-          className="absolute -inset-5 rounded-full border border-dashed border-[#3182CE]/28"
+          className="absolute inset-x-1 top-8 bottom-2 rounded-full border border-dashed border-[#3182CE]/28 sm:inset-x-0"
           aria-hidden
         />
       )}
 
       <div
-        className="absolute -inset-2 rounded-full border-2 border-[#3182CE]/28"
+        className="absolute inset-x-3 top-10 bottom-4 rounded-full border-2 border-[#3182CE]/28 sm:inset-x-2"
         aria-hidden
       />
 
@@ -70,7 +70,7 @@ function AboutAvatar({ src, alt }) {
             alt={alt}
             className="absolute inset-0 h-full w-full object-contain object-bottom"
             style={{
-              transform: "scale(1.14) translateY(18px)",
+              transform: "scale(1.18) translateY(28px)",
               transformOrigin: "center bottom",
             }}
             loading="eager"
@@ -85,7 +85,7 @@ function AboutAvatar({ src, alt }) {
       </div>
 
       <motion.div
-        className="absolute -right-1 top-[10%] z-10 flex h-11 w-11 items-center justify-center rounded-2xl border border-[color:var(--tl-border)] bg-[var(--tl-card-solid)] shadow-lg"
+        className="absolute right-1 top-12 z-10 flex h-11 w-11 items-center justify-center rounded-2xl border border-[color:var(--tl-border)] bg-[var(--tl-card-solid)] shadow-lg sm:right-0"
         style={{ color: BLUE }}
         animate={reduceMotion ? undefined : { y: [0, -8, 0] }}
         transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
@@ -94,7 +94,7 @@ function AboutAvatar({ src, alt }) {
         <FaGraduationCap className="text-base" />
       </motion.div>
       <motion.div
-        className="absolute -left-1 bottom-[16%] z-10 flex h-10 w-10 items-center justify-center rounded-2xl border border-[color:var(--tl-border)] bg-[var(--tl-card-solid)] shadow-lg"
+        className="absolute left-1 bottom-8 z-10 flex h-10 w-10 items-center justify-center rounded-2xl border border-[color:var(--tl-border)] bg-[var(--tl-card-solid)] shadow-lg sm:left-0"
         style={{ color: BLUE_LIGHT }}
         animate={reduceMotion ? undefined : { y: [0, 8, 0] }}
         transition={{ duration: 5.2, repeat: Infinity, ease: "easeInOut", delay: 0.4 }}
@@ -178,7 +178,7 @@ export default function TenantProBentoWall({
   return (
     <section
       id="services"
-      className="relative scroll-mt-20 overflow-hidden bg-[var(--tl-section)] py-14 md:py-20"
+      className="relative scroll-mt-20 overflow-x-clip overflow-y-visible bg-[var(--tl-section)] py-14 md:py-20"
       dir="rtl"
     >
       {/* subtle section atmosphere */}

@@ -656,17 +656,17 @@ function ChoicesSection({
 
       isCorrect: choice.is_correct,
 
-      isPending: pendingCorrect?.[questionId] === choice.id,
+      isPending: Boolean(pendingCorrect?.[questionId]),
 
       mode,
 
-      disabled: mode === "teacher" && choice.is_correct,
+      disabled: false,
 
       onClick: () => {
 
         if (mode === "student") onSelectLetter?.(choice.letter);
 
-        else if (!choice.is_correct) onSetCorrect?.(questionId, choice.id);
+        else onSetCorrect?.(questionId, choice.id);
 
       },
 
@@ -686,7 +686,7 @@ function ChoicesSection({
 
           key={choice.id ?? cidx}
 
-          label={choice.is_correct ? "الإجابة الصحيحة" : "اضغط لتعيين كإجابة صحيحة"}
+          label={choice.is_correct ? "إجابة صحيحة — اضغط لإلغاء التحديد" : "اضغط لاختيار إجابتين صحيحتين"}
 
           hasArrow
 
@@ -740,7 +740,7 @@ function ChoicesSection({
 
       <Text fontSize="xs" fontWeight="semibold" color={muted} mb={2}>
 
-        {mode === "student" ? "اختر الإجابة الصحيحة" : "الاختيارات"}
+        {mode === "student" ? "اختر الإجابة الصحيحة" : "اختر إجابتين صحيحتين (A–D)"}
 
       </Text>
 
@@ -792,17 +792,17 @@ function ChoicesSection({
 
               isCorrect={choice.is_correct}
 
-              isPending={pendingCorrect?.[questionId] === choice.id}
+              isPending={Boolean(pendingCorrect?.[questionId])}
 
               mode={mode}
 
-              disabled={mode === "teacher" && choice.is_correct}
+              disabled={false}
 
               onClick={() => {
 
                 if (mode === "student") onSelectLetter?.(choice.letter);
 
-                else if (!choice.is_correct) onSetCorrect?.(questionId, choice.id);
+                else onSetCorrect?.(questionId, choice.id);
 
               }}
 

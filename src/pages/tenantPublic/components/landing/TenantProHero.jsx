@@ -808,7 +808,7 @@ function HeroCopy({
         </h1>
         {supportLine ? (
           <p
-            className={`mt-2.5 font-heading font-semibold ${
+            className={`mt-2.5 whitespace-pre-line font-heading font-semibold ${
               compact ? "text-base leading-7 sm:text-lg" : "text-lg leading-8 sm:text-xl lg:text-[1.65rem]"
             }`}
             style={{
@@ -834,7 +834,7 @@ function HeroCopy({
 
       <HeroStaggerItem className={compact ? "mt-4" : "mt-5"}>
         <p
-          className={`max-w-lg text-[var(--tl-hero-muted)] ${
+          className={`max-w-lg whitespace-pre-line text-[var(--tl-hero-muted)] ${
             compact
               ? "text-[0.925rem] leading-7"
               : "text-base leading-8 sm:text-[1.05rem]"
