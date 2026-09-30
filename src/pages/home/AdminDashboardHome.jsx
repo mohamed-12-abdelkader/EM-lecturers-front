@@ -19,6 +19,7 @@ import {
   MdMenuBook,
   MdInventory,
   MdPersonAdd,
+  MdSchool,
 } from "react-icons/md";
 import { FaChalkboardTeacher, FaWhatsapp } from "react-icons/fa";
 import ScrollToTop from "../../components/scollToTop/ScrollToTop";
@@ -137,6 +138,21 @@ const AdminDashboardHome = () => {
                 _hover={{ bg: "blue.50" }}
               >
                 كل الطلاب
+              </Button>
+              <Button
+                as={RouterLink}
+                to="/admin/grades"
+                size="sm"
+                variant="outline"
+                borderColor={AD_BLUE}
+                color={AD_BLUE}
+                borderRadius="lg"
+                leftIcon={<MdSchool />}
+                fontWeight="700"
+                cursor="pointer"
+                _hover={{ bg: "blue.50" }}
+              >
+                الصفوف الدراسية
               </Button>
               <Button
                 as={RouterLink}

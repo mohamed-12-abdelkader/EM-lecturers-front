@@ -22,6 +22,7 @@ import {
   MdGroups,
   MdRestoreFromTrash,
   MdEmojiEvents,
+  MdSchool,
 } from "react-icons/md";
 import { FaRobot, FaFolderOpen, FaWhatsapp } from "react-icons/fa";
 import { Link, useLocation } from "react-router-dom";
@@ -192,6 +193,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
       title: "الإدارة",
       links: [
         { to: "/admin/management", Icon: MdDashboard, label: "لوحة التحكم" },
+        { to: "/admin/grades", Icon: MdSchool, label: "الصفوف الدراسية" },
         { to: "/admin/finance", Icon: MdAccountBalanceWallet, label: "الحسابات والمالية" },
         { to: "/admin/whatsapp/inbox", Icon: FaWhatsapp, label: "واتساب" },
         { to: "/admin/whatsapp/policy", Icon: FaWhatsapp, label: "تخصيص الدعم" },

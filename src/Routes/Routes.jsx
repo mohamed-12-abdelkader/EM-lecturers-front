@@ -192,6 +192,7 @@ const Match = lazyPage(() => import("../pages/league/Match"));
 const LecturesSchedule = lazyPage(() => import("../pages/lecturesSchedule/LecturesSchedule"));
 const FinanceManagementPage = lazyPage(() => import("../pages/finance/FinanceManagementPage"));
 const AdminAllStudentsPage = lazyPage(() => import("../pages/Admin/AdminAllStudentsPage"));
+const AdminGradesPage = lazyPage(() => import("../pages/Admin/AdminGradesPage"));
 const AdminYoutubeUploadsPage = lazyPage(() => import("../pages/Admin/AdminYoutubeUploadsPage"));
 const WhatsAppSessionsPage = lazyPage(() => import("../pages/Admin/whatsapp/WhatsAppSessionsPage"));
 const WhatsAppServicesPage = lazyPage(() => import("../pages/Admin/whatsapp/WhatsAppServicesPage"));
@@ -392,6 +393,18 @@ const AppRouter = () => {
           }
         >
           <Route index element={<AdminAllStudentsPage />} />
+        </Route>
+
+        {/* إدارة الصفوف الدراسية */}
+        <Route
+          path="/admin/grades"
+          element={
+            <ProtectedRoute auth={isAdmin}>
+              <HomeLogin />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<AdminGradesPage />} />
         </Route>
 
         {/* WhatsApp platform admin */}
