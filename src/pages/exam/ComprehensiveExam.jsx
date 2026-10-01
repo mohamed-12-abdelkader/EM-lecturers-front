@@ -84,7 +84,7 @@ import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import { useParams, useNavigate } from "react-router-dom";
 import UserType from "../../Hooks/auth/userType";
 import { useTeacherCourseGroups } from "../../Hooks/course/useCourseGroups";
-import { fetchLectureExamSubmissions } from "../../api/courseAssignmentReportsApi";
+import { fetchExamGrades } from "../../api/courseAssignmentReportsApi";
 import { normalizeStudyGroups } from "./utils/examReportUtils";
 import {
   extractExamAttemptId,
@@ -227,8 +227,11 @@ const ComprehensiveExam = () => {
       setGradesLoading(true);
       setGradesError(null);
       try {
-        const list = await fetchLectureExamSubmissions(id, { groupId: groupFilter });
-        setGradesData(list);
+        const result = await fetchExamGrades(id, {
+          groupId: groupFilter,
+          groupType: groupFilter ? "study" : undefined,
+        });
+        setGradesData(result.students || []);
       } catch (err) {
         setGradesError("حدث خطأ أثناء تحميل الدرجات");
       } finally {
@@ -2092,7 +2095,7 @@ const ComprehensiveExam = () => {
         <ExamSubmissionsView
           submissions={gradesData || []}
           examQuestions={questions}
-          examTitle={examData?.title || "درجات الطلاب في الواجب"}
+          examTitle={examData?.title || "درجات الطلاب في الامتحان"}
           loading={gradesLoading}
           error={gradesError}
           onBack={() => setShowGrades(false)}
@@ -2100,7 +2103,10 @@ const ComprehensiveExam = () => {
           onReport={() => navigate(`/lecture-exam/${id}/report`)}
           groups={studyGroups}
           selectedGroupId={gradesGroupId}
-          onGroupChange={setGradesGroupId}
+          onGroupChange={(value) => {
+            setGradesGroupId(value);
+            fetchGrades(value);
+          }}
           groupFilterDisabled={gradesLoading}
           onZoomImage={(src) => {
             setImageZoomSrc(src);

@@ -55,6 +55,28 @@ export function normalizeGradeSubmission(raw) {
     raw.in_progress === true ||
     raw.exam_status === "in_progress";
 
+  const startedAt = firstDefined(raw.started_at, raw.startedAt);
+  const submittedAt = firstDefined(raw.submitted_at, raw.submittedAt);
+  const finishedAt = firstDefined(raw.finished_at, raw.finishedAt, submittedAt);
+  const durationSeconds = firstDefined(
+    raw.duration_seconds,
+    raw.durationSeconds,
+    raw.time_spent_seconds,
+    raw.timeSpentSeconds,
+  );
+  const durationFormatted = firstDefined(
+    raw.duration_formatted,
+    raw.durationFormatted,
+    raw.time_spent_formatted,
+    raw.timeSpentFormatted,
+    formatDurationSeconds(durationSeconds),
+  );
+  const durationMinutes = firstDefined(
+    raw.duration_minutes,
+    raw.durationMinutes,
+    durationSeconds != null ? Number(durationSeconds) / 60 : null,
+  );
+
   return {
     ...raw,
     name,
@@ -72,13 +94,101 @@ export function normalizeGradeSubmission(raw) {
     maxGrade: total ?? raw.maxGrade,
     totalGrade: total ?? raw.totalGrade,
     submission_id: firstDefined(raw.submission_id, raw.attemptId, raw.attempt_id),
+    attemptId: firstDefined(raw.attemptId, raw.attempt_id, raw.submission_id),
     attempt_number: firstDefined(raw.attempt_number, raw.attemptNumber, 1),
-    submitted_at: firstDefined(raw.submitted_at, raw.submittedAt),
-    started_at: firstDefined(raw.started_at, raw.startedAt),
+    submitted_at: submittedAt,
+    submittedAt,
+    started_at: startedAt,
+    startedAt,
+    finished_at: finishedAt,
+    finishedAt,
+    duration_seconds: durationSeconds ?? raw.duration_seconds,
+    durationSeconds: durationSeconds ?? raw.durationSeconds,
+    duration_minutes: durationMinutes ?? raw.duration_minutes,
+    durationMinutes: durationMinutes ?? raw.durationMinutes,
+    duration_formatted: durationFormatted,
+    durationFormatted,
+    time_spent_seconds: durationSeconds ?? raw.time_spent_seconds,
+    timeSpentSeconds: durationSeconds ?? raw.timeSpentSeconds,
+    time_spent_formatted: durationFormatted,
+    timeSpentFormatted: durationFormatted,
     percentage: inProgress ? null : raw.percentage,
     in_progress: inProgress,
     wrongQuestions: wrongList,
     wrong_questions: wrongList,
+    wrong_questions_count: firstDefined(
+      raw.wrong_questions_count,
+      raw.wrongQuestionsCount,
+      wrongList.length,
+    ),
+    wrongQuestionsCount: firstDefined(
+      raw.wrongQuestionsCount,
+      raw.wrong_questions_count,
+      wrongList.length,
+    ),
+    answered_count: firstDefined(raw.answered_count, raw.answeredCount),
+    unanswered_count: firstDefined(raw.unanswered_count, raw.unansweredCount),
+    questions_count: firstDefined(raw.questions_count, raw.questionsCount),
+  };
+}
+
+export function formatDurationSeconds(seconds) {
+  if (seconds == null || seconds === "") return null;
+  const total = Math.max(0, Math.floor(Number(seconds)));
+  if (!Number.isFinite(total)) return null;
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) {
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+export function formatAttemptDateTime(value) {
+  if (!value) return null;
+  try {
+    return new Date(value).toLocaleString("ar-EG", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+  } catch {
+    return String(value);
+  }
+}
+
+/** يستخرج ملخص توقيت المحاولة للعرض */
+export function getAttemptTiming(submission) {
+  if (!submission || typeof submission !== "object") {
+    return { startedAt: null, finishedAt: null, durationLabel: null, startedLabel: null, finishedLabel: null };
+  }
+  const startedAt = firstDefined(submission.started_at, submission.startedAt);
+  const finishedAt = firstDefined(
+    submission.finished_at,
+    submission.finishedAt,
+    submission.submitted_at,
+    submission.submittedAt,
+  );
+  const durationLabel = firstDefined(
+    submission.duration_formatted,
+    submission.durationFormatted,
+    submission.time_spent_formatted,
+    submission.timeSpentFormatted,
+    formatDurationSeconds(
+      firstDefined(
+        submission.duration_seconds,
+        submission.durationSeconds,
+        submission.time_spent_seconds,
+        submission.timeSpentSeconds,
+      ),
+    ),
+  );
+  return {
+    startedAt,
+    finishedAt,
+    durationLabel,
+    startedLabel: formatAttemptDateTime(startedAt),
+    finishedLabel: formatAttemptDateTime(finishedAt),
   };
 }
 
@@ -141,11 +251,34 @@ export function normalizeWrongQuestion(raw) {
   const yourChoice = raw.yourChoice ?? raw.your_choice ?? null;
   const correctChoice = raw.correctChoice ?? raw.correct_choice ?? null;
   const yourLetter = raw.yourAnswer ?? raw.your_answer ?? yourChoice?.id ?? null;
-  const correctLetter = raw.correctAnswer ?? raw.correct_answer ?? correctChoice?.id ?? null;
+  const correctLetters = Array.isArray(raw.correctAnswers)
+    ? raw.correctAnswers
+    : [raw.correctAnswer, raw.correctAnswer2, raw.correct_answer, raw.correct_answer_2]
+        .filter((v) => v != null && String(v).trim() !== "")
+        .map((v) => String(v).trim().toUpperCase());
+  const uniqueCorrectLetters = [...new Set(correctLetters)];
+  const correctLetter =
+    uniqueCorrectLetters[0] ??
+    correctChoice?.id ??
+    null;
   const yourText = raw.yourAnswerText ?? raw.your_answer_text ?? yourChoice?.text ?? null;
   const correctText =
     raw.correctAnswerText ?? raw.correct_answer_text ?? correctChoice?.text ?? null;
   const unanswered = raw.unanswered === true || raw.unanswered === "true";
+
+  let correctAnswerDisplay;
+  if (uniqueCorrectLetters.length > 1) {
+    correctAnswerDisplay = uniqueCorrectLetters
+      .map((letter) => formatSubmissionAnswer(letter, resolveOptionText(raw, letter), raw))
+      .join(" · ");
+  } else {
+    correctAnswerDisplay = formatChoiceDisplay(
+      correctChoice,
+      correctLetter,
+      correctText,
+      raw,
+    );
+  }
 
   return {
     questionId: raw.questionId ?? raw.question_id ?? raw.id,
@@ -156,12 +289,7 @@ export function normalizeWrongQuestion(raw) {
     yourAnswerDisplay: unanswered
       ? "لم يجب"
       : formatChoiceDisplay(yourChoice, yourLetter, yourText, raw),
-    correctAnswerDisplay: formatChoiceDisplay(
-      correctChoice,
-      correctLetter,
-      correctText,
-      raw,
-    ),
+    correctAnswerDisplay,
   };
 }
 
@@ -388,12 +516,16 @@ export function downloadExamGradesExcel(submissions = [], options = {}) {
     "الدرجة الكلية",
     "النسبة المئوية",
     "الحالة",
+    "بدأ الامتحان",
+    "أنهى الامتحان",
+    "المدة المستغرقة",
   ];
 
   const rows = list.map((submission, index) => {
     const outcome = resolveSubmissionOutcome(submission);
     const { obtained, total, percentage, passed, inProgress } = outcome;
     const status = resolveSubmissionStatus(submission, outcome);
+    const timing = getAttemptTiming(submission);
     const statusLabel = inProgress
       ? status.label
       : `${passed ? "ناجح" : "راسب"}${status.key === "timed_out" ? " — انتهى الوقت" : ""}`;
@@ -405,6 +537,9 @@ export function downloadExamGradesExcel(submissions = [], options = {}) {
       inProgress ? "" : Number.isFinite(total) && total > 0 ? total : "",
       inProgress ? "" : `${percentage}%`,
       statusLabel,
+      timing.startedLabel || "",
+      timing.finishedLabel || (inProgress ? "لم يسلّم بعد" : ""),
+      timing.durationLabel || "",
     ];
   });
 

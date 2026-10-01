@@ -37,6 +37,7 @@ import { renderFormattedExamText } from "../../../utils/renderFormattedExamText"
 import {
   getWrongQuestions,
   getWrongQuestionsCount,
+  getAttemptTiming,
   resolveSubmissionOutcome,
   resolveSubmissionStatus,
   downloadExamGradesExcel,
@@ -315,6 +316,68 @@ function AnswerRow({ type, label, text }) {
   );
 }
 
+function AttemptTimingPanel({ submission, compact = false }) {
+  const timing = getAttemptTiming(submission);
+  const panelBg = useColorModeValue("#F7FAFC", "whiteAlpha.50");
+  const border = useColorModeValue("gray.200", "gray.700");
+  const muted = useColorModeValue("gray.500", "gray.400");
+  const heading = useColorModeValue("gray.800", "gray.100");
+  const accentBg = useColorModeValue("#E8F0FA", "whiteAlpha.100");
+
+  if (!timing.startedLabel && !timing.finishedLabel && !timing.durationLabel) {
+    return null;
+  }
+
+  const items = [
+    { label: "بدأ الامتحان", value: timing.startedLabel || "—" },
+    {
+      label: timing.finishedAt ? "أنهى الامتحان" : "الانتهاء",
+      value: timing.finishedLabel || (submission?.in_progress ? "لم يسلّم بعد" : "—"),
+    },
+    {
+      label: "المدة المستغرقة",
+      value: timing.durationLabel || "—",
+      emphasize: true,
+    },
+  ];
+
+  return (
+    <SimpleGrid
+      columns={{ base: 1, sm: 3 }}
+      spacing={2}
+      mt={compact ? 2 : 0}
+      mb={compact ? 0 : 4}
+      fontFamily={FONT}
+    >
+      {items.map((item) => (
+        <Box
+          key={item.label}
+          bg={item.emphasize ? accentBg : panelBg}
+          borderWidth="1px"
+          borderColor={border}
+          borderRadius="xl"
+          px={3}
+          py={2.5}
+          textAlign="center"
+        >
+          <Text fontSize="xs" color={muted} fontWeight="700" mb={1}>
+            {item.label}
+          </Text>
+          <Text
+            fontSize={item.emphasize ? "lg" : "sm"}
+            fontWeight="800"
+            color={heading}
+            sx={{ fontVariantNumeric: "tabular-nums" }}
+            lineHeight="1.3"
+          >
+            {item.value}
+          </Text>
+        </Box>
+      ))}
+    </SimpleGrid>
+  );
+}
+
 export function SubmissionCard({ submission, index, onZoomImage }) {
   const [wrongOpen, setWrongOpen] = useState(false);
   const cardBg = useColorModeValue("white", "gray.900");
@@ -346,7 +409,6 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
     perfect,
   });
   const statusLabel = statusMeta.label;
-  const startedAt = submission.started_at || submission.startedAt;
 
   if (inProgress) {
     return (
@@ -361,7 +423,7 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
       >
         <Box h="4px" bg={AMBER} />
         <Box p={{ base: 4, md: 5 }}>
-          <HStack align="start" spacing={3}>
+          <HStack align="start" spacing={3} mb={3}>
             <Flex
               w="48px"
               h="48px"
@@ -393,12 +455,6 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
                   : answeredCount > 0
                     ? ` · أجاب على ${answeredCount} سؤال`
                     : ""}
-                {startedAt
-                  ? ` · ${new Date(startedAt).toLocaleString("ar-EG", {
-                      dateStyle: "short",
-                      timeStyle: "short",
-                    })}`
-                  : ""}
                 {remainingSeconds != null
                   ? Number(remainingSeconds) > 0
                     ? ` · متبقٍ ${String(Math.floor(Number(remainingSeconds) / 60)).padStart(2, "0")}:${String(Number(remainingSeconds) % 60).padStart(2, "0")}`
@@ -407,6 +463,7 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
               </Text>
             </Box>
           </HStack>
+          <AttemptTimingPanel submission={submission} compact />
         </Box>
       </Box>
     );
@@ -517,6 +574,8 @@ export function SubmissionCard({ submission, index, onZoomImage }) {
             </Box>
           </Flex>
         </Flex>
+
+        <AttemptTimingPanel submission={submission} />
 
         <Box mb={4}>
           <Flex justify="space-between" mb={1.5} fontFamily={FONT}>
