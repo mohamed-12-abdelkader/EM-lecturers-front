@@ -55,11 +55,31 @@ function WrongQuestionCard({ question, index, onZoomImage }) {
   const cardBg = useColorModeValue("white", "gray.800");
   const border = useColorModeValue("gray.200", "gray.700");
   const yourAnswer = question.yourAnswer;
-  const correctAnswer = question.correctAnswer;
-  const yourText = getAnswerTextFromQuestion(question, yourAnswer);
-  const correctText = getAnswerTextFromQuestion(question, correctAnswer);
+  const correctAnswers = Array.isArray(question.correctAnswers) && question.correctAnswers.length
+    ? question.correctAnswers
+    : [question.correctAnswer, question.correctAnswer2].filter(Boolean);
+  const yourText =
+    (question.yourAnswerText && String(question.yourAnswerText).trim()) ||
+    getAnswerTextFromQuestion(question, yourAnswer);
+  const correctParts = correctAnswers.map((letter) => ({
+    letter,
+    text: getAnswerTextFromQuestion(question, letter),
+  }));
+  const correctText =
+    correctParts.length > 1
+      ? correctParts.map((p) => `${getAnswerLetterLabel(p.letter)} — ${p.text}`).join(" · ")
+      : correctParts[0]?.text ||
+        (question.correctAnswerText && String(question.correctAnswerText).trim()) ||
+        "—";
+  const correctLettersLabel = correctAnswers
+    .map((letter) => getAnswerLetterLabel(letter))
+    .filter(Boolean)
+    .join(" / ");
   const yourImg = yourText && isImageUrl(yourText) ? yourText : null;
-  const correctImg = correctText && isImageUrl(correctText) ? correctText : null;
+  const correctImg =
+    correctParts.length === 1 && correctParts[0]?.text && isImageUrl(correctParts[0].text)
+      ? correctParts[0].text
+      : null;
 
   return (
     <Box
@@ -74,9 +94,14 @@ function WrongQuestionCard({ question, index, onZoomImage }) {
         <Badge colorScheme="red" borderRadius="full" px={3}>
           سؤال خاطئ {index + 1}
         </Badge>
+        {question.unanswered ? (
+          <Badge colorScheme="orange" borderRadius="full" px={3}>
+            بدون إجابة
+          </Badge>
+        ) : null}
       </HStack>
 
-      {question.questionText && (
+      {question.questionText ? (
         <FormattedQuestionText
           value={question.questionText}
           fontSize="md"
@@ -84,9 +109,9 @@ function WrongQuestionCard({ question, index, onZoomImage }) {
           mb={3}
           lineHeight="1.9"
         />
-      )}
+      ) : null}
 
-      {question.questionImage && (
+      {question.questionImage ? (
         <Box
           mb={4}
           cursor="pointer"
@@ -100,7 +125,11 @@ function WrongQuestionCard({ question, index, onZoomImage }) {
             objectFit="contain"
           />
         </Box>
-      )}
+      ) : !question.questionText ? (
+        <Text fontSize="sm" color="gray.500" mb={3}>
+          سؤال بصورة
+        </Text>
+      ) : null}
 
       <VStack align="stretch" spacing={3}>
         <Box
@@ -117,7 +146,11 @@ function WrongQuestionCard({ question, index, onZoomImage }) {
               <Text fontSize="sm" fontWeight="bold" color="red.600" mb={1}>
                 إجابتك {yourAnswer ? `(${getAnswerLetterLabel(yourAnswer)})` : ""}
               </Text>
-              <FormattedQuestionText value={yourImg ? "صورة" : yourText} fontSize="sm" color="red.600" />
+              <FormattedQuestionText
+                value={question.unanswered ? "لم يجب" : yourImg ? "صورة" : yourText}
+                fontSize="sm"
+                color="red.600"
+              />
               {yourImg && (
                 <Image
                   src={yourImg}
@@ -145,7 +178,7 @@ function WrongQuestionCard({ question, index, onZoomImage }) {
             <AiOutlineCheckCircle color="#16A34A" size={18} style={{ marginTop: 4, flexShrink: 0 }} />
             <Box flex={1}>
               <Text fontSize="sm" fontWeight="bold" color="green.600" mb={1}>
-                الإجابة الصحيحة {correctAnswer ? `(${getAnswerLetterLabel(correctAnswer)})` : ""}
+                الإجابة الصحيحة {correctLettersLabel ? `(${correctLettersLabel})` : ""}
               </Text>
               <FormattedQuestionText value={correctImg ? "صورة" : correctText} fontSize="sm" color="green.600" />
               {correctImg && (

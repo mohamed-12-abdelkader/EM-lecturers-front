@@ -1279,49 +1279,48 @@ const TeacherDashboardHome = () => {
                         h="auto"
                         display="block"
                       />
-                      <Flex position="absolute" top={2} right={2} left={2} justify="space-between" align="center" zIndex={1}>
-                        <Badge
-                          bg={isCourseFree(course) ? "green.500" : "white"}
-                          color={isCourseFree(course) ? "white" : "blue.700"}
+                      <HStack position="absolute" top={2} left={2} spacing={1} zIndex={1}>
+                        <IconButton
+                          aria-label="تعديل"
+                          icon={<FaEdit />}
+                          size="xs"
+                          bg="white"
+                          color="blue.600"
                           borderRadius="md"
-                          fontSize="xs"
-                          fontWeight="800"
-                          px={2}
-                          boxShadow="sm"
-                        >
-                          {isCourseFree(course) ? "مجاني" : `${course.price} ج.م`}
-                        </Badge>
-                        <HStack spacing={1}>
-                          <IconButton
-                            aria-label="تعديل"
-                            icon={<FaEdit />}
-                            size="xs"
-                            bg="white"
-                            color="blue.600"
-                            borderRadius="md"
-                            cursor="pointer"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditCourse(course);
-                            }}
-                          />
-                          <IconButton
-                            aria-label="حذف"
-                            icon={<FaTrash />}
-                            size="xs"
-                            bg="white"
-                            color="red.500"
-                            borderRadius="md"
-                            cursor="pointer"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteCourse(course);
-                            }}
-                          />
-                        </HStack>
-                      </Flex>
+                          cursor="pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditCourse(course);
+                          }}
+                        />
+                        <IconButton
+                          aria-label="حذف"
+                          icon={<FaTrash />}
+                          size="xs"
+                          bg="white"
+                          color="red.500"
+                          borderRadius="md"
+                          cursor="pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCourse(course);
+                          }}
+                        />
+                      </HStack>
                     </Box>
                     <Box p={4}>
+                      <Badge
+                        bg={isCourseFree(course) ? "green.50" : "blue.50"}
+                        color={isCourseFree(course) ? "green.700" : "blue.700"}
+                        borderRadius="md"
+                        fontSize="xs"
+                        fontWeight="800"
+                        px={2.5}
+                        py={1}
+                        mb={2}
+                      >
+                        {isCourseFree(course) ? "مجاني" : `${course.price} ج.م`}
+                      </Badge>
                       <Badge colorScheme="blue" borderRadius="md" fontSize="xs" mb={2} fontWeight="700" whiteSpace="normal" textAlign="right">
                         {getCourseGradeLabel(course)}
                       </Badge>

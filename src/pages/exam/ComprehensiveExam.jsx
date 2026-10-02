@@ -1405,17 +1405,7 @@ const ComprehensiveExam = () => {
       );
 
       const result = res.data;
-      setSubmitResult({
-        attemptId: result.attemptId,
-        status: result.status,
-        totalGrade: result.totalGrade,
-        maxGrade: result.maxGrade,
-        passed: result.passed,
-        timedOut: result.timedOut,
-        wrongQuestions: result.wrongQuestions || [],
-        releaseReason: result.releaseReason,
-        showAnswers: result.showAnswers,
-      });
+      setSubmitResult(result);
 
       setExamStatus(
         result.status === "submitted" || result.status === "late"
@@ -1435,6 +1425,8 @@ const ComprehensiveExam = () => {
         setFeedback({
           wrongQuestions: result.wrongQuestions,
           releaseReason: result.releaseReason || "immediate",
+          showAnswers: result.showAnswers,
+          wrongCount: result.wrongCount,
         });
       }
 
@@ -2247,6 +2239,24 @@ const ComprehensiveExam = () => {
           (feedback && feedback.wrongQuestions && feedback.wrongQuestions.length > 0)) &&
         student
       ) {
+        const normalizedSubmit = submitResult
+          ? normalizeExamAttemptResult(submitResult)
+          : null;
+        if (normalizedSubmit?.wrongQuestions?.length > 0 || normalizedSubmit?.showAnswers) {
+          return (
+            <ExamAttemptResultScreen
+              result={normalizedSubmit}
+              examTitle={examData?.title}
+              pageBg={pageBg}
+              compactTop
+              onBack={() => navigate(-1)}
+              onZoomImage={(src) => {
+                setImageZoomSrc(src);
+                setImageZoomOpen(true);
+              }}
+            />
+          );
+        }
         return (
           <Box minH="100dvh" bg={pageBg} pt={6} pb={10} dir="rtl" px={4}>
             <Box maxW="3xl" mx="auto">

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { dedupeEnrolledStudents } from "../../utils/dedupeEnrolledStudents";
 import {
   Box,
   Heading,
@@ -218,7 +219,7 @@ const CourseStudentsPage = () => {
       const response = await baseUrl.get(`api/course/${id}/enrollments`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setEnrollments(response.data.students || []);
+      setEnrollments(dedupeEnrolledStudents(response.data.students || []));
     } catch (error) {
       console.error("Error fetching enrollments:", error);
     }

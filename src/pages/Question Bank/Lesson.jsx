@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   Box,
   Flex,
@@ -73,6 +73,7 @@ import {
 } from "./components/LessonPageChrome";
 import LessonQuestionCard, { shouldStackChoiceOptions } from "./components/LessonQuestionCard";
 import LessonQuestionsToolbar from "./components/LessonQuestionsToolbar";
+import LessonSelectionDock from "./components/LessonSelectionDock";
 import {
   fetchTeacherComprehensiveExams,
   fetchTeacherLectureExams,
@@ -171,8 +172,6 @@ const Lesson = () => {
     } catch {}
   }, []);
 
-  // وضع التحديد (لإضافة أسئلة للامتحان) — مثل التطبيق
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
   // تكبير الصورة
   const [zoomImageUri, setZoomImageUri] = useState(null);
   // عرض نتيجة الإضافة للامتحان
@@ -206,6 +205,72 @@ const Lesson = () => {
   const [selectedExamId, setSelectedExamId] = useState("");
   const [examModalTab, setExamModalTab] = useState("lecture"); // "lecture" | "comprehensive"
   const [examModalMode, setExamModalMode] = useState("questions"); // "questions" | "passages"
+  const [questionSearch, setQuestionSearch] = useState("");
+
+  const filteredQuestions = useMemo(() => {
+    const term = questionSearch.trim().toLowerCase();
+    const selectedSet = new Set(selectedQuestions);
+    const mapped = questions.map((question, originalIndex) => ({
+      ...question,
+      originalIndex,
+      isSelected: selectedSet.has(question.id),
+    }));
+    if (!term) return mapped;
+    return mapped.filter((question) => {
+      const text = String(question.question_text || question.text || "").toLowerCase();
+      const options = (question.options || [])
+        .map((opt) =>
+          typeof opt === "string"
+            ? opt
+            : opt?.text_content || opt?.image_url || "",
+        )
+        .join(" ")
+        .toLowerCase();
+      return text.includes(term) || options.includes(term) || String(question.id).includes(term);
+    });
+  }, [questions, questionSearch, selectedQuestions]);
+
+  const visibleIds = useMemo(
+    () => filteredQuestions.map((q) => q.id).filter((id) => id != null),
+    [filteredQuestions],
+  );
+
+  const visibleAllSelected =
+    visibleIds.length > 0 && visibleIds.every((id) => selectedQuestions.includes(id));
+
+  const jumpToQuestion = useCallback(
+    (originalIndex) => {
+      const question = questions[originalIndex];
+      if (!question) return;
+
+      const scrollAndHighlight = () => {
+        const el =
+          (question.id != null && document.getElementById(`lesson-q-${question.id}`)) ||
+          document.querySelector(`[data-question-index="${originalIndex}"]`);
+        if (!el) return;
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.style.transition = "box-shadow 0.25s ease, outline 0.25s ease";
+        el.style.outline = "2px solid #3182CE";
+        el.style.boxShadow = "0 0 0 4px rgba(49,130,206,0.25)";
+        window.setTimeout(() => {
+          el.style.outline = "";
+          el.style.boxShadow = "";
+        }, 1600);
+      };
+
+      if (questionSearch.trim()) {
+        const stillVisible = filteredQuestions.some((q) => q.originalIndex === originalIndex);
+        if (!stillVisible) {
+          setQuestionSearch("");
+          window.setTimeout(scrollAndHighlight, 80);
+          return;
+        }
+      }
+
+      window.requestAnimationFrame(scrollAndHighlight);
+    },
+    [questions, questionSearch, filteredQuestions],
+  );
 
   // Form states
   const [bulkQuestions, setBulkQuestions] = useState("");
@@ -293,6 +358,14 @@ const Lesson = () => {
   const errorIconBg = useColorModeValue("red.50", "red.900");
   const optionLetterBg = textSecondary;
   const questionIndexBg = useColorModeValue("blue.500", "blue.600");
+  const modalTabListBg = useColorModeValue("gray.100", "whiteAlpha.100");
+  const examOptionBg = useColorModeValue("gray.50", "whiteAlpha.50");
+  const examOptionSelectedBg = useColorModeValue("blue.50", "blue.900");
+  const examOptionHoverBg = useColorModeValue("blue.50", "whiteAlpha.100");
+  const examOptionBorder = useColorModeValue("transparent", "whiteAlpha.200");
+  const examOptionSelectedBorder = useColorModeValue("blue.500", "blue.300");
+  const modalFooterBg = useColorModeValue("gray.50", "gray.900");
+  const modalContentBg = useColorModeValue("white", "gray.800");
 
   const fetchQuestionsData = async () => {
     await invalidateQb.invalidateLesson(id);
@@ -661,7 +734,6 @@ const Lesson = () => {
       onExamClose();
       setSelectedQuestions([]);
       setSelectedExamId("");
-      setIsSelectionMode(false);
       onAddSuccessOpen();
     } catch (err) {
       console.error("Error adding questions to exam:", err);
@@ -673,21 +745,47 @@ const Lesson = () => {
   };
 
   const handleToggleSelectId = (id) => {
-    setSelectedQuestions(prev => {
-      if (prev.includes(id)) return prev.filter(qId => qId !== id);
+    if (id == null) return;
+    setSelectedQuestions((prev) => {
+      if (prev.includes(id)) return prev.filter((qId) => qId !== id);
       return [...prev, id];
     });
   };
 
-  // تبديل وضع التحديد (مثل التطبيق)
-  const toggleSelectionMode = () => {
-    setIsSelectionMode((prev) => !prev);
+  const clearQuestionSelection = () => {
     setSelectedQuestions([]);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedQuestions.length === questions.length) {
+      setSelectedQuestions([]);
+    } else {
+      setSelectedQuestions(questions.map((q) => q.id).filter((id) => id != null));
+    }
+  };
+
+  const handleSelectVisible = () => {
+    if (visibleAllSelected) {
+      const visibleSet = new Set(visibleIds);
+      setSelectedQuestions((prev) => prev.filter((id) => !visibleSet.has(id)));
+      return;
+    }
+    setSelectedQuestions((prev) => {
+      const next = new Set(prev);
+      visibleIds.forEach((id) => next.add(id));
+      return Array.from(next);
+    });
+  };
+
+  const handleInvertSelection = () => {
+    const selectedSet = new Set(selectedQuestions);
+    setSelectedQuestions(
+      questions.map((q) => q.id).filter((id) => id != null && !selectedSet.has(id)),
+    );
   };
 
   // اختيار إجابة للعرض التدريبي (يظهر صحيح/خطأ)
   const handleSelectAnswer = (questionId, optionIndex) => {
-    if (isSelectionMode) return;
     setSelectedAnswers((prev) => ({ ...prev, [questionId]: optionIndex }));
   };
 
@@ -720,14 +818,6 @@ const Lesson = () => {
       case "easy": return "سهل";
       case "hard": return "صعب";
       default: return "متوسط";
-    }
-  };
-
-  const handleSelectAll = () => {
-    if (selectedQuestions.length === questions.length) {
-      setSelectedQuestions([]);
-    } else {
-      setSelectedQuestions(questions.map(q => q.id));
     }
   };
 
@@ -960,15 +1050,18 @@ const Lesson = () => {
     return <LessonErrorScreen error={error} onRetry={fetchQuestionsData} />;
   }
 
+  const canSelectForExam = isTeacher || isAdmin;
+  const hasSelection = selectedQuestions.length > 0;
+
   return (
-    <Box minH="100vh" bg={pageBg} dir="rtl" pb={24}>
+    <Box minH="100vh" bg={pageBg} dir="rtl" pb={hasSelection ? 36 : 24}>
       <ScrollToTop />
       <Container maxW="1200px" px={{ base: 3, md: 5 }} py={{ base: 4, md: 6 }}>
         <LessonPageHeader
           lessonId={id}
           questionsCount={questions.length}
           passagesCount={passagesList.length}
-          isSelectionMode={isSelectionMode}
+          isSelectionMode={hasSelection}
           selectedCount={selectedQuestions.length}
           isAdmin={isAdmin}
           isTeacher={isTeacher}
@@ -978,7 +1071,7 @@ const Lesson = () => {
             onOpen();
           }}
           onExtract={onExtractOpen}
-          onToggleSelection={toggleSelectionMode}
+          onClearSelection={clearQuestionSelection}
         />
 
         {/* Tabs: الأسئلة العادية | أسئلة القطع */}
@@ -997,20 +1090,45 @@ const Lesson = () => {
                 <Box>
                   <LessonQuestionsToolbar
                     total={questions.length}
-                    isSelectionMode={isSelectionMode}
+                    questions={filteredQuestions}
+                    isSelectionMode={hasSelection}
                     selectedCount={selectedQuestions.length}
                     canManage={isAdmin}
                     onSelectAll={handleSelectAll}
                     allSelected={selectedQuestions.length === questions.length && questions.length > 0}
+                    onSelectVisible={handleSelectVisible}
+                    visibleAllSelected={visibleAllSelected}
+                    onInvertSelection={handleInvertSelection}
+                    searchQuery={questionSearch}
+                    onSearchChange={setQuestionSearch}
+                    onJumpToQuestion={jumpToQuestion}
                   />
+                  {filteredQuestions.length === 0 ? (
+                    <Box
+                      p={8}
+                      textAlign="center"
+                      bg={cardBg}
+                      borderRadius="2xl"
+                      borderWidth="1px"
+                      borderColor={cardBorder}
+                    >
+                      <Text color={textSecondary} fontWeight="600">
+                        لا توجد نتائج مطابقة للبحث
+                      </Text>
+                      <Button mt={3} size="sm" variant="outline" onClick={() => setQuestionSearch("")}>
+                        مسح البحث
+                      </Button>
+                    </Box>
+                  ) : (
                   <SimpleGrid columns={{ base: 1, xl: 2 }} spacing={3}>
-                    {questions.map((question, index) => (
+                    {filteredQuestions.map((question) => (
                       <LessonQuestionCard
                         key={question.id}
                         question={question}
-                        index={index}
-                        isSelectionMode={isSelectionMode}
+                        index={question.originalIndex}
+                        isSelectionMode={hasSelection}
                         isSelected={selectedQuestions.includes(question.id)}
+                        canSelect={canSelectForExam}
                         onToggleSelect={handleToggleSelectId}
                         canManage={isAdmin}
                         selectedAnswerIndex={selectedAnswers[question.id]}
@@ -1045,6 +1163,7 @@ const Lesson = () => {
                       />
                     ))}
                   </SimpleGrid>
+                  )}
                 </Box>
               ) : (
                 <LessonEmptyState
@@ -1246,105 +1365,131 @@ const Lesson = () => {
         </Tabs>
       </Container>
 
-      {/* FAB — إضافة للامتحان (مثل التطبيق) */}
-      {isSelectionMode && selectedQuestions.length > 0 && (
-        <Box position="fixed" bottom={6} left={{ base: 4, md: 20 }} right={{ base: 4, md: 20 }} zIndex={100} maxW="400px" mx="auto">
-          <Button
-            w="full"
-            size="lg"
-            colorScheme="blue"
-            leftIcon={<Icon as={FaClipboardList} />}
-            fontWeight="bold"
-            borderRadius="2xl"
-            boxShadow="lg"
-            _hover={{ transform: "translateY(-2px)", boxShadow: "xl" }}
-            onClick={() => { setExamModalMode("questions"); fetchExams(); onExamOpen(); }}
-          >
-            إضافة {selectedQuestions.length} سؤال للامتحان
-          </Button>
-        </Box>
-      )}
+      {/* شريط اختيار الأسئلة للامتحان — يظهر بعد التحديد بنقرتين */}
+      {canSelectForExam && hasSelection ? (
+        <LessonSelectionDock
+          selectedCount={selectedQuestions.length}
+          onClear={clearQuestionSelection}
+          onAddToExam={() => {
+            setExamModalMode("questions");
+            fetchExams();
+            onExamOpen();
+          }}
+        />
+      ) : null}
 
       {/* --- ADD TO EXAM MODAL (مدرس) — امتحان محاضرة | امتحان شامل، أسئلة أو قطع --- */}
       {isTeacher && (
         <Modal isOpen={isExamOpen} onClose={() => { onExamClose(); setExamModalMode("questions"); }} size="lg" isCentered>
           <ModalOverlay backdropFilter="blur(6px)" bg="blackAlpha.600" />
-          <ModalContent borderRadius="2xl" boxShadow={panelShadow} borderWidth="1px" borderColor={cardBorder} overflow="hidden">
+          <ModalContent
+            bg={modalContentBg}
+            color={textPrimary}
+            borderRadius="2xl"
+            boxShadow={panelShadow}
+            borderWidth="1px"
+            borderColor={cardBorder}
+            overflow="hidden"
+          >
             <LessonModalHeader title={examModalMode === "passages" ? "إضافة القطع للامتحان" : "إضافة الأسئلة للامتحان"} />
-            <ModalCloseButton top={3} />
+            <ModalCloseButton top={3} color={textSecondary} />
             <ModalBody py={4}>
-              <Tabs index={examModalTab === "lecture" ? 0 : 1} onChange={(i) => setExamModalTab(i === 0 ? "lecture" : "comprehensive")} variant="soft-rounded" colorScheme="blue" mb={4}>
-                <TabList bg="gray.100" p={1} borderRadius="xl">
-                  <Tab fontSize="sm" fontWeight="600">امتحان محاضرة</Tab>
-                  {examModalMode !== "passages" && <Tab fontSize="sm" fontWeight="600">امتحان شامل</Tab>}
+              <Tabs
+                index={examModalTab === "lecture" ? 0 : 1}
+                onChange={(i) => setExamModalTab(i === 0 ? "lecture" : "comprehensive")}
+                variant="soft-rounded"
+                colorScheme="blue"
+                mb={4}
+              >
+                <TabList bg={modalTabListBg} p={1} borderRadius="xl">
+                  <Tab fontSize="sm" fontWeight="600" color={textSecondary} _selected={{ color: "blue.600", bg: cardBg, _dark: { color: "blue.200", bg: "gray.700" } }}>
+                    امتحان محاضرة
+                  </Tab>
+                  {examModalMode !== "passages" && (
+                    <Tab fontSize="sm" fontWeight="600" color={textSecondary} _selected={{ color: "blue.600", bg: cardBg, _dark: { color: "blue.200", bg: "gray.700" } }}>
+                      امتحان شامل
+                    </Tab>
+                  )}
                 </TabList>
               </Tabs>
               {examLoading ? (
                 <Flex justify="center" p={8}><Spinner color="blue.500" /></Flex>
               ) : examModalTab === "lecture" ? (
                 exams.length === 0 ? (
-                  <Text textAlign="center" color="gray.500" py={8}>لا توجد امتحانات محاضرة متاحة.</Text>
+                  <Text textAlign="center" color={textSecondary} py={8}>لا توجد امتحانات محاضرة متاحة.</Text>
                 ) : (
                   <RadioGroup value={selectedExamId} onChange={setSelectedExamId}>
                     <VStack align="stretch" spacing={3} maxH="360px" overflowY="auto" pr={1}>
-                      {exams.map((exam) => (
-                        <Box
-                          key={exam.id}
-                          p={4}
-                          bg={selectedExamId === String(exam.id) ? "blue.50" : "gray.50"}
-                          borderRadius="xl"
-                          borderWidth="2px"
-                          borderColor={selectedExamId === String(exam.id) ? "blue.500" : "transparent"}
-                          cursor="pointer"
-                          onClick={() => setSelectedExamId(String(exam.id))}
-                          _hover={{ bg: "blue.50" }}
-                        >
-                          <Radio value={String(exam.id)} mb={2}>
-                            <Text fontWeight="bold" fontSize="md">{exam.title}</Text>
-                          </Radio>
-                          <HStack fontSize="sm" color="gray.500" spacing={4} pl={6}>
-                            {exam.courseTitle && <Text>{exam.courseTitle}</Text>}
-                            {exam.lectureTitle && (<><Text>•</Text><Text>{exam.lectureTitle}</Text></>)}
-                          </HStack>
-                        </Box>
-                      ))}
+                      {exams.map((exam) => {
+                        const selected = selectedExamId === String(exam.id);
+                        return (
+                          <Box
+                            key={exam.id}
+                            p={4}
+                            bg={selected ? examOptionSelectedBg : examOptionBg}
+                            borderRadius="xl"
+                            borderWidth="2px"
+                            borderColor={selected ? examOptionSelectedBorder : examOptionBorder}
+                            cursor="pointer"
+                            onClick={() => setSelectedExamId(String(exam.id))}
+                            _hover={{ bg: examOptionHoverBg }}
+                          >
+                            <Radio value={String(exam.id)} mb={2} colorScheme="blue">
+                              <Text fontWeight="bold" fontSize="md" color={textPrimary}>
+                                {exam.title}
+                              </Text>
+                            </Radio>
+                            <HStack fontSize="sm" color={textSecondary} spacing={4} pl={6}>
+                              {exam.courseTitle && <Text>{exam.courseTitle}</Text>}
+                              {exam.lectureTitle && (<><Text>•</Text><Text>{exam.lectureTitle}</Text></>)}
+                            </HStack>
+                          </Box>
+                        );
+                      })}
                     </VStack>
                   </RadioGroup>
                 )
               ) : (
                 comprehensiveExams.length === 0 ? (
-                  <Text textAlign="center" color="gray.500" py={8}>لا توجد امتحانات شاملة متاحة.</Text>
+                  <Text textAlign="center" color={textSecondary} py={8}>لا توجد امتحانات شاملة متاحة.</Text>
                 ) : (
                   <RadioGroup value={selectedExamId} onChange={setSelectedExamId}>
                     <VStack align="stretch" spacing={3} maxH="360px" overflowY="auto" pr={1}>
-                      {comprehensiveExams.map((exam) => (
-                        <Box
-                          key={exam.id}
-                          p={4}
-                          bg={selectedExamId === String(exam.id) ? "blue.50" : "gray.50"}
-                          borderRadius="xl"
-                          borderWidth="2px"
-                          borderColor={selectedExamId === String(exam.id) ? "blue.500" : "transparent"}
-                          cursor="pointer"
-                          onClick={() => setSelectedExamId(String(exam.id))}
-                          _hover={{ bg: "blue.50" }}
-                        >
-                          <Radio value={String(exam.id)} mb={2}>
-                            <Text fontWeight="bold" fontSize="md">{exam.title}</Text>
-                          </Radio>
-                          <HStack fontSize="sm" color="gray.500" spacing={4} pl={6}>
-                            <Text>{exam.course_title || exam.courseTitle || ""}</Text>
-                            {exam.duration_minutes != null && <Text>• {exam.duration_minutes} د</Text>}
-                          </HStack>
-                        </Box>
-                      ))}
+                      {comprehensiveExams.map((exam) => {
+                        const selected = selectedExamId === String(exam.id);
+                        return (
+                          <Box
+                            key={exam.id}
+                            p={4}
+                            bg={selected ? examOptionSelectedBg : examOptionBg}
+                            borderRadius="xl"
+                            borderWidth="2px"
+                            borderColor={selected ? examOptionSelectedBorder : examOptionBorder}
+                            cursor="pointer"
+                            onClick={() => setSelectedExamId(String(exam.id))}
+                            _hover={{ bg: examOptionHoverBg }}
+                          >
+                            <Radio value={String(exam.id)} mb={2} colorScheme="blue">
+                              <Text fontWeight="bold" fontSize="md" color={textPrimary}>
+                                {exam.title}
+                              </Text>
+                            </Radio>
+                            <HStack fontSize="sm" color={textSecondary} spacing={4} pl={6}>
+                              <Text>{exam.course_title || exam.courseTitle || ""}</Text>
+                              {exam.duration_minutes != null && <Text>• {exam.duration_minutes} د</Text>}
+                            </HStack>
+                          </Box>
+                        );
+                      })}
                     </VStack>
                   </RadioGroup>
                 )
               )}
             </ModalBody>
-            <ModalFooter borderTopWidth="1px" borderColor={borderColor} py={4}>
-              <Button variant="ghost" mr={3} onClick={() => { onExamClose(); setExamModalMode("questions"); }}>إلغاء</Button>
+            <ModalFooter borderTopWidth="1px" borderColor={borderColor} py={4} bg={modalFooterBg}>
+              <Button variant="ghost" mr={3} color={textSecondary} onClick={() => { onExamClose(); setExamModalMode("questions"); }}>
+                إلغاء
+              </Button>
               {examModalMode === "passages" ? (
                 <Button colorScheme="blue" onClick={handleAddPassagesToExam} isLoading={addToExamLoading} isDisabled={!selectedExamId} fontWeight="bold">
                   إضافة {selectedPassageIds.length} قطعة

@@ -110,23 +110,27 @@ export default function HomePlatformCourseCard({
             </span>
           </div>
 
-          <div className="absolute inset-x-3 bottom-3 flex items-end justify-between gap-2">
-            <span className="rounded-xl bg-white/95 px-3 py-1.5 font-cairo text-sm font-extrabold shadow-sm backdrop-blur-sm dark:bg-slate-900/90"
-              style={{ color: accent }}
-            >
-              {priceLabel}
-            </span>
-            {lecturesCount != null ? (
+          {lecturesCount != null ? (
+            <div className="absolute inset-x-3 bottom-3 flex justify-end">
               <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/15 px-2.5 py-1.5 text-[11px] font-bold text-white backdrop-blur-md ring-1 ring-white/25">
                 <FaPlay className="text-[9px]" />
                 {lecturesCount} محاضرة
               </span>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
       </div>
 
       <div className="flex flex-1 flex-col px-4 pb-4 pt-3.5">
+        <div className="mb-2.5 flex items-center justify-between gap-2">
+          <span
+            className="rounded-xl px-3 py-1.5 font-cairo text-sm font-extrabold"
+            style={{ color: accent, background: `${accent}14` }}
+          >
+            {priceLabel}
+          </span>
+        </div>
+
         <h3 className="line-clamp-2 min-h-[2.9rem] font-cairo text-[1.05rem] font-extrabold leading-snug tracking-tight text-slate-900 transition group-hover:text-[#3182CE] dark:text-white dark:group-hover:text-blue-300">
           {course.title}
         </h3>

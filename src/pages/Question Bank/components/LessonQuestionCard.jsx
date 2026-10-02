@@ -235,7 +235,7 @@ function ChoiceOption({
         borderWidth={borderW}
         borderColor={borderColor}
         boxShadow={shadow}
-        cursor={canSelectCorrect || !isSelectionMode ? "pointer" : "default"}
+        cursor={canSelectCorrect ? "pointer" : "pointer"}
         transition="all 0.15s ease"
         _hover={
           canSelectCorrect
@@ -303,6 +303,7 @@ export default function LessonQuestionCard({
   index,
   isSelectionMode = false,
   isSelected = false,
+  canSelect = false,
   onToggleSelect,
   canManage = false,
   selectedAnswerIndex,
@@ -357,11 +358,21 @@ export default function LessonQuestionCard({
         : "blue";
 
   const handleCardClick = () => {
-    if (isSelectionMode && onToggleSelect) onToggleSelect(question.id);
+    // التحديد يتم بنقرتين — النقرة الواحدة لا تغيّر التحديد
+  };
+
+  const handleCardDoubleClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (canSelect && onToggleSelect && question?.id != null) {
+      onToggleSelect(question.id);
+    }
   };
 
   return (
     <Box
+      id={question?.id != null ? `lesson-q-${question.id}` : undefined}
+      data-question-index={index}
       position="relative"
       bg={cardBg}
       borderRadius="xl"
@@ -374,8 +385,10 @@ export default function LessonQuestionCard({
       }
       overflow="hidden"
       transition="border-color 0.15s ease, box-shadow 0.15s ease"
-      cursor={isSelectionMode ? "pointer" : "default"}
+      cursor={canSelect ? "pointer" : "default"}
+      title={canSelect ? "اضغط مرتين لتحديد السؤال للامتحان" : undefined}
       onClick={handleCardClick}
+      onDoubleClick={handleCardDoubleClick}
       _hover={{
         borderColor: isSelected ? "orange.400" : "blue.200",
         boxShadow: hoverShadow,
@@ -402,19 +415,24 @@ export default function LessonQuestionCard({
         borderColor={cardBorder}
       >
         <HStack spacing={2} minW={0} flex={1}>
-          {isSelectionMode && (
+          {(canSelect || isSelected) && (
             <Flex
-              w={4}
-              h={4}
-              borderRadius="sm"
+              w={6}
+              h={6}
+              borderRadius="md"
               borderWidth="2px"
               borderColor={isSelected ? "orange.400" : "gray.300"}
               bg={isSelected ? "orange.400" : "transparent"}
               align="center"
               justify="center"
               flexShrink={0}
+              boxShadow={isSelected ? "0 0 0 3px rgba(237,137,54,0.25)" : "none"}
+              transition="all 0.15s ease"
+              opacity={isSelected ? 1 : 0.55}
+              title="اضغط مرتين على السؤال للتحديد"
+              _dark={{ bg: isSelected ? "orange.400" : "transparent" }}
             >
-              {isSelected && <Icon as={FaCheck} color="white" boxSize={2} />}
+              {isSelected && <Icon as={FaCheck} color="white" boxSize={3} />}
             </Flex>
           )}
 
@@ -481,7 +499,13 @@ export default function LessonQuestionCard({
         )}
       </Flex>
 
-      <Box ps={4} pe={3} py={3} onClick={(e) => e.stopPropagation()}>
+      <Box
+        ps={4}
+        pe={3}
+        py={3}
+        onClick={(e) => e.stopPropagation()}
+        onDoubleClick={handleCardDoubleClick}
+      >
         {question.status === "rejected" && question.rejection_reason ? (
           <Alert status="error" borderRadius="lg" mb={2} py={1.5} fontSize="xs">
             <AlertIcon boxSize={3} />
@@ -563,7 +587,6 @@ export default function LessonQuestionCard({
                   stacked={stackOptions}
                   onZoomImage={onZoomImage}
                   onClick={() => {
-                    if (isSelectionMode) return;
                     if (canSelectCorrect) onUpdateCorrectAnswer?.(question.id, i);
                     else onSelectAnswer?.(question.id, i);
                   }}

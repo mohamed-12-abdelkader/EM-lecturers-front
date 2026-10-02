@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { resolvePublicImageUrl } from "../../../utils/highQualityImageUrl";
+import { dedupeEnrolledStudents } from "../../../utils/dedupeEnrolledStudents";
 import {
   Icon,
   Button,
@@ -176,6 +177,7 @@ export default function CourseTeacherActions({
   const [isLoading, setIsLoading] = useState(false);
   const [enrollments, setEnrollments] = useState([]);
   const [loadingEnrollments, setLoadingEnrollments] = useState(false);
+  const [enrollmentsLoaded, setEnrollmentsLoaded] = useState(false);
   const [enrollmentSearch, setEnrollmentSearch] = useState("");
   const toast = useToast();
   const token = localStorage.getItem("token");
@@ -192,6 +194,17 @@ export default function CourseTeacherActions({
     course?.students_count ?? course?.enrolled_students ?? course?.total_students ?? course?.participants;
   const studentsCountNum = studentsCountRaw != null ? Number(studentsCountRaw) : null;
 
+  const uniqueEnrollments = useMemo(
+    () => dedupeEnrolledStudents(enrollments),
+    [enrollments],
+  );
+
+  const subscribersCount = enrollmentsLoaded
+    ? uniqueEnrollments.length
+    : Number.isFinite(studentsCountNum)
+      ? studentsCountNum
+      : uniqueEnrollments.length;
+
   const fetchEnrollments = async () => {
     if (!course?.id) return;
     try {
@@ -199,7 +212,8 @@ export default function CourseTeacherActions({
       const response = await baseUrl.get(`api/course/${course.id}/enrollments`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setEnrollments(response.data.students || []);
+      setEnrollments(dedupeEnrolledStudents(response.data.students || []));
+      setEnrollmentsLoaded(true);
     } catch (error) {
       toast({
         title: "خطأ",
@@ -217,6 +231,13 @@ export default function CourseTeacherActions({
     onEnrollmentsOpen();
     fetchEnrollments();
   };
+
+  useEffect(() => {
+    if (canManageStudents && course?.id) {
+      fetchEnrollments();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canManageStudents, course?.id]);
 
   useEffect(() => {
     const openActivate = () => onOpen();
@@ -239,15 +260,15 @@ export default function CourseTeacherActions({
 
   const filteredEnrollments = useMemo(() => {
     const query = enrollmentSearch.trim().toLowerCase();
-    if (!query) return enrollments;
-    return enrollments.filter((student) => {
+    if (!query) return uniqueEnrollments;
+    return uniqueEnrollments.filter((student) => {
       const haystack = [student.name, student.email, student.phone, student.activation_code]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
       return haystack.includes(query);
     });
-  }, [enrollments, enrollmentSearch]);
+  }, [uniqueEnrollments, enrollmentSearch]);
 
   const handleActivateStudent = async () => {
     if (!studentId.trim()) {
@@ -315,7 +336,7 @@ export default function CourseTeacherActions({
       key: "enrollments",
       tourId: "course-hero-enrollments",
       icon: FaUserGraduate,
-      label: `المشتركين (${studentsCountNum ?? enrollments.length ?? 0})`,
+      label: `المشتركين (${subscribersCount})`,
       onClick: handleOpenEnrollmentsModal,
       tone: "blue",
     },
@@ -462,7 +483,7 @@ export default function CourseTeacherActions({
               <Box>
                 <Text fontWeight="bold">الطلاب المسجلين</Text>
                 <Text fontSize="sm" color={mutedTextColor}>
-                  {courseTitle}
+                  {courseTitle} · {subscribersCount} مشترك
                 </Text>
               </Box>
             </HStack>
@@ -498,8 +519,8 @@ export default function CourseTeacherActions({
                     </Tr>
                   </Thead>
                   <Tbody>
-                    {filteredEnrollments.map((student) => (
-                      <Tr key={student.id}>
+                    {filteredEnrollments.map((student, index) => (
+                      <Tr key={student.student_id ?? student.studentId ?? student.user_id ?? student.id ?? `student-${index}`}>
                         <Td>
                           <HStack spacing={3}>
                             <Avatar size="sm" name={student.name} src={resolvePublicImageUrl(student.avatar)} />

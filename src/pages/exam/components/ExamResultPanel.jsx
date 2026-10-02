@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Box,
   VStack,
@@ -12,6 +12,11 @@ import {
 import { AiOutlineCheckCircle, AiOutlineCloseCircle } from "react-icons/ai";
 import { ExamQuestionImage } from "./ExamQuestionDisplay";
 import { renderFormattedExamText } from "../../../utils/renderFormattedExamText";
+import {
+  getAnswerLetterLabel,
+  getAnswerTextFromQuestion,
+  normalizeWrongQuestions,
+} from "../../../utils/examAttemptResultUtils";
 
 export default function ExamResultPanel({
   submitResult,
@@ -31,18 +36,29 @@ export default function ExamResultPanel({
   const maxGrade = submitResult?.maxGrade ?? examData?.totalGrade ?? 100;
   const percentage = maxGrade > 0 ? Math.round((totalGrade / maxGrade) * 100) : 0;
   const passed = submitResult?.passed ?? percentage >= 50;
-  const wrongQuestions =
-    submitResult?.wrongQuestions ?? feedback?.wrongQuestions ?? [];
-  const wrongCount = wrongQuestions.length;
-  const isPerfect = maxGrade > 0 && Number(totalGrade) >= Number(maxGrade) && wrongCount === 0;
+  const wrongQuestions = useMemo(
+    () =>
+      normalizeWrongQuestions(
+        submitResult?.wrongQuestions ?? feedback?.wrongQuestions ?? [],
+      ),
+    [submitResult?.wrongQuestions, feedback?.wrongQuestions],
+  );
+  const wrongCount =
+    Number(submitResult?.wrongCount ?? feedback?.wrongCount ?? wrongQuestions.length) ||
+    wrongQuestions.length;
+  const isPerfect =
+    maxGrade > 0 && Number(totalGrade) >= Number(maxGrade) && wrongQuestions.length === 0;
   const accent = passed ? "green" : "orange";
+  const showAnswers =
+    submitResult?.showAnswers !== false && feedback?.showAnswers !== false;
 
+  const releaseReason = submitResult?.releaseReason || feedback?.releaseReason;
   const releaseLabel =
-    feedback?.releaseReason === "immediate"
+    releaseReason === "immediate"
       ? "تم إظهار الإجابات فوراً"
-      : feedback?.releaseReason === "scheduled_release"
+      : releaseReason === "scheduled_release"
         ? "تم إظهار الإجابات في الموعد المحدد"
-        : feedback?.releaseReason
+        : releaseReason
           ? "تم إظهار الإجابات بعد المدة المحددة"
           : null;
 
@@ -124,15 +140,15 @@ export default function ExamResultPanel({
         </Box>
       </Box>
 
-      {wrongCount > 0 && (
+      {showAnswers && wrongQuestions.length > 0 && (
         <Box>
           <Text fontSize="sm" fontWeight="semibold" color={heading} mb={3}>
-            مراجعة الأخطاء ({wrongCount})
+            مراجعة الأخطاء ({wrongQuestions.length})
           </Text>
           <VStack spacing={3} align="stretch">
             {wrongQuestions.map((wq, idx) => (
               <WrongAnswerCard
-                key={wq.questionId ?? idx}
+                key={wq.questionId ?? wq.id ?? idx}
                 index={idx}
                 question={wq}
                 onZoomImage={onZoomImage}
@@ -147,7 +163,7 @@ export default function ExamResultPanel({
         </Box>
       )}
 
-      {wrongCount === 0 && isPerfect && (
+      {showAnswers && wrongQuestions.length === 0 && isPerfect && (
         <Box
           p={5}
           borderRadius="xl"
@@ -164,7 +180,8 @@ export default function ExamResultPanel({
           </HStack>
         </Box>
       )}
-      {wrongCount === 0 && !isPerfect && (
+
+      {showAnswers && wrongQuestions.length === 0 && !isPerfect && wrongCount > 0 && (
         <Box
           p={5}
           borderRadius="xl"
@@ -179,6 +196,21 @@ export default function ExamResultPanel({
               توجد أسئلة خاطئة أو متروكة — السؤال المتروك لا يُحتسب
             </Text>
           </HStack>
+        </Box>
+      )}
+
+      {!showAnswers && (
+        <Box
+          p={5}
+          borderRadius="xl"
+          borderWidth="1px"
+          borderColor={cardBorder}
+          bg={softBg}
+          textAlign="center"
+        >
+          <Text fontSize="sm" color={muted} lineHeight="1.8">
+            الإجابات التفصيلية غير متاحة بعد. ستظهر حسب إعدادات المدرس.
+          </Text>
         </Box>
       )}
     </VStack>
@@ -271,6 +303,22 @@ function StatPill({ label, value, tone }) {
   );
 }
 
+function resolveAnswerDisplay(question, letter, fallbackText) {
+  if (fallbackText != null && String(fallbackText).trim()) {
+    const letterLabel = letter ? getAnswerLetterLabel(letter) : "";
+    const text = String(fallbackText).trim();
+    if (letterLabel && text.toUpperCase() !== String(letter).toUpperCase()) {
+      return `${letterLabel} — ${text}`;
+    }
+    if (letterLabel) return `${letterLabel} — ${getAnswerTextFromQuestion(question, letter)}`;
+    return text;
+  }
+  if (!letter) return "لم تجب";
+  const letterLabel = getAnswerLetterLabel(letter);
+  const text = getAnswerTextFromQuestion(question, letter);
+  return `${letterLabel} — ${text}`;
+}
+
 function WrongAnswerCard({
   index,
   question: wq,
@@ -281,6 +329,26 @@ function WrongAnswerCard({
   heading,
   muted,
 }) {
+  const correctAnswers =
+    Array.isArray(wq.correctAnswers) && wq.correctAnswers.length
+      ? wq.correctAnswers
+      : [wq.correctAnswer, wq.correctAnswer2].filter(Boolean);
+
+  const yourDisplay = wq.unanswered
+    ? "لم تجب"
+    : resolveAnswerDisplay(wq, wq.yourAnswer, wq.yourAnswerText || wq.yourChoice?.text);
+
+  const correctDisplay =
+    correctAnswers.length > 1
+      ? correctAnswers
+          .map((letter) => resolveAnswerDisplay(wq, letter, null))
+          .join(" · ")
+      : resolveAnswerDisplay(
+          wq,
+          correctAnswers[0] || wq.correctAnswer,
+          wq.correctAnswerText || wq.correctChoice?.text,
+        );
+
   return (
     <Box
       borderRadius="xl"
@@ -291,40 +359,29 @@ function WrongAnswerCard({
     >
       <Box px={4} py={3} bg={softBg} borderBottomWidth="1px" borderColor={cardBorder}>
         <Text fontSize="xs" fontWeight="semibold" color={muted}>
-          سؤال {index + 1}
+          سؤال خاطئ {index + 1}
+          {wq.unanswered ? " · متروك" : ""}
         </Text>
       </Box>
 
       <Box p={4}>
-        {wq.questionText && (
+        {wq.questionText ? (
           <Text fontSize="sm" fontWeight="medium" color={heading} lineHeight="1.9" mb={3}>
             {renderFormattedExamText(wq.questionText)}
           </Text>
-        )}
+        ) : null}
 
-        {wq.questionImage && (
+        {wq.questionImage ? (
           <Box mb={3}>
             <ExamQuestionImage src={wq.questionImage} onZoom={onZoomImage} compact />
           </Box>
-        )}
+        ) : null}
 
         <Divider mb={3} borderColor={cardBorder} />
 
         <VStack spacing={2} align="stretch">
-          <AnswerRow
-            type="wrong"
-            label="إجابتك"
-            text={
-              wq.yourChoice?.text
-                ? renderFormattedExamText(wq.yourChoice.text)
-                : "لم تجب"
-            }
-          />
-          <AnswerRow
-            type="correct"
-            label="الصحيحة"
-            text={renderFormattedExamText(wq.correctChoice?.text)}
-          />
+          <AnswerRow type="wrong" label="إجابتك" text={yourDisplay} />
+          <AnswerRow type="correct" label="الصحيحة" text={correctDisplay} />
         </VStack>
       </Box>
     </Box>
@@ -355,7 +412,7 @@ function AnswerRow({ type, label, text }) {
         </Text>
       </HStack>
       <Text fontSize="sm" lineHeight="1.8" color={useColorModeValue("gray.700", "gray.200")}>
-        {text}
+        {typeof text === "string" ? text : renderFormattedExamText(String(text ?? "—"))}
       </Text>
     </Flex>
   );

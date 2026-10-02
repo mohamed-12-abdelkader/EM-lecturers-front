@@ -104,20 +104,45 @@ export function getAnswersVisibilityInfo(result = {}) {
   return null;
 }
 
-function normalizeWrongQuestions(list = []) {
+export function normalizeWrongQuestions(list = []) {
   return (Array.isArray(list) ? list : [])
-    .filter((item) => item && (item.questionText || item.text))
-    .map((item, index) => ({
-      id: item.questionId ?? item.id ?? index,
-      questionText: item.questionText ?? item.text ?? "",
-      questionImage: item.questionImage ?? item.image ?? null,
-      correctAnswer: item.correctAnswer ?? item.correctChoice?.letter ?? null,
-      yourAnswer: item.yourAnswer ?? item.yourChoice?.letter ?? null,
-      optionA: item.optionA ?? null,
-      optionB: item.optionB ?? null,
-      optionC: item.optionC ?? null,
-      optionD: item.optionD ?? null,
-    }));
+    .filter(
+      (item) =>
+        item &&
+        (item.questionText ||
+          item.text ||
+          item.questionImage ||
+          item.image ||
+          item.questionId ||
+          item.id),
+    )
+    .map((item, index) => {
+      const correctLetters = Array.isArray(item.correctAnswers)
+        ? item.correctAnswers
+        : [item.correctAnswer, item.correctAnswer2, item.correct_answer, item.correct_answer_2]
+            .filter((v) => v != null && String(v).trim() !== "")
+            .map((v) => String(v).trim().toUpperCase());
+      const uniqueCorrectLetters = [...new Set(correctLetters)];
+
+      return {
+        id: item.questionId ?? item.id ?? index,
+        questionId: item.questionId ?? item.id ?? null,
+        questionText: item.questionText ?? item.text ?? "",
+        questionImage: item.questionImage ?? item.image ?? null,
+        type: item.type ?? null,
+        unanswered: item.unanswered === true,
+        correctAnswer: uniqueCorrectLetters[0] ?? item.correctAnswer ?? item.correctChoice?.letter ?? null,
+        correctAnswer2: uniqueCorrectLetters[1] ?? item.correctAnswer2 ?? null,
+        correctAnswers: uniqueCorrectLetters,
+        yourAnswer: item.yourAnswer ?? item.yourChoice?.letter ?? null,
+        yourAnswerText: item.yourAnswerText ?? item.your_answer_text ?? null,
+        correctAnswerText: item.correctAnswerText ?? item.correct_answer_text ?? null,
+        optionA: item.optionA ?? null,
+        optionB: item.optionB ?? null,
+        optionC: item.optionC ?? null,
+        optionD: item.optionD ?? null,
+      };
+    });
 }
 
 function normalizePreviousAttempt(raw = {}) {

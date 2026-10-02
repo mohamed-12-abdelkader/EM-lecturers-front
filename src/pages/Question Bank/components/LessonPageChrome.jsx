@@ -3,7 +3,6 @@ import {
   Box,
   Button,
   Flex,
-  Grid,
   Heading,
   HStack,
   Icon,
@@ -11,6 +10,8 @@ import {
   Text,
   useColorModeValue,
   VStack,
+  Wrap,
+  WrapItem,
 } from "@chakra-ui/react";
 import {
   MdArrowForward,
@@ -53,6 +54,7 @@ export function LessonErrorScreen({ error, onRetry }) {
         borderWidth="1px"
         borderColor={border}
         textAlign="center"
+        boxShadow="sm"
       >
         <Text color="red.500" fontWeight="semibold" mb={2}>
           {error}
@@ -65,18 +67,23 @@ export function LessonErrorScreen({ error, onRetry }) {
   );
 }
 
-function StatChip({ label, value, accent }) {
-  const bg = useColorModeValue("white", "gray.800");
-  const border = useColorModeValue("gray.200", "gray.700");
+function StatPill({ label, value, tone = "blue" }) {
+  const bg = useColorModeValue(`${tone}.50`, "whiteAlpha.100");
+  const color = useColorModeValue(`${tone}.700`, `${tone}.200`);
   return (
-    <Box px={3} py={2} bg={bg} borderRadius="lg" borderWidth="1px" borderColor={border} minW={0}>
-      <Text fontSize="lg" fontWeight="bold" color={accent} lineHeight="1">
+    <HStack spacing={2} px={3} py={1.5} bg={bg} borderRadius="full" minW="fit-content">
+      <Text
+        fontSize="sm"
+        fontWeight="800"
+        color={color}
+        sx={{ fontVariantNumeric: "tabular-nums" }}
+      >
         {value}
       </Text>
-      <Text fontSize="xs" color={useColorModeValue("gray.500", "gray.400")} noOfLines={1}>
+      <Text fontSize="xs" fontWeight="600" color={useColorModeValue("gray.600", "gray.300")}>
         {label}
       </Text>
-    </Box>
+    </HStack>
   );
 }
 
@@ -91,74 +98,122 @@ export function LessonPageHeader({
   onAddQuestions,
   onAddImageQuestion,
   onExtract,
-  onToggleSelection,
+  onClearSelection,
 }) {
-  const heroGradient = useColorModeValue(
-    "linear(to-br, blue.600, blue.500)",
-    "linear(to-br, blue.700, blue.600)",
+  const cardBg = useColorModeValue("white", "gray.800");
+  const border = useColorModeValue(
+    isSelectionMode ? "orange.200" : "gray.200",
+    isSelectionMode ? "orange.700" : "gray.700",
+  );
+  const muted = useColorModeValue("gray.500", "gray.400");
+  const heading = useColorModeValue("gray.900", "white");
+  const accentBar = useColorModeValue(
+    isSelectionMode ? "orange.400" : "blue.500",
+    isSelectionMode ? "orange.300" : "blue.300",
+  );
+  const iconBg = useColorModeValue(
+    isSelectionMode ? "orange.50" : "blue.50",
+    "whiteAlpha.100",
   );
 
   return (
-    <Box bgGradient={heroGradient} color="white" borderRadius="2xl" overflow="hidden" mb={4}>
-      <Box px={{ base: 4, md: 6 }} py={{ base: 4, md: 5 }}>
+    <Box
+      bg={cardBg}
+      borderRadius="2xl"
+      borderWidth="1px"
+      borderColor={border}
+      overflow="hidden"
+      mb={4}
+      boxShadow="sm"
+    >
+      <Box h="3px" bg={accentBar} />
+      <Box px={{ base: 4, md: 5 }} py={{ base: 4, md: 5 }}>
         <Flex
-          direction={{ base: "column", lg: "row" }}
-          align={{ base: "stretch", lg: "center" }}
+          direction={{ base: "column", md: "row" }}
+          align={{ base: "stretch", md: "center" }}
           justify="space-between"
           gap={4}
         >
-          <HStack spacing={3} align="start" minW={0}>
+          <HStack spacing={3} align="center" minW={0}>
             <Button
               as={Link}
               to="/Teacher_subjects"
               size="sm"
-              variant="outline"
-              borderColor="whiteAlpha.400"
-              color="white"
+              variant="ghost"
+              colorScheme={isSelectionMode ? "orange" : "blue"}
               leftIcon={<MdArrowForward />}
-              _hover={{ bg: "whiteAlpha.200" }}
               flexShrink={0}
+              borderRadius="lg"
             >
               رجوع
             </Button>
+            <Flex
+              w={11}
+              h={11}
+              borderRadius="xl"
+              bg={iconBg}
+              color={isSelectionMode ? "orange.500" : "blue.500"}
+              align="center"
+              justify="center"
+              flexShrink={0}
+            >
+              <Icon as={isSelectionMode ? MdChecklist : MdMenuBook} boxSize={5} />
+            </Flex>
             <Box minW={0}>
-              <HStack spacing={2} mb={1} flexWrap="wrap">
-                <Icon as={MdMenuBook} boxSize={5} opacity={0.9} />
-                <Heading size={{ base: "sm", md: "md" }} fontWeight="bold" noOfLines={1}>
-                  أسئلة الدرس
+              <HStack spacing={2} mb={0.5} flexWrap="wrap">
+                <Heading size="md" fontWeight="800" color={heading} noOfLines={1}>
+                  {isSelectionMode ? "أسئلة محددةة للامتحان" : "أسئلة الدرس"}
                 </Heading>
-                <Badge bg="whiteAlpha.250" color="white" fontFamily="mono" fontSize="xs">
+                <Badge
+                  colorScheme="gray"
+                  variant="subtle"
+                  fontFamily="mono"
+                  fontSize="xs"
+                  borderRadius="md"
+                >
                   #{lessonId}
                 </Badge>
               </HStack>
-              <Text fontSize="sm" opacity={0.9} lineHeight="1.7">
-                إدارة أسئلة الاختيار من متعدد، القطع، والإضافة للامتحان
+              <Text fontSize="sm" color={muted} lineHeight="1.7" noOfLines={2}>
+                {isSelectionMode
+                  ? `${selectedCount} سؤال محدد — أضِفهم من الشريط السفلي أو اضغط مرتين لإلغاء التحديد`
+                  : (isAdmin || isTeacher)
+                    ? "اضغط مرتين على أي سؤال لتحديده وإضافته للامتحان"
+                    : "إدارة الأسئلة والقطع، والبحث أو الانتقال لسؤال برقم معيّن"}
               </Text>
             </Box>
           </HStack>
 
-          <Grid
-            templateColumns={{ base: "repeat(2, 1fr)", sm: "repeat(4, auto)" }}
-            gap={2}
-            w={{ base: "full", lg: "auto" }}
-          >
-            <StatChip label="أسئلة" value={questionsCount} accent="white" />
-            <StatChip label="قطع" value={passagesCount} accent="white" />
+          <Wrap spacing={2} justify={{ base: "flex-start", md: "flex-end" }}>
+            <WrapItem>
+              <StatPill label="سؤال" value={questionsCount} tone="blue" />
+            </WrapItem>
+            <WrapItem>
+              <StatPill label="قطعة" value={passagesCount} tone="teal" />
+            </WrapItem>
             {isSelectionMode ? (
-              <StatChip label="محدد" value={selectedCount} accent="orange.200" />
+              <WrapItem>
+                <StatPill label="محدد" value={selectedCount} tone="orange" />
+              </WrapItem>
             ) : null}
-          </Grid>
+          </Wrap>
         </Flex>
 
-        <Flex mt={4} gap={2} flexWrap="wrap">
+        <Flex
+          mt={4}
+          pt={4}
+          borderTopWidth="1px"
+          borderColor={border}
+          gap={2}
+          flexWrap="wrap"
+          align="center"
+        >
           {isAdmin && (
             <>
               <Button
                 size="sm"
                 leftIcon={<MdQuiz />}
-                bg="white"
-                color="blue.600"
-                _hover={{ bg: "whiteAlpha.900" }}
+                colorScheme="blue"
                 borderRadius="xl"
                 onClick={onAddQuestions}
               >
@@ -168,8 +223,7 @@ export function LessonPageHeader({
                 size="sm"
                 leftIcon={<MdImage />}
                 variant="outline"
-                borderColor="whiteAlpha.500"
-                color="white"
+                colorScheme="blue"
                 borderRadius="xl"
                 onClick={onAddImageQuestion}
               >
@@ -179,8 +233,7 @@ export function LessonPageHeader({
                 size="sm"
                 leftIcon={<MdDocumentScanner />}
                 variant="outline"
-                borderColor="whiteAlpha.500"
-                color="white"
+                colorScheme="blue"
                 borderRadius="xl"
                 onClick={onExtract}
               >
@@ -188,47 +241,54 @@ export function LessonPageHeader({
               </Button>
             </>
           )}
-          {(isAdmin || isTeacher) && questionsCount > 0 && (
+          {isSelectionMode && typeof onClearSelection === "function" ? (
             <Button
               size="sm"
-              leftIcon={isSelectionMode ? <MdClose /> : <MdChecklist />}
-              variant={isSelectionMode ? "solid" : "outline"}
-              colorScheme={isSelectionMode ? "orange" : undefined}
-              borderColor={isSelectionMode ? undefined : "whiteAlpha.500"}
-              color={isSelectionMode ? undefined : "white"}
+              leftIcon={<MdClose />}
+              variant="solid"
+              colorScheme="orange"
               borderRadius="xl"
-              onClick={onToggleSelection}
+              onClick={onClearSelection}
+              fontWeight="800"
+              mr={isAdmin ? "auto" : undefined}
             >
-              {isSelectionMode ? "إلغاء التحديد" : "تحديد للامتحان"}
+              مسح التحديد ({selectedCount})
             </Button>
-          )}
+          ) : null}
         </Flex>
       </Box>
     </Box>
   );
 }
 
-export function LessonEmptyState({ title, subtitle, actionLabel, onAction, icon: IconComp = MdQuiz }) {
+export function LessonEmptyState({
+  title,
+  subtitle,
+  actionLabel,
+  onAction,
+  icon: IconComp = MdQuiz,
+}) {
   const cardBg = useColorModeValue("white", "gray.800");
   const border = useColorModeValue("gray.200", "gray.700");
   const muted = useColorModeValue("gray.500", "gray.400");
-  const iconBg = useColorModeValue("gray.100", "gray.700");
+  const iconBg = useColorModeValue("blue.50", "whiteAlpha.100");
 
   return (
     <Flex
       direction="column"
       align="center"
       justify="center"
-      minH="360px"
+      minH="320px"
       bg={cardBg}
       borderRadius="2xl"
       borderWidth="1px"
       borderColor={border}
       textAlign="center"
       p={10}
+      boxShadow="sm"
     >
-      <Flex w={14} h={14} borderRadius="xl" bg={iconBg} align="center" justify="center" mb={4}>
-        <Icon as={IconComp} boxSize={6} color={muted} />
+      <Flex w={14} h={14} borderRadius="2xl" bg={iconBg} align="center" justify="center" mb={4}>
+        <Icon as={IconComp} boxSize={6} color="blue.400" />
       </Flex>
       <Heading size="sm" mb={2}>
         {title}
@@ -248,11 +308,19 @@ export function LessonEmptyState({ title, subtitle, actionLabel, onAction, icon:
 export function LessonModalHeader({ title, icon: IconComp = MdTextSnippet }) {
   const border = useColorModeValue("gray.200", "gray.700");
   const textColor = useColorModeValue("gray.800", "white");
+  const iconBg = useColorModeValue("blue.50", "blue.900");
   return (
     <Box px={6} py={4} borderBottomWidth="1px" borderColor={border}>
       <HStack spacing={3}>
-        <Flex w={9} h={9} borderRadius="lg" bg="blue.50" _dark={{ bg: "blue.900" }} align="center" justify="center">
-          <Icon as={IconComp} color="blue.500" />
+        <Flex
+          w={9}
+          h={9}
+          borderRadius="lg"
+          bg={iconBg}
+          align="center"
+          justify="center"
+        >
+          <Icon as={IconComp} color="blue.500" _dark={{ color: "blue.300" }} />
         </Flex>
         <Heading size="sm" color={textColor}>
           {title}
