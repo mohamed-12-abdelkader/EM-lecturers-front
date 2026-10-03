@@ -1,6 +1,7 @@
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
+  Button,
   Icon,
   IconButton,
   Tooltip,
@@ -998,6 +999,22 @@ const LectureCard = ({
           {/* أزرار المدرس — صف أفقي على الموبايل */}
           {canManage && (
             <div className="flex items-center gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:justify-end [&::-webkit-scrollbar]:hidden">
+              <Tooltip label="عرض تقرير تفاعل الطلاب مع المحاضرة">
+                <Button
+                  as={Link}
+                  to={`/lectures/${lecture.id}/engagement-report`}
+                  size="sm"
+                  colorScheme="teal"
+                  variant="solid"
+                  borderRadius="lg"
+                  leftIcon={<Icon as={FaChartBar} />}
+                  fontWeight="700"
+                  flexShrink={0}
+                  px={3}
+                >
+                  عرض التقرير
+                </Button>
+              </Tooltip>
               <Tooltip label="تعديل المحاضرة">
                 <IconButton
                   aria-label="تعديل المحاضرة"

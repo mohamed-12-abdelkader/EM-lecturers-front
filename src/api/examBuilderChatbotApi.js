@@ -160,6 +160,20 @@ export async function approveExamBuilderSession(sessionId, payload = {}) {
   return data;
 }
 
+/** إضافة أسئلة معتمدة من البنك إلى امتحان موجود (محاضرة أو كورس) */
+export async function addApprovedQuestionsToExam(examId, questionIds, { isCourseExam = false } = {}) {
+  const body = {
+    questionIds: (questionIds || []).map(Number).filter((n) => Number.isInteger(n) && n > 0),
+  };
+  if (isCourseExam) body.type = "course-exam";
+
+  const { data } = await baseUrl.post(`/api/exams/${examId}/questions/from-bank`, body, {
+    headers: authHeaders("application/json"),
+  });
+  if (data?.success === false) throw rejectApiResponse(data, "فشل إضافة الأسئلة للامتحان");
+  return data;
+}
+
 export async function fetchExamBuilderQuestionPreview(source, questionId) {
   const { data } = await baseUrl.get(`${API}/questions/${source}/${questionId}/preview`, {
     headers: authHeaders(),

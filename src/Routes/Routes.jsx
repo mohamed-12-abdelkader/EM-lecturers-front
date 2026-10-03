@@ -138,6 +138,7 @@ const StudentPointsPage = lazyPage(() => import("../pages/points/StudentPointsPa
 const ScientificChatPage = lazyPage(() => import("../pages/scientificChat/ScientificChatPage"));
 const ScientificTeacherFilesPage = lazyPage(() => import("../pages/scientificChat/ScientificTeacherFilesPage"));
 const ExamBuilderChatPage = lazyPage(() => import("../pages/examBuilder/ExamBuilderChatPage"));
+const ExamBuilderApprovePage = lazyPage(() => import("../pages/examBuilder/ExamBuilderApprovePage"));
 const PlatformExams = lazyPage(() => import("../pages/PlatformExams/PlatformExams"));
 const EssayExam = lazyPage(() => import("../pages/exam/EssayExam"));
 
@@ -166,6 +167,9 @@ const CourseFileViewPage = lazyPage(() => import("../pages/course/CourseFileView
 const CourseStatisticsPage = lazyPage(() => import("../pages/course/CourseStatisticsPage"));
 const CourseStatistics = lazyPage(() => import("../pages/courseStatistics/CourseStatistics"));
 const CourseStudentsPage = lazyPage(() => import("../pages/course/CourseStudentsPage"));
+const LectureEngagementReportPage = lazyPage(
+  () => import("../pages/course/LectureEngagementReportPage"),
+);
 
 // Chat & Support
 const ChatPage = lazyPage(() => import("../pages/chat/ChatPage"));
@@ -653,6 +657,10 @@ const AppRouter = () => {
           <Route path="CourseDetailsPage/:id" element={<CourseDetailsPage />} />
           <Route path="CourseStudentsPage/:id" element={<CourseStudentsPage />} />
           <Route path="CourseStatisticsPage/:id" element={<CourseStatisticsPage />} />
+          <Route
+            path="lectures/:lectureId/engagement-report"
+            element={<LectureEngagementReportPage />}
+          />
 
           {/* Meeting Room */}
           <Route path="meeting/:meetingId" element={<MeetingRoom />} />
@@ -723,6 +731,7 @@ const AppRouter = () => {
           <Route path="teacher-assignments" element={<TeacherAssignmentsPage />} />
           <Route path="teacher-exams" element={<TeacherCourseExamsPage />} />
           <Route path="exam-builder-chat" element={<ExamBuilderChatPage />} />
+          <Route path="exam-builder-chat/:sessionId/approve" element={<ExamBuilderApprovePage />} />
           <Route path="teacher-free-lectures" element={<TeacherFreeLecturesPage />} />
           <Route path="teacher-daily-quizzes" element={<TeacherDailyQuizzesPage />} />
           <Route path="teacher-daily-quizzes/:id" element={<TeacherDailyQuizDetailPage />} />

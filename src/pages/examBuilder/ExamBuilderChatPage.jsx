@@ -46,7 +46,6 @@ import UserType from "../../Hooks/auth/userType";
   sendExamBuilderChat,
   regenerateExamBuilderSession,
   adjustExamBuilderSession,
-  approveExamBuilderSession,
   normalizeChatResponse,
   mapHistoryItemToSession,
   apiErrorMessage,
@@ -60,7 +59,6 @@ import { ACCENT } from "./examBuilderTheme";
 import ExamBuilderChatWorkspace from "./components/ExamBuilderChatWorkspace";
 import ExamProposalPanel from "./components/ExamProposalPanel";
 import ExamBuilderHistoryPanel from "./components/ExamBuilderHistoryPanel";
-import ApproveExamModal from "./components/ApproveExamModal";
 import { exportExamBuilderQuestionsPdf } from "./exportExamBuilderPdf";
 
 const HISTORY_PAGE_SIZE = 20;
@@ -212,7 +210,7 @@ export default function ExamBuilderChatPage() {
   const [thinking, setThinking] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
-  const [approving, setApproving] = useState(false);
+  const [focusQuestionIndex, setFocusQuestionIndex] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
 
   const [history, setHistory] = useState([]);
@@ -224,7 +222,6 @@ export default function ExamBuilderChatPage() {
     has_more: false,
   });
 
-  const approveDisclosure = useDisclosure();
   const exportPdfDisclosure = useDisclosure();
 
   const pageBg = useColorModeValue("gray.50", "gray.900");
@@ -433,8 +430,12 @@ export default function ExamBuilderChatPage() {
     }
   };
 
-  const handleAdjustQuestion = async (mode, item) => {
+  const handleAdjustQuestion = async (mode, item, index) => {
     if (!session?.id || !item?.id) return;
+    const targetIndex =
+      Number.isFinite(index) && index >= 0
+        ? index
+        : proposalQuestions.findIndex((q) => q.id === item.id);
     setAdjusting(true);
     try {
       const payload =
@@ -443,6 +444,11 @@ export default function ExamBuilderChatPage() {
           : { remove_ids: [item.id] };
       const data = await adjustExamBuilderSession(session.id, payload);
       applyChatResponse(data, currentRequest);
+      if (mode === "replace" && targetIndex >= 0) {
+        setFocusQuestionIndex(targetIndex);
+      } else {
+        setFocusQuestionIndex(null);
+      }
       toast({
         title: mode === "replace" ? "تم استبدال السؤال" : "تم حذف السؤال",
         status: "success",
@@ -510,63 +516,13 @@ export default function ExamBuilderChatPage() {
     }
   };
 
-  const handleApproveConfirm = async (payload) => {
+  const handleApprove = () => {
     if (!session?.id) return;
-    setApproving(true);
-    try {
-      const data = await approveExamBuilderSession(session.id, payload);
-      approveDisclosure.onClose();
-
-      const approvedSession = mapHistoryItemToSession(data.session) || data.session;
-
-      toast({
-        title: data.message || "تم اعتماد الأسئلة",
-        description:
-          !data.exam_id && data.question_ids?.length
-            ? `تم اعتماد ${data.question_ids.length} سؤالاً — يمكنك إضافتها لامتحان موجود`
-            : undefined,
-        status: "success",
-        duration: 4000,
-        isClosable: true,
-      });
-
-      applyProposalState({
-        session: approvedSession,
-        questions: resolveProposalQuestions(data),
-        reply: sessionReply,
-        actions: { can_approve: false, can_regenerate: false, can_adjust: false },
-        readOnly: true,
-        requestText: currentRequest,
-      });
-
-      loadHistory({ offset: 0 });
-
-      const redirect = data.redirect || {};
-      const examId = data.exam_id || redirect.exam_id;
-      const examType = data.exam_type || redirect.exam_type;
-
-      if (examId && examType) {
-        navigateToExam(examId, examType);
-      }
-    } catch (err) {
-      toast({
-        title: "فشل الاعتماد",
-        description: apiErrorMessage(err),
-        status: "error",
-        duration: 5000,
-        isClosable: true,
-      });
-    } finally {
-      setApproving(false);
-    }
+    navigate(`/exam-builder-chat/${session.id}/approve`);
   };
 
   if (!isTeacher) return null;
   if (loading) return <BrandLoadingScreen />;
-
-  const defaultApproveTitle =
-    session?.parsed_filters?.exam_title ||
-    (session?.user_message ? session.user_message.slice(0, 60) : "امتحان من بنك الأسئلة");
 
   const sidebarProps = {
     history,
@@ -647,17 +603,17 @@ export default function ExamBuilderChatPage() {
                 reply={sessionReply}
                 actions={actions}
                 onRegenerate={handleRegenerate}
-                onApprove={approveDisclosure.onOpen}
+                onApprove={handleApprove}
                 onOpenExam={handleOpenExam}
                 onExportPdf={handleExportPdfClick}
-                onRemoveQuestion={(item) => handleAdjustQuestion("remove", item)}
-                onReplaceQuestion={(item) => handleAdjustQuestion("replace", item)}
+                onRemoveQuestion={(item, index) => handleAdjustQuestion("remove", item, index)}
+                onReplaceQuestion={(item, index) => handleAdjustQuestion("replace", item, index)}
                 exportingPdf={exportingPdf}
                 regenerating={regenerating}
                 adjusting={adjusting}
-                approving={approving}
                 readOnly={proposalReadOnly}
                 hideReply
+                focusQuestionIndex={focusQuestionIndex}
               />
             )}
           </ExamBuilderChatWorkspace>
@@ -680,15 +636,6 @@ export default function ExamBuilderChatPage() {
           </DrawerBody>
         </DrawerContent>
       </Drawer>
-
-      <ApproveExamModal
-        isOpen={approveDisclosure.isOpen}
-        onClose={approveDisclosure.onClose}
-        onConfirm={handleApproveConfirm}
-        submitting={approving}
-        defaultTitle={defaultApproveTitle}
-        questionCount={proposalQuestions.length}
-      />
 
       <ExportExamPdfModal
         isOpen={exportPdfDisclosure.isOpen}
@@ -797,13 +744,13 @@ function CompactPageHeader({
   return (
     <Box
       bg={cardBg}
-      borderRadius={{ base: "lg", md: "xl" }}
+      borderRadius={{ base: "xl", md: "xl" }}
       borderWidth="1px"
       borderColor={border}
       overflow="hidden"
       boxShadow="sm"
     >
-      <Flex align="center" gap={2} p={{ base: 2.5, md: 3 }}>
+      <Flex align="center" gap={2} px={{ base: 2.5, md: 3 }} py={{ base: 2, md: 2.5 }}>
         {onOpenSidebar && (
           <IconButton
             aria-label="فتح السجل"
@@ -813,26 +760,20 @@ function CompactPageHeader({
             borderRadius="lg"
             onClick={onOpenSidebar}
             flexShrink={0}
+            minW="40px"
+            h="40px"
           />
         )}
-        <Flex w={9} h={9} borderRadius="lg" bg={statBg} align="center" justify="center" flexShrink={0}>
+        <Flex w={8} h={8} borderRadius="lg" bg={statBg} align="center" justify="center" flexShrink={0}>
           <Icon as={MdQuiz} color={ACCENT} boxSize={4} />
         </Flex>
         <Box flex={1} minW={0}>
-          <Text fontSize={{ base: "xs", md: "sm" }} fontWeight="bold" noOfLines={1}>
+          <Text fontSize="sm" fontWeight="800" noOfLines={1}>
             {botInfo?.name || "مساعد إنشاء الامتحانات"}
           </Text>
-          <Text fontSize="10px" color={subColor} noOfLines={{ base: 2, sm: 1 }}>
-            <Box as="span" display={{ base: "block", sm: "inline" }}>
-              {catalogTotal || 0} سؤال
-            </Box>
-            <Box as="span" display={{ base: "none", sm: "inline" }}>
-              {" · "}
-            </Box>
-            <Box as="span" display={{ base: "block", sm: "inline" }}>
-              {historyCount} طلب
-              {hasProposal ? ` · ${proposalCount} جاهز` : ` · حد ${maxQuestions}`}
-            </Box>
+          <Text fontSize="10px" color={subColor} noOfLines={1}>
+            {catalogTotal || 0} سؤال · {historyCount} طلب
+            {hasProposal ? ` · ${proposalCount} جاهز` : ` · حد ${maxQuestions}`}
           </Text>
         </Box>
       </Flex>
