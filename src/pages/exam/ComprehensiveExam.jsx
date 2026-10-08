@@ -104,6 +104,11 @@ import {
 } from "../../utils/examAttemptProgress";
 import { normalizeExamAttemptResult } from "../../utils/examAttemptResultUtils";
 import ExamAttemptResultScreen from "./components/ExamAttemptResultScreen";
+import {
+  patchLectureExamQuestionCorrectAnswers,
+  normalizeCorrectAnswerLetters,
+  toggleCorrectAnswerLetter,
+} from "../../api/courseExamsApi";
 
 function countLectureAnswered(questions, answers) {
   return (questions || []).filter((q) => {
@@ -1242,46 +1247,113 @@ const ComprehensiveExam = () => {
     }
   };
 
-  // Set correct answer
-  const [pendingCorrect, setPendingCorrect] = useState({}); // { [qid]: cid }
-  const handleSetCorrect = async (qid, cid) => {
-    // أظهر مباشرةً أن هذا هو الاختيار الحالي
-    setPendingCorrect((prev) => ({ ...prev, [qid]: cid }));
-    const matchQuestion = (q) =>
-      (q.type === "passage_sub" ? q.sub_question?.id : q.id) === qid;
-    const applyCorrect = (q, cidVal) => {
-      if (q.type === "passage_sub") {
-        return {
-          ...q,
-          sub_question: {
-            ...q.sub_question,
-            choices: q.sub_question.choices.map((c) => ({
-              ...c,
-              is_correct: c.id === cidVal,
-            })),
-          },
-        };
-      }
+  // تحديد إجابة أو إجابتين صحيحتين
+  const [pendingCorrect, setPendingCorrect] = useState({}); // { [qid]: true }
+  const [draftCorrectLetters, setDraftCorrectLetters] = useState({});
+  const LETTER_KEYS = ["A", "B", "C", "D"];
+
+  const getChoiceLetter = (choice, index = 0) => {
+    const raw = choice?.letter || LETTER_KEYS[index] || String.fromCharCode(65 + index);
+    return String(raw).trim().toUpperCase();
+  };
+
+  const getQuestionCorrectLetters = (questionNode) => {
+    const choices = questionNode?.choices || [];
+    const fromFlags = choices
+      .map((c, i) => (c.is_correct ? getChoiceLetter(c, i) : null))
+      .filter(Boolean);
+    if (fromFlags.length) return normalizeCorrectAnswerLetters(fromFlags);
+    if (Array.isArray(questionNode?.correctAnswers)) {
+      return normalizeCorrectAnswerLetters(questionNode.correctAnswers);
+    }
+    if (questionNode?.correctAnswer) {
+      return normalizeCorrectAnswerLetters([questionNode.correctAnswer]);
+    }
+    return [];
+  };
+
+  const applyCorrectLetters = (q, letters) => {
+    const set = new Set(normalizeCorrectAnswerLetters(letters));
+    if (q.type === "passage_sub") {
       return {
         ...q,
-        choices: q.choices.map((c) => ({ ...c, is_correct: c.id === cidVal })),
+        sub_question: {
+          ...q.sub_question,
+          correctAnswers: [...set],
+          choices: (q.sub_question?.choices || []).map((c, i) => ({
+            ...c,
+            is_correct: set.has(getChoiceLetter(c, i)),
+          })),
+        },
       };
+    }
+    return {
+      ...q,
+      correctAnswers: [...set],
+      choices: (q.choices || []).map((c, i) => ({
+        ...c,
+        is_correct: set.has(getChoiceLetter(c, i)),
+      })),
     };
+  };
+
+  const handleSetCorrect = async (qid, cid) => {
+    const matchQuestion = (q) =>
+      (q.type === "passage_sub" ? q.sub_question?.id : q.id) === qid;
+    const question = questions.find(matchQuestion);
+    if (!question) return;
+
+    const node =
+      question.type === "passage_sub" ? question.sub_question : question;
+    const choiceIndex = (node?.choices || []).findIndex((c) => c.id === cid);
+    if (choiceIndex < 0) return;
+    const letter = getChoiceLetter(node.choices[choiceIndex], choiceIndex);
+
+    const current =
+      draftCorrectLetters[qid] ?? getQuestionCorrectLetters(node);
+    const next = toggleCorrectAnswerLetter(current, letter, 2);
+
+    setDraftCorrectLetters((prev) => ({ ...prev, [qid]: next }));
     setQuestions((prev) =>
-      prev.map((q) => (matchQuestion(q) ? applyCorrect(q, cid) : q))
+      prev.map((q) => (matchQuestion(q) ? applyCorrectLetters(q, next) : q)),
     );
+
+    if (next.length === 0) {
+      toast({
+        title: "يجب اختيار إجابة صحيحة واحدة على الأقل",
+        status: "warning",
+        duration: 2500,
+      });
+      return;
+    }
+
+    setPendingCorrect((prev) => ({ ...prev, [qid]: true }));
     try {
       const token = localStorage.getItem("token");
-      await baseUrl.patch(
-        `/api/questions/lecture-exam-question/${qid}/answer`,
-        { correct_answer: cid },
-        token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+      const patchRes = await patchLectureExamQuestionCorrectAnswers(
+        id,
+        qid,
+        next,
+        token,
       );
-      toast({ title: "تم تحديد الإجابة الصحيحة", status: "success" });
-      setPendingCorrect((prev) => {
+      const saved = normalizeCorrectAnswerLetters(
+        patchRes?.correctAnswers || next,
+      );
+      setQuestions((prev) =>
+        prev.map((q) => (matchQuestion(q) ? applyCorrectLetters(q, saved) : q)),
+      );
+      setDraftCorrectLetters((prev) => {
         const copy = { ...prev };
         delete copy[qid];
         return copy;
+      });
+      toast({
+        title:
+          patchRes?.message ||
+          (saved.length === 2
+            ? "تم تحديث الإجابتين الصحيحتين"
+            : "تم تحديث الإجابة الصحيحة"),
+        status: "success",
       });
     } catch (error) {
       console.error("Error setting correct answer:", error);
@@ -1289,12 +1361,23 @@ const ComprehensiveExam = () => {
         title: "فشل تحديد الإجابة",
         description:
           error.response?.data?.message ||
+          error?.message ||
           "حدث خطأ أثناء تحديد الإجابة الصحيحة",
         status: "error",
       });
       setQuestions((prev) =>
-        prev.map((q) => (matchQuestion(q) ? applyCorrect(q, null) : q))
+        prev.map((q) =>
+          matchQuestion(q)
+            ? applyCorrectLetters(q, getQuestionCorrectLetters(node))
+            : q,
+        ),
       );
+      setDraftCorrectLetters((prev) => {
+        const copy = { ...prev };
+        delete copy[qid];
+        return copy;
+      });
+    } finally {
       setPendingCorrect((prev) => {
         const copy = { ...prev };
         delete copy[qid];

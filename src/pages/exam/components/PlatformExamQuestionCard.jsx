@@ -686,7 +686,11 @@ function ChoicesSection({
 
           key={choice.id ?? cidx}
 
-          label={choice.is_correct ? "إجابة صحيحة — اضغط لإلغاء التحديد" : "اضغط لاختيار إجابتين صحيحتين"}
+          label={
+            choice.is_correct
+              ? "إجابة صحيحة — اضغط لإلغاء التحديد"
+              : "اضغط لتحديد إجابة صحيحة (حتى إجابتين)"
+          }
 
           hasArrow
 
@@ -740,7 +744,9 @@ function ChoicesSection({
 
       <Text fontSize="xs" fontWeight="semibold" color={muted} mb={2}>
 
-        {mode === "student" ? "اختر الإجابة الصحيحة" : "اختر إجابتين صحيحتين (A–D)"}
+        {mode === "student"
+          ? "اختر الإجابة الصحيحة"
+          : "اختر إجابة أو إجابتين صحيحتين (A–D)"}
 
       </Text>
 

@@ -194,9 +194,23 @@ export function normalizeCorrectAnswerLetters(letters) {
   return unique;
 }
 
+/** تبديل حرف صحيح مع حد أقصى إجابتين (1 أو 2) */
+export function toggleCorrectAnswerLetter(current, letter, max = 2) {
+  const normalized = normalizeCorrectAnswerLetters(current);
+  const nextLetter = String(letter || "").trim().toUpperCase();
+  if (!VALID_CORRECT_LETTERS.has(nextLetter)) return normalized;
+  if (normalized.includes(nextLetter)) {
+    return normalized.filter((l) => l !== nextLetter);
+  }
+  if (normalized.length >= max) {
+    return normalizeCorrectAnswerLetters([normalized[normalized.length - 1], nextLetter]);
+  }
+  return normalizeCorrectAnswerLetters([...normalized, nextLetter]);
+}
+
 /**
  * PATCH /api/course/course-exam/question/:questionId/correct-answers
- * Body: { correctAnswers: ["A", "B"] } — حرفان مختلفان من A–D فقط.
+ * Body: { correctAnswers: ["A"] } أو { correctAnswers: ["A", "C"] }
  */
 export async function patchCourseExamQuestionCorrectAnswers(
   questionId,
@@ -204,12 +218,73 @@ export async function patchCourseExamQuestionCorrectAnswers(
   token,
 ) {
   const answers = normalizeCorrectAnswerLetters(correctAnswers);
-  if (answers.length !== 2) {
-    throw new Error("يجب اختيار حرفين مختلفين من A–D فقط");
+  if (answers.length < 1 || answers.length > 2) {
+    throw new Error("يجب اختيار إجابة واحدة أو إجابتين من A–D");
   }
   const { data } = await baseUrl.patch(
     `/api/course/course-exam/question/${questionId}/correct-answers`,
     { correctAnswers: answers },
+    {
+      headers: {
+        ...authHeaders(token),
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+    },
+  );
+  return data;
+}
+
+/**
+ * PATCH /api/exams/:examId/questions/:questionId/correct-answer
+ * Body: { correctAnswers: ["A"] } أو { correctAnswers: ["A", "C"] }
+ */
+export async function patchLectureExamQuestionCorrectAnswers(
+  examId,
+  questionId,
+  correctAnswers,
+  token,
+) {
+  const answers = normalizeCorrectAnswerLetters(correctAnswers);
+  if (answers.length < 1 || answers.length > 2) {
+    throw new Error("يجب اختيار إجابة واحدة أو إجابتين من A–D");
+  }
+  const { data } = await baseUrl.patch(
+    `/api/exams/${examId}/questions/${questionId}/correct-answer`,
+    { correctAnswers: answers },
+    {
+      headers: {
+        ...authHeaders(token),
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+    },
+  );
+  return data;
+}
+
+/**
+ * PATCH /api/assignment-questions/:questionId/correct-answer
+ * Body: { correctAnswers: ["a"] } أو { correctAnswers: ["a", "c"] }
+ */
+export async function patchAssignmentQuestionCorrectAnswers(
+  questionId,
+  correctAnswers,
+  token,
+) {
+  const answers = normalizeCorrectAnswerLetters(correctAnswers).map((l) =>
+    l.toLowerCase(),
+  );
+  if (answers.length < 1 || answers.length > 2) {
+    throw new Error("يجب اختيار إجابة واحدة أو إجابتين من a–d");
+  }
+  const body =
+    answers.length === 1
+      ? { correct_answer: answers[0], correctAnswers: answers }
+      : { correctAnswers: answers };
+  const { data } = await baseUrl.patch(
+    `/api/assignment-questions/${questionId}/correct-answer`,
+    body,
     {
       headers: {
         ...authHeaders(token),

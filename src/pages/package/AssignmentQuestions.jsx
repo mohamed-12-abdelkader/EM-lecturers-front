@@ -47,7 +47,37 @@ import {
   NumberDecrementStepper,
   Alert,
   AlertIcon,
+  Flex,
 } from '@chakra-ui/react';
+import {
+  normalizeCorrectAnswerLetters,
+  toggleCorrectAnswerLetter,
+  patchAssignmentQuestionCorrectAnswers,
+} from '../../api/courseExamsApi';
+
+const ASSIGNMENT_OPTION_KEYS = [
+  { key: 'a', label: 'أ', field: 'option_a' },
+  { key: 'b', label: 'ب', field: 'option_b' },
+  { key: 'c', label: 'ج', field: 'option_c' },
+  { key: 'd', label: 'د', field: 'option_d' },
+];
+
+function getAssignmentCorrectAnswers(question) {
+  if (!question) return [];
+  if (Array.isArray(question.correct_answers) && question.correct_answers.length) {
+    return normalizeCorrectAnswerLetters(question.correct_answers).map((l) => l.toLowerCase());
+  }
+  if (Array.isArray(question.correctAnswers) && question.correctAnswers.length) {
+    return normalizeCorrectAnswerLetters(question.correctAnswers).map((l) => l.toLowerCase());
+  }
+  return normalizeCorrectAnswerLetters(
+    [question.correct_answer, question.correct_answer_2].filter(Boolean),
+  ).map((l) => l.toLowerCase());
+}
+
+function isAssignmentOptionCorrect(question, letter) {
+  return getAssignmentCorrectAnswers(question).includes(String(letter).toLowerCase());
+}
 import {
   FiArrowLeft,
   FiEdit,
@@ -92,6 +122,7 @@ const AssignmentQuestions = () => {
     option_c: '',
     option_d: '',
     correct_answer: 'a',
+    correctAnswers: ['a'],
     order_index: 0,
   });
 
@@ -185,13 +216,15 @@ const AssignmentQuestions = () => {
   // Open edit question modal
   const openEditQuestionModal = (question) => {
     setSelectedQuestion(question);
+    const answers = getAssignmentCorrectAnswers(question);
     setEditQuestionFormData({
       question_text: question.question_text || '',
       option_a: question.option_a || '',
       option_b: question.option_b || '',
       option_c: question.option_c || '',
       option_d: question.option_d || '',
-      correct_answer: question.correct_answer || 'a',
+      correct_answer: answers[0] || 'a',
+      correctAnswers: answers.length ? answers : ['a'],
       order_index: question.order_index || 0,
     });
     onEditQuestionModalOpen();
@@ -211,7 +244,16 @@ const AssignmentQuestions = () => {
       if (editQuestionFormData.option_b) updateData.option_b = editQuestionFormData.option_b;
       if (editQuestionFormData.option_c) updateData.option_c = editQuestionFormData.option_c;
       if (editQuestionFormData.option_d) updateData.option_d = editQuestionFormData.option_d;
-      if (editQuestionFormData.correct_answer) updateData.correct_answer = editQuestionFormData.correct_answer;
+      const answers = normalizeCorrectAnswerLetters(
+        editQuestionFormData.correctAnswers?.length
+          ? editQuestionFormData.correctAnswers
+          : [editQuestionFormData.correct_answer],
+      ).map((l) => l.toLowerCase());
+      if (answers.length >= 1 && answers.length <= 2) {
+        updateData.correct_answer = answers[0];
+        updateData.correctAnswers = answers;
+        if (answers[1]) updateData.correct_answer_2 = answers[1];
+      }
       if (editQuestionFormData.order_index !== undefined) updateData.order_index = editQuestionFormData.order_index;
 
       const response = await baseUrl.put(
@@ -252,31 +294,45 @@ const AssignmentQuestions = () => {
     }
   };
 
-  // Update correct answer only
+  // Update correct answer only (1 أو 2)
   const handleUpdateCorrectAnswer = async () => {
     if (!selectedQuestion) return;
+
+    const answers = normalizeCorrectAnswerLetters(
+      editQuestionFormData.correctAnswers?.length
+        ? editQuestionFormData.correctAnswers
+        : [editQuestionFormData.correct_answer],
+    ).map((l) => l.toLowerCase());
+
+    if (answers.length < 1 || answers.length > 2) {
+      toast({
+        title: 'حدد الإجابة الصحيحة',
+        description: 'اختر إجابة واحدة أو إجابتين من أ–د',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
 
     try {
       setUpdatingCorrectAnswer(true);
       const token = localStorage.getItem('token');
-
-      const response = await baseUrl.patch(
-        `/api/assignment-questions/${selectedQuestion.id}/correct-answer`,
-        { correct_answer: editQuestionFormData.correct_answer },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
+      const response = await patchAssignmentQuestionCorrectAnswers(
+        selectedQuestion.id,
+        answers,
+        token,
       );
 
-      if (response.data?.success) {
+      if (response?.success !== false) {
         await fetchAssignmentAndQuestions();
-        
         toast({
           title: 'تم التحديث بنجاح! ✅',
-          description: 'تم تحديث الإجابة الصحيحة بنجاح',
+          description:
+            response?.message ||
+            (answers.length === 2
+              ? 'تم تحديث الإجابتين الصحيحتين'
+              : 'تم تحديث الإجابة الصحيحة بنجاح'),
           status: 'success',
           duration: 3000,
           isClosable: true,
@@ -288,7 +344,7 @@ const AssignmentQuestions = () => {
       console.error('Error updating correct answer:', error);
       toast({
         title: 'فشل التحديث! ❌',
-        description: error.response?.data?.error || error.response?.data?.message || 'حدث خطأ أثناء تحديث الإجابة الصحيحة',
+        description: error.response?.data?.error || error.response?.data?.message || error?.message || 'حدث خطأ أثناء تحديث الإجابة الصحيحة',
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -341,11 +397,26 @@ const AssignmentQuestions = () => {
   // Open update correct answer dialog
   const openUpdateCorrectAnswerDialog = (question) => {
     setSelectedQuestion(question);
-    setEditQuestionFormData(prev => ({
+    const answers = getAssignmentCorrectAnswers(question);
+    setEditQuestionFormData((prev) => ({
       ...prev,
-      correct_answer: question.correct_answer || 'a',
+      correct_answer: answers[0] || 'a',
+      correctAnswers: answers.length ? answers : ['a'],
     }));
     onUpdateCorrectAnswerOpen();
+  };
+
+  const toggleFormCorrectAnswer = (letter) => {
+    setEditQuestionFormData((prev) => {
+      const next = toggleCorrectAnswerLetter(prev.correctAnswers || [], letter, 2).map((l) =>
+        l.toLowerCase(),
+      );
+      return {
+        ...prev,
+        correctAnswers: next,
+        correct_answer: next[0] || prev.correct_answer,
+      };
+    });
   };
 
   if (loading) {
@@ -430,7 +501,7 @@ const AssignmentQuestions = () => {
                           {question.question_type === 'image' ? 'صورة' : 'نصي'}
                         </Badge>
                         <Badge colorScheme="blue" variant="outline" fontSize="xs" px={2} py={1} borderRadius="md">
-                          الإجابة: {question.correct_answer?.toUpperCase()}
+                          الإجابة: {getAssignmentCorrectAnswers(question).map((l) => l.toUpperCase()).join(' · ') || '—'}
                         </Badge>
                       </HStack>
                       {(isAdmin || isTeacher) && (
@@ -516,126 +587,42 @@ const AssignmentQuestions = () => {
                         الخيارات:
                       </Text>
                       <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
-                        <Card 
-                          bg={question.correct_answer === 'a' ? blueLight : cardBg} 
-                          border="1px solid" 
-                          borderColor={question.correct_answer === 'a' ? primaryColor : borderColor}
-                          borderRadius="lg"
-                          _hover={{ borderColor: primaryColor }}
-                          transition="all 0.2s"
-                        >
-                          <CardBody p={4}>
-                            <HStack spacing={3}>
-                              <Badge 
-                                bg={question.correct_answer === 'a' ? primaryColor : 'gray.300'} 
-                                color={question.correct_answer === 'a' ? 'white' : 'gray.700'} 
-                                fontSize="xs" 
-                                px={2.5}
-                                py={1}
-                                borderRadius="md"
-                                fontWeight="600"
-                              >
-                                أ
-                              </Badge>
-                              <Text color={textColor} fontSize="sm" flex={1} lineHeight="1.6">
-                                {question.option_a}
-                              </Text>
-                              {question.correct_answer === 'a' && (
-                                <Icon as={FiCheckCircle} color={primaryColor} boxSize={4} />
-                              )}
-                            </HStack>
-                          </CardBody>
-                        </Card>
-                        <Card 
-                          bg={question.correct_answer === 'b' ? blueLight : cardBg} 
-                          border="1px solid" 
-                          borderColor={question.correct_answer === 'b' ? primaryColor : borderColor}
-                          borderRadius="lg"
-                          _hover={{ borderColor: primaryColor }}
-                          transition="all 0.2s"
-                        >
-                          <CardBody p={4}>
-                            <HStack spacing={3}>
-                              <Badge 
-                                bg={question.correct_answer === 'b' ? primaryColor : 'gray.300'} 
-                                color={question.correct_answer === 'b' ? 'white' : 'gray.700'} 
-                                fontSize="xs" 
-                                px={2.5}
-                                py={1}
-                                borderRadius="md"
-                                fontWeight="600"
-                              >
-                                ب
-                              </Badge>
-                              <Text color={textColor} fontSize="sm" flex={1} lineHeight="1.6">
-                                {question.option_b}
-                              </Text>
-                              {question.correct_answer === 'b' && (
-                                <Icon as={FiCheckCircle} color={primaryColor} boxSize={4} />
-                              )}
-                            </HStack>
-                          </CardBody>
-                        </Card>
-                        <Card 
-                          bg={question.correct_answer === 'c' ? blueLight : cardBg} 
-                          border="1px solid" 
-                          borderColor={question.correct_answer === 'c' ? primaryColor : borderColor}
-                          borderRadius="lg"
-                          _hover={{ borderColor: primaryColor }}
-                          transition="all 0.2s"
-                        >
-                          <CardBody p={4}>
-                            <HStack spacing={3}>
-                              <Badge 
-                                bg={question.correct_answer === 'c' ? primaryColor : 'gray.300'} 
-                                color={question.correct_answer === 'c' ? 'white' : 'gray.700'} 
-                                fontSize="xs" 
-                                px={2.5}
-                                py={1}
-                                borderRadius="md"
-                                fontWeight="600"
-                              >
-                                ج
-                              </Badge>
-                              <Text color={textColor} fontSize="sm" flex={1} lineHeight="1.6">
-                                {question.option_c}
-                              </Text>
-                              {question.correct_answer === 'c' && (
-                                <Icon as={FiCheckCircle} color={primaryColor} boxSize={4} />
-                              )}
-                            </HStack>
-                          </CardBody>
-                        </Card>
-                        <Card 
-                          bg={question.correct_answer === 'd' ? blueLight : cardBg} 
-                          border="1px solid" 
-                          borderColor={question.correct_answer === 'd' ? primaryColor : borderColor}
-                          borderRadius="lg"
-                          _hover={{ borderColor: primaryColor }}
-                          transition="all 0.2s"
-                        >
-                          <CardBody p={4}>
-                            <HStack spacing={3}>
-                              <Badge 
-                                bg={question.correct_answer === 'd' ? primaryColor : 'gray.300'} 
-                                color={question.correct_answer === 'd' ? 'white' : 'gray.700'} 
-                                fontSize="xs" 
-                                px={2.5}
-                                py={1}
-                                borderRadius="md"
-                                fontWeight="600"
-                              >
-                                د
-                              </Badge>
-                              <Text color={textColor} fontSize="sm" flex={1} lineHeight="1.6">
-                                {question.option_d}
-                              </Text>
-                              {question.correct_answer === 'd' && (
-                                <Icon as={FiCheckCircle} color={primaryColor} boxSize={4} />
-                              )}
-                            </HStack>
-                          </CardBody>
-                        </Card>
+                        {ASSIGNMENT_OPTION_KEYS.map(({ key, label, field }) => {
+                          const selected = isAssignmentOptionCorrect(question, key);
+                          return (
+                            <Card
+                              key={key}
+                              bg={selected ? blueLight : cardBg}
+                              border="1px solid"
+                              borderColor={selected ? primaryColor : borderColor}
+                              borderRadius="lg"
+                              _hover={{ borderColor: primaryColor }}
+                              transition="all 0.2s"
+                            >
+                              <CardBody p={4}>
+                                <HStack spacing={3}>
+                                  <Badge
+                                    bg={selected ? primaryColor : 'gray.300'}
+                                    color={selected ? 'white' : 'gray.700'}
+                                    fontSize="xs"
+                                    px={2.5}
+                                    py={1}
+                                    borderRadius="md"
+                                    fontWeight="600"
+                                  >
+                                    {label}
+                                  </Badge>
+                                  <Text color={textColor} fontSize="sm" flex={1} lineHeight="1.6">
+                                    {question[field]}
+                                  </Text>
+                                  {selected && (
+                                    <Icon as={FiCheckCircle} color={primaryColor} boxSize={4} />
+                                  )}
+                                </HStack>
+                              </CardBody>
+                            </Card>
+                          );
+                        })}
                       </SimpleGrid>
                     </Box>
                   </VStack>
@@ -786,28 +773,36 @@ const AssignmentQuestions = () => {
                 </SimpleGrid>
 
                 <FormControl>
-                  <FormLabel fontWeight="bold" color={textColor} fontSize="md" mb={2}>
-                    الإجابة الصحيحة
-                  </FormLabel>
-                  <Select
-                    value={editQuestionFormData.correct_answer}
-                    onChange={(e) =>
-                      setEditQuestionFormData((prev) => ({ ...prev, correct_answer: e.target.value }))
-                    }
-                    borderColor={borderColor}
-                    borderRadius="lg"
-                    size="lg"
-                    _focus={{
-                      borderColor: primaryColor,
-                      boxShadow: `0 0 0 3px ${primaryColor}33`,
-                      borderWidth: '2px',
-                    }}
-                  >
-                    <option value="a">أ - {editQuestionFormData.option_a || 'الخيار أ'}</option>
-                    <option value="b">ب - {editQuestionFormData.option_b || 'الخيار ب'}</option>
-                    <option value="c">ج - {editQuestionFormData.option_c || 'الخيار ج'}</option>
-                    <option value="d">د - {editQuestionFormData.option_d || 'الخيار د'}</option>
-                  </Select>
+                  <Flex justify="space-between" align="center" mb={2} gap={2}>
+                    <FormLabel fontWeight="bold" color={textColor} fontSize="md" mb={0}>
+                      الإجابة الصحيحة
+                    </FormLabel>
+                    <Badge colorScheme="green" borderRadius="full">
+                      {(editQuestionFormData.correctAnswers || []).length}/2
+                    </Badge>
+                  </Flex>
+                  <Text fontSize="xs" color={subTextColor} mb={3}>
+                    اختر إجابة واحدة أو إجابتين — أي منهما تُحسب صحيحة
+                  </Text>
+                  <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={2}>
+                    {ASSIGNMENT_OPTION_KEYS.map(({ key, label, field }) => {
+                      const selected = (editQuestionFormData.correctAnswers || []).includes(key);
+                      return (
+                        <Button
+                          key={key}
+                          size="sm"
+                          variant={selected ? 'solid' : 'outline'}
+                          colorScheme={selected ? 'green' : 'gray'}
+                          borderRadius="lg"
+                          justifyContent="flex-start"
+                          onClick={() => toggleFormCorrectAnswer(key)}
+                        >
+                          {label} — {editQuestionFormData[field] || `الخيار ${label}`}
+                          {selected ? ' ✓' : ''}
+                        </Button>
+                      );
+                    })}
+                  </SimpleGrid>
                 </FormControl>
 
                 <FormControl>
@@ -890,7 +885,7 @@ const AssignmentQuestions = () => {
             <ModalBody p={{ base: 4, md: 6 }} bg={cardBg}>
               <VStack spacing={4} align="stretch">
                 <Text color={textColor} fontSize="md">
-                  اختر الإجابة الصحيحة للسؤال:
+                  اختر إجابة واحدة أو إجابتين صحيحتين:
                 </Text>
                 {selectedQuestion && (
                   <Box p={3} bg={blueLight} borderRadius="md" border="1px solid" borderColor={borderColor}>
@@ -906,28 +901,33 @@ const AssignmentQuestions = () => {
                   </Box>
                 )}
                 <FormControl isRequired>
-                  <FormLabel fontWeight="bold" color={textColor} fontSize="md" mb={2}>
-                    الإجابة الصحيحة
-                  </FormLabel>
-                  <Select
-                    value={editQuestionFormData.correct_answer}
-                    onChange={(e) =>
-                      setEditQuestionFormData((prev) => ({ ...prev, correct_answer: e.target.value }))
-                    }
-                    borderColor={borderColor}
-                    borderRadius="lg"
-                    size="lg"
-                    _focus={{
-                      borderColor: primaryColor,
-                      boxShadow: `0 0 0 3px ${primaryColor}33`,
-                      borderWidth: '2px',
-                    }}
-                  >
-                    <option value="a">أ - {selectedQuestion?.option_a || 'الخيار أ'}</option>
-                    <option value="b">ب - {selectedQuestion?.option_b || 'الخيار ب'}</option>
-                    <option value="c">ج - {selectedQuestion?.option_c || 'الخيار ج'}</option>
-                    <option value="d">د - {selectedQuestion?.option_d || 'الخيار د'}</option>
-                  </Select>
+                  <Flex justify="space-between" align="center" mb={2} gap={2}>
+                    <FormLabel fontWeight="bold" color={textColor} fontSize="md" mb={0}>
+                      الإجابات الصحيحة
+                    </FormLabel>
+                    <Badge colorScheme="green" borderRadius="full">
+                      {(editQuestionFormData.correctAnswers || []).length}/2
+                    </Badge>
+                  </Flex>
+                  <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={2}>
+                    {ASSIGNMENT_OPTION_KEYS.map(({ key, label, field }) => {
+                      const selected = (editQuestionFormData.correctAnswers || []).includes(key);
+                      return (
+                        <Button
+                          key={key}
+                          size="md"
+                          variant={selected ? 'solid' : 'outline'}
+                          colorScheme={selected ? 'green' : 'gray'}
+                          borderRadius="lg"
+                          justifyContent="flex-start"
+                          onClick={() => toggleFormCorrectAnswer(key)}
+                        >
+                          {label} — {selectedQuestion?.[field] || `الخيار ${label}`}
+                          {selected ? ' ✓' : ''}
+                        </Button>
+                      );
+                    })}
+                  </SimpleGrid>
                 </FormControl>
               </VStack>
             </ModalBody>

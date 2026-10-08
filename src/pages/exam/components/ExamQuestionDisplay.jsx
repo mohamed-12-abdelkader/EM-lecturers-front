@@ -300,7 +300,7 @@ function ExamChoicesSection({
   const renderTeacherChoice = (choice, cidx) => {
     const letter = CHOICE_LETTERS[cidx] ?? String.fromCharCode(65 + cidx);
     const isCorrect = choice.is_correct;
-    const isPending = pendingCorrect?.[displayId] === choice.id;
+    const isPending = Boolean(pendingCorrect?.[displayId]);
 
     return (
       <Flex
@@ -322,9 +322,9 @@ function ExamChoicesSection({
           borderColor: isCorrect ? correctBorder : "blue.300",
           bg: isCorrect ? correctBg : hoverBg,
         }}
-        cursor={isCorrect || isPending ? "default" : "pointer"}
+        cursor={isPending ? "wait" : "pointer"}
         onClick={() => {
-          if (!isPending && !isCorrect) onSetCorrect?.(displayId, choice.id);
+          if (!isPending) onSetCorrect?.(displayId, choice.id);
         }}
         disabled={isPending}
       >
@@ -602,7 +602,7 @@ export function TeacherQuestionCard({
             ) : null}
             {!hasCorrect ? (
               <Badge colorScheme="orange" variant="subtle" borderRadius="full" fontSize="10px">
-                بدون إجابة صحيحة
+                حدد إجابة أو إجابتين صحيحتين
               </Badge>
             ) : null}
           </HStack>

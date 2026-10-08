@@ -28,6 +28,7 @@ import TeacherExamTour from "../../components/onboarding/TeacherExamTour";
 import {
   patchCourseExamQuestionCorrectAnswers,
   normalizeCorrectAnswerLetters,
+  toggleCorrectAnswerLetter,
 } from "../../api/courseExamsApi";
 import {
   TOUR_CLOSE_AI,
@@ -364,10 +365,10 @@ const Exam = () => {
         : editForm.choices.filter((c) => c.is_correct).map((c, i) => getChoiceLetter(c, i)),
     );
 
-    if (correctLetters.length !== 2) {
+    if (correctLetters.length < 1 || correctLetters.length > 2) {
       toast({
-        title: "حدد إجابتين صحيحتين",
-        description: "يجب اختيار حرفين مختلفين من A–D قبل الحفظ",
+        title: "حدد الإجابة الصحيحة",
+        description: "اختر إجابة واحدة أو إجابتين من A–D قبل الحفظ",
         status: "warning",
       });
       return;
@@ -435,26 +436,17 @@ const Exam = () => {
 
     const current =
       draftCorrectLetters[qid] ?? getQuestionCorrectLetters(question);
-    let next;
-    if (current.includes(letter)) {
-      next = current.filter((l) => l !== letter);
-    } else if (current.length >= 2) {
-      next = [current[1], letter];
-    } else {
-      next = [...current, letter];
-    }
-    next = normalizeCorrectAnswerLetters(next);
+    const next = toggleCorrectAnswerLetter(current, letter, 2);
 
     setDraftCorrectLetters((prev) => ({ ...prev, [qid]: next }));
     setQuestions((prev) =>
       prev.map((q) => (q.id === qid ? applyCorrectLettersToQuestion(q, next) : q)),
     );
 
-    if (next.length !== 2) {
+    if (next.length === 0) {
       toast({
-        title: `اختر إجابتين صحيحتين (${next.length}/2)`,
-        description: "بعد اختيار الحرف الثاني سيتم الحفظ وإعادة التصحيح تلقائياً",
-        status: "info",
+        title: "يجب اختيار إجابة صحيحة واحدة على الأقل",
+        status: "warning",
         duration: 2500,
       });
       return;
@@ -478,7 +470,11 @@ const Exam = () => {
       });
       const regrade = patchRes?.regrade;
       toast({
-        title: patchRes?.message || "تم تحديث الإجابتين الصحيحتين",
+        title:
+          patchRes?.message ||
+          (saved.length === 2
+            ? "تم تحديث الإجابتين الصحيحتين"
+            : "تم تحديث الإجابة الصحيحة"),
         description: regrade
           ? `مراجعة ${regrade.answersReviewed ?? 0} · تحديث ${regrade.attemptsUpdated ?? 0} محاولة`
           : undefined,
@@ -1103,12 +1099,15 @@ const Exam = () => {
               <Box>
                 <Flex justify="space-between" align="center" mb={2} gap={3}>
                   <Text fontWeight="600" fontSize="sm" color="gray.600">الاختيارات</Text>
-                  <Badge colorScheme={(editForm.correctLetters || []).length === 2 ? "green" : "orange"} borderRadius="full">
-                    إجابتان صحيحتان: {(editForm.correctLetters || []).length}/2
+                  <Badge
+                    colorScheme={(editForm.correctLetters || []).length >= 1 ? "green" : "orange"}
+                    borderRadius="full"
+                  >
+                    إجابات صحيحة: {(editForm.correctLetters || []).length}/2
                   </Badge>
                 </Flex>
                 <Text fontSize="xs" color="gray.500" mb={3}>
-                  اختر حرفين مختلفين من A–D كإجابتين صحيحتين (سيتم إعادة تصحيح المحاولات السابقة)
+                  اختر إجابة واحدة أو إجابتين من A–D (أي إجابة منهما تُحسب صحيحة — مع إعادة تصحيح المحاولات السابقة)
                 </Text>
                 <VStack spacing={3}>
                   {editForm.choices.map((choice, idx) => {
@@ -1127,16 +1126,11 @@ const Exam = () => {
                           borderRadius="full"
                           onClick={() =>
                             setEditForm((prev) => {
-                              const current = normalizeCorrectAnswerLetters(prev.correctLetters || []);
-                              let next;
-                              if (current.includes(letter)) {
-                                next = current.filter((l) => l !== letter);
-                              } else if (current.length >= 2) {
-                                next = [current[1], letter];
-                              } else {
-                                next = [...current, letter];
-                              }
-                              next = normalizeCorrectAnswerLetters(next);
+                              const next = toggleCorrectAnswerLetter(
+                                prev.correctLetters || [],
+                                letter,
+                                2,
+                              );
                               return {
                                 ...prev,
                                 correctLetters: next,
