@@ -209,11 +209,26 @@ export default function TeacherTrashPage() {
       const result = await restoreTeacherTrashItem(
         restoreTarget.type,
         restoreTarget.id,
-        token
+        token,
+        {
+          source:
+            restoreTarget.source ||
+            (restoreTarget.needsSnapshotSource ? "snapshot" : undefined),
+        },
       );
+      const restoredEntityId = result?.entityId ?? result?.entity_id ?? result?.id;
       toast({
-        title: "تمت الاستعادة",
-        description: result?.message || `تم استعادة «${restoreTarget.title}»`,
+        title:
+          restoreTarget.type === "platform_student"
+            ? "تم استعادة حساب الطالب"
+            : "تمت الاستعادة",
+        description:
+          result?.message ||
+          (restoreTarget.type === "platform_student"
+            ? `تم استعادة حساب «${restoreTarget.title}»${
+                restoredEntityId != null ? ` (#${restoredEntityId})` : ""
+              }`
+            : `تم استعادة «${restoreTarget.title}»`),
         status: "success",
         isClosable: true,
       });
@@ -268,8 +283,8 @@ export default function TeacherTrashPage() {
                   المحذوفات
                 </Heading>
                 <Text fontSize="sm" color="whiteAlpha.900" lineHeight="1.8" maxW="2xl">
-                  استعد المجموعات والملفات والاشتراكات المحذوفة. العناصر القديمة بدون نسخة
-                  احتياطية تظهر للعرض فقط.
+                  استعد حسابات الطلاب والمجموعات والملفات والاشتراكات المحذوفة. العناصر القديمة
+                  بدون نسخة احتياطية تظهر للعرض فقط.
                 </Text>
               </VStack>
             </HStack>
@@ -330,8 +345,9 @@ export default function TeacherTrashPage() {
         <Alert status="info" borderRadius="xl" mb={5} bg={cardBg} borderWidth="1px" borderColor={border}>
           <AlertIcon />
           <Text fontSize="sm" color={muted} lineHeight="1.8">
-            الحذف النهائي القديم للكورسات والمحاضرات قبل تفعيل هذا النظام لا يُستعاد بالكامل.
-            كل ما كان حذفه ناعماً (مثل مجموعات السنتر والملفات) يُستعاد من هنا.
+            يمكن استعادة حسابات طلاب المنصة وطلاب السنتر من هنا (الاسم، الهاتف، الكود، وكلمة
+            المرور إن وُجدت في النسخة، مع الصف والمجموعة إن حُفظت). الحذف النهائي القديم
+            للكورسات والمحاضرات قبل تفعيل هذا النظام قد لا يُستعاد بالكامل.
           </Text>
         </Alert>
 
@@ -480,8 +496,19 @@ export default function TeacherTrashPage() {
                           {item.subtitle}
                         </Text>
                       ) : null}
+                      {item.type === "platform_student" && item.canRestore ? (
+                        <Text fontSize="xs" color="teal.600" mt={1} lineHeight="1.7">
+                          استعادة الحساب: الاسم والهاتف والكود وكلمة المرور (إن وُجدت) والصف/المجموعة
+                        </Text>
+                      ) : null}
+                      {item.restoreBlockers?.length ? (
+                        <Text fontSize="xs" color="orange.500" mt={1} lineHeight="1.7">
+                          {item.restoreBlockers.join(" · ")}
+                        </Text>
+                      ) : null}
                       <Text fontSize="xs" color={muted} mt={1}>
                         حُذف في {formatDeletedAt(item.deletedAt)}
+                        {item.source === "snapshot" ? " · من نسخة محفوظة" : ""}
                       </Text>
                     </Box>
                   </HStack>
@@ -535,7 +562,15 @@ export default function TeacherTrashPage() {
               تأكيد الاستعادة
             </AlertDialogHeader>
             <AlertDialogBody lineHeight="1.9">
-              {restoreTarget?.restoreKind === TRASH_RESTORE.PARTIAL ? (
+              {restoreTarget?.type === "platform_student" ? (
+                <>
+                  سيتم استعادة حساب الطالب «{restoreTarget?.title}» بما يشمل الاسم والهاتف
+                  والكود وكلمة المرور إن وُجدت في النسخة، بالإضافة إلى الصف والمجموعة ومجموعة
+                  الكورس إن كانوا محفوظين.
+                </>
+              ) : restoreTarget?.type === "center_student" ? (
+                <>هل تريد استعادة طالب السنتر «{restoreTarget?.title}» إلى مكانه الأصلي؟</>
+              ) : restoreTarget?.restoreKind === TRASH_RESTORE.PARTIAL ? (
                 <>
                   سيتم استعادة سجل «{restoreTarget?.title}» بشكل جزئي فقط. المحتوى المرفق قد لا
                   يعود بالكامل إذا لم تُحفظ نسخة منه.

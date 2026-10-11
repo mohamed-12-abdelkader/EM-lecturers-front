@@ -16,7 +16,7 @@ export const TRASH_RESTORE = {
   NONE: "none",
 };
 
-/** أنواع قابلة للاستعادة الكاملة (soft-delete) */
+/** أنواع قابلة للاستعادة الكاملة (soft-delete أو snapshot حساب طالب) */
 const FULL_TYPES = new Set([
   "center_group",
   "center_student",
@@ -29,14 +29,21 @@ const FULL_TYPES = new Set([
   "my_file",
   "file",
   "course_file",
+  "platform_student",
 ]);
 
 /** استعادة جزئية للسجل فقط */
 const PARTIAL_TYPES = new Set(["course", "lecture"]);
 
+/** أنواع تُستعاد من snapshot — يُفضّل تمرير source=snapshot */
+const SNAPSHOT_RESTORE_TYPES = new Set([
+  "platform_student",
+  "course",
+  "lecture",
+]);
+
 /** عرض فقط — لا استعادة */
 const VIEW_ONLY_TYPES = new Set([
-  "platform_student",
   "question",
   "lesson",
   "question_bank_question",
@@ -58,7 +65,7 @@ export const TRASH_TYPE_META = {
   course_file: { label: "ملف PDF للكورس", color: "red", group: "files" },
   course: { label: "كورس", color: "blue", group: "content" },
   lecture: { label: "محاضرة", color: "orange", group: "content" },
-  platform_student: { label: "طالب منصة", color: "gray", group: "view" },
+  platform_student: { label: "طالب منصة", color: "teal", group: "students" },
   question: { label: "سؤال محذوف", color: "gray", group: "view" },
   lesson: { label: "درس محذوف", color: "gray", group: "view" },
   question_bank_question: { label: "سؤال من البنك", color: "gray", group: "view" },
@@ -80,11 +87,21 @@ export function trashRestoreKind(type, raw = {}) {
   if (raw.canRestore === false || raw.can_restore === false) return TRASH_RESTORE.NONE;
   if (raw.restoreKind) return raw.restoreKind;
   if (raw.restore_kind) return raw.restore_kind;
+  // احترام إشارة الـ API أولاً (مثلاً platform_student بعد تفعيل الاستعادة)
+  if (raw.canRestore === true || raw.can_restore === true) {
+    if (PARTIAL_TYPES.has(type)) return TRASH_RESTORE.PARTIAL;
+    return TRASH_RESTORE.FULL;
+  }
   if (VIEW_ONLY_TYPES.has(type)) return TRASH_RESTORE.NONE;
   if (PARTIAL_TYPES.has(type)) return TRASH_RESTORE.PARTIAL;
   if (FULL_TYPES.has(type)) return TRASH_RESTORE.FULL;
-  if (raw.canRestore === true || raw.can_restore === true) return TRASH_RESTORE.FULL;
   return TRASH_RESTORE.NONE;
+}
+
+export function trashNeedsSnapshotSource(type, raw = {}) {
+  const source = String(raw.source || "").toLowerCase();
+  if (source === "snapshot") return true;
+  return SNAPSHOT_RESTORE_TYPES.has(type) && source !== "live";
 }
 
 function unwrap(raw) {
@@ -96,6 +113,12 @@ export function normalizeTrashItem(raw) {
   if (!raw || typeof raw !== "object") return null;
   const id = raw.id ?? raw.entityId ?? raw.entity_id ?? raw.itemId ?? raw.item_id;
   const type = String(raw.type ?? raw.entityType ?? raw.entity_type ?? "").trim();
+  const source = String(raw.source || "").trim().toLowerCase() || null;
+  const restoreBlockers = Array.isArray(raw.restoreBlockers)
+    ? raw.restoreBlockers
+    : Array.isArray(raw.restore_blockers)
+      ? raw.restore_blockers
+      : [];
   const restoreKind = trashRestoreKind(type, raw);
   return {
     id,
@@ -116,9 +139,12 @@ export function normalizeTrashItem(raw) {
       raw.restore_note ||
       "",
     deletedAt: raw.deletedAt ?? raw.deleted_at ?? raw.deletedOn ?? raw.createdAt ?? raw.created_at,
+    source,
+    restoreBlockers,
     restoreKind,
     canRestore: restoreKind === TRASH_RESTORE.FULL || restoreKind === TRASH_RESTORE.PARTIAL,
-    extra: raw.meta ?? raw.extra ?? null,
+    needsSnapshotSource: trashNeedsSnapshotSource(type, { ...raw, source }),
+    extra: raw.meta ?? raw.metadata ?? raw.extra ?? null,
   };
 }
 
@@ -198,11 +224,22 @@ export async function fetchTeacherTrashSummary(token) {
   return normalizeTrashSummary(data);
 }
 
-export async function restoreTeacherTrashItem(type, id, token) {
+/**
+ * POST /api/teacher/trash/:type/:id/restore
+ * لطلاب المنصة والكورسات/المحاضرات من snapshot: مرّر source=snapshot
+ */
+export async function restoreTeacherTrashItem(type, id, token, options = {}) {
+  const params = {};
+  const source = options.source || (trashNeedsSnapshotSource(type, options) ? "snapshot" : undefined);
+  if (source) params.source = source;
+
   const { data } = await baseUrl.post(
     `${API}/${encodeURIComponent(type)}/${encodeURIComponent(id)}/restore`,
-    {},
-    { headers: authHeaders(token) }
+    source ? { source } : {},
+    {
+      params,
+      headers: authHeaders(token),
+    },
   );
   return data;
 }
