@@ -109,7 +109,22 @@ export function settingsToPayload(settings) {
   };
 }
 
+function normalizeCourseGroup(raw) {
+  const src = raw?.courseGroup ?? raw?.course_group ?? raw?.group ?? null;
+  if (!src || typeof src !== "object") return null;
+  const id = src.id ?? src.groupId ?? src.group_id ?? null;
+  const name = src.name ?? src.groupName ?? src.group_name ?? "";
+  if (id == null && !name) return null;
+  return {
+    id,
+    name: name || (id != null ? `مجموعة ${id}` : ""),
+    gradeId: src.gradeId ?? src.grade_id ?? null,
+    status: src.status ?? null,
+  };
+}
+
 export function normalizeLeaderboardStudent(row = {}) {
+  const courseGroup = normalizeCourseGroup(row);
   return {
     rank: toInt(row.rank, 0),
     studentId: row.studentId ?? row.student_id ?? null,
@@ -119,6 +134,8 @@ export function normalizeLeaderboardStudent(row = {}) {
     gradeId: row.gradeId ?? row.grade_id ?? null,
     gradeName: row.gradeName ?? row.grade_name ?? "",
     points: toInt(row.points ?? row.totalPoints ?? row.total_points, 0),
+    courseGroup,
+    groupName: courseGroup?.name || row.groupName || row.group_name || "",
   };
 }
 
@@ -208,6 +225,62 @@ export async function fetchStudentPointTransactions(studentId, params = {}) {
   return {
     studentId: payload?.studentId ?? payload?.student_id ?? studentId,
     transactions: list.map(normalizeTransaction),
+  };
+}
+
+/**
+ * DELETE /api/teacher/points/transactions/:transactionId
+ * يحذف منح يدوي (MANUAL_REWARD) فقط ويخصم النقاط من رصيد الطالب
+ */
+export async function deleteManualPointsTransaction(transactionId, teacherId) {
+  const { data } = await baseUrl.delete(
+    `${TEACHER_API}/transactions/${encodeURIComponent(transactionId)}${buildQuery(
+      teacherScope(teacherId),
+    )}`,
+  );
+  const result = unwrap(data, "فشل حذف النقاط الممنوحة");
+  return {
+    deleted: result?.deleted !== false,
+    transactionId: result?.transactionId ?? result?.transaction_id ?? transactionId,
+    studentId: result?.studentId ?? result?.student_id ?? null,
+    pointsRemoved: toInt(result?.pointsRemoved ?? result?.points_removed, 0),
+    totalPoints: toInt(result?.totalPoints ?? result?.total_points, 0),
+    message: data?.message || "تم حذف النقاط الممنوحة بنجاح",
+  };
+}
+
+export const RESET_POINTS_CONFIRM = "RESET_ALL_POINTS";
+
+/**
+ * POST /api/teacher/points/reset
+ * Body: { confirm: "RESET_ALL_POINTS", gradeId?: number }
+ * يصفّر الأرصدة ويمسح سجل النقاط (كل الصفوف أو صف واحد)
+ */
+export async function resetTeacherPoints({ gradeId, teacherId } = {}) {
+  const body = {
+    confirm: RESET_POINTS_CONFIRM,
+  };
+  if (gradeId != null && gradeId !== "") {
+    body.gradeId = Number(gradeId);
+  }
+  if (teacherId) body.teacherId = teacherId;
+
+  const { data } = await baseUrl.post(`${TEACHER_API}/reset`, body);
+  const result = unwrap(data, "فشل تصفير النقاط");
+  return {
+    reset: result?.reset !== false,
+    teacherId: result?.teacherId ?? result?.teacher_id ?? teacherId ?? null,
+    gradeId: result?.gradeId ?? result?.grade_id ?? null,
+    balancesCleared: toInt(result?.balancesCleared ?? result?.balances_cleared, 0),
+    transactionsDeleted: toInt(
+      result?.transactionsDeleted ?? result?.transactions_deleted,
+      0,
+    ),
+    message:
+      data?.message ||
+      (result?.gradeId != null
+        ? "تم تصفير نقاط طلاب الصف — يمكنهم البدء من جديد"
+        : "تم تصفير نقاط كل الطلاب — يمكنهم البدء من جديد"),
   };
 }
 
