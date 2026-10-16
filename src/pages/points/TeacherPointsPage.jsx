@@ -42,6 +42,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import {
+  FaArchive,
+  FaEye,
   FaGift,
   FaHistory,
   FaSync,
@@ -54,12 +56,17 @@ import {
   awardManualPoints,
   DEFAULT_POINTS_SETTINGS,
   deleteManualPointsTransaction,
+  fetchSeasonStudentTransactions,
   fetchStudentPointTransactions,
   fetchTeacherPointsLeaderboard,
+  fetchTeacherPointsSeason,
+  fetchTeacherPointsSeasons,
   fetchTeacherPointsSettings,
   pointsApiError,
   RESET_POINTS_CONFIRM,
+  RESTORE_POINTS_SEASON_CONFIRM,
   resetTeacherPoints,
+  restoreTeacherPointsSeason,
   settingsToPayload,
   updateTeacherPointsSettings,
 } from "../../api/teacherPointsApi";
@@ -87,8 +94,15 @@ import {
 
 const TABS = [
   { id: "ranking", label: "ترتيب الطلاب" },
+  { id: "seasons", label: "المواسم المؤرشفة" },
   { id: "settings", label: "إعدادات النقاط" },
 ];
+
+function seasonSourceLabel(source) {
+  if (source === "pre_restore_backup") return "نسخة قبل الاسترجاع";
+  if (source === "reset") return "تصفير";
+  return source || "موسم";
+}
 
 function RankBadge({ rank }) {
   const medal = rankMedal(rank);
@@ -143,12 +157,28 @@ export default function TeacherPointsPage() {
   const [deleting, setDeleting] = useState(false);
   const deleteCancelRef = useRef();
   const resetModal = useDisclosure();
+  const seasonDrawer = useDisclosure();
+  const restoreModal = useDisclosure();
   const [resetGradeId, setResetGradeId] = useState("");
+  const [resetLabel, setResetLabel] = useState("");
+  const [resetReason, setResetReason] = useState("");
   const [resetConfirmText, setResetConfirmText] = useState("");
   const [resetting, setResetting] = useState(false);
+  const [seasons, setSeasons] = useState([]);
+  const [seasonsLoading, setSeasonsLoading] = useState(false);
+  const [seasonDetail, setSeasonDetail] = useState(null);
+  const [seasonDetailLoading, setSeasonDetailLoading] = useState(false);
+  const [seasonStudentId, setSeasonStudentId] = useState(null);
+  const [seasonStudentTx, setSeasonStudentTx] = useState([]);
+  const [seasonStudentTxLoading, setSeasonStudentTxLoading] = useState(false);
+  const [restoreTarget, setRestoreTarget] = useState(null);
+  const [restoreConfirmText, setRestoreConfirmText] = useState("");
+  const [restoring, setRestoring] = useState(false);
 
   const scopedTeacherId = isAdmin ? teacherId : "";
   const resetConfirmReady = resetConfirmText.trim() === RESET_POINTS_CONFIRM;
+  const restoreConfirmReady =
+    restoreConfirmText.trim() === RESTORE_POINTS_SEASON_CONFIRM;
   const dirtySettings = useMemo(
     () => JSON.stringify(settingsToPayload(settingsForm)) !== JSON.stringify(settingsToPayload(settings)),
     [settings, settingsForm],
@@ -352,8 +382,35 @@ export default function TeacherPointsPage() {
     }
   };
 
+  const loadSeasons = useCallback(async () => {
+    setSeasonsLoading(true);
+    try {
+      const list = await fetchTeacherPointsSeasons({
+        gradeId: gradeId || undefined,
+        teacherId: scopedTeacherId || undefined,
+        limit: 50,
+      });
+      setSeasons(list);
+    } catch (err) {
+      setSeasons([]);
+      toast({
+        title: pointsApiError(err, "فشل تحميل المواسم"),
+        status: "error",
+        isClosable: true,
+      });
+    } finally {
+      setSeasonsLoading(false);
+    }
+  }, [gradeId, scopedTeacherId, toast]);
+
+  useEffect(() => {
+    if (tab === "seasons") loadSeasons();
+  }, [tab, loadSeasons]);
+
   const openResetModal = () => {
     setResetGradeId(gradeId || "");
+    setResetLabel("");
+    setResetReason("");
     setResetConfirmText("");
     resetModal.onOpen();
   };
@@ -372,19 +429,26 @@ export default function TeacherPointsPage() {
       const result = await resetTeacherPoints({
         gradeId: resetGradeId || undefined,
         teacherId: scopedTeacherId || undefined,
+        label: resetLabel || undefined,
+        reason: resetReason || undefined,
       });
       toast({
         title: result.message,
-        description: `تم مسح ${result.balancesCleared} رصيد و${result.transactionsDeleted} معاملة`,
+        description: result.seasonId
+          ? `تم حفظ الموسم #${result.seasonId} — ${result.balancesCleared} رصيد و${result.transactionsDeleted} معاملة`
+          : `تم مسح ${result.balancesCleared} رصيد و${result.transactionsDeleted} معاملة`,
         status: "success",
         isClosable: true,
       });
       resetModal.onClose();
       setResetConfirmText("");
+      setResetLabel("");
+      setResetReason("");
       setTransactions([]);
       historyDrawer.onClose();
       setPage(1);
       loadBoard();
+      if (tab === "seasons") loadSeasons();
     } catch (err) {
       toast({
         title: pointsApiError(err, "فشل تصفير النقاط"),
@@ -393,6 +457,111 @@ export default function TeacherPointsPage() {
       });
     } finally {
       setResetting(false);
+    }
+  };
+
+  const openSeasonDetail = async (season) => {
+    if (!season?.id) return;
+    seasonDrawer.onOpen();
+    setSeasonDetailLoading(true);
+    setSeasonDetail(null);
+    setSeasonStudentId(null);
+    setSeasonStudentTx([]);
+    try {
+      const detail = await fetchTeacherPointsSeason(season.id, {
+        includeBalances: true,
+        teacherId: scopedTeacherId || undefined,
+      });
+      setSeasonDetail(detail);
+    } catch (err) {
+      toast({
+        title: pointsApiError(err, "فشل تحميل تفاصيل الموسم"),
+        status: "error",
+        isClosable: true,
+      });
+      seasonDrawer.onClose();
+    } finally {
+      setSeasonDetailLoading(false);
+    }
+  };
+
+  const toggleSeasonStudentHistory = async (row) => {
+    const studentId = row?.studentId;
+    const seasonId = seasonDetail?.season?.id;
+    if (!studentId || !seasonId) return;
+
+    if (seasonStudentId === studentId) {
+      setSeasonStudentId(null);
+      setSeasonStudentTx([]);
+      return;
+    }
+
+    setSeasonStudentId(studentId);
+    setSeasonStudentTx([]);
+    setSeasonStudentTxLoading(true);
+    try {
+      const data = await fetchSeasonStudentTransactions(seasonId, studentId, {
+        teacherId: scopedTeacherId || undefined,
+        limit: 200,
+      });
+      setSeasonStudentTx(data.transactions);
+    } catch (err) {
+      setSeasonStudentTx([]);
+      toast({
+        title: pointsApiError(err, "فشل تحميل سجل الطالب"),
+        status: "error",
+        isClosable: true,
+      });
+    } finally {
+      setSeasonStudentTxLoading(false);
+    }
+  };
+
+  const openRestoreModal = (season) => {
+    setRestoreTarget(season);
+    setRestoreConfirmText("");
+    restoreModal.onOpen();
+  };
+
+  const submitRestoreSeason = async () => {
+    if (!restoreTarget?.id || !restoreConfirmReady) {
+      toast({
+        title: `اكتب ${RESTORE_POINTS_SEASON_CONFIRM} للتأكيد`,
+        status: "warning",
+        isClosable: true,
+      });
+      return;
+    }
+    setRestoring(true);
+    try {
+      const result = await restoreTeacherPointsSeason(
+        restoreTarget.id,
+        scopedTeacherId || undefined,
+      );
+      toast({
+        title: result.message,
+        description: result.backupSeasonId
+          ? `نُسخت النقاط الحالية كموسم #${result.backupSeasonId}`
+          : `تمت استعادة ${result.balancesRestored} رصيد`,
+        status: "success",
+        isClosable: true,
+      });
+      restoreModal.onClose();
+      setRestoreTarget(null);
+      setRestoreConfirmText("");
+      seasonDrawer.onClose();
+      setPage(1);
+      loadBoard();
+      loadSeasons();
+      setTab("ranking");
+    } catch (err) {
+      toast({
+        title: pointsApiError(err, "فشل استرجاع الموسم"),
+        status: "error",
+        isClosable: true,
+      });
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -410,7 +579,7 @@ export default function TeacherPointsPage() {
         icon={FaTrophy}
         eyebrow="Points & Ranking"
         title="النقاط والترتيب"
-        subtitle="رصيد كل طالب داخل صفك فقط. عدّل كيف تُمنح النقاط، وتابع الترتيب، وامنح مكافأة يدوية عند الحاجة."
+        subtitle="رصيد كل طالب داخل صفك. التصفير يحفظ موسمًا يمكنك استرجاعه لاحقًا، والطلاب يبدأون من صفر."
         actions={
           <Button
             leftIcon={<FaSync />}
@@ -419,8 +588,20 @@ export default function TeacherPointsPage() {
             color="white"
             borderRadius="xl"
             _hover={{ bg: "whiteAlpha.200" }}
-            onClick={() => (tab === "settings" ? loadSettings() : loadBoard())}
-            isLoading={tab === "settings" ? settingsLoading : loading}
+            onClick={() =>
+              tab === "settings"
+                ? loadSettings()
+                : tab === "seasons"
+                  ? loadSeasons()
+                  : loadBoard()
+            }
+            isLoading={
+              tab === "settings"
+                ? settingsLoading
+                : tab === "seasons"
+                  ? seasonsLoading
+                  : loading
+            }
           >
             تحديث
           </Button>
@@ -488,6 +669,138 @@ export default function TeacherPointsPage() {
             />
           )}
         </DailyQuizSurface>
+      ) : tab === "seasons" ? (
+        <>
+          <DailyQuizSurface mb={4} p={3}>
+            <Flex gap={3} wrap="wrap" align="center">
+              <Select
+                maxW="220px"
+                borderRadius="xl"
+                value={gradeId}
+                onChange={(e) => setGradeId(e.target.value)}
+              >
+                <option value="">كل الصفوف</option>
+                {grades.map((grade) => (
+                  <option key={optionId(grade)} value={optionId(grade)}>
+                    {optionLabel(grade, "صف")}
+                  </option>
+                ))}
+              </Select>
+              <Text fontSize="sm" color={theme.muted} flex="1">
+                كل تصفير يحفظ موسمًا يمكنك استرجاعه لاحقًا.
+              </Text>
+              <Button
+                colorScheme="red"
+                variant="outline"
+                borderRadius="xl"
+                leftIcon={<FaUndo />}
+                onClick={openResetModal}
+              >
+                تصفير + أرشفة
+              </Button>
+            </Flex>
+          </DailyQuizSurface>
+
+          <DailyQuizSurface overflow="hidden">
+            <Flex
+              px={4}
+              py={3}
+              justify="space-between"
+              align="center"
+              borderBottomWidth="1px"
+              borderColor={theme.cardBorder}
+            >
+              <HStack>
+                <Icon as={FaArchive} color="blue.500" />
+                <Text fontWeight="800" color={theme.heading}>
+                  {seasons.length} موسم مؤرشف
+                </Text>
+              </HStack>
+            </Flex>
+
+            {seasonsLoading ? (
+              <VStack p={4} spacing={3} align="stretch">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} h="72px" borderRadius="xl" />
+                ))}
+              </VStack>
+            ) : seasons.length === 0 ? (
+              <Box p={10} textAlign="center">
+                <Text color={theme.muted}>
+                  لا توجد مواسم بعد. عند تصفير النقاط يُحفظ السجل هنا تلقائيًا.
+                </Text>
+              </Box>
+            ) : (
+              seasons.map((season) => {
+                const gradeLabel = season.gradeId
+                  ? optionLabel(
+                      grades.find((g) => String(optionId(g)) === String(season.gradeId)),
+                      `صف ${season.gradeId}`,
+                    )
+                  : "كل الصفوف";
+                return (
+                  <Box
+                    key={season.id}
+                    px={{ base: 3, md: 4 }}
+                    py={3}
+                    borderBottomWidth="1px"
+                    borderColor={theme.cardBorder}
+                  >
+                    <Flex
+                      direction={{ base: "column", md: "row" }}
+                      align={{ base: "stretch", md: "center" }}
+                      gap={3}
+                      justify="space-between"
+                    >
+                      <Box minW={0}>
+                        <HStack spacing={2} mb={1} flexWrap="wrap">
+                          <Text fontWeight="800" color={theme.heading}>
+                            {season.label || `موسم #${season.id}`}
+                          </Text>
+                          <Badge colorScheme="purple" borderRadius="md">
+                            {seasonSourceLabel(season.source)}
+                          </Badge>
+                          <Badge colorScheme="blue" variant="subtle" borderRadius="md">
+                            {gradeLabel}
+                          </Badge>
+                        </HStack>
+                        <Text fontSize="sm" color={theme.muted}>
+                          {formatPointsDate(season.archivedAt)} — {season.studentsCount} طالب —{" "}
+                          {season.totalPointsSum} نقطة — {season.transactionsCount} معاملة
+                        </Text>
+                        {season.reason ? (
+                          <Text fontSize="xs" color={theme.muted} mt={1}>
+                            السبب: {season.reason}
+                          </Text>
+                        ) : null}
+                      </Box>
+                      <HStack spacing={2} flexShrink={0}>
+                        <Button
+                          size="sm"
+                          borderRadius="xl"
+                          leftIcon={<FaEye />}
+                          variant="outline"
+                          onClick={() => openSeasonDetail(season)}
+                        >
+                          التفاصيل
+                        </Button>
+                        <Button
+                          size="sm"
+                          borderRadius="xl"
+                          colorScheme="orange"
+                          leftIcon={<FaUndo />}
+                          onClick={() => openRestoreModal(season)}
+                        >
+                          استرجاع
+                        </Button>
+                      </HStack>
+                    </Flex>
+                  </Box>
+                );
+              })
+            )}
+          </DailyQuizSurface>
+        </>
       ) : (
         <>
           <DailyQuizSurface mb={4} p={3}>
@@ -539,7 +852,7 @@ export default function TeacherPointsPage() {
                 onClick={openResetModal}
                 ml="auto"
               >
-                تصفير النقاط
+                تصفير + أرشفة
               </Button>
             </Flex>
           </DailyQuizSurface>
@@ -919,15 +1232,16 @@ export default function TeacherPointsPage() {
       >
         <ModalOverlay />
         <ModalContent borderRadius="2xl" mx={3} dir="rtl">
-          <ModalHeader>تصفير نقاط الطلاب</ModalHeader>
+          <ModalHeader>تصفير النقاط مع حفظ الموسم</ModalHeader>
           <ModalCloseButton isDisabled={resetting} />
           <ModalBody>
             <VStack align="stretch" spacing={4}>
-              <Alert status="warning" borderRadius="xl">
+              <Alert status="info" borderRadius="xl">
                 <AlertIcon />
                 <Text fontSize="sm" lineHeight="1.8">
-                  سيتم تصفير أرصدة الطلاب ومسح سجل النقاط لنطاق «{resetGradeLabel}». بعدها
-                  يقدروا يجمعوا من جديد (امتحان / فيديو / منح يدوي…). لا يمكن التراجع.
+                  سيتم حفظ أرصدة ومعاملات «{resetGradeLabel}» كموسم أرشيفي، ثم تصفير
+                  النقاط الحية. الطلاب يبدأون من صفر ويمكنك استرجاع الموسم لاحقًا من
+                  تبويب المواسم.
                 </Text>
               </Alert>
               <FormControl>
@@ -945,6 +1259,27 @@ export default function TeacherPointsPage() {
                     </option>
                   ))}
                 </Select>
+              </FormControl>
+              <FormControl>
+                <FormLabel>اسم الموسم (اختياري)</FormLabel>
+                <Input
+                  value={resetLabel}
+                  onChange={(e) => setResetLabel(e.target.value)}
+                  placeholder="مثال: ترم أول 2026"
+                  borderRadius="xl"
+                  isDisabled={resetting}
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>السبب (اختياري)</FormLabel>
+                <Textarea
+                  value={resetReason}
+                  onChange={(e) => setResetReason(e.target.value)}
+                  placeholder="بداية ترم جديد"
+                  borderRadius="xl"
+                  rows={2}
+                  isDisabled={resetting}
+                />
               </FormControl>
               <FormControl isRequired>
                 <FormLabel>
@@ -982,13 +1317,285 @@ export default function TeacherPointsPage() {
               isLoading={resetting}
               isDisabled={!resetConfirmReady}
               borderRadius="xl"
-              leftIcon={<FaUndo />}
+              leftIcon={<FaArchive />}
             >
-              تصفير النقاط
+              تصفير وأرشفة
             </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      <Modal
+        isOpen={restoreModal.isOpen}
+        onClose={() => !restoring && restoreModal.onClose()}
+        isCentered
+      >
+        <ModalOverlay />
+        <ModalContent borderRadius="2xl" mx={3} dir="rtl">
+          <ModalHeader>استرجاع موسم النقاط</ModalHeader>
+          <ModalCloseButton isDisabled={restoring} />
+          <ModalBody>
+            <VStack align="stretch" spacing={4}>
+              <Alert status="warning" borderRadius="xl">
+                <AlertIcon />
+                <Text fontSize="sm" lineHeight="1.8">
+                  سيتم استبدال النقاط الحالية بموسم «
+                  {restoreTarget?.label || `#${restoreTarget?.id || ""}`}». النقاط
+                  الحالية تُحفظ تلقائيًا كنسخة احتياطية قبل الاستبدال.
+                </Text>
+              </Alert>
+              <FormControl isRequired>
+                <FormLabel>
+                  للتأكيد اكتب{" "}
+                  <Code dir="ltr" fontSize="sm">
+                    {RESTORE_POINTS_SEASON_CONFIRM}
+                  </Code>
+                </FormLabel>
+                <Input
+                  value={restoreConfirmText}
+                  onChange={(e) => setRestoreConfirmText(e.target.value)}
+                  placeholder={RESTORE_POINTS_SEASON_CONFIRM}
+                  borderRadius="xl"
+                  dir="ltr"
+                  fontFamily="mono"
+                  isDisabled={restoring}
+                  autoComplete="off"
+                />
+              </FormControl>
+            </VStack>
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              variant="ghost"
+              mr={2}
+              onClick={restoreModal.onClose}
+              isDisabled={restoring}
+              borderRadius="xl"
+            >
+              إلغاء
+            </Button>
+            <Button
+              colorScheme="orange"
+              onClick={submitRestoreSeason}
+              isLoading={restoring}
+              isDisabled={!restoreConfirmReady}
+              borderRadius="xl"
+              leftIcon={<FaUndo />}
+            >
+              استرجاع الموسم
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      <Drawer
+        isOpen={seasonDrawer.isOpen}
+        onClose={seasonDrawer.onClose}
+        placement="left"
+        size="md"
+      >
+        <DrawerOverlay />
+        <DrawerContent dir="rtl">
+          <DrawerCloseButton />
+          <DrawerHeader borderBottomWidth="1px">
+            {seasonDetail?.season?.label ||
+              (seasonDetail?.season?.id
+                ? `موسم #${seasonDetail.season.id}`
+                : "تفاصيل الموسم")}
+          </DrawerHeader>
+          <DrawerBody>
+            {seasonDetailLoading ? (
+              <VStack spacing={3} align="stretch" pt={2}>
+                {[1, 2, 3, 4].map((i) => (
+                  <Skeleton key={i} h="56px" borderRadius="xl" />
+                ))}
+              </VStack>
+            ) : seasonDetail?.season ? (
+              <VStack align="stretch" spacing={4} pt={2}>
+                <DailyQuizSurface p={3}>
+                  <Text fontSize="sm" color={theme.muted} mb={1}>
+                    {formatPointsDate(seasonDetail.season.archivedAt)}
+                  </Text>
+                  <Text fontWeight="800" mb={1}>
+                    {seasonDetail.season.studentsCount} طالب —{" "}
+                    {seasonDetail.season.totalPointsSum} نقطة
+                  </Text>
+                  <HStack spacing={2} flexWrap="wrap">
+                    <Badge colorScheme="purple" borderRadius="md">
+                      {seasonSourceLabel(seasonDetail.season.source)}
+                    </Badge>
+                    {seasonDetail.season.reason ? (
+                      <Text fontSize="xs" color={theme.muted}>
+                        {seasonDetail.season.reason}
+                      </Text>
+                    ) : null}
+                  </HStack>
+                </DailyQuizSurface>
+                <Button
+                  colorScheme="orange"
+                  borderRadius="xl"
+                  leftIcon={<FaUndo />}
+                  onClick={() => openRestoreModal(seasonDetail.season)}
+                >
+                  استرجاع هذا الموسم
+                </Button>
+                <Text fontWeight="800" color={theme.heading}>
+                  أرصدة الطلاب
+                </Text>
+                <Text fontSize="xs" color={theme.muted} mt={-2}>
+                  اضغط على طالب لعرض سجل نقاطه في هذا الموسم
+                </Text>
+                {(seasonDetail.balances || []).length === 0 ? (
+                  <Text fontSize="sm" color={theme.muted}>
+                    لا توجد أرصدة محفوظة في هذا الموسم.
+                  </Text>
+                ) : (
+                  seasonDetail.balances.map((row) => {
+                    const isOpen = seasonStudentId === row.studentId;
+                    return (
+                      <Box
+                        key={`${row.studentId}-${row.gradeId}`}
+                        borderWidth="1px"
+                        borderColor={
+                          isOpen ? "orange.300" : theme.cardBorder
+                        }
+                        borderRadius="xl"
+                        overflow="hidden"
+                      >
+                        <Flex
+                          as="button"
+                          type="button"
+                          w="full"
+                          justify="space-between"
+                          align="center"
+                          p={3}
+                          textAlign="start"
+                          cursor="pointer"
+                          bg={isOpen ? "orange.50" : "transparent"}
+                          _dark={{
+                            bg: isOpen ? "whiteAlpha.100" : "transparent",
+                          }}
+                          onClick={() => toggleSeasonStudentHistory(row)}
+                        >
+                          <HStack spacing={3} minW={0} flex="1">
+                            <Icon
+                              as={FaHistory}
+                              color={isOpen ? "orange.500" : theme.muted}
+                              flexShrink={0}
+                            />
+                            <Box minW={0}>
+                              <Text fontWeight="700" noOfLines={1}>
+                                {row.studentName}
+                              </Text>
+                              {row.studentPhone ? (
+                                <Text
+                                  fontSize="xs"
+                                  color={theme.muted}
+                                  dir="ltr"
+                                >
+                                  {row.studentPhone}
+                                </Text>
+                              ) : null}
+                            </Box>
+                          </HStack>
+                          <Text fontWeight="900" color="orange.500" flexShrink={0}>
+                            {row.totalPoints}
+                          </Text>
+                        </Flex>
+                        {isOpen ? (
+                          <Box
+                            px={3}
+                            pb={3}
+                            borderTopWidth="1px"
+                            borderColor={theme.cardBorder}
+                          >
+                            {seasonStudentTxLoading ? (
+                              <VStack align="stretch" spacing={2} pt={3}>
+                                {[1, 2, 3].map((i) => (
+                                  <Skeleton
+                                    key={i}
+                                    h="56px"
+                                    borderRadius="lg"
+                                  />
+                                ))}
+                              </VStack>
+                            ) : seasonStudentTx.length === 0 ? (
+                              <Text
+                                fontSize="sm"
+                                color={theme.muted}
+                                textAlign="center"
+                                py={4}
+                              >
+                                لا يوجد سجل معاملات لهذا الطالب في الموسم.
+                              </Text>
+                            ) : (
+                              <VStack align="stretch" spacing={2} pt={3}>
+                                {seasonStudentTx.map((tx) => (
+                                  <Box
+                                    key={tx.id}
+                                    p={2.5}
+                                    borderWidth="1px"
+                                    borderRadius="lg"
+                                    borderColor={theme.cardBorder}
+                                    bg={theme.pageBg}
+                                  >
+                                    <Flex
+                                      justify="space-between"
+                                      align="start"
+                                      gap={2}
+                                    >
+                                      <Box minW={0} flex="1">
+                                        <Badge
+                                          colorScheme={eventTypeTone(
+                                            tx.eventType,
+                                          )}
+                                          borderRadius="full"
+                                          fontSize="0.65rem"
+                                        >
+                                          {eventTypeLabel(tx.eventType)}
+                                        </Badge>
+                                        {transactionDetail(tx) ? (
+                                          <Text
+                                            mt={1}
+                                            fontSize="xs"
+                                            fontWeight="700"
+                                            noOfLines={2}
+                                          >
+                                            {transactionDetail(tx)}
+                                          </Text>
+                                        ) : null}
+                                        <Text
+                                          mt={0.5}
+                                          fontSize="xs"
+                                          color={theme.muted}
+                                        >
+                                          {formatPointsDate(tx.createdAt)}
+                                        </Text>
+                                      </Box>
+                                      <Text
+                                        fontWeight="900"
+                                        color="orange.500"
+                                        fontSize="sm"
+                                        flexShrink={0}
+                                      >
+                                        +{tx.points}
+                                      </Text>
+                                    </Flex>
+                                  </Box>
+                                ))}
+                              </VStack>
+                            )}
+                          </Box>
+                        ) : null}
+                      </Box>
+                    );
+                  })
+                )}
+              </VStack>
+            ) : null}
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
     </DailyQuizPageShell>
   );
 }

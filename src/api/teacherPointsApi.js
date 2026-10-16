@@ -250,18 +250,57 @@ export async function deleteManualPointsTransaction(transactionId, teacherId) {
 }
 
 export const RESET_POINTS_CONFIRM = "RESET_ALL_POINTS";
+export const RESTORE_POINTS_SEASON_CONFIRM = "RESTORE_POINTS_SEASON";
+
+export function normalizePointsSeason(row = {}) {
+  return {
+    id: row.id,
+    teacherId: row.teacherId ?? row.teacher_id ?? null,
+    gradeId: row.gradeId ?? row.grade_id ?? null,
+    label: row.label || "",
+    reason: row.reason || "",
+    source: row.source || "reset",
+    archivedBy: row.archivedBy ?? row.archived_by ?? null,
+    studentsCount: toInt(row.studentsCount ?? row.students_count, 0),
+    totalPointsSum: toInt(row.totalPointsSum ?? row.total_points_sum, 0),
+    transactionsCount: toInt(row.transactionsCount ?? row.transactions_count, 0),
+    archivedAt: row.archivedAt ?? row.archived_at ?? null,
+    createdAt: row.createdAt ?? row.created_at ?? null,
+  };
+}
+
+export function normalizeSeasonBalance(row = {}) {
+  return {
+    studentId: row.studentId ?? row.student_id ?? null,
+    gradeId: row.gradeId ?? row.grade_id ?? null,
+    totalPoints: toInt(row.totalPoints ?? row.total_points, 0),
+    studentName: row.studentName ?? row.student_name ?? "طالب",
+    studentPhone: row.studentPhone ?? row.student_phone ?? "",
+  };
+}
 
 /**
  * POST /api/teacher/points/reset
- * Body: { confirm: "RESET_ALL_POINTS", gradeId?: number }
- * يصفّر الأرصدة ويمسح سجل النقاط (كل الصفوف أو صف واحد)
+ * Body: { confirm, gradeId?, label?, reason? }
+ * يحفظ الأرصدة والمعاملات في موسم أرشيفي ثم يصفّر النقاط الحية
  */
-export async function resetTeacherPoints({ gradeId, teacherId } = {}) {
+export async function resetTeacherPoints({
+  gradeId,
+  teacherId,
+  label,
+  reason,
+} = {}) {
   const body = {
     confirm: RESET_POINTS_CONFIRM,
   };
   if (gradeId != null && gradeId !== "") {
     body.gradeId = Number(gradeId);
+  }
+  if (label != null && String(label).trim()) {
+    body.label = String(label).trim();
+  }
+  if (reason != null && String(reason).trim()) {
+    body.reason = String(reason).trim();
   }
   if (teacherId) body.teacherId = teacherId;
 
@@ -271,16 +310,104 @@ export async function resetTeacherPoints({ gradeId, teacherId } = {}) {
     reset: result?.reset !== false,
     teacherId: result?.teacherId ?? result?.teacher_id ?? teacherId ?? null,
     gradeId: result?.gradeId ?? result?.grade_id ?? null,
+    seasonId: result?.seasonId ?? result?.season_id ?? null,
     balancesCleared: toInt(result?.balancesCleared ?? result?.balances_cleared, 0),
     transactionsDeleted: toInt(
       result?.transactionsDeleted ?? result?.transactions_deleted,
       0,
     ),
+    studentsCount: toInt(result?.studentsCount ?? result?.students_count, 0),
+    totalPointsSum: toInt(result?.totalPointsSum ?? result?.total_points_sum, 0),
     message:
       data?.message ||
-      (result?.gradeId != null
-        ? "تم تصفير نقاط طلاب الصف — يمكنهم البدء من جديد"
-        : "تم تصفير نقاط كل الطلاب — يمكنهم البدء من جديد"),
+      "تم حفظ سجل النقاط وتصفيرها — يمكنهم البدء من جديد ويمكنك استرجاع السجل لاحقًا",
+  };
+}
+
+/** GET /api/teacher/points/seasons */
+export async function fetchTeacherPointsSeasons(params = {}) {
+  const { data } = await baseUrl.get(
+    `${TEACHER_API}/seasons${buildQuery({
+      gradeId: params.gradeId,
+      limit: params.limit || 50,
+      teacherId: params.teacherId,
+    })}`,
+  );
+  const payload = unwrap(data, "فشل تحميل مواسم النقاط");
+  const list = Array.isArray(payload?.seasons) ? payload.seasons : [];
+  return list.map(normalizePointsSeason);
+}
+
+/** GET /api/teacher/points/seasons/:seasonId */
+export async function fetchTeacherPointsSeason(seasonId, params = {}) {
+  const { data } = await baseUrl.get(
+    `${TEACHER_API}/seasons/${encodeURIComponent(seasonId)}${buildQuery({
+      includeBalances: params.includeBalances !== false ? "true" : "false",
+      balancesLimit: params.balancesLimit || 200,
+      teacherId: params.teacherId,
+    })}`,
+  );
+  const payload = unwrap(data, "فشل تحميل تفاصيل الموسم");
+  const seasonRaw = payload?.season ?? payload;
+  const balances = Array.isArray(payload?.balances) ? payload.balances : [];
+  return {
+    season: normalizePointsSeason(seasonRaw),
+    balances: balances.map(normalizeSeasonBalance),
+  };
+}
+
+/** GET /api/teacher/points/seasons/:seasonId/students/:studentId/transactions */
+export async function fetchSeasonStudentTransactions(
+  seasonId,
+  studentId,
+  params = {},
+) {
+  const { data } = await baseUrl.get(
+    `${TEACHER_API}/seasons/${encodeURIComponent(seasonId)}/students/${encodeURIComponent(studentId)}/transactions${buildQuery(
+      {
+        limit: params.limit || 200,
+        teacherId: params.teacherId,
+      },
+    )}`,
+  );
+  const payload = unwrap(data, "فشل تحميل سجل الطالب في الموسم");
+  const list = Array.isArray(payload?.transactions) ? payload.transactions : [];
+  return {
+    seasonId: payload?.seasonId ?? payload?.season_id ?? seasonId,
+    studentId: payload?.studentId ?? payload?.student_id ?? studentId,
+    transactions: list.map(normalizeTransaction),
+  };
+}
+
+/**
+ * POST /api/teacher/points/seasons/:seasonId/restore
+ * Body: { confirm: "RESTORE_POINTS_SEASON" }
+ */
+export async function restoreTeacherPointsSeason(seasonId, teacherId) {
+  const body = { confirm: RESTORE_POINTS_SEASON_CONFIRM };
+  if (teacherId) body.teacherId = teacherId;
+  const { data } = await baseUrl.post(
+    `${TEACHER_API}/seasons/${encodeURIComponent(seasonId)}/restore`,
+    body,
+  );
+  const result = unwrap(data, "فشل استرجاع الموسم");
+  return {
+    restored: result?.restored !== false,
+    seasonId: result?.seasonId ?? result?.season_id ?? seasonId,
+    backupSeasonId: result?.backupSeasonId ?? result?.backup_season_id ?? null,
+    balancesRestored: toInt(
+      result?.balancesRestored ?? result?.balances_restored,
+      0,
+    ),
+    transactionsRestored: toInt(
+      result?.transactionsRestored ?? result?.transactions_restored,
+      0,
+    ),
+    message:
+      data?.message ||
+      (result?.backupSeasonId != null
+        ? "تم استرجاع الموسم — ونُسخت النقاط الحالية احتياطيًا قبل الاستبدال"
+        : "تم استرجاع موسم النقاط بنجاح"),
   };
 }
 
