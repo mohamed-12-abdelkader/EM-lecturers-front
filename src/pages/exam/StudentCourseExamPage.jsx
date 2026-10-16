@@ -214,6 +214,8 @@ export default function StudentCourseExamPage() {
             ...session,
             courseId: location.state?.courseId || session.courseId || session.course_id,
           });
+        } else if (location.state?.fromPublic) {
+          setError("ابدأ الامتحان من صفحة الامتحانات العامة.");
         } else {
           setError("ابدأ الامتحان من صفحة الكورس. لا يمكن بدء محاولة جديدة من هنا.");
         }
@@ -415,6 +417,10 @@ export default function StudentCourseExamPage() {
   };
 
   const goToCourseExams = () => {
+    if (location.state?.fromPublic) {
+      navigate("/student-public-exams");
+      return;
+    }
     const courseId = examMeta?.courseId || location.state?.courseId;
     if (courseId) {
       navigate(`/CourseDetailsPage/${courseId}?section=exams`);

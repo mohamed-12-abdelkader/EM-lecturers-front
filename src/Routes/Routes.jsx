@@ -113,6 +113,14 @@ const TeacherTrashPage = lazyPage(() => import("../pages/teacher/TeacherTrashPag
 const TeacherCourseGroupsPage = lazyPage(() => import("../pages/teacher/CourseGroupsPage"));
 const TeacherAssignmentsPage = lazyPage(() => import("../pages/assignments/TeacherAssignmentsPage"));
 const TeacherCourseExamsPage = lazyPage(() => import("../pages/exams/TeacherCourseExamsPage"));
+const TeacherPublicExamsPage = lazyPage(() => import("../pages/publicExams/TeacherPublicExamsPage"));
+const TeacherPublicExamManagePage = lazyPage(() =>
+  import("../pages/publicExams/TeacherPublicExamManagePage"),
+);
+const TeacherQuestionExtractionPage = lazyPage(() =>
+  import("../pages/questionExtraction/TeacherQuestionExtractionPage"),
+);
+const StudentPublicExamsPage = lazyPage(() => import("../pages/publicExams/StudentPublicExamsPage"));
 const TeacherFreeLecturesPage = lazyPage(() => import("../pages/freeLectures/TeacherFreeLecturesPage"));
 const TeacherDailyQuizzesPage = lazyPage(() => import("../pages/dailyQuiz/TeacherDailyQuizzesPage"));
 const TeacherDailyQuizDetailPage = lazyPage(() =>
@@ -730,6 +738,10 @@ const AppRouter = () => {
           <Route path="teacher-course-groups" element={<TeacherCourseGroupsPage />} />
           <Route path="teacher-assignments" element={<TeacherAssignmentsPage />} />
           <Route path="teacher-exams" element={<TeacherCourseExamsPage />} />
+          <Route path="teacher-public-exams" element={<TeacherPublicExamsPage />} />
+          <Route path="public-exams/:examId" element={<TeacherPublicExamManagePage />} />
+          <Route path="public-exams/:examId/report" element={<ExamReportPage />} />
+          <Route path="teacher-question-extraction" element={<TeacherQuestionExtractionPage />} />
           <Route path="exam-builder-chat" element={<ExamBuilderChatPage />} />
           <Route path="exam-builder-chat/:sessionId/approve" element={<ExamBuilderApprovePage />} />
           <Route path="teacher-free-lectures" element={<TeacherFreeLecturesPage />} />
@@ -749,6 +761,7 @@ const AppRouter = () => {
           <Route path="student-daily-quizzes/:id/result" element={<StudentDailyQuizResultPage />} />
           <Route path="student-daily-quizzes/:id/leaderboard" element={<StudentDailyQuizLeaderboardPage />} />
           <Route path="my-points" element={<StudentPointsPage />} />
+          <Route path="student-public-exams" element={<StudentPublicExamsPage />} />
         </Route>
 
         {/* Shared Routes (طالب + مدرس) */}

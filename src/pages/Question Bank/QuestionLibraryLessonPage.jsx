@@ -67,6 +67,7 @@ import {
   addTeacherLibraryToExam,
   fetchLectureExamsForLibrary,
   fetchCourseLevelExamsForLibrary,
+  fetchPublicExamsForLibrary,
   teacherLibraryExamErrorMessage,
 } from "../../api/teacherLibraryExamApi";
 import { bulkCreateTeacherLibraryQuestions, saveReadingPassageQuestions } from "../../api/teacherQuestionLibraryApi";
@@ -222,6 +223,7 @@ const QuestionLibraryLessonPage = () => {
   const [examLoading, setExamLoading] = useState(false);
   const [lectureExams, setLectureExams] = useState([]);
   const [courseExams, setCourseExams] = useState([]);
+  const [publicExams, setPublicExams] = useState([]);
   const [selectedExamIds, setSelectedExamIds] = useState([]);
   const [examModalTab, setExamModalTab] = useState("lecture");
   const [examModalMode, setExamModalMode] = useState("questions");
@@ -410,11 +412,15 @@ const QuestionLibraryLessonPage = () => {
 
   const openEditQuestion = useCallback((question) => {
     const q = normalizeTeacherQuestion(question);
+    const existingChoices = Array.isArray(q.choices)
+      ? q.choices.map((c) => String(c ?? ""))
+      : [];
     setQuestionEdit(q);
     setQuestionForm({
       question_text: q.question_text || "",
       question_type: q.question_type || "choice",
-      choices: q.choices?.length ? q.choices : ["", "", "", ""],
+      // نبقي عدد الاختيارات الحالي؛ المدرس يقدر يضيف لحد 4 من المودال
+      choices: existingChoices.length > 0 ? existingChoices : ["", "", "", ""],
       answer: q.answer || "",
       correct_answer_index: q.correct_answer_index ?? null,
       explanation: q.explanation || "",
@@ -424,6 +430,33 @@ const QuestionLibraryLessonPage = () => {
     });
     onQuestionModalOpen();
   }, [onQuestionModalOpen]);
+
+  const addQuestionChoice = () => {
+    setQuestionForm((f) => {
+      if ((f.choices || []).length >= 4) return f;
+      return { ...f, choices: [...(f.choices || []), ""] };
+    });
+  };
+
+  const removeQuestionChoice = (index) => {
+    setQuestionForm((f) => {
+      const choices = [...(f.choices || [])];
+      if (choices.length <= 2) return f;
+      choices.splice(index, 1);
+      let correct = f.correct_answer_index;
+      if (correct == null) {
+        return { ...f, choices };
+      }
+      if (correct === index) correct = null;
+      else if (correct > index) correct -= 1;
+      return {
+        ...f,
+        choices,
+        correct_answer_index: correct,
+        answer: correct != null ? choices[correct] : f.answer,
+      };
+    });
+  };
 
   const saveQuestion = async () => {
     if (!selectedLesson || !questionForm.question_text.trim()) return;
@@ -841,12 +874,14 @@ const QuestionLibraryLessonPage = () => {
     setExamLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const [lecture, course] = await Promise.all([
+      const [lecture, course, publicList] = await Promise.all([
         fetchLectureExamsForLibrary(token),
         fetchCourseLevelExamsForLibrary(token),
+        fetchPublicExamsForLibrary(token),
       ]);
       setLectureExams(lecture);
       setCourseExams(course);
+      setPublicExams(publicList);
     } catch (err) {
       toast({
         title: "خطأ",
@@ -857,6 +892,7 @@ const QuestionLibraryLessonPage = () => {
       });
       setLectureExams([]);
       setCourseExams([]);
+      setPublicExams([]);
     } finally {
       setExamLoading(false);
     }
@@ -905,7 +941,11 @@ const QuestionLibraryLessonPage = () => {
     try {
       const token = localStorage.getItem("token");
       const basePayload =
-        examModalTab === "course" ? { type: "course-exam" } : {};
+        examModalTab === "course"
+          ? { type: "course-exam" }
+          : examModalTab === "public"
+            ? { type: "public-exam" }
+            : {};
 
       let totalAdded = 0;
       let successExams = 0;
@@ -1474,7 +1514,9 @@ const QuestionLibraryLessonPage = () => {
               )}
               {questionForm.question_type === "choice" && (
                 <FormControl>
-                  <FormLabel fontSize="sm">الاختيارات</FormLabel>
+                  <FormLabel fontSize="sm">
+                    الاختيارات ({questionForm.choices.length}/4)
+                  </FormLabel>
                   {questionForm.choices.map((choice, idx) => (
                     <HStack key={idx} mb={2}>
                       <Badge colorScheme={questionForm.correct_answer_index === idx ? "green" : "gray"}>
@@ -1504,8 +1546,35 @@ const QuestionLibraryLessonPage = () => {
                           }))
                         }
                       />
+                      {questionForm.choices.length > 2 ? (
+                        <IconButton
+                          aria-label="حذف الخيار"
+                          icon={<FaTimes />}
+                          size="xs"
+                          variant="ghost"
+                          colorScheme="red"
+                          onClick={() => removeQuestionChoice(idx)}
+                        />
+                      ) : null}
                     </HStack>
                   ))}
+                  {questionForm.choices.length < 4 ? (
+                    <Button
+                      size="sm"
+                      leftIcon={<FaPlus />}
+                      variant="outline"
+                      colorScheme="blue"
+                      borderRadius="lg"
+                      mt={1}
+                      onClick={addQuestionChoice}
+                    >
+                      إضافة خيار
+                    </Button>
+                  ) : (
+                    <Text fontSize="xs" color="gray.500" mt={1}>
+                      الحد الأقصى 4 خيارات
+                    </Text>
+                  )}
                 </FormControl>
               )}
               {questionForm.question_type === "text" && (
@@ -1886,6 +1955,7 @@ const QuestionLibraryLessonPage = () => {
         confirmLabel={examModalConfirmLabel}
         lectureExams={lectureExams}
         courseExams={courseExams}
+        publicExams={publicExams}
         examTab={examModalTab}
         onExamTabChange={setExamModalTab}
         selectedExamIds={selectedExamIds}

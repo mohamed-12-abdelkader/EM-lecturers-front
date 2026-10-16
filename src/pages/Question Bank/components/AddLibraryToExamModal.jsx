@@ -58,8 +58,12 @@ function matchesExamSearch(exam, query) {
   return haystack.includes(query);
 }
 
+function examGradeLabel(exam) {
+  return exam.gradeName || exam.grade_name || "";
+}
+
 /**
- * اختيار واجب أو امتحان شامل لإضافة أسئلة من مكتبة المدرس (اختيار متعدد).
+ * اختيار واجب أو امتحان شامل أو امتحان عام لإضافة أسئلة من مكتبة المدرس (اختيار متعدد).
  */
 export default function AddLibraryToExamModal({
   isOpen,
@@ -68,6 +72,7 @@ export default function AddLibraryToExamModal({
   confirmLabel,
   lectureExams = [],
   courseExams = [],
+  publicExams = [],
   examTab,
   onExamTabChange,
   selectedExamIds = [],
@@ -76,6 +81,7 @@ export default function AddLibraryToExamModal({
   isLoading = false,
   examsLoading = false,
   showCourseTab = true,
+  showPublicTab = true,
 }) {
   const borderColor = useColorModeValue("gray.200", "gray.700");
   const panelShadow = useColorModeValue("sm", "dark-lg");
@@ -89,10 +95,17 @@ export default function AddLibraryToExamModal({
     [selectedExamIds],
   );
 
-  const activeList = examTab === "lecture" ? lectureExams : courseExams;
+  const activeList =
+    examTab === "lecture"
+      ? lectureExams
+      : examTab === "public"
+        ? publicExams
+        : courseExams;
   const normalizedQuery = searchQuery.trim().toLowerCase();
+  const showCourseFilter = examTab === "lecture" || examTab === "course";
 
   const courseOptions = useMemo(() => {
+    if (!showCourseFilter) return [];
     const map = new Map();
     for (const exam of activeList) {
       const id = examCourseId(exam);
@@ -103,19 +116,23 @@ export default function AddLibraryToExamModal({
     return [...map.entries()]
       .map(([value, label]) => ({ value, label }))
       .sort((a, b) => a.label.localeCompare(b.label, "ar"));
-  }, [activeList]);
+  }, [activeList, showCourseFilter]);
 
   const filteredList = useMemo(() => {
     return activeList.filter((exam) => {
-      if (courseFilter) {
+      if (showCourseFilter && courseFilter) {
         const id = examCourseId(exam);
         const title = examCourseTitle(exam);
         if (id && id !== courseFilter && title !== courseFilter) return false;
         if (!id && title !== courseFilter) return false;
       }
+      if (examTab === "public" && normalizedQuery) {
+        const haystack = [exam.title, examGradeLabel(exam)].filter(Boolean).join(" ").toLowerCase();
+        return haystack.includes(normalizedQuery);
+      }
       return matchesExamSearch(exam, normalizedQuery);
     });
-  }, [activeList, courseFilter, normalizedQuery]);
+  }, [activeList, courseFilter, normalizedQuery, examTab, showCourseFilter]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -128,14 +145,27 @@ export default function AddLibraryToExamModal({
       ? activeList.length === 0
         ? "لا توجد واجبات."
         : "لا توجد واجبات تطابق البحث أو الفلتر."
-      : activeList.length === 0
-        ? "لا توجد امتحانات شاملة."
-        : "لا توجد امتحانات شاملة تطابق البحث أو الفلتر.";
+      : examTab === "public"
+        ? activeList.length === 0
+          ? "لا توجد امتحانات عامة."
+          : "لا توجد امتحانات عامة تطابق البحث."
+        : activeList.length === 0
+          ? "لا توجد امتحانات شاملة."
+          : "لا توجد امتحانات شاملة تطابق البحث أو الفلتر.";
 
   const selectedCount = selectedSet.size;
   const footerLabel =
     confirmLabel ||
     (selectedCount > 1 ? `إضافة إلى ${selectedCount} امتحانات` : "إضافة");
+
+  const tabKeys = useMemo(() => {
+    const keys = ["lecture"];
+    if (showCourseTab) keys.push("course");
+    if (showPublicTab) keys.push("public");
+    return keys;
+  }, [showCourseTab, showPublicTab]);
+
+  const tabIndex = Math.max(0, tabKeys.indexOf(examTab));
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="lg" isCentered scrollBehavior="inside">
@@ -146,21 +176,28 @@ export default function AddLibraryToExamModal({
         </ModalHeader>
         <ModalCloseButton />
         <ModalBody py={4}>
-          {showCourseTab ? (
+          {tabKeys.length > 1 ? (
             <Tabs
-              index={examTab === "lecture" ? 0 : 1}
-              onChange={(i) => onExamTabChange(i === 0 ? "lecture" : "course")}
+              index={tabIndex}
+              onChange={(i) => onExamTabChange(tabKeys[i] || "lecture")}
               variant="soft-rounded"
               colorScheme="blue"
               mb={4}
             >
-              <TabList bg="gray.100" p={1} borderRadius="xl">
+              <TabList bg="gray.100" p={1} borderRadius="xl" flexWrap="wrap">
                 <Tab fontSize="sm" fontWeight="600">
                   واجب
                 </Tab>
-                <Tab fontSize="sm" fontWeight="600">
-                  امتحان شامل
-                </Tab>
+                {showCourseTab ? (
+                  <Tab fontSize="sm" fontWeight="600">
+                    امتحان شامل
+                  </Tab>
+                ) : null}
+                {showPublicTab ? (
+                  <Tab fontSize="sm" fontWeight="600">
+                    امتحان عام
+                  </Tab>
+                ) : null}
               </TabList>
             </Tabs>
           ) : null}
@@ -172,14 +209,20 @@ export default function AddLibraryToExamModal({
                   <FaSearch />
                 </InputLeftElement>
                 <Input
-                  placeholder={examTab === "lecture" ? "ابحث عن واجب..." : "ابحث عن امتحان..."}
+                  placeholder={
+                    examTab === "lecture"
+                      ? "ابحث عن واجب..."
+                      : examTab === "public"
+                        ? "ابحث عن امتحان عام..."
+                        : "ابحث عن امتحان..."
+                  }
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   borderRadius="lg"
                   bg="white"
                 />
               </InputGroup>
-              {courseOptions.length > 1 ? (
+              {showCourseFilter && courseOptions.length > 1 ? (
                 <Select
                   size="sm"
                   value={courseFilter}
@@ -198,7 +241,7 @@ export default function AddLibraryToExamModal({
               <Flex align="center" justify="space-between" flexWrap="wrap" gap={2}>
                 <Text fontSize="xs" color="gray.500">
                   {filteredList.length} من {activeList.length}{" "}
-                  {examTab === "lecture" ? "واجب" : "امتحان"}
+                  {examTab === "lecture" ? "واجب" : examTab === "public" ? "امتحان عام" : "امتحان"}
                 </Text>
                 {selectedCount > 0 ? (
                   <Badge colorScheme="blue" borderRadius="full" px={2}>
@@ -246,17 +289,22 @@ export default function AddLibraryToExamModal({
                       </Text>
                     </Checkbox>
                     <HStack fontSize="sm" color="gray.500" spacing={4} pl={6} flexWrap="wrap">
-                      {examCourseTitle(exam) ? <Text>{examCourseTitle(exam)}</Text> : null}
-                      {examLectureTitle(exam) ? (
+                      {examTab === "public" && examGradeLabel(exam) ? (
+                        <Text>{examGradeLabel(exam)}</Text>
+                      ) : null}
+                      {examTab !== "public" && examCourseTitle(exam) ? (
+                        <Text>{examCourseTitle(exam)}</Text>
+                      ) : null}
+                      {examTab !== "public" && examLectureTitle(exam) ? (
                         <>
                           <Text>•</Text>
                           <Text>{examLectureTitle(exam)}</Text>
                         </>
                       ) : null}
-                      {exam.duration_minutes != null ? (
+                      {exam.duration_minutes != null || exam.durationMinutes != null ? (
                         <>
                           <Text>•</Text>
-                          <Text>{exam.duration_minutes} د</Text>
+                          <Text>{exam.duration_minutes ?? exam.durationMinutes} د</Text>
                         </>
                       ) : null}
                     </HStack>

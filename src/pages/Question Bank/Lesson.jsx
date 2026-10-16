@@ -82,6 +82,11 @@ import {
   useTeacherQbLessonPassages,
   useTeacherQbLessonQuestions,
 } from "../../Hooks/teacher/useTeacherQuestionBankQueries";
+import {
+  addPublicExamQuestionsFromBank,
+  fetchTeacherPublicExams,
+  publicExamsApiError,
+} from "../../api/publicExamsApi";
 
 // دالة لضغط الصور قبل الرفع لتجنب خطأ 413 (Payload Too Large)
 const compressImage = (file, maxWidth = 1024, quality = 0.7) => {
@@ -184,6 +189,7 @@ const Lesson = () => {
   const [questions, setQuestions] = useState([]);
   const [exams, setExams] = useState([]);
   const [comprehensiveExams, setComprehensiveExams] = useState([]);
+  const [publicExams, setPublicExams] = useState([]);
   const [passagesList, setPassagesList] = useState([]); // [{ passage: {...}, questions: [...] }]
   const passagesLoading = passagesQueryLoading && cachedPassages === undefined;
   const passagesError =
@@ -203,7 +209,7 @@ const Lesson = () => {
   const [selectedQuestions, setSelectedQuestions] = useState([]);
   const [selectedPassageIds, setSelectedPassageIds] = useState([]);
   const [selectedExamId, setSelectedExamId] = useState("");
-  const [examModalTab, setExamModalTab] = useState("lecture"); // "lecture" | "comprehensive"
+  const [examModalTab, setExamModalTab] = useState("lecture"); // "lecture" | "comprehensive" | "public"
   const [examModalMode, setExamModalMode] = useState("questions"); // "questions" | "passages"
   const [questionSearch, setQuestionSearch] = useState("");
 
@@ -406,9 +412,30 @@ const Lesson = () => {
     }
   };
 
+  const fetchPublicExamsList = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const examsData = await fetchTeacherPublicExams({}, token);
+      setPublicExams(examsData || []);
+    } catch (err) {
+      console.error("Error fetching public exams:", err);
+      setPublicExams([]);
+      toast({
+        title: "خطأ",
+        description: publicExamsApiError(err, "فشل تحميل الامتحانات العامة"),
+        status: "error",
+        isClosable: true,
+      });
+    }
+  };
+
   const fetchExams = async () => {
     setExamLoading(true);
-    await Promise.all([fetchLectureExams(), fetchComprehensiveExams()]);
+    await Promise.all([
+      fetchLectureExams(),
+      fetchComprehensiveExams(),
+      fetchPublicExamsList(),
+    ]);
     setExamLoading(false);
   };
 
@@ -695,8 +722,8 @@ const Lesson = () => {
   };
 
   // إضافة الأسئلة من بنك الأسئلة إلى الامتحان
-  // امتحان محاضرة: POST /api/exams/:examId/questions/from-bank → يُنشئ نسخة داخل الامتحان، الاستجابة تحتوي examQuestionIds
-  // امتحان كورس: نفس الـ endpoint (تمييز تلقائي) أو POST /api/exams/course-level/:examId/questions/from-bank
+  // محاضرة/شامل: POST /api/exams/:examId/questions/from-bank
+  // عام: POST /api/public-exams/:examId/questions/from-bank
   const handleAddQuestionsToExam = async () => {
     if (!selectedExamId) {
       toast({ title: "تنبيه", description: "الرجاء اختيار امتحان", status: "warning" });
@@ -711,23 +738,29 @@ const Lesson = () => {
       setAddToExamLoading(true);
       const token = localStorage.getItem("token");
 
-      const body = examModalTab === "comprehensive"
-        ? { questionIds: selectedQuestions, type: "course-exam" }
-        : { questionIds: selectedQuestions };
+      let data;
+      if (examModalTab === "public") {
+        data = await addPublicExamQuestionsFromBank(selectedExamId, selectedQuestions, token);
+      } else {
+        const body =
+          examModalTab === "comprehensive"
+            ? { questionIds: selectedQuestions, type: "course-exam" }
+            : { questionIds: selectedQuestions };
 
-      const response = await baseUrl.post(
-        `/api/exams/${selectedExamId}/questions/from-bank`,
-        body,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json"
-          }
-        }
-      );
+        const response = await baseUrl.post(
+          `/api/exams/${selectedExamId}/questions/from-bank`,
+          body,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          },
+        );
+        data = response.data;
+      }
 
-      const data = response.data;
-      const count = data?.count ?? selectedQuestions.length;
+      const count = data?.addedCount ?? data?.count ?? selectedQuestions.length;
       const message = data?.message || `تم إضافة ${count} سؤال للامتحان بنجاح`;
 
       setAddSuccessMessage(message);
@@ -737,7 +770,9 @@ const Lesson = () => {
       onAddSuccessOpen();
     } catch (err) {
       console.error("Error adding questions to exam:", err);
-      const msg = err.response?.data?.message || "حدث خطأ أثناء إضافة الأسئلة للامتحان";
+      const msg =
+        err.response?.data?.message ||
+        publicExamsApiError(err, "حدث خطأ أثناء إضافة الأسئلة للامتحان");
       toast({ title: "خطأ", description: msg, status: "error", isClosable: true });
     } finally {
       setAddToExamLoading(false);
@@ -1395,19 +1430,34 @@ const Lesson = () => {
             <ModalCloseButton top={3} color={textSecondary} />
             <ModalBody py={4}>
               <Tabs
-                index={examModalTab === "lecture" ? 0 : 1}
-                onChange={(i) => setExamModalTab(i === 0 ? "lecture" : "comprehensive")}
+                index={
+                  examModalTab === "lecture"
+                    ? 0
+                    : examModalTab === "comprehensive"
+                      ? 1
+                      : 2
+                }
+                onChange={(i) =>
+                  setExamModalTab(
+                    i === 0 ? "lecture" : i === 1 ? "comprehensive" : "public",
+                  )
+                }
                 variant="soft-rounded"
                 colorScheme="blue"
                 mb={4}
               >
-                <TabList bg={modalTabListBg} p={1} borderRadius="xl">
+                <TabList bg={modalTabListBg} p={1} borderRadius="xl" flexWrap="wrap">
                   <Tab fontSize="sm" fontWeight="600" color={textSecondary} _selected={{ color: "blue.600", bg: cardBg, _dark: { color: "blue.200", bg: "gray.700" } }}>
                     امتحان محاضرة
                   </Tab>
                   {examModalMode !== "passages" && (
                     <Tab fontSize="sm" fontWeight="600" color={textSecondary} _selected={{ color: "blue.600", bg: cardBg, _dark: { color: "blue.200", bg: "gray.700" } }}>
                       امتحان شامل
+                    </Tab>
+                  )}
+                  {examModalMode !== "passages" && (
+                    <Tab fontSize="sm" fontWeight="600" color={textSecondary} _selected={{ color: "blue.600", bg: cardBg, _dark: { color: "blue.200", bg: "gray.700" } }}>
+                      امتحان عام
                     </Tab>
                   )}
                 </TabList>
@@ -1449,7 +1499,7 @@ const Lesson = () => {
                     </VStack>
                   </RadioGroup>
                 )
-              ) : (
+              ) : examModalTab === "comprehensive" ? (
                 comprehensiveExams.length === 0 ? (
                   <Text textAlign="center" color={textSecondary} py={8}>لا توجد امتحانات شاملة متاحة.</Text>
                 ) : (
@@ -1477,6 +1527,45 @@ const Lesson = () => {
                             <HStack fontSize="sm" color={textSecondary} spacing={4} pl={6}>
                               <Text>{exam.course_title || exam.courseTitle || ""}</Text>
                               {exam.duration_minutes != null && <Text>• {exam.duration_minutes} د</Text>}
+                            </HStack>
+                          </Box>
+                        );
+                      })}
+                    </VStack>
+                  </RadioGroup>
+                )
+              ) : (
+                publicExams.length === 0 ? (
+                  <Text textAlign="center" color={textSecondary} py={8}>لا توجد امتحانات عامة متاحة.</Text>
+                ) : (
+                  <RadioGroup value={selectedExamId} onChange={setSelectedExamId}>
+                    <VStack align="stretch" spacing={3} maxH="360px" overflowY="auto" pr={1}>
+                      {publicExams.map((exam) => {
+                        const selected = selectedExamId === String(exam.id);
+                        return (
+                          <Box
+                            key={exam.id}
+                            p={4}
+                            bg={selected ? examOptionSelectedBg : examOptionBg}
+                            borderRadius="xl"
+                            borderWidth="2px"
+                            borderColor={selected ? examOptionSelectedBorder : examOptionBorder}
+                            cursor="pointer"
+                            onClick={() => setSelectedExamId(String(exam.id))}
+                            _hover={{ bg: examOptionHoverBg }}
+                          >
+                            <Radio value={String(exam.id)} mb={2} colorScheme="blue">
+                              <Text fontWeight="bold" fontSize="md" color={textPrimary}>
+                                {exam.title}
+                              </Text>
+                            </Radio>
+                            <HStack fontSize="sm" color={textSecondary} spacing={4} pl={6}>
+                              {(exam.gradeName || exam.grade_name) && (
+                                <Text>{exam.gradeName || exam.grade_name}</Text>
+                              )}
+                              {(exam.duration_minutes ?? exam.durationMinutes) != null && (
+                                <Text>• {exam.duration_minutes ?? exam.durationMinutes} د</Text>
+                              )}
                             </HStack>
                           </Box>
                         );

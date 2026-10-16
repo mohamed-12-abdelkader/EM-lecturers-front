@@ -8,8 +8,8 @@ import {
   HiOutlineBookOpen,
   HiSparkles,
   HiOutlineSparkles,
-  HiClipboardDocumentList,
-  HiOutlineClipboardDocumentList,
+  HiGlobeAlt,
+  HiOutlineGlobeAlt,
 } from "react-icons/hi2";
 import { BOTTOM_NAV_MAX_BP } from "../../theme/chakraTheme";
 
@@ -37,10 +37,11 @@ const STUDENT_NAV_ITEMS = [
     fullLabel: "المساعد العلمي",
   },
   {
-    label: "امتحاناتي",
-    href: "/exam_grades",
-    icon: HiOutlineClipboardDocumentList,
-    iconActive: HiClipboardDocumentList,
+    label: "امتحانات عامة",
+    href: "/student-public-exams",
+    icon: HiOutlineGlobeAlt,
+    iconActive: HiGlobeAlt,
+    fullLabel: "الامتحانات العامة",
   },
 ];
 

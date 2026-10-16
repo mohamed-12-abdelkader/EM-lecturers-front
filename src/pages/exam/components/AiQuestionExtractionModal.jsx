@@ -58,7 +58,11 @@ export default function AiQuestionExtractionModal({
   examTitle,
   examKind = "lecture",
   onImported,
+  /** إن وُجدت: تُرجع المسودات للصفحة بدون استيراد لامتحان */
+  onConfirmDrafts,
+  confirmLabel,
 }) {
+  const isDraftOnly = typeof onConfirmDrafts === "function";
   const isCourseExam = examKind === "course";
   const validateDraftQuestion = isCourseExam
     ? validateCourseExamDraftQuestion
@@ -377,6 +381,32 @@ export default function AiQuestionExtractionModal({
         toast({ title: "خطأ في التحقق", description: err, status: "error", duration: 5000, isClosable: true });
         return;
       }
+    }
+
+    if (isDraftOnly) {
+      setIsImporting(true);
+      try {
+        await onConfirmDrafts(draftQuestions, draftPassages);
+        toast({
+          title: "تم",
+          description: `تم تجهيز ${draftQuestions.length} سؤال على الإطار المختار`,
+          status: "success",
+          duration: 3500,
+          isClosable: true,
+        });
+        handleClose();
+      } catch (error) {
+        toast({
+          title: "خطأ",
+          description: formatOcrApiError(error) || error?.message || "فشل تطبيق الأسئلة",
+          status: "error",
+          duration: 5000,
+          isClosable: true,
+        });
+      } finally {
+        setIsImporting(false);
+      }
+      return;
     }
 
     setIsImporting(true);
@@ -934,7 +964,12 @@ export default function AiQuestionExtractionModal({
               draftQuestions.length === 0 || isExtractingOcr || isImporting
             }
           >
-            {isCourseExam ? "استيراد لامتحان الكورس" : "استيراد للامتحان"}{" "}
+            {confirmLabel ||
+              (isDraftOnly
+                ? "تطبيق على الإطار"
+                : isCourseExam
+                  ? "استيراد لامتحان الكورس"
+                  : "استيراد للامتحان")}{" "}
             {draftQuestions.length > 0 ? `(${draftQuestions.length})` : ""}
           </Button>
           <Button

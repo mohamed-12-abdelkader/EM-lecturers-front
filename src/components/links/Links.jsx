@@ -23,6 +23,7 @@ import {
   MdRestoreFromTrash,
   MdEmojiEvents,
   MdSchool,
+  MdAutoAwesome,
 } from "react-icons/md";
 import { FaRobot, FaFolderOpen, FaWhatsapp } from "react-icons/fa";
 import { Link, useLocation } from "react-router-dom";
@@ -234,9 +235,11 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
         { to: "/teacher-my-files", Icon: FaFolderOpen, label: "ملفاتي" },
         { to: "/teacher-assignments", Icon: MdAssignment, label: "الواجبات" },
         { to: "/teacher-exams", Icon: MdQuiz, label: "الامتحانات" },
+        { to: "/teacher-public-exams", Icon: MdPublic, label: "الامتحانات العامة" },
         { to: "/teacher-daily-quizzes", Icon: MdWhatshot, label: "المسابقات اليومية" },
         { to: "/teacher-points", Icon: MdEmojiEvents, label: "النقاط والترتيب" },
         { to: "/exam-builder-chat", Icon: MdQuiz, label: "مساعد الامتحانات" },
+        { to: "/teacher-question-extraction", Icon: MdAutoAwesome, label: "استخراج الأسئلة" },
         { to: "/teacher-free-lectures", Icon: MdVideoLibrary, label: "المحاضرات المجانية" },
         { to: "/teacher-whatsapp", Icon: FaWhatsapp, label: "واتساب المدرس" },
       ],
@@ -267,6 +270,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
       title: "التعلم",
       links: [
         { to: "/my-courses", Icon: MdCollectionsBookmark, label: "كورساتي" },
+        { to: "/student-public-exams", Icon: MdPublic, label: "الامتحانات العامة" },
         { to: "/student-daily-quizzes", Icon: MdWhatshot, label: "المسابقات اليومية" },
         { to: "/my-points", Icon: MdEmojiEvents, label: "نقاطي وترتيبي" },
         { to: "/exam_grades", Icon: MdGrading, label: "درجات الامتحانات" },
@@ -306,6 +310,8 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
       title: "المحتوى",
       links: [
         { to: "/teacher-exams", Icon: MdQuiz, label: "الامتحانات" },
+        { to: "/teacher-public-exams", Icon: MdPublic, label: "الامتحانات العامة" },
+        { to: "/teacher-question-extraction", Icon: MdAutoAwesome, label: "استخراج الأسئلة" },
         { to: "/teacher-assignments", Icon: MdAssignment, label: "الواجبات" },
         { to: "/teacher-points", Icon: MdEmojiEvents, label: "النقاط والترتيب" },
         { to: "/teacher-my-files", Icon: FaFolderOpen, label: "ملفاتي" },

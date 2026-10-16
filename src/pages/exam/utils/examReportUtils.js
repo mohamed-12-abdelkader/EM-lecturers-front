@@ -227,6 +227,9 @@ export function normalizeReportPayload(data) {
 export function resolveExamReportRoute(pathname = "") {
   const path = String(pathname);
 
+  if (path.includes("/public-exams/")) {
+    return { kind: "public", backSegment: "public-exams" };
+  }
   if (path.includes("/lecture-exam/")) {
     return { kind: "lecture", backSegment: "lecture-exam" };
   }
@@ -241,11 +244,13 @@ export function resolveExamReportRoute(pathname = "") {
 }
 
 export function buildExamReportPath(examId, { from = "lecture" } = {}) {
+  if (from === "public") return `/public-exams/${examId}/report`;
   if (from === "course-level") return `/exam/${examId}/report`;
   return `/lecture-exam/${examId}/report`;
 }
 
 export function buildExamManagePath(examId, { from = "lecture" } = {}) {
+  if (from === "public") return `/public-exams/${examId}`;
   if (from === "course-level") return `/exam/${examId}`;
   return `/ComprehensiveExam/${examId}`;
 }

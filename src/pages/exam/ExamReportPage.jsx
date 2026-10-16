@@ -58,6 +58,7 @@ import {
   fetchLectureExamReport,
 } from "../../api/courseAssignmentReportsApi";
 import { fetchExamAttemptReport } from "../../api/courseExamsApi";
+import { fetchPublicExamReport } from "../../api/publicExamsApi";
 import { readAuthToken } from "../../utils/authStorage";
 import {
   normalizeAttemptReport,
@@ -877,7 +878,7 @@ export default function ExamReportPage() {
   const examId = id || examIdParam;
   const { kind } = resolveExamReportRoute(location.pathname);
   const examBasePath = buildExamManagePath(examId, {
-    from: kind === "course-level" ? "course-level" : "lecture",
+    from: kind === "public" ? "public" : kind === "course-level" ? "course-level" : "lecture",
   });
   const [searchParams, setSearchParams] = useSearchParams();
   const [, isAdmin, isTeacher, student] = UserType();
@@ -915,10 +916,13 @@ export default function ExamReportPage() {
     else setLoading(true);
     setError(null);
     try {
+      const token = readAuthToken();
       const raw =
-        kind === "course-level"
-          ? await fetchCourseLevelExamReport(examId, { passPercentage, groupId })
-          : await fetchLectureExamReport(examId, { passPercentage, groupId });
+        kind === "public"
+          ? await fetchPublicExamReport(examId, { passPercentage }, token)
+          : kind === "course-level"
+            ? await fetchCourseLevelExamReport(examId, { passPercentage, groupId })
+            : await fetchLectureExamReport(examId, { passPercentage, groupId });
       const normalized = normalizeReportPayload(raw);
       reportRef.current = normalized;
       setReport(normalized);
@@ -1086,6 +1090,10 @@ export default function ExamReportPage() {
       : 0;
 
   const goToCourseExams = () => {
+    if (kind === "public" || location.state?.fromPublic) {
+      navigate(isStaff ? "/teacher-public-exams" : "/student-public-exams");
+      return;
+    }
     const courseId =
       location.state?.courseId ||
       studentResult?.courseId ||

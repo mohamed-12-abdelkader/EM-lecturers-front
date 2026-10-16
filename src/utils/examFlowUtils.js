@@ -297,10 +297,21 @@ function isImageUrlValue(value) {
 }
 
 /** تطبيع سؤال واحد من صيغة API المسطحة (questionText, optionA..D) أو choices[] */
+function pickFlatOption(q, letter) {
+  const upper = `option${letter}`;
+  const lower = `option_${letter.toLowerCase()}`;
+  const raw = q[upper] ?? q[lower] ?? q[`Option${letter}`];
+  return raw != null ? String(raw).trim() : "";
+}
+
 export function normalizeSingleExamQuestion(q) {
   if (!q || typeof q !== "object") return null;
 
   const questionId = q.id ?? q.questionId;
+  const questionTextRaw =
+    q.questionText ?? q.question_text ?? q.text ?? q.question ?? null;
+  const questionImageRaw =
+    q.questionImage ?? q.question_image ?? q.image ?? q.image_url ?? null;
   const passageText =
     q.passageText ||
     q.passage_text ||
@@ -311,8 +322,11 @@ export function normalizeSingleExamQuestion(q) {
   const hasFlatOptions =
     q.type != null ||
     q.questionText != null ||
+    q.question_text != null ||
     q.optionA != null ||
-    q.optionB != null;
+    q.option_a != null ||
+    q.optionB != null ||
+    q.option_b != null;
 
   if (hasFlatOptions) {
     const correctLetters = (() => {
@@ -322,13 +336,16 @@ export function normalizeSingleExamQuestion(q) {
       if (Array.isArray(q.correct_answers) && q.correct_answers.length) {
         return q.correct_answers.map((a) => String(a || "").toUpperCase()).filter(Boolean);
       }
-      const single = String(q.correctAnswer || q.correct_answer || "").toUpperCase();
-      return single ? [single] : [];
+      const letters = [];
+      const primary = String(q.correctAnswer || q.correct_answer || "").toUpperCase();
+      if (primary) letters.push(primary);
+      const secondary = String(q.correctAnswer2 || q.correct_answer_2 || "").toUpperCase();
+      if (secondary && secondary !== primary) letters.push(secondary);
+      return letters;
     })();
     const correctSet = new Set(correctLetters);
     const choices = LETTER_KEYS.map((letter, idx) => {
-      const raw = q[`option${letter}`];
-      const val = raw != null ? String(raw).trim() : "";
+      const val = pickFlatOption(q, letter);
       const img = isImageUrlValue(val);
       return {
         id: idx + 1,
@@ -341,8 +358,8 @@ export function normalizeSingleExamQuestion(q) {
 
     return {
       id: questionId,
-      text: q.questionText != null ? String(q.questionText) : q.text ?? "",
-      image: q.questionImage ?? q.image ?? null,
+      text: questionTextRaw != null ? String(questionTextRaw) : "",
+      image: questionImageRaw,
       type: q.type || null,
       grade: q.grade ?? 1,
       passageId: q.passageId ?? q.passage_id ?? q.passage?.id ?? null,
@@ -353,7 +370,7 @@ export function normalizeSingleExamQuestion(q) {
     };
   }
 
-  if (questionId == null && !q.text && !q.questionText) return null;
+  if (questionId == null && !q.text && !q.questionText && !q.question_text) return null;
 
   const choices = (q.choices || []).map((c, idx) => {
     const letter = c.letter || LETTER_KEYS[idx] || String.fromCharCode(65 + idx);
@@ -389,8 +406,8 @@ export function normalizeSingleExamQuestion(q) {
 
   return {
     id: questionId,
-    text: q.text ?? q.questionText ?? "",
-    image: q.image ?? q.questionImage ?? null,
+    text: q.text ?? q.questionText ?? q.question_text ?? "",
+    image: q.image ?? q.questionImage ?? q.question_image ?? null,
     type: q.type ?? null,
     grade: q.grade ?? 1,
     passageId: q.passageId ?? q.passage_id ?? q.passage?.id ?? null,

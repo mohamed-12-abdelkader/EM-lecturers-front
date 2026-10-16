@@ -765,26 +765,144 @@ export async function importDraftsToLectureExam(examId, draftPassages, draftQues
 
 async function attachCourseExamQuestionImageFromUrl(questionId, imageUrl, token) {
   if (!imageUrl || !questionId) return false;
+
+  // 1) رابط مباشر — يعمل مع الامتحانات العامة بدون إعادة رفع / CORS
+  try {
+    await baseUrl.put(
+      `/api/questions/${questionId}`,
+      { questionImage: imageUrl },
+      {
+        headers: {
+          ...authHeaders(token),
+          "Content-Type": "application/json",
+        },
+      },
+    );
+    return true;
+  } catch {
+    // fall through
+  }
+
+  // 2) رفع ملف بعد تحميل الصورة من الـ CDN
   try {
     const file = await urlToImageFile(imageUrl);
     const formData = new FormData();
     formData.append("questionImage", file);
-    await baseUrl.patch(`/api/course/course-exam/question/${questionId}/image`, formData, {
-      headers: authHeaders(token),
-    });
-    return true;
+    try {
+      await baseUrl.patch(`/api/course/course-exam/question/${questionId}/image`, formData, {
+        headers: authHeaders(token),
+      });
+      return true;
+    } catch (err) {
+      if (err?.response?.status === 404 || err?.response?.status === 403) {
+        await baseUrl.put(`/api/questions/${questionId}`, formData, {
+          headers: authHeaders(token),
+        });
+        return true;
+      }
+      throw err;
+    }
   } catch {
     return false;
   }
+}
+
+async function importMcqDraftWithImageToCourseExam(examId, draft, token) {
+  const choices = normalizeMcqChoices(draft.choices);
+  const imageUrl = getDraftImageUrl(draft);
+  const correctAnswer = getDraftCorrectAnswerLetter(draft);
+
+  // أفضّل إرسال رابط الصورة مباشرة مع إنشاء السؤال (بدون CORS download)
+  if (imageUrl) {
+    try {
+      await baseUrl.post(
+        `/api/exams/${examId}/questions`,
+        {
+          type: "TEXT",
+          questionText: String(draft.question_text || "").trim(),
+          optionA: choices[0] || "",
+          optionB: choices[1] || "",
+          optionC: choices[2] || "",
+          optionD: choices[3] || "",
+          correctAnswer,
+          questionImage: imageUrl,
+        },
+        {
+          headers: {
+            ...authHeaders(token),
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      return { added: 1, imageAttached: true };
+    } catch {
+      // fall through to FormData upload
+    }
+  }
+
+  const formData = new FormData();
+  formData.append("type", "TEXT");
+  formData.append("questionText", String(draft.question_text || "").trim());
+  formData.append("optionA", choices[0] || "");
+  formData.append("optionB", choices[1] || "");
+  formData.append("optionC", choices[2] || "");
+  formData.append("optionD", choices[3] || "");
+  formData.append("correctAnswer", correctAnswer);
+
+  let imageAttached = false;
+  if (imageUrl) {
+    try {
+      const file = await urlToImageFile(imageUrl);
+      formData.append("questionImage", file);
+      imageAttached = true;
+    } catch {
+      imageAttached = false;
+    }
+  }
+
+  await baseUrl.post(`/api/exams/${examId}/questions`, formData, {
+    headers: authHeaders(token),
+  });
+  return { added: 1, imageAttached: imageAttached && Boolean(imageUrl) };
 }
 
 async function importImageDraftToCourseExam(examId, draft, token) {
   const imageUrl = getDraftImageUrl(draft);
   if (!imageUrl) return 0;
 
+  // سؤال بصورة فقط (أو نص+صورة بدون اختيارات MCQ كاملة)
+  const questionText = String(draft.question_text || "").trim();
+  if (questionText) {
+    try {
+      await baseUrl.post(
+        `/api/exams/${examId}/questions`,
+        {
+          type: "TEXT",
+          questionText,
+          optionA: "أ",
+          optionB: "ب",
+          optionC: "ج",
+          optionD: "د",
+          correctAnswer: "A",
+          questionImage: imageUrl,
+        },
+        {
+          headers: {
+            ...authHeaders(token),
+            "Content-Type": "application/json",
+          },
+        },
+      );
+      return 1;
+    } catch {
+      // fall through
+    }
+  }
+
   const file = await urlToImageFile(imageUrl);
   const formData = new FormData();
   formData.append("images", file);
+  formData.append("images[]", file);
   const res = await baseUrl.post(`/api/exams/${examId}/questions/images`, formData, {
     headers: authHeaders(token),
   });
@@ -792,16 +910,16 @@ async function importImageDraftToCourseExam(examId, draft, token) {
 }
 
 /**
- * استيراد أسئلة مستخرجة بالـ AI إلى امتحان الكورس الشامل
- * @param {number|string} examId
- * @param {object[]} draftPassages
- * @param {object[]} draftQuestions
- * @param {string} token
+ * استيراد أسئلة مستخرجة بالـ AI إلى امتحان الكورس / العام
+ * الأسئلة التي معها صور تُنشأ مع questionImage حتى تظهر في GET الأسئلة
  */
 export async function importDraftsToCourseExam(examId, draftPassages, draftQuestions, token) {
   const headers = { ...authHeaders(token), "Content-Type": "application/json" };
   const mcqDrafts = draftQuestions.filter((q) => isDraftMcq(q));
   const imageDrafts = draftQuestions.filter((q) => isDraftImageQuestion(q) && !isDraftMcq(q));
+
+  const mcqWithImages = mcqDrafts.filter((d) => getDraftImageUrl(d));
+  const mcqWithoutImages = mcqDrafts.filter((d) => !getDraftImageUrl(d));
 
   let totalAdded = 0;
   let imagesAttached = 0;
@@ -814,33 +932,66 @@ export async function importDraftsToCourseExam(examId, draftPassages, draftQuest
     );
   }
 
-  if (mcqDrafts.length > 0) {
-    const text = buildBulkTextFromDrafts(mcqDrafts);
-    const correctAnswers = mcqDrafts.map((d) => getDraftCorrectAnswerLetter(d));
+  // أسئلة بدون صور: bulk سريع
+  if (mcqWithoutImages.length > 0) {
+    const text = buildBulkTextFromDrafts(mcqWithoutImages);
+    const correctAnswers = mcqWithoutImages.map((d) => getDraftCorrectAnswerLetter(d));
     try {
       const res = await baseUrl.post(
         `/api/exams/${examId}/questions/bulk`,
         { text, correctAnswers },
-        { headers }
+        { headers },
       );
-      const created = Array.isArray(res.data?.questions) ? res.data.questions : [];
-      totalAdded += res.data?.count ?? created.length ?? 0;
-      for (let i = 0; i < mcqDrafts.length && i < created.length; i += 1) {
-        const imageUrl = getDraftImageUrl(mcqDrafts[i]);
-        if (imageUrl) {
-          const questionId = created[i]?.id;
-          const ok = await attachCourseExamQuestionImageFromUrl(questionId, imageUrl, token);
-          if (ok) imagesAttached += 1;
-        }
-      }
+      totalAdded += res.data?.count ?? (Array.isArray(res.data?.questions) ? res.data.questions.length : 0);
     } catch (err) {
       errors.push(err.response?.data?.message || err.message || "فشل استيراد الأسئلة النصية");
+    }
+  }
+
+  // أسئلة مع صور: إنشاء فردي مع questionImage
+  for (const draft of mcqWithImages) {
+    try {
+      const result = await importMcqDraftWithImageToCourseExam(examId, draft, token);
+      totalAdded += result.added;
+      if (result.imageAttached) imagesAttached += 1;
+      else {
+        warnings.push(
+          `تمت إضافة سؤال بدون صورة: ${(draft.question_text || "").slice(0, 40)}…`,
+        );
+      }
+    } catch (err) {
+      // محاولة أخيرة: bulk بدون صورة ثم إرفاق
+      try {
+        const text = buildBulkTextFromDrafts([draft]);
+        const res = await baseUrl.post(
+          `/api/exams/${examId}/questions/bulk`,
+          { text, correctAnswers: [getDraftCorrectAnswerLetter(draft)] },
+          { headers },
+        );
+        const created = Array.isArray(res.data?.questions) ? res.data.questions : [];
+        totalAdded += res.data?.count ?? created.length ?? 0;
+        const questionId = created[0]?.id;
+        const imageUrl = getDraftImageUrl(draft);
+        if (questionId && imageUrl) {
+          const ok = await attachCourseExamQuestionImageFromUrl(questionId, imageUrl, token);
+          if (ok) imagesAttached += 1;
+          else warnings.push("تعذر إرفاق صورة أحد الأسئلة بعد الإنشاء");
+        }
+      } catch (innerErr) {
+        errors.push(
+          err.response?.data?.message ||
+            innerErr.response?.data?.message ||
+            err.message ||
+            "فشل استيراد سؤال مع صورة",
+        );
+      }
     }
   }
 
   for (const draft of imageDrafts) {
     try {
       totalAdded += await importImageDraftToCourseExam(examId, draft, token);
+      if (getDraftImageUrl(draft)) imagesAttached += 1;
     } catch (err) {
       errors.push(err.response?.data?.message || err.message || "فشل استيراد سؤال بالصورة");
     }
