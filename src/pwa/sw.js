@@ -14,7 +14,6 @@ import {
   precacheAndRoute,
   cleanupOutdatedCaches,
   getCacheKeyForURL,
-  createHandlerBoundToURL,
 } from "workbox-precaching";
 import { registerRoute, setCatchHandler, NavigationRoute } from "workbox-routing";
 import { CacheFirst, NetworkFirst, StaleWhileRevalidate } from "workbox-strategies";
