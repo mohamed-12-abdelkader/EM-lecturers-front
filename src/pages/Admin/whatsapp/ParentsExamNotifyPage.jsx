@@ -67,6 +67,8 @@ export default function ParentsExamNotifyPage() {
   const [exams, setExams] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState("");
   const [testStudentId, setTestStudentId] = useState("");
   const [testCohort, setTestCohort] = useState("passed");
   const [busyExam, setBusyExam] = useState(false);
@@ -111,8 +113,11 @@ export default function ParentsExamNotifyPage() {
     async (examId) => {
       if (!examId) {
         setPreview(null);
+        setPreviewLoading(false);
         return;
       }
+      setPreviewLoading(true);
+      setPreviewError("");
       try {
         const data = await fetchParentsExamPreview(examId);
         setPreview(data);
@@ -125,11 +130,16 @@ export default function ParentsExamNotifyPage() {
         else if (data?.samples?.failed?.length) setTestCohort("failed");
         else setTestCohort("absent");
       } catch (err) {
+        const message = err?.response?.data?.message || err.message || "تعذّر عرض الامتحان";
+        setPreview(null);
+        setPreviewError(message);
         toast({
           title: "تعذّر عرض الامتحان",
-          description: err?.response?.data?.message || err.message,
+          description: message,
           status: "error",
         });
+      } finally {
+        setPreviewLoading(false);
       }
     },
     [toast],
@@ -211,7 +221,6 @@ export default function ParentsExamNotifyPage() {
     );
   }
 
-  const selected = exams.find((exam) => exam.id === selectedId);
   const sampleStudents = preview
     ? [
         ...(preview.samples?.passed || []).map((row) => ({ ...row, cohort: "passed" })),
@@ -372,8 +381,12 @@ export default function ParentsExamNotifyPage() {
               </Tr>
             </Thead>
             <Tbody>
-              {exams.map((exam) => (
-                <Tr key={exam.id} bg={exam.id === selectedId ? "green.50" : undefined}>
+              {exams.map((exam) => {
+                const examId = Number(exam.id);
+                const open = Number(selectedId) === examId;
+                return (
+                <React.Fragment key={examId}>
+                <Tr bg={open ? "green.50" : undefined}>
                   <Td>{exam.title}</Td>
                   <Td>
                     <Badge colorScheme={exam.isActive ? "green" : "gray"}>
@@ -392,143 +405,228 @@ export default function ParentsExamNotifyPage() {
                     </Text>
                   </Td>
                   <Td>
-                    <Button size="xs" onClick={() => setSelectedId(exam.id)}>
-                      تفاصيل
+                    <Button
+                      type="button"
+                      size="xs"
+                      colorScheme={open ? "green" : "gray"}
+                      onClick={() => {
+                        setPreview(null);
+                        setPreviewError("");
+                        setSelectedId(open ? null : examId);
+                      }}
+                    >
+                      {open ? "إخفاء" : "تفاصيل"}
                     </Button>
                   </Td>
                 </Tr>
-              ))}
+                {open ? (
+                  <Tr>
+                    <Td colSpan={4} bg="green.50">
+                      <ExamDetails
+                        exam={exam}
+                        preview={preview}
+                        previewLoading={previewLoading}
+                        previewError={previewError}
+                        busyExam={busyExam}
+                        sampleStudents={sampleStudents}
+                        testStudentId={testStudentId}
+                        testCohort={testCohort}
+                        setTestStudentId={setTestStudentId}
+                        setTestCohort={setTestCohort}
+                        draft={draft}
+                        toast={toast}
+                        runExamAction={runExamAction}
+                      />
+                    </Td>
+                  </Tr>
+                ) : null}
+                </React.Fragment>
+                );
+              })}
             </Tbody>
           </Table>
 
-          {selected && preview && (
-            <VStack align="stretch" spacing={3}>
-              <Text fontWeight="700">{selected.title}</Text>
-              <HStack wrap="wrap" spacing={2}>
-                <Badge>ناجح {preview.counts?.passed ?? 0}</Badge>
-                <Badge>راسب {preview.counts?.failed ?? 0}</Badge>
-                <Badge>لم يدخل {preview.counts?.absent ?? 0}</Badge>
-                <Badge colorScheme="orange">لسه بيمتحن {preview.counts?.inProgress ?? 0}</Badge>
-                <Badge colorScheme="red">بدون رقم {preview.counts?.missingPhone ?? 0}</Badge>
-              </HStack>
-              <HStack wrap="wrap">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  isLoading={busyExam}
-                  onClick={() =>
-                    void runExamAction(async () => {
-                      await setParentsExamEnabled(selected.id, !selected.enabled);
-                      toast({ title: selected.enabled ? "تم كتم الامتحان" : "تم تشغيل الامتحان", status: "success" });
-                    })
-                  }
-                >
-                  {selected.enabled ? "كتم" : "تشغيل"}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  isLoading={busyExam}
-                  onClick={() =>
-                    void runExamAction(async () => {
-                      if (selected.paused) {
-                        await resumeParentsExam(selected.id);
-                        toast({ title: "تم استئناف الطابور", status: "success" });
-                      } else {
-                        await pauseParentsExam(selected.id);
-                        toast({ title: "الطابور متوقف", status: "success" });
-                      }
-                    })
-                  }
-                >
-                  {selected.paused ? "استئناف" : "إيقاف مؤقت"}
-                </Button>
-                <Button
-                  size="sm"
-                  colorScheme="red"
-                  variant="outline"
-                  isLoading={busyExam}
-                  onClick={() =>
-                    void runExamAction(async () => {
-                      const result = await cancelParentsExamPending(selected.id);
-                      toast({
-                        title: `اتلغى ${result?.notifications ?? 0} رسالة`,
-                        status: "success",
-                      });
-                    })
-                  }
-                >
-                  إلغاء المعلق
-                </Button>
-                <Button
-                  size="sm"
-                  colorScheme="green"
-                  variant="outline"
-                  isLoading={busyExam}
-                  onClick={() =>
-                    void runExamAction(async () => {
-                      const result = await sendParentsExamCohorts(selected.id, {
-                        passed: Boolean(draft.notify_passed),
-                        failed: Boolean(draft.notify_failed),
-                        absent: Boolean(draft.notify_absent),
-                      });
-                      toast({
-                        title: `اتجدول ${result?.inserted ?? 0}، واتتخطى ${result?.skipped ?? 0}`,
-                        status: "success",
-                      });
-                    })
-                  }
-                >
-                  أرسل الآن بالتباعد
-                </Button>
-              </HStack>
-              <HStack align="end" wrap="wrap">
-                <FormControl maxW="280px">
-                  <FormLabel fontSize="sm">طالب للتجربة</FormLabel>
-                  <Select value={testStudentId} onChange={(e) => setTestStudentId(e.target.value)}>
-                    <option value="">اختار</option>
-                    {sampleStudents.map((student) => (
-                      <option key={`${student.cohort}-${student.studentId}`} value={student.studentId}>
-                        {student.studentName} — {COHORT_LABEL[student.cohort]}
-                      </option>
-                    ))}
-                  </Select>
-                </FormControl>
-                <FormControl maxW="180px">
-                  <FormLabel fontSize="sm">الحالة</FormLabel>
-                  <Select value={testCohort} onChange={(e) => setTestCohort(e.target.value)}>
-                    <option value="passed">ناجح</option>
-                    <option value="failed">راسب</option>
-                    <option value="absent">لم يدخل</option>
-                  </Select>
-                </FormControl>
-                <Button
-                  colorScheme="green"
-                  isLoading={busyExam}
-                  onClick={() =>
-                    void runExamAction(async () => {
-                      if (!testStudentId) throw new Error("اختار طالب");
-                      const result = await testParentsExamSend(
-                        selected.id,
-                        Number(testStudentId),
-                        testCohort,
-                      );
-                      toast({
-                        title: "اتجدولة رسالة واحدة لولي الأمر",
-                        description: formatWhen(result?.scheduledAt),
-                        status: "success",
-                      });
-                    })
-                  }
-                >
-                  تجربة ولي أمر واحد
-                </Button>
-              </HStack>
-            </VStack>
-          )}
         </Box>
       </Container>
     </Box>
+  );
+}
+
+function messagePreview(cohort, examTitle) {
+  const name = "أحمد";
+  const exam = examTitle || "الامتحان";
+  if (cohort === "absent") {
+    return `ولي أمر ${name}، ${name} ما دخلش امتحان «${exam}» خالص.`;
+  }
+  if (cohort === "failed") {
+    return `ولي أمر ${name}، نتيجة «${exam}»: 8/20 — للأسف ما نجحش.`;
+  }
+  return `ولي أمر ${name}، نتيجة «${exam}»: 16/20 — ألف مبروك، نجح.`;
+}
+
+function ExamDetails({
+  exam,
+  preview,
+  previewLoading,
+  previewError,
+  busyExam,
+  sampleStudents,
+  testStudentId,
+  testCohort,
+  setTestStudentId,
+  setTestCohort,
+  draft,
+  toast,
+  runExamAction,
+}) {
+  return (
+    <VStack align="stretch" spacing={3} py={2}>
+      <Text fontWeight="700">{exam.title}</Text>
+      {previewLoading ? <Spinner size="sm" /> : null}
+      {previewError ? (
+        <Alert status="error" borderRadius="md">
+          <AlertIcon />
+          {previewError}
+        </Alert>
+      ) : null}
+      {preview ? (
+        <HStack wrap="wrap" spacing={2}>
+          <Badge>ناجح {preview.counts?.passed ?? 0}</Badge>
+          <Badge>راسب {preview.counts?.failed ?? 0}</Badge>
+          <Badge>لم يدخل {preview.counts?.absent ?? 0}</Badge>
+          <Badge colorScheme="orange">لسه بيمتحن {preview.counts?.inProgress ?? 0}</Badge>
+          <Badge colorScheme="red">بدون رقم {preview.counts?.missingPhone ?? 0}</Badge>
+        </HStack>
+      ) : null}
+      <Box>
+        <Text fontSize="sm" fontWeight="700" mb={1}>
+          رسالة الناجح
+        </Text>
+        <Text fontSize="sm">{messagePreview("passed", exam.title)}</Text>
+        <Text fontSize="sm" fontWeight="700" mt={2} mb={1}>
+          رسالة الراسب
+        </Text>
+        <Text fontSize="sm">{messagePreview("failed", exam.title)}</Text>
+        <Text fontSize="sm" fontWeight="700" mt={2} mb={1}>
+          رسالة اللي ما دخلش
+        </Text>
+        <Text fontSize="sm">{messagePreview("absent", exam.title)}</Text>
+      </Box>
+      <HStack wrap="wrap">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          isLoading={busyExam}
+          onClick={() =>
+            void runExamAction(async () => {
+              await setParentsExamEnabled(exam.id, !exam.enabled);
+              toast({ title: exam.enabled ? "تم كتم الامتحان" : "تم تشغيل الامتحان", status: "success" });
+            })
+          }
+        >
+          {exam.enabled ? "كتم" : "تشغيل"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          isLoading={busyExam}
+          onClick={() =>
+            void runExamAction(async () => {
+              if (exam.paused) {
+                await resumeParentsExam(exam.id);
+                toast({ title: "تم استئناف الطابور", status: "success" });
+              } else {
+                await pauseParentsExam(exam.id);
+                toast({ title: "الطابور متوقف", status: "success" });
+              }
+            })
+          }
+        >
+          {exam.paused ? "استئناف" : "إيقاف مؤقت"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          colorScheme="red"
+          variant="outline"
+          isLoading={busyExam}
+          onClick={() =>
+            void runExamAction(async () => {
+              const result = await cancelParentsExamPending(exam.id);
+              toast({
+                title: `اتلغى ${result?.notifications ?? 0} رسالة`,
+                status: "success",
+              });
+            })
+          }
+        >
+          إلغاء المعلق
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          colorScheme="green"
+          variant="outline"
+          isLoading={busyExam}
+          onClick={() =>
+            void runExamAction(async () => {
+              const result = await sendParentsExamCohorts(exam.id, {
+                passed: Boolean(draft.notify_passed),
+                failed: Boolean(draft.notify_failed),
+                absent: Boolean(draft.notify_absent),
+              });
+              toast({
+                title: `اتجدول ${result?.inserted ?? 0}، واتتخطى ${result?.skipped ?? 0}`,
+                status: "success",
+              });
+            })
+          }
+        >
+          أرسل الآن بالتباعد
+        </Button>
+      </HStack>
+      <HStack align="end" wrap="wrap">
+        <FormControl maxW="280px">
+          <FormLabel fontSize="sm">طالب للتجربة</FormLabel>
+          <Select value={testStudentId} onChange={(e) => setTestStudentId(e.target.value)}>
+            <option value="">اختار</option>
+            {sampleStudents.map((student) => (
+              <option key={`${student.cohort}-${student.studentId}`} value={student.studentId}>
+                {student.studentName} — {COHORT_LABEL[student.cohort]}
+              </option>
+            ))}
+          </Select>
+        </FormControl>
+        <FormControl maxW="180px">
+          <FormLabel fontSize="sm">الحالة</FormLabel>
+          <Select value={testCohort} onChange={(e) => setTestCohort(e.target.value)}>
+            <option value="passed">ناجح</option>
+            <option value="failed">راسب</option>
+            <option value="absent">لم يدخل</option>
+          </Select>
+        </FormControl>
+        <Button
+          type="button"
+          colorScheme="green"
+          isLoading={busyExam}
+          onClick={() =>
+            void runExamAction(async () => {
+              if (!testStudentId) throw new Error("اختار طالب");
+              const result = await testParentsExamSend(exam.id, Number(testStudentId), testCohort);
+              toast({
+                title: "اتجدولة رسالة واحدة لولي الأمر",
+                description: formatWhen(result?.scheduledAt),
+                status: "success",
+              });
+            })
+          }
+        >
+          تجربة ولي أمر واحد
+        </Button>
+      </HStack>
+    </VStack>
   );
 }
 
