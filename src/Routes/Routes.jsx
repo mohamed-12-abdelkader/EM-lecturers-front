@@ -462,16 +462,6 @@ const AppRouter = () => {
           <Route index element={<WhatsAppInboxPage />} />
         </Route>
         <Route
-          path="/admin/whatsapp/parents-exam"
-          element={
-            <ProtectedRoute auth={isAdmin}>
-              <HomeLogin />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<ParentsExamNotifyPage />} />
-        </Route>
-        <Route
           path="/admin/whatsapp/policy"
           element={
             <ProtectedRoute auth={isAdmin}>
@@ -510,6 +500,7 @@ const AppRouter = () => {
             <Route path="create_code" element={<AdminCreateCode />} />
             <Route path="cridet" element={<AdminTeacherBalances />} />
             <Route path="open_phone" element={<OpenPhone />} />
+            <Route path="whatsapp/parents-exam" element={<ParentsExamNotifyPage />} />
 
           </Route>
 

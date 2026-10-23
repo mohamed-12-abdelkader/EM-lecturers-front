@@ -70,6 +70,7 @@ export default function ParentsExamNotifyPage() {
   const [testStudentId, setTestStudentId] = useState("");
   const [testCohort, setTestCohort] = useState("passed");
   const [busyExam, setBusyExam] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   const pageBg = useColorModeValue("gray.50", "gray.900");
   const cardBg = useColorModeValue("white", "gray.800");
@@ -79,6 +80,7 @@ export default function ParentsExamNotifyPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const [nextSettings, nextExams] = await Promise.all([
         fetchParentsExamSettings(),
@@ -87,10 +89,13 @@ export default function ParentsExamNotifyPage() {
       setSettings(nextSettings);
       setDraft(nextSettings?.config || null);
       setExams(Array.isArray(nextExams) ? nextExams : []);
+      if (!nextSettings?.config) setLoadError("الإعدادات رجعت فاضية");
     } catch (err) {
+      const message = err?.response?.data?.message || err.message || "تعذّر التحميل";
+      setLoadError(message);
       toast({
         title: "تعذّر تحميل الإعدادات",
-        description: err?.response?.data?.message || err.message,
+        description: message,
         status: "error",
       });
     } finally {
@@ -184,11 +189,25 @@ export default function ParentsExamNotifyPage() {
     }
   };
 
-  if (loading || !draft) {
+  if (loading) {
     return (
-      <Flex minH="60vh" align="center" justify="center" bg={pageBg}>
+      <Flex minH="40vh" align="center" justify="center" bg={pageBg}>
         <Spinner />
       </Flex>
+    );
+  }
+
+  if (!draft) {
+    return (
+      <Box bg={pageBg} minH="40vh" p={6}>
+        <Alert status="error" borderRadius="lg">
+          <AlertIcon />
+          {loadError || "تعذّر فتح صفحة إشعارات أولياء الأمور"}
+        </Alert>
+        <Button mt={4} onClick={() => void load()}>
+          إعادة المحاولة
+        </Button>
+      </Box>
     );
   }
 
