@@ -13,6 +13,12 @@ const AdminLinks = ({ currentLink, setCurrentLink }) => {
   const adminLinks = [
     {
       id: Math.random(),
+      link: "أولياء الأمور",
+      path: "/admin/whatsapp/parents-exam",
+      icon: <FaWhatsapp size={22} />,
+    },
+    {
+      id: Math.random(),
       link: "ادارة المنصة",
       path: "/admin/management",
       icon: <MdDashboard size={22} />,
@@ -57,12 +63,6 @@ const AdminLinks = ({ currentLink, setCurrentLink }) => {
       id: Math.random(),
       link: "واتساب",
       path: "/admin/whatsapp/inbox",
-      icon: <FaWhatsapp size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "إشعارات أولياء الأمور",
-      path: "/admin/whatsapp/parents-exam",
       icon: <FaWhatsapp size={22} />,
     },
     {

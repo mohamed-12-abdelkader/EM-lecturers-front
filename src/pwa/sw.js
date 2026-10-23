@@ -17,7 +17,7 @@ import {
   createHandlerBoundToURL,
 } from "workbox-precaching";
 import { registerRoute, setCatchHandler, NavigationRoute } from "workbox-routing";
-import { CacheFirst, StaleWhileRevalidate } from "workbox-strategies";
+import { CacheFirst, NetworkFirst, StaleWhileRevalidate } from "workbox-strategies";
 import { ExpirationPlugin } from "workbox-expiration";
 
 const DEFAULT_ICON = "/icons/icon-192.png";
@@ -179,6 +179,9 @@ registerRoute(
 precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
 clientsClaim();
 
 self.addEventListener("message", (event) => {
@@ -204,9 +207,15 @@ function isApiRequest(url) {
 }
 
 registerRoute(
-  new NavigationRoute(createHandlerBoundToURL("index.html"), {
-    denylist: [/^\/api\//, /^\/socket\.io/],
-  }),
+  new NavigationRoute(
+    new NetworkFirst({
+      cacheName: "em-pages",
+      networkTimeoutSeconds: 4,
+    }),
+    {
+      denylist: [/^\/api\//, /^\/socket\.io/],
+    },
+  ),
 );
 
 registerRoute(
