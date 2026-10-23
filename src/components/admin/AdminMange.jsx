@@ -80,8 +80,13 @@ const packageColorSchemeMap = {
 
 const toAbsoluteAvatarUrl = (avatar) => {
   if (!avatar) return undefined;
-  if (avatar.startsWith("http")) return avatar;
-  return `${API_ORIGIN}/${String(avatar).replace(/^\/+/, "")}`;
+  if (avatar.startsWith("http") || avatar.startsWith("data:")) return avatar;
+  let path = String(avatar).startsWith("/") ? String(avatar) : `/${avatar}`;
+  // Local images are served from /cdn (same files as /uploads)
+  if (path.startsWith("/uploads/") && /\.(jpe?g|png|gif|webp)$/i.test(path)) {
+    path = `/cdn/${path.slice("/uploads/".length)}`;
+  }
+  return `${API_ORIGIN}${path}`;
 };
 
 const AdminMange = () => {
@@ -211,27 +216,34 @@ const AdminMange = () => {
   const openEditModal = (teacher) => {
     setSelectedTeacher(teacher);
     const token = localStorage.getItem("token");
-    const fillEditForm = (teacherData) => {
+    const fillEditForm = (teacherData, { preservePendingAvatar = false } = {}) => {
       const selectedGradeIds =
         teacherData.grades && Array.isArray(teacherData.grades)
           ? teacherData.grades.map((g) => g.id.toString())
           : [];
-      setEditFormData({
-        name: teacherData.name || "",
-        email: teacherData.email || "",
-        password: "",
-        phone: teacherData.phone || "",
-        description: teacherData.description || "",
-        subject: teacherData.subject || "",
-        account_status: teacherData.account_status || "active",
-        grade_ids: selectedGradeIds,
-        avatar: teacherData.avatar || "",
-        avatarPreview: toAbsoluteAvatarUrl(teacherData.avatar) || "",
-        facebook_url: teacherData.facebook_url || "",
-        youtube_url: teacherData.youtube_url || "",
-        tiktok_url: teacherData.tiktok_url || "",
-        whatsapp_number: teacherData.whatsapp_number || "",
-        subscription_package: teacherData.subscription_package || "bronze",
+      setEditFormData((prev) => {
+        const keepAvatar =
+          preservePendingAvatar && (prev.avatarFile || (prev.avatarPreview || "").startsWith("data:"));
+        return {
+          name: teacherData.name || "",
+          email: teacherData.email || "",
+          password: "",
+          phone: teacherData.phone || "",
+          description: teacherData.description || "",
+          subject: teacherData.subject || "",
+          account_status: teacherData.account_status || "active",
+          grade_ids: selectedGradeIds,
+          avatar: keepAvatar ? prev.avatar : teacherData.avatar || "",
+          avatarPreview: keepAvatar
+            ? prev.avatarPreview
+            : toAbsoluteAvatarUrl(teacherData.avatar) || "",
+          avatarFile: keepAvatar ? prev.avatarFile : null,
+          facebook_url: teacherData.facebook_url || "",
+          youtube_url: teacherData.youtube_url || "",
+          tiktok_url: teacherData.tiktok_url || "",
+          whatsapp_number: teacherData.whatsapp_number || "",
+          subscription_package: teacherData.subscription_package || "bronze",
+        };
       });
     };
     fillEditForm(teacher);
@@ -248,7 +260,8 @@ const AdminMange = () => {
       .then((response) => {
         const fullTeacher = response?.data?.data;
         if (!fullTeacher) return;
-        fillEditForm(fullTeacher);
+        // Don't wipe a file the admin already picked while details were loading
+        fillEditForm(fullTeacher, { preservePendingAvatar: true });
         setTeachers((prev) =>
           prev.map((t) => (t.id === teacher.id ? { ...t, ...fullTeacher } : t))
         );
@@ -276,29 +289,60 @@ const AdminMange = () => {
 
       // التأكد من أن grade_ids هو array وتحويله من strings إلى numbers
       const gradeIds = Array.isArray(editFormData.grade_ids)
-        ? editFormData.grade_ids.map(id => parseInt(id, 10)).filter(id => !isNaN(id))
+        ? editFormData.grade_ids.map((id) => parseInt(id, 10)).filter((id) => !isNaN(id))
         : [];
 
-      // PUT /api/admin/teachers/:id — تعديل جزئي أو كامل بنفس الشكل المطلوب
-      const updateData = {
-        name: editFormData.name,
-        email: editFormData.email,
-        phone: editFormData.phone || "",
-        subject: editFormData.subject,
-        description: editFormData.description || "",
-        account_status: editFormData.account_status || "active",
-        grade_ids: gradeIds,
-      };
+      // PUT /api/admin/teachers/:id — multipart when a new avatar file is selected
+      // (JSON alone never uploads the image; the API expects field name `avatar`)
+      // Important: do NOT send empty email/phone as "" — backend maps "" → null and
+      // can hit DB check constraint email_or_phone_check (500).
+      const formData = new FormData();
+      formData.append("name", editFormData.name || "");
+      if (editFormData.email) formData.append("email", editFormData.email);
+      if (editFormData.phone) formData.append("phone", editFormData.phone);
+      if (editFormData.subject) formData.append("subject", editFormData.subject);
+      formData.append("description", editFormData.description || "");
+      formData.append("account_status", editFormData.account_status || "active");
+      formData.append("grade_ids", JSON.stringify(gradeIds));
       if (editFormData.password) {
-        updateData.password = editFormData.password;
+        formData.append("password", editFormData.password);
+      }
+      if (editFormData.facebook_url) {
+        formData.append("facebook_url", editFormData.facebook_url);
+      }
+      if (editFormData.youtube_url) {
+        formData.append("youtube_url", editFormData.youtube_url);
+      }
+      if (editFormData.tiktok_url) {
+        formData.append("tiktok_url", editFormData.tiktok_url);
+      }
+      if (editFormData.whatsapp_number) {
+        formData.append("whatsapp_number", editFormData.whatsapp_number);
+      }
+      if (editFormData.avatarFile) {
+        formData.append("avatar", editFormData.avatarFile);
+      } else if (!editFormData.avatarFile && editFormData.avatarPreview?.startsWith("data:")) {
+        toast({
+          title: "تنبيه",
+          description: "الصورة لم تُرفق بشكل صحيح — اختر الملف مرة أخرى ثم احفظ",
+          status: "warning",
+          duration: 4000,
+          isClosable: true,
+        });
+        setEditLoading(false);
+        return;
       }
 
-      await baseUrl.put(`/api/admin/teachers/${selectedTeacher.id}`, updateData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
+      const updateRes = await baseUrl.put(
+        `/api/admin/teachers/${selectedTeacher.id}`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            // Do not set Content-Type — axios/browser must add multipart boundary
+          },
         },
-      });
+      );
 
       // تحديث باقة المدرس عبر endpoint مخصص حسب الـ API doc
       const selectedPackage = editFormData.subscription_package || "bronze";
@@ -310,7 +354,7 @@ const AdminMange = () => {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }
+        },
       );
 
       toast({
@@ -329,29 +373,35 @@ const AdminMange = () => {
         .map((id) => grades.find((g) => g.id.toString() === id))
         .filter(Boolean);
 
+      const savedTeacher = updateRes?.data?.data;
+      const savedAvatar =
+        savedTeacher?.avatar ||
+        (editFormData.avatarFile ? null : editFormData.avatar) ||
+        selectedTeacher.avatar;
+
       setTeachers((prev) =>
         prev.map((teacher) =>
           teacher.id === selectedTeacher.id
             ? {
-              ...teacher,
-              name: editFormData.name,
-              email: editFormData.email,
-              phone: editFormData.phone,
-              description: editFormData.description,
-              subject: editFormData.subject,
-              account_status: editFormData.account_status || teacher.account_status || "active",
-              avatar: editFormData.avatarPreview
-                ? editFormData.avatarPreview
-                : teacher.avatar,
-              facebook_url: editFormData.facebook_url,
-              youtube_url: editFormData.youtube_url,
-              tiktok_url: editFormData.tiktok_url,
-              whatsapp_number: editFormData.whatsapp_number,
-              subscription_package: editFormData.subscription_package || "bronze",
-              grades: updatedGrades,
-            }
-            : teacher
-        )
+                ...teacher,
+                ...(savedTeacher || {}),
+                name: editFormData.name,
+                email: editFormData.email,
+                phone: editFormData.phone,
+                description: editFormData.description,
+                subject: editFormData.subject,
+                account_status:
+                  editFormData.account_status || teacher.account_status || "active",
+                avatar: savedAvatar,
+                facebook_url: editFormData.facebook_url,
+                youtube_url: editFormData.youtube_url,
+                tiktok_url: editFormData.tiktok_url,
+                whatsapp_number: editFormData.whatsapp_number,
+                subscription_package: editFormData.subscription_package || "bronze",
+                grades: updatedGrades,
+              }
+            : teacher,
+        ),
       );
 
       onEditClose();

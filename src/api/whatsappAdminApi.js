@@ -186,6 +186,95 @@ export async function fetchSupportPolicyMessages() {
   return data?.data?.messages || [];
 }
 
+export async function fetchParentsExamSettings() {
+  const { data } = await baseUrl.get(`${API}/parents-exam/settings`, {
+    headers: authHeaders(getToken()),
+  });
+  return data?.data || data;
+}
+
+export async function saveParentsExamSettings(payload) {
+  const { data } = await baseUrl.put(`${API}/parents-exam/settings`, payload, {
+    headers: authHeaders(getToken(), "application/json"),
+  });
+  return data?.data || data;
+}
+
+export async function fetchParentsExamQueue() {
+  const { data } = await baseUrl.get(`${API}/parents-exam/queue`, {
+    headers: authHeaders(getToken()),
+  });
+  return data?.data || data;
+}
+
+export async function fetchParentsExamExams() {
+  const { data } = await baseUrl.get(`${API}/parents-exam/exams`, {
+    headers: authHeaders(getToken()),
+  });
+  return data?.data?.exams || [];
+}
+
+export async function setParentsExamEnabled(examId, enabled) {
+  const { data } = await baseUrl.put(
+    `${API}/parents-exam/exams/${examId}`,
+    { enabled },
+    { headers: authHeaders(getToken(), "application/json") },
+  );
+  return data?.data || data;
+}
+
+export async function fetchParentsExamPreview(examId) {
+  const { data } = await baseUrl.get(`${API}/parents-exam/exams/${examId}/preview`, {
+    headers: authHeaders(getToken()),
+  });
+  return data?.data || data;
+}
+
+export async function testParentsExamSend(examId, studentId, cohort) {
+  const { data } = await baseUrl.post(
+    `${API}/parents-exam/exams/${examId}/test`,
+    { studentId, cohort },
+    { headers: authHeaders(getToken(), "application/json") },
+  );
+  return data?.data || data;
+}
+
+export async function sendParentsExamCohorts(examId, flags) {
+  const { data } = await baseUrl.post(
+    `${API}/parents-exam/exams/${examId}/send`,
+    flags,
+    { headers: authHeaders(getToken(), "application/json") },
+  );
+  return data?.data || data;
+}
+
+export async function pauseParentsExam(examId) {
+  const { data } = await baseUrl.post(
+    `${API}/parents-exam/exams/${examId}/pause`,
+    {},
+    { headers: authHeaders(getToken(), "application/json") },
+  );
+  return data?.data || data;
+}
+
+export async function resumeParentsExam(examId) {
+  const { data } = await baseUrl.post(
+    `${API}/parents-exam/exams/${examId}/resume`,
+    {},
+    { headers: authHeaders(getToken(), "application/json") },
+  );
+  return data?.data || data;
+}
+
+export async function cancelParentsExamPending(examId) {
+  const { data } = await baseUrl.post(
+    `${API}/parents-exam/exams/${examId}/cancel-pending`,
+    {},
+    { headers: authHeaders(getToken(), "application/json") },
+  );
+  return data?.data || data;
+}
+
 export async function sendSupportPolicyChat(message) {
   const { data } = await baseUrl.post(
     `${API}/support-policy/chat`,

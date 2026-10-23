@@ -211,6 +211,7 @@ const WhatsAppServicesPage = lazyPage(() => import("../pages/Admin/whatsapp/What
 const WhatsAppMonitorPage = lazyPage(() => import("../pages/Admin/whatsapp/WhatsAppMonitorPage"));
 const WhatsAppInboxPage = lazyPage(() => import("../pages/Admin/whatsapp/WhatsAppInboxPage"));
 const WhatsAppPolicyPage = lazyPage(() => import("../pages/Admin/whatsapp/WhatsAppPolicyPage"));
+const ParentsExamNotifyPage = lazyPage(() => import("../pages/Admin/whatsapp/ParentsExamNotifyPage"));
 const TeacherInvoicesPage = lazyPage(() => import("../pages/teacher/TeacherInvoicesPage"));
 const AdminDashboardHome = lazyPage(() => import("../pages/home/AdminDashboardHome"));
 const TeacherDashboardHome = lazyPage(() => import("../pages/home/TeacherDashboardHome"));
@@ -459,6 +460,16 @@ const AppRouter = () => {
           }
         >
           <Route index element={<WhatsAppInboxPage />} />
+        </Route>
+        <Route
+          path="/admin/whatsapp/parents-exam"
+          element={
+            <ProtectedRoute auth={isAdmin}>
+              <HomeLogin />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<ParentsExamNotifyPage />} />
         </Route>
         <Route
           path="/admin/whatsapp/policy"

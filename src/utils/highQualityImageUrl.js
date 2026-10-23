@@ -38,11 +38,10 @@ export function resolvePublicImageUrl(url) {
     !raw.includes("/") &&
     /\.(png|jpe?g|webp|gif|jfif|svg)$/i.test(raw)
   ) {
-    path = `/uploads/${raw}`;
+    path = `/cdn/general/${raw}`;
   } else if (!raw.startsWith("/")) {
     path = `/${raw}`;
   }
-
   // أصول الفرونت (Vite / public) — لا تُحوَّل لأصل الـ API
   if (
     path.startsWith("/assets/") ||
@@ -56,6 +55,13 @@ export function resolvePublicImageUrl(url) {
     return path;
   }
 
+  // Prefer image CDN for local uploads paths
+  if (
+    path.startsWith("/uploads/") &&
+    /\.(png|jpe?g|webp|gif|jfif)$/i.test(path)
+  ) {
+    path = `/cdn/${path.slice("/uploads/".length)}`;
+  }
   if (typeof window !== "undefined" && useDevViteProxy()) {
     return `${window.location.origin}${path}`;
   }

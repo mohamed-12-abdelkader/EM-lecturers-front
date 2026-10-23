@@ -61,6 +61,12 @@ const AdminLinks = ({ currentLink, setCurrentLink }) => {
     },
     {
       id: Math.random(),
+      link: "إشعارات أولياء الأمور",
+      path: "/admin/whatsapp/parents-exam",
+      icon: <FaWhatsapp size={22} />,
+    },
+    {
+      id: Math.random(),
       link: "تخصيص الدعم",
       path: "/admin/whatsapp/policy",
       icon: <FaWhatsapp size={22} />,
