@@ -98,8 +98,10 @@ import {
 import {
   clearExamProgress,
   clearPersistedAttemptId,
+  mergeTimerWithLocalProgress,
   persistAttemptId,
   readExamProgress,
+  resolveResumeQuestionIndex,
   writeExamProgress,
 } from "../../utils/examAttemptProgress";
 import { normalizeExamAttemptResult } from "../../utils/examAttemptResultUtils";
@@ -109,6 +111,9 @@ import {
   normalizeCorrectAnswerLetters,
   toggleCorrectAnswerLetter,
 } from "../../api/courseExamsApi";
+import useExamTakingProtection, {
+  clearExamTakingFlag,
+} from "../../Hooks/exam/useExamTakingProtection";
 
 function countLectureAnswered(questions, answers) {
   return (questions || []).filter((q) => {
@@ -333,11 +338,34 @@ const ComprehensiveExam = () => {
     [id, submitResult],
   );
 
+  const isStudentTakingExam =
+    Boolean(student) &&
+    !isTeacher &&
+    !isAdmin &&
+    !submitResult &&
+    !blockedAttemptResult &&
+    Boolean(currentAttempt) &&
+    questions.length > 0;
+
+  useExamTakingProtection({
+    enabled: isStudentTakingExam,
+    onPersist: () => persistLectureProgress(),
+  });
+
+  useEffect(() => {
+    if (submitResult) clearExamTakingFlag();
+  }, [submitResult]);
+
+  useEffect(() => {
+    if (!isStudentTakingExam) return;
+    persistLectureProgress({ current: currentQuestionIndex });
+  }, [currentQuestionIndex, isStudentTakingExam, persistLectureProgress]);
+
   const applyLectureAttemptSession = useCallback(
     (payload = {}, { wipeAnswers = false } = {}) => {
       if (isLectureExamFinishedPayload(payload) && !payload.questions?.length) {
         setSubmitResult(payload);
-        return { remaining: 0, finished: true };
+        return { remaining: 0, finished: true, resumeIndex: 0 };
       }
       const attempt = payload.attempt || payload;
       const resolvedAttemptId =
@@ -347,8 +375,12 @@ const ComprehensiveExam = () => {
         persistAttemptId(id, resolvedAttemptId);
         attemptIdRef.current = resolvedAttemptId;
       }
-      const { endsAt, remaining } = resolveLectureExamServerTimer(payload, {
+      const localProgress = resolvedAttemptId ? readExamProgress(id, resolvedAttemptId) : null;
+      const serverTimer = resolveLectureExamServerTimer(payload, {
         isNewAttempt: wipeAnswers,
+      });
+      const { endsAt, remaining } = mergeTimerWithLocalProgress(serverTimer, localProgress, {
+        allowLocal: !wipeAnswers,
       });
       examEndsAtRef.current = endsAt;
       setExamEndsAt(endsAt);
@@ -366,7 +398,6 @@ const ComprehensiveExam = () => {
       const serverAnswers = savedLectureExamAnswersToMap(
         payload.savedAnswers || payload.saved_answers,
       );
-      const localProgress = resolvedAttemptId ? readExamProgress(id, resolvedAttemptId) : null;
       const localAnswers =
         localProgress?.answers && typeof localProgress.answers === "object"
           ? localProgress.answers
@@ -377,7 +408,16 @@ const ComprehensiveExam = () => {
       studentAnswersRef.current = merged;
       setStudentAnswers(merged);
       persistLectureProgress({ answers: merged, endsAt });
-      return { remaining, finished: false, attemptId: resolvedAttemptId };
+      return {
+        remaining,
+        finished: false,
+        attemptId: resolvedAttemptId,
+        resumeIndex: wipeAnswers
+          ? 0
+          : resolveResumeQuestionIndex(localProgress, null, merged),
+        localProgress,
+        mergedAnswers: merged,
+      };
     },
     [id, persistLectureProgress],
   );
@@ -682,6 +722,20 @@ const ComprehensiveExam = () => {
           if (formattedQuestions.length > 0) {
             setQuestions(formattedQuestions);
             setQuestionsLoadError(null);
+            if (data.attempt && appliedAttempt) {
+              const resumeIndex = resolveResumeQuestionIndex(
+                appliedAttempt.localProgress,
+                formattedQuestions,
+                appliedAttempt.mergedAnswers || studentAnswersRef.current,
+              );
+              currentQuestionIndexRef.current = resumeIndex;
+              setCurrentQuestionIndex(resumeIndex);
+              persistLectureProgress({
+                current: resumeIndex,
+                answers: appliedAttempt.mergedAnswers || studentAnswersRef.current,
+                endsAt: examEndsAtRef.current,
+              });
+            }
           } else if (!data.attempt) {
             setQuestions([]);
             setQuestionsLoadError(
@@ -876,7 +930,20 @@ const ComprehensiveExam = () => {
 
       setQuestions(formattedQuestions);
       setQuestionsLoadError(null);
-      setCurrentQuestionIndex(0);
+      const resumeIndex = resumed
+        ? resolveResumeQuestionIndex(
+            applied?.localProgress,
+            formattedQuestions,
+            applied?.mergedAnswers || studentAnswersRef.current,
+          )
+        : 0;
+      currentQuestionIndexRef.current = resumeIndex;
+      setCurrentQuestionIndex(resumeIndex);
+      persistLectureProgress({
+        current: resumeIndex,
+        answers: applied?.mergedAnswers || studentAnswersRef.current,
+        endsAt: examEndsAtRef.current,
+      });
 
       toast({
         title: resumed ? "تم استئناف المحاولة" : "تم بدء المحاولة بنجاح",
@@ -1410,6 +1477,7 @@ const ComprehensiveExam = () => {
         examEndsAtRef.current = null;
         clearExamProgress(id, attemptId);
         clearPersistedAttemptId(id);
+        clearExamTakingFlag();
         return;
       }
       if (result?.remainingSeconds != null || result?.attemptExpiresAt || result?.attempt_expires_at) {
@@ -1417,11 +1485,12 @@ const ComprehensiveExam = () => {
         examEndsAtRef.current = endsAt;
         setExamEndsAt(endsAt);
         setRemainingSeconds(remaining);
+        persistLectureProgress({ endsAt });
       }
     } catch {
       /* silent — next interval retries */
     }
-  }, [id, submitResult, isTeacher, isAdmin]);
+  }, [id, submitResult, isTeacher, isAdmin, persistLectureProgress]);
 
   useEffect(() => {
     if (submitResult || !questions.length || isTeacher || isAdmin) return undefined;
@@ -1452,18 +1521,27 @@ const ComprehensiveExam = () => {
   // دوال التنقل بين الأسئلة
   const goToNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      const next = currentQuestionIndex + 1;
+      currentQuestionIndexRef.current = next;
+      setCurrentQuestionIndex(next);
+      persistLectureProgress({ current: next });
     }
   };
 
   const goToPreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
+      const prev = currentQuestionIndex - 1;
+      currentQuestionIndexRef.current = prev;
+      setCurrentQuestionIndex(prev);
+      persistLectureProgress({ current: prev });
     }
   };
 
   const goToQuestion = (index) => {
+    if (index < 0 || index >= questions.length) return;
+    currentQuestionIndexRef.current = index;
     setCurrentQuestionIndex(index);
+    persistLectureProgress({ current: index });
   };
 
   // للطالب: تسليم الامتحان
@@ -1503,6 +1581,7 @@ const ComprehensiveExam = () => {
         clearExamProgress(id, attemptId);
         clearPersistedAttemptId(id);
       }
+      clearExamTakingFlag();
 
       if (result.wrongQuestions && result.wrongQuestions.length > 0) {
         setFeedback({

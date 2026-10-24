@@ -14,6 +14,52 @@ import {
 } from 'react-icons/fa';
 import baseUrl from '../../api/baseUrl';
 import UserType from '../../Hooks/auth/userType';
+import useExamTakingProtection, {
+  clearExamTakingFlag,
+} from '../../Hooks/exam/useExamTakingProtection';
+
+function essayDraftStorageKey(examId) {
+  try {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const uid = user.id || user.user_id || user.student_id || 'u';
+    return `em-lecture-essay-draft:${uid}:${examId}`;
+  } catch {
+    return `em-lecture-essay-draft:u:${examId}`;
+  }
+}
+
+function readEssayDraft(examId) {
+  if (!examId) return null;
+  try {
+    const raw = localStorage.getItem(essayDraftStorageKey(examId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeEssayDraft(examId, payload) {
+  if (!examId) return;
+  try {
+    localStorage.setItem(
+      essayDraftStorageKey(examId),
+      JSON.stringify({ ...payload, savedAt: Date.now() }),
+    );
+  } catch {
+    // ignore
+  }
+}
+
+function clearEssayDraft(examId) {
+  if (!examId) return;
+  try {
+    localStorage.removeItem(essayDraftStorageKey(examId));
+  } catch {
+    // ignore
+  }
+}
 
 const EssayExam = () => {
   const { id } = useParams();
@@ -1716,34 +1762,91 @@ const StudentView = ({
   exam, questions, answers, grade, submitAnswer, submitting, textColor, subTextColor, cardBg, borderColor,
   studentReport, loadingReport, fetchStudentReport
 }) => {
+  const examId = exam?.id;
   const [localAnswers, setLocalAnswers] = useState({});
   const [errors, setErrors] = useState({});
   const [submitAllLoading, setSubmitAllLoading] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answeredQuestions, setAnsweredQuestions] = useState(new Set());
+  const localAnswersRef = useRef({});
+  const currentIndexRef = useRef(0);
+
+  const persistEssayDraft = () => {
+    if (!examId || grade != null || studentReport) return;
+    writeEssayDraft(examId, {
+      answers: localAnswersRef.current,
+      current: currentIndexRef.current,
+    });
+  };
+
+  const isTakingEssay =
+    Boolean(examId) &&
+    Array.isArray(questions) &&
+    questions.length > 0 &&
+    grade == null &&
+    !studentReport;
+
+  useExamTakingProtection({
+    enabled: isTakingEssay,
+    onPersist: persistEssayDraft,
+  });
+
+  useEffect(() => {
+    localAnswersRef.current = localAnswers;
+  }, [localAnswers]);
+
+  useEffect(() => {
+    currentIndexRef.current = currentQuestionIndex;
+    persistEssayDraft();
+  }, [currentQuestionIndex, examId]);
 
   useEffect(() => {
     const answersMap = {};
     const answeredSet = new Set();
-    answers.forEach(answer => {
+    (answers || []).forEach((answer) => {
       answersMap[answer.question_id] = answer.answer_text;
       answeredSet.add(answer.question_id);
     });
-    setLocalAnswers(answersMap);
+    const draft = readEssayDraft(examId);
+    const draftAnswers =
+      draft?.answers && typeof draft.answers === 'object' ? draft.answers : {};
+    const merged = { ...draftAnswers, ...answersMap };
+    Object.entries(merged).forEach(([qid, text]) => {
+      if (text && String(text).trim().length >= 10) answeredSet.add(Number(qid) || qid);
+    });
+    setLocalAnswers(merged);
+    localAnswersRef.current = merged;
     setAnsweredQuestions(answeredSet);
-  }, [answers]);
+
+    const resumeIndex = Number(draft?.current);
+    if (
+      Number.isInteger(resumeIndex) &&
+      resumeIndex >= 0 &&
+      resumeIndex < (questions?.length || 0)
+    ) {
+      setCurrentQuestionIndex(resumeIndex);
+      currentIndexRef.current = resumeIndex;
+    }
+  }, [answers, examId, questions?.length]);
 
   const handleAnswerChange = (questionId, value) => {
-    setLocalAnswers(prev => ({ ...prev, [questionId]: value }));
+    setLocalAnswers((prev) => {
+      const next = { ...prev, [questionId]: value };
+      localAnswersRef.current = next;
+      writeEssayDraft(examId, {
+        answers: next,
+        current: currentIndexRef.current,
+      });
+      return next;
+    });
     if (errors[questionId]) {
-      setErrors(prev => ({ ...prev, [questionId]: '' }));
+      setErrors((prev) => ({ ...prev, [questionId]: '' }));
     }
-    
-    // Update answered questions set
+
     if (value && value.trim().length >= 10) {
-      setAnsweredQuestions(prev => new Set([...prev, questionId]));
+      setAnsweredQuestions((prev) => new Set([...prev, questionId]));
     } else {
-      setAnsweredQuestions(prev => {
+      setAnsweredQuestions((prev) => {
         const newSet = new Set(prev);
         newSet.delete(questionId);
         return newSet;
@@ -1778,6 +1881,8 @@ const StudentView = ({
         submitAnswer(question.id, localAnswers[question.id] || '')
       );
       await Promise.all(promises);
+      clearEssayDraft(examId);
+      clearExamTakingFlag();
     } catch (error) {
       console.error('Error submitting answers:', error);
     } finally {
@@ -1787,18 +1892,27 @@ const StudentView = ({
 
   const goToNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      const next = currentQuestionIndex + 1;
+      setCurrentQuestionIndex(next);
+      currentIndexRef.current = next;
+      persistEssayDraft();
     }
   };
 
   const goToPreviousQuestion = () => {
     if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
+      const prev = currentQuestionIndex - 1;
+      setCurrentQuestionIndex(prev);
+      currentIndexRef.current = prev;
+      persistEssayDraft();
     }
   };
 
   const goToQuestion = (index) => {
+    if (index < 0 || index >= questions.length) return;
     setCurrentQuestionIndex(index);
+    currentIndexRef.current = index;
+    persistEssayDraft();
   };
 
   const currentQuestion = questions[currentQuestionIndex];

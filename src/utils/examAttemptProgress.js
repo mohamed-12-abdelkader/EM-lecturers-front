@@ -1,4 +1,4 @@
-import { toPositiveAttemptId } from "./examFlowUtils";
+import { remainingFromEndsAt, toPositiveAttemptId } from "./examFlowUtils";
 
 function currentUserStorageId() {
   try {
@@ -132,4 +132,48 @@ export function isQuestionAnswered(question, answers = {}) {
 
 export function countAnsweredQuestions(questions = [], answers = {}) {
   return questions.filter((question) => isQuestionAnswered(question, answers)).length;
+}
+
+/**
+ * إن لم يرسل السيرفر وقتًا عند الاستئناف، استخدم endsAt المحفوظ محليًا.
+ * @returns {{ endsAt: number|null, remaining: number|null }}
+ */
+export function mergeTimerWithLocalProgress(serverTimer = {}, localProgress = null, { allowLocal = true } = {}) {
+  const serverEndsAt = serverTimer?.endsAt ?? null;
+  const serverRemaining = serverTimer?.remaining ?? null;
+  if (serverEndsAt != null && serverRemaining != null) {
+    return { endsAt: serverEndsAt, remaining: serverRemaining };
+  }
+  if (serverRemaining != null && serverRemaining >= 0) {
+    return {
+      endsAt: serverEndsAt ?? Date.now() + serverRemaining * 1000,
+      remaining: serverRemaining,
+    };
+  }
+  if (!allowLocal || !localProgress?.endsAt) {
+    return { endsAt: serverEndsAt, remaining: serverRemaining };
+  }
+  const localRemaining = remainingFromEndsAt(localProgress.endsAt);
+  if (localRemaining == null) {
+    return { endsAt: serverEndsAt, remaining: serverRemaining };
+  }
+  const endsAt =
+    typeof localProgress.endsAt === "number" && localProgress.endsAt > 1e12
+      ? localProgress.endsAt
+      : Date.now() + localRemaining * 1000;
+  return { endsAt, remaining: localRemaining };
+}
+
+/** استرجاع فهرس السؤال من التقدم المحلي */
+export function resolveResumeQuestionIndex(localProgress, questions = [], answers = {}) {
+  const len = Array.isArray(questions) ? questions.length : 0;
+  if (!len) return 0;
+
+  let resumeIndex = Number(localProgress?.current);
+  if (Number.isInteger(resumeIndex) && resumeIndex >= 0 && resumeIndex < len) {
+    return resumeIndex;
+  }
+
+  const firstOpen = questions.findIndex((q) => !isQuestionAnswered(q, answers));
+  return firstOpen >= 0 ? firstOpen : 0;
 }

@@ -43,12 +43,17 @@ import {
   clearExamProgress,
   clearPersistedAttemptId,
   countAnsweredQuestions,
+  mergeTimerWithLocalProgress,
   persistAttemptId,
   readExamProgress,
   readPersistedAttemptId,
+  resolveResumeQuestionIndex,
   writeExamProgress,
 } from "../../utils/examAttemptProgress";
 import { normalizeExamAttemptResult } from "../../utils/examAttemptResultUtils";
+import useExamTakingProtection, {
+  clearExamTakingFlag,
+} from "../../Hooks/exam/useExamTakingProtection";
 
 export default function StudentCourseExamPage() {
   const { examId } = useParams();
@@ -98,6 +103,18 @@ export default function StudentCourseExamPage() {
     });
   }, [examId, examMeta?.startedAt, submitResult]);
 
+  const isTakingExam =
+    !submitResult && !loading && !error && questions.length > 0 && Boolean(attemptId);
+
+  useExamTakingProtection({
+    enabled: isTakingExam,
+    onPersist: () => persistProgress(),
+  });
+
+  useEffect(() => {
+    if (submitResult) clearExamTakingFlag();
+  }, [submitResult]);
+
   const applySession = useCallback((session = {}) => {
     if (isCourseExamFinishedPayload(session)) {
       setSubmitResult(session);
@@ -132,25 +149,18 @@ export default function StudentCourseExamPage() {
         ? localProgress.answers
         : {};
     const restoredAnswers = { ...serverAnswers, ...localAnswers };
-    const { endsAt, remaining } = resolveCourseExamServerTimer(session, {
+    const serverTimer = resolveCourseExamServerTimer(session, {
       isNewAttempt,
       durationMinutes,
       durationUnlimited,
     });
+    const { endsAt, remaining } = mergeTimerWithLocalProgress(serverTimer, localProgress, {
+      allowLocal: !isNewAttempt,
+    });
 
-    let resumeIndex = Number(localProgress?.current);
-    if (
-      isNewAttempt ||
-      !Number.isInteger(resumeIndex) ||
-      resumeIndex < 0 ||
-      resumeIndex >= normalizedQuestions.length
-    ) {
-      const firstOpen = normalizedQuestions.findIndex((q) => {
-        const ans = restoredAnswers[q.id] ?? restoredAnswers[String(q.id)];
-        return ans == null || ans === "";
-      });
-      resumeIndex = firstOpen >= 0 ? firstOpen : 0;
-    }
+    const resumeIndex = isNewAttempt
+      ? 0
+      : resolveResumeQuestionIndex(localProgress, normalizedQuestions, restoredAnswers);
 
     attemptIdRef.current = resolvedAttemptId;
     studentAnswersRef.current = restoredAnswers;
@@ -302,6 +312,7 @@ export default function StudentCourseExamPage() {
       examEndsAtRef.current = null;
       clearExamProgress(examId, id);
       clearPersistedAttemptId(examId);
+      clearExamTakingFlag();
       if (autoSubmit || result?.timedOut) {
         toast({
           title: result?.timedOut ? "انتهى الوقت" : "تم التسليم تلقائياً",
@@ -343,6 +354,7 @@ export default function StudentCourseExamPage() {
         examEndsAtRef.current = null;
         clearExamProgress(examId, id);
         clearPersistedAttemptId(examId);
+        clearExamTakingFlag();
         return;
       }
       if (result?.remainingSeconds != null || result?.attemptExpiresAt || result?.attempt_expires_at) {
@@ -350,6 +362,7 @@ export default function StudentCourseExamPage() {
         examEndsAtRef.current = endsAt;
         setExamEndsAt(endsAt);
         setRemainingSeconds(remaining);
+        persistProgress({ endsAt });
       }
     } catch {
       /* silent — next interval retries */

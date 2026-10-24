@@ -2,7 +2,10 @@
  * تسجيل الـ Service Worker + تطبيق التحديثات تلقائياً.
  *
  * عند توفر إصدار جديد: يُفعَّل فوراً ويُعاد تحميل التطبيق بالنسخة الجديدة.
+ * أثناء حل امتحان/واجب: يؤجَّل الـ reload حتى لا تضيع جلسة الطالب.
  */
+
+import { isExamTakingActive } from "../Hooks/exam/useExamTakingProtection";
 
 export const PWA_UPDATE_EVENT = "pwa:update-available";
 export const PWA_OFFLINE_READY_EVENT = "pwa:offline-ready";
@@ -13,6 +16,7 @@ const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 let updateServiceWorker = null;
 let pendingUserReload = false;
 let autoUpdateInProgress = false;
+let deferredUpdateWhileExam = false;
 
 /** هل يوجد تحديث قيد التطبيق؟ */
 export function isUpdateAvailable() {
@@ -24,8 +28,14 @@ export async function applyPWAUpdate() {
   if (typeof updateServiceWorker !== "function") return false;
   if (autoUpdateInProgress) return true;
 
+  if (isExamTakingActive()) {
+    deferredUpdateWhileExam = true;
+    return false;
+  }
+
   autoUpdateInProgress = true;
   pendingUserReload = true;
+  deferredUpdateWhileExam = false;
 
   try {
     await updateServiceWorker(true);
@@ -34,6 +44,13 @@ export async function applyPWAUpdate() {
     if (typeof window !== "undefined") window.location.reload();
     return true;
   }
+}
+
+/** إن وُجد تحديث مؤجّل بسبب امتحان نشط — طبّقه بعد انتهاء الجلسة */
+export function flushDeferredPWAUpdate() {
+  if (!deferredUpdateWhileExam) return false;
+  if (isExamTakingActive()) return false;
+  return applyPWAUpdate();
 }
 
 function scheduleUpdateCheck(registration) {
@@ -71,6 +88,10 @@ async function ensureFreshBuild() {
   if (stored) {
     await purgePwaCachesAndUnregister();
     localStorage.setItem(BUILD_ID_STORAGE_KEY, buildId);
+    if (isExamTakingActive()) {
+      deferredUpdateWhileExam = true;
+      return false;
+    }
     window.location.reload();
     return true;
   }
@@ -90,8 +111,21 @@ export async function initPWA() {
   navigator.serviceWorker.addEventListener("controllerchange", () => {
     if (!pendingUserReload) return;
     if (reloading) return;
+    if (isExamTakingActive()) {
+      deferredUpdateWhileExam = true;
+      pendingUserReload = false;
+      autoUpdateInProgress = false;
+      return;
+    }
     reloading = true;
     window.location.reload();
+  });
+
+  // بعد انتهاء الامتحان طبّق التحديث المؤجّل إن وُجد
+  window.addEventListener("storage", (event) => {
+    if (event.key === "em-lecture-exam-taking" && event.newValue == null) {
+      void flushDeferredPWAUpdate();
+    }
   });
 
   try {

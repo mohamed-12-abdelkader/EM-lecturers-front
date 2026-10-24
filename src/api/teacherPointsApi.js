@@ -251,6 +251,208 @@ export async function deleteManualPointsTransaction(transactionId, teacherId) {
 
 export const RESET_POINTS_CONFIRM = "RESET_ALL_POINTS";
 export const RESTORE_POINTS_SEASON_CONFIRM = "RESTORE_POINTS_SEASON";
+export const RESET_AND_START_FROM_EXAM_CONFIRM = "RESET_AND_START_FROM_EXAM";
+export const RESET_AND_REBUILD_LAST_EXAM_CONFIRM = "RESET_AND_REBUILD_LAST_EXAM";
+export const CONSOLIDATE_EXAM_POINTS_CONFIRM = "CONSOLIDATE_EXAM_POINTS";
+
+export function normalizeGradePointsAnchor(raw = {}) {
+  if (!raw || typeof raw !== "object") return null;
+  const startExamId = raw.startExamId ?? raw.start_exam_id ?? null;
+  if (startExamId == null) return null;
+  return {
+    teacherId: raw.teacherId ?? raw.teacher_id ?? null,
+    gradeId: raw.gradeId ?? raw.grade_id ?? null,
+    startExamId: Number(startExamId),
+    startExamTitle: raw.startExamTitle ?? raw.start_exam_title ?? null,
+    startExamCreatedAt:
+      raw.startExamCreatedAt ?? raw.start_exam_created_at ?? null,
+    updatedAt: raw.updatedAt ?? raw.updated_at ?? null,
+  };
+}
+
+export function normalizeGradeAnchorExam(row = {}) {
+  return {
+    id: Number(row.id),
+    title: row.title || `امتحان #${row.id}`,
+    courseId: row.courseId ?? row.course_id ?? null,
+    createdAt: row.createdAt ?? row.created_at ?? null,
+    submittedAttempts: toInt(
+      row.submittedAttempts ?? row.submitted_attempts,
+      0,
+    ),
+  };
+}
+
+export function normalizeGradeAnchorRow(row = {}) {
+  const gradeId = Number(row.gradeId ?? row.grade_id);
+  const anchor = normalizeGradePointsAnchor(row.anchor);
+  return {
+    gradeId,
+    gradeName: row.gradeName ?? row.grade_name ?? `صف ${gradeId}`,
+    anchor,
+    mode: row.mode || (anchor ? "from_exam_onward" : "last_exam_only"),
+  };
+}
+
+/** GET /api/teacher/points/grade-anchors */
+export async function fetchTeacherGradePointsAnchors(teacherId) {
+  const { data } = await baseUrl.get(
+    `${TEACHER_API}/grade-anchors${buildQuery(teacherScope(teacherId))}`,
+  );
+  const payload = unwrap(data, "فشل تحميل امتحانات بداية النقاط");
+  const list = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.anchors)
+      ? payload.anchors
+      : Array.isArray(payload?.grades)
+        ? payload.grades
+        : [];
+  return list.map(normalizeGradeAnchorRow);
+}
+
+/** GET /api/teacher/points/grade-anchors/:gradeId */
+export async function fetchTeacherGradePointsAnchor(gradeId, teacherId) {
+  const { data } = await baseUrl.get(
+    `${TEACHER_API}/grade-anchors/${encodeURIComponent(gradeId)}${buildQuery(
+      teacherScope(teacherId),
+    )}`,
+  );
+  const payload = unwrap(data, "فشل تحميل تفاصيل امتحان البداية");
+  const exams = Array.isArray(payload?.exams) ? payload.exams : [];
+  const eligible = Array.isArray(payload?.eligibleExamIds)
+    ? payload.eligibleExamIds.map(Number)
+    : Array.isArray(payload?.eligible_exam_ids)
+      ? payload.eligible_exam_ids.map(Number)
+      : [];
+  return {
+    gradeId: Number(payload?.gradeId ?? payload?.grade_id ?? gradeId),
+    anchor: normalizeGradePointsAnchor(payload?.anchor),
+    mode:
+      payload?.mode ||
+      (payload?.anchor ? "from_exam_onward" : "last_exam_only"),
+    eligibleExamIds: eligible,
+    exams: exams.map(normalizeGradeAnchorExam),
+  };
+}
+
+/** PUT /api/teacher/points/grade-anchors/:gradeId — بدون تصفير */
+export async function setTeacherGradePointsAnchor(
+  gradeId,
+  startExamId,
+  teacherId,
+) {
+  const body = { startExamId: Number(startExamId) };
+  if (teacherId) body.teacherId = teacherId;
+  const { data } = await baseUrl.put(
+    `${TEACHER_API}/grade-anchors/${encodeURIComponent(gradeId)}`,
+    body,
+  );
+  const result = unwrap(data, "فشل تعيين امتحان البداية");
+  return {
+    ...normalizeGradePointsAnchor(result),
+    message: data?.message || "تم تعيين امتحان بداية النقاط لهذا الصف",
+  };
+}
+
+/**
+ * POST /api/teacher/points/reset-and-start-from-exam
+ * تصفير الصف + مرساة + إعادة بناء من الامتحان فصاعدًا
+ */
+export async function resetAndStartFromExam({
+  gradeId,
+  startExamId,
+  label,
+  reason,
+  teacherId,
+} = {}) {
+  const body = {
+    confirm: RESET_AND_START_FROM_EXAM_CONFIRM,
+    gradeId: Number(gradeId),
+    startExamId: Number(startExamId),
+  };
+  if (label != null && String(label).trim()) body.label = String(label).trim();
+  if (reason != null && String(reason).trim()) {
+    body.reason = String(reason).trim();
+  }
+  if (teacherId) body.teacherId = teacherId;
+
+  const { data } = await baseUrl.post(
+    `${TEACHER_API}/reset-and-start-from-exam`,
+    body,
+  );
+  const result = unwrap(data, "فشل التصفير وبدء النقاط من الامتحان");
+  return {
+    ...result,
+    seasonId: result?.seasonId ?? result?.season_id ?? null,
+    message:
+      data?.message ||
+      "تم تصفير نقاط الصف وبدء حساب الترتيب من الامتحان المختار",
+  };
+}
+
+/**
+ * POST /api/teacher/points/reset-and-rebuild-last-exam
+ * حذف كل النقاط ثم منح بدء+درجة آخر امتحان فقط
+ */
+export async function resetAndRebuildLastExam({
+  gradeId,
+  label,
+  reason,
+  teacherId,
+} = {}) {
+  const body = { confirm: RESET_AND_REBUILD_LAST_EXAM_CONFIRM };
+  if (gradeId != null && gradeId !== "") body.gradeId = Number(gradeId);
+  if (label != null && String(label).trim()) body.label = String(label).trim();
+  if (reason != null && String(reason).trim()) {
+    body.reason = String(reason).trim();
+  }
+  if (teacherId) body.teacherId = teacherId;
+
+  const { data } = await baseUrl.post(
+    `${TEACHER_API}/reset-and-rebuild-last-exam`,
+    body,
+  );
+  const result = unwrap(data, "فشل إعادة بناء النقاط من آخر امتحان");
+  return {
+    ...result,
+    message:
+      data?.message ||
+      "تم حذف كل النقاط وإعادة بنائها من آخر امتحان فقط لكل صف",
+  };
+}
+
+/** POST /api/teacher/points/consolidate-legacy */
+export async function consolidateLegacyExamPoints(teacherId) {
+  const body = { confirm: CONSOLIDATE_EXAM_POINTS_CONFIRM };
+  if (teacherId) body.teacherId = teacherId;
+  const { data } = await baseUrl.post(
+    `${TEACHER_API}/consolidate-legacy`,
+    body,
+  );
+  const result = unwrap(data, "فشل توحيد نقاط الامتحانات القديمة");
+  return {
+    groupsProcessed: toInt(
+      result?.groupsProcessed ?? result?.groups_processed,
+      0,
+    ),
+    transactionsDeleted: toInt(
+      result?.transactionsDeleted ?? result?.transactions_deleted,
+      0,
+    ),
+    transactionsUpdated: toInt(
+      result?.transactionsUpdated ?? result?.transactions_updated,
+      0,
+    ),
+    pointsRemovedFromBalances: toInt(
+      result?.pointsRemovedFromBalances ??
+        result?.points_removed_from_balances,
+      0,
+    ),
+    message:
+      data?.message ||
+      "تم توحيد نقاط الامتحانات: احتساب أول محاولة فقط",
+  };
+}
 
 export function normalizePointsSeason(row = {}) {
   return {

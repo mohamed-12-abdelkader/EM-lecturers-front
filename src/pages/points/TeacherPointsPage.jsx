@@ -82,6 +82,7 @@ import {
   useDailyQuizTheme,
 } from "../dailyQuiz/DailyQuizChrome";
 import PointsSettingsPanel from "./PointsSettingsPanel";
+import GradeAnchorsPanel from "./GradeAnchorsPanel";
 import {
   eventTypeLabel,
   eventTypeTone,
@@ -94,6 +95,7 @@ import {
 
 const TABS = [
   { id: "ranking", label: "ترتيب الطلاب" },
+  { id: "anchors", label: "امتحان البداية" },
   { id: "seasons", label: "المواسم المؤرشفة" },
   { id: "settings", label: "إعدادات النقاط" },
 ];
@@ -579,7 +581,7 @@ export default function TeacherPointsPage() {
         icon={FaTrophy}
         eyebrow="Points & Ranking"
         title="النقاط والترتيب"
-        subtitle="رصيد كل طالب داخل صفك. التصفير يحفظ موسمًا يمكنك استرجاعه لاحقًا، والطلاب يبدأون من صفر."
+        subtitle="رصيد كل طالب داخل صفك. عيّن امتحان بداية لكل صف، والتصفير يحفظ موسمًا قابلًا للاسترجاع."
         actions={
           <Button
             leftIcon={<FaSync />}
@@ -593,15 +595,20 @@ export default function TeacherPointsPage() {
                 ? loadSettings()
                 : tab === "seasons"
                   ? loadSeasons()
-                  : loadBoard()
+                  : tab === "anchors"
+                    ? undefined
+                    : loadBoard()
             }
             isLoading={
               tab === "settings"
                 ? settingsLoading
                 : tab === "seasons"
                   ? seasonsLoading
-                  : loading
+                  : tab === "anchors"
+                    ? false
+                    : loading
             }
+            isDisabled={tab === "anchors"}
           >
             تحديث
           </Button>
@@ -668,6 +675,17 @@ export default function TeacherPointsPage() {
               dirty={dirtySettings}
             />
           )}
+        </DailyQuizSurface>
+      ) : tab === "anchors" ? (
+        <DailyQuizSurface p={{ base: 4, md: 5 }}>
+          <GradeAnchorsPanel
+            grades={grades}
+            teacherId={scopedTeacherId || undefined}
+            onChanged={() => {
+              loadBoard();
+              loadSeasons();
+            }}
+          />
         </DailyQuizSurface>
       ) : tab === "seasons" ? (
         <>
