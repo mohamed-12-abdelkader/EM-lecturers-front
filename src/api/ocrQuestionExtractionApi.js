@@ -166,11 +166,51 @@ export const normalizeMcqChoices = (choices = []) =>
     .filter(Boolean)
     .slice(0, MCQ_CHOICE_MAX);
 
-export const isValidMcqChoiceCount = (choices = []) => {
+/** اختيار صالح: نص أو صورة (اختيارات مصوّرة) */
+export const choiceHasContent = (text, image) => {
+  if (String(text ?? "").trim()) return true;
+  if (!image) return false;
+  if (typeof image === "string") return Boolean(image.trim());
+  return Boolean(image.image_url || image.url);
+};
+
+export const isValidMcqChoiceCount = (choices = [], choiceImages = []) => {
   if (!Array.isArray(choices) || choices.length === 0) return false;
   if (choices.length < MCQ_CHOICE_MIN || choices.length > MCQ_CHOICE_MAX) return false;
-  return choices.every((c) => String(c ?? "").trim());
+  const images = Array.isArray(choiceImages) ? choiceImages : [];
+  return choices.every((c, i) => choiceHasContent(c, images[i]));
 };
+
+const CHOICE_IMAGE_TYPES = new Set([
+  "choice_option",
+  "option",
+  "answer_choice",
+  "choice",
+]);
+
+function resolveOptionImage(option, questionImages = []) {
+  const direct = option?.image_url || option?.url || null;
+  if (direct) {
+    return {
+      image_id: option?.image_id ?? null,
+      image_url: String(direct),
+      image_type: "choice_option",
+      short_description: option?.short_description || "",
+    };
+  }
+  const imageId = option?.image_id;
+  if (!imageId) return null;
+  const found = (Array.isArray(questionImages) ? questionImages : []).find(
+    (img) => img?.image_id === imageId && img?.image_url,
+  );
+  if (!found) return null;
+  return {
+    image_id: found.image_id,
+    image_url: String(found.image_url),
+    image_type: found.image_type || "choice_option",
+    short_description: found.short_description || "",
+  };
+}
 
 export const emptyDraftQuestion = () => ({
   id: newDraftId(),
@@ -186,6 +226,7 @@ export const emptyDraftQuestion = () => ({
   confidence: null,
   question_type: "choice",
   choices: ["", "", "", ""],
+  choiceImages: [null, null, null, null],
   optionLabels: ["أ", "ب", "ج", "د"],
   answer: "",
   correctAnswerIndex: null,
@@ -193,6 +234,7 @@ export const emptyDraftQuestion = () => ({
   image_url: null,
   imageDescription: "",
   questionImages: [],
+  questionTable: null,
   passage_id: null,
   source_number: null,
 });
@@ -292,24 +334,58 @@ function resolveOcrCorrectIndex(q, optionTexts) {
 }
 
 /**
- * يحوّل سؤال OCR إلى مسودة — يدعم 2–5 اختيارات + قطع القراءة + display_blocks
+ * يحوّل سؤال OCR إلى مسودة — يدعم 2–5 اختيارات (نص/صورة) + جداول + قطع + display_blocks
  * @param {object} q
  */
 export const mapOcrQuestionToDraft = (q) => {
-  const rawOptions = Array.isArray(q.options) ? q.options : [];
-  const optionTexts = normalizeMcqChoices(
-    rawOptions.map((o) => (o?.text == null ? "" : String(o.text))),
-  );
-  const optionLabels = rawOptions
-    .slice(0, optionTexts.length)
-    .map((o, i) => String(o?.label ?? "").trim() || CHOICE_LETTERS_AR[i] || String(i + 1));
-  const hasMcqOptions = optionTexts.length >= MCQ_CHOICE_MIN;
-
-  const questionImages = Array.isArray(q.question_images)
+  const rawQuestionImages = Array.isArray(q.question_images)
     ? q.question_images.filter((image) => image?.image_url)
     : [];
+
+  const rawOptions = Array.isArray(q.options) ? q.options : [];
+  const mappedOptions = rawOptions
+    .map((o, i) => {
+      const text = o?.text == null ? "" : String(o.text).trim();
+      const image = resolveOptionImage(o, rawQuestionImages);
+      if (!choiceHasContent(text, image)) return null;
+      return {
+        label: String(o?.label ?? "").trim() || CHOICE_LETTERS_AR[i] || String(i + 1),
+        text,
+        image,
+      };
+    })
+    .filter(Boolean)
+    .slice(0, MCQ_CHOICE_MAX);
+
+  const optionTexts = mappedOptions.map((o) => o.text);
+  const choiceImages = mappedOptions.map((o) => o.image);
+  const optionLabels = mappedOptions.map((o) => o.label);
+  const hasMcqOptions = mappedOptions.length >= MCQ_CHOICE_MIN;
+
+  // أشكال السؤال / جداول مرئية — بدون صور الاختيارات المصوّرة
+  const questionImages = rawQuestionImages
+    .filter((image) => {
+      const t = String(image.image_type || "").toLowerCase();
+      return !CHOICE_IMAGE_TYPES.has(t);
+    })
+    .map((image) => ({
+      image_id: image.image_id ?? null,
+      page_index: image.page_index ?? null,
+      image_type: image.image_type || "question_figure",
+      short_description: image.short_description || "",
+      image_url: String(image.image_url),
+    }));
   const questionImage = questionImages[0] || null;
   const hasImages = questionImages.length > 0 || !!questionImage?.image_url;
+  const questionTable =
+    q.question_table &&
+    (q.question_table.role === "options" || q.question_table.role === "data")
+      ? {
+          role: q.question_table.role,
+          format: q.question_table.format || "markdown",
+          content: String(q.question_table.content || ""),
+        }
+      : null;
 
   let questionType = "choice";
   if (hasMcqOptions) {
@@ -321,6 +397,9 @@ export const mapOcrQuestionToDraft = (q) => {
   }
 
   const choices = hasMcqOptions ? optionTexts : ["", "", "", ""];
+  const draftChoiceImages = hasMcqOptions
+    ? choiceImages
+    : [null, null, null, null];
   const correctAnswerIndex = hasMcqOptions
     ? resolveOcrCorrectIndex(q, optionTexts)
     : null;
@@ -360,6 +439,7 @@ export const mapOcrQuestionToDraft = (q) => {
     passage_id: q.passage_id ?? null,
     question_type: questionType,
     choices,
+    choiceImages: draftChoiceImages,
     optionLabels: hasMcqOptions
       ? optionLabels
       : ["أ", "ب", "ج", "د"],
@@ -374,6 +454,7 @@ export const mapOcrQuestionToDraft = (q) => {
     image_url: questionImage?.image_url ?? null,
     imageDescription: questionImage?.short_description ?? "",
     questionImages,
+    questionTable,
     source_number: q.source_number ?? q.number ?? null,
   };
 };
@@ -387,11 +468,12 @@ export const mapOcrPassageToDraft = (passage) => ({
 
 export const getDraftCorrectAnswerIndex = (draft) => {
   const choices = (draft.choices || []).map((c) => String(c ?? "").trim());
+  const images = Array.isArray(draft.choiceImages) ? draft.choiceImages : [];
   if (
     Number.isInteger(draft.correctAnswerIndex) &&
     draft.correctAnswerIndex >= 0 &&
     draft.correctAnswerIndex < choices.length &&
-    choices[draft.correctAnswerIndex]
+    choiceHasContent(choices[draft.correctAnswerIndex], images[draft.correctAnswerIndex])
   ) {
     return draft.correctAnswerIndex;
   }
@@ -437,12 +519,13 @@ export const validateLectureExamDraftQuestion = (draft, index) => {
   }
 
   const choices = draft.choices.map((c) => c.trim());
-  if (choices.filter(Boolean).length > EXAM_MCQ_CHOICE_MAX) {
+  const choiceImages = Array.isArray(draft.choiceImages) ? draft.choiceImages : [];
+  const filledCount = choices.filter((c, i) => choiceHasContent(c, choiceImages[i])).length;
+  if (filledCount > EXAM_MCQ_CHOICE_MAX) {
     return `السؤال ${n}: امتحان المحاضرة يدعم حتى ${EXAM_MCQ_CHOICE_MAX} اختيارات (أ–د)`;
   }
-  if (!isValidMcqChoiceCount(choices) || choices.filter(Boolean).length > EXAM_MCQ_CHOICE_MAX) {
-    const filled = choices.filter(Boolean).length;
-    return `السؤال ${n}: أدخل من ${MCQ_CHOICE_MIN} إلى ${EXAM_MCQ_CHOICE_MAX} اختيارات كاملة (حالياً ${filled})`;
+  if (!isValidMcqChoiceCount(choices, choiceImages) || filledCount > EXAM_MCQ_CHOICE_MAX) {
+    return `السؤال ${n}: أدخل من ${MCQ_CHOICE_MIN} إلى ${EXAM_MCQ_CHOICE_MAX} اختيارات كاملة (حالياً ${filledCount})`;
   }
 
   const correctAnswerIndex = getDraftCorrectAnswerIndex(draft);
@@ -623,6 +706,103 @@ export async function extractQuestions(
  */
 export async function extractQuestionsFromFile(file, options = {}, token) {
   return extractQuestions(file, options, token);
+}
+
+/**
+ * يبني FormData لرفع ملف واحد أو عدة ملفات بنفس عقدة extract/crop
+ * @param {File[]} files
+ * @param {{ startPage?: number|string, endPage?: number|string }} [pageRange]
+ */
+function buildOcrUploadFormData(files, pageRange = {}) {
+  const formData = new FormData();
+  if (files.length === 1) {
+    formData.append("file", files[0]);
+  } else {
+    for (const file of files) {
+      formData.append("files", file);
+    }
+  }
+
+  const singlePdf = files.length === 1 && isPdfFile(files[0]);
+  if (singlePdf) {
+    const { startPage, endPage } = pageRange;
+    if (startPage != null && startPage !== "") {
+      formData.append("start_page", String(startPage));
+    }
+    if (endPage != null && endPage !== "") {
+      formData.append("end_page", String(endPage));
+    }
+  }
+
+  return formData;
+}
+
+/**
+ * يقص كل سؤال كصورة واحدة (نص + اختيارات + رسوم + جداول)
+ * POST /api/ocr/crop-questions — منفصل عن extract-questions
+ * @param {File|File[]} source
+ * @param {{ startPage?: number|string, endPage?: number|string }} options
+ * @param {string} token
+ */
+export async function cropQuestions(source, { startPage, endPage } = {}, token) {
+  const files = Array.isArray(source) ? source : [source];
+  const fileError = validateOcrFiles(files);
+  if (fileError) throw new Error(fileError);
+
+  const singlePdf = files.length === 1 && isPdfFile(files[0]);
+  if (singlePdf) {
+    const rangeError = validatePdfPageRange(startPage, endPage);
+    if (rangeError) throw new Error(rangeError);
+  } else if (
+    (startPage != null && startPage !== "") ||
+    (endPage != null && endPage !== "")
+  ) {
+    throw new Error("نطاق الصفحات متاح لملف PDF واحد فقط");
+  }
+
+  const formData = buildOcrUploadFormData(files, { startPage, endPage });
+
+  const { data } = await baseUrl.post(`${OCR_API}/crop-questions`, formData, {
+    headers: authHeaders(token),
+    timeout: 0,
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
+  });
+
+  if (!data?.success) {
+    const err = new Error(data?.message || "فشل قص الأسئلة");
+    err.response = { data };
+    throw err;
+  }
+
+  return data.data;
+}
+
+/** يطبيع عناصر رد crop-questions */
+export function normalizeCroppedQuestions(data) {
+  const list = Array.isArray(data?.questions) ? data.questions : [];
+  return list
+    .map((q, index) => {
+      const imageUrl = q?.image_url || q?.imageUrl || null;
+      if (!imageUrl) return null;
+      const bbox = Array.isArray(q.bbox) ? q.bbox.map(Number) : null;
+      return {
+        number: Number.isFinite(Number(q.number)) ? Number(q.number) : index + 1,
+        source_number:
+          q.source_number != null
+            ? String(q.source_number)
+            : q.number != null
+              ? String(q.number)
+              : String(index + 1),
+        page_index:
+          q.page_index != null && Number.isFinite(Number(q.page_index))
+            ? Number(q.page_index)
+            : null,
+        bbox,
+        image_url: String(imageUrl),
+      };
+    })
+    .filter(Boolean);
 }
 
 /** @param {object} data — data من POST /extract-questions */
@@ -1005,10 +1185,19 @@ export const validateCourseExamDraftQuestion = validateLectureExamDraftQuestion;
 const TEACHER_LIBRARY_API = "/api/teacher/questions";
 
 function draftToTeacherQuestionPayload(draft) {
-  const choices = normalizeMcqChoices(draft.choices);
-  const isMcq = draft.question_type === "choice" && isValidMcqChoiceCount(choices);
+  const rawChoices = Array.isArray(draft.choices) ? draft.choices : [];
+  const choiceImages = Array.isArray(draft.choiceImages) ? draft.choiceImages : [];
+  const choices = rawChoices
+    .map((c) => String(c ?? "").trim())
+    .slice(0, MCQ_CHOICE_MAX);
+  const isMcq =
+    draft.question_type === "choice" && isValidMcqChoiceCount(choices, choiceImages);
   const imageUrl = getDraftImageUrl(draft);
-  const correctAnswerIndex = getDraftCorrectAnswerIndex({ ...draft, choices });
+  const correctAnswerIndex = getDraftCorrectAnswerIndex({
+    ...draft,
+    choices,
+    choiceImages,
+  });
 
   if (isMcq) {
     return {
@@ -1017,7 +1206,7 @@ function draftToTeacherQuestionPayload(draft) {
       choices,
       answer:
         correctAnswerIndex != null
-          ? choices[correctAnswerIndex]
+          ? choices[correctAnswerIndex] || draft.answer?.trim() || null
           : draft.answer?.trim() || null,
       correct_answer_index: correctAnswerIndex,
       image_url: imageUrl,
@@ -1057,9 +1246,11 @@ export const validateTeacherLibraryDraftQuestion = (draft, index) => {
     return null;
   }
 
-  const choices = normalizeMcqChoices(draft.choices);
-  if (draft.question_type === "choice" && !isValidMcqChoiceCount(choices)) {
-    return `السؤال ${n}: أدخل من ${MCQ_CHOICE_MIN} إلى ${MCQ_CHOICE_MAX} اختيارات كاملة (حالياً ${choices.length})`;
+  const choices = Array.isArray(draft.choices) ? draft.choices : [];
+  const choiceImages = Array.isArray(draft.choiceImages) ? draft.choiceImages : [];
+  if (draft.question_type === "choice" && !isValidMcqChoiceCount(choices, choiceImages)) {
+    const filled = choices.filter((c, i) => choiceHasContent(c, choiceImages[i])).length;
+    return `السؤال ${n}: أدخل من ${MCQ_CHOICE_MIN} إلى ${MCQ_CHOICE_MAX} اختيارات كاملة (حالياً ${filled})`;
   }
 
   return null;
@@ -1150,6 +1341,7 @@ function draftQuestionImagesToExtraction(draft) {
     .map((img, index) => ({
       image_id: img.image_id || `draft-${draft.id}-img-${index}`,
       page_index: img.page_index ?? null,
+      image_type: img.image_type || "question_figure",
       short_description: img.short_description || "",
       image_url: img.image_url,
     }));
@@ -1159,6 +1351,7 @@ function draftQuestionImagesToExtraction(draft) {
     questionImages.unshift({
       image_id: `draft-${draft.id}-primary`,
       page_index: null,
+      image_type: "question_figure",
       short_description: draft.imageDescription || "",
       image_url: imageUrl,
     });
@@ -1168,10 +1361,17 @@ function draftQuestionImagesToExtraction(draft) {
 }
 
 function draftToExtractionQuestion(draft, index) {
-  const choices = normalizeMcqChoices(draft.choices);
-  const isMcq = draft.question_type === "choice" && isValidMcqChoiceCount(choices);
+  const rawChoices = Array.isArray(draft.choices) ? draft.choices : [];
+  const choiceImages = Array.isArray(draft.choiceImages) ? draft.choiceImages : [];
+  const choices = rawChoices.map((c) => String(c ?? "").trim()).slice(0, MCQ_CHOICE_MAX);
+  const isMcq =
+    draft.question_type === "choice" && isValidMcqChoiceCount(choices, choiceImages);
 
-  const correctAnswerIndex = getDraftCorrectAnswerIndex({ ...draft, choices });
+  const correctAnswerIndex = getDraftCorrectAnswerIndex({
+    ...draft,
+    choices,
+    choiceImages,
+  });
   const questionImages = draftQuestionImagesToExtraction(draft);
   const labels = Array.isArray(draft.optionLabels) ? draft.optionLabels : QUESTION_BANK_OPTION_LABELS;
 
@@ -1190,6 +1390,54 @@ function draftToExtractionQuestion(draft, index) {
         .filter((v) => v.firstHemistich || v.secondHemistich)
     : [];
 
+  const options = isMcq
+    ? choices.map((text, i) => {
+        const img = choiceImages[i];
+        const imageUrl =
+          (typeof img === "string" ? img : img?.image_url || img?.url) || null;
+        const imageId =
+          (typeof img === "object" && img?.image_id) ||
+          (imageUrl ? `draft-${draft.id}-opt-${i}` : null);
+        const option = {
+          label: labels[i] || QUESTION_BANK_OPTION_LABELS[i] || String(i + 1),
+          text,
+        };
+        if (imageUrl) {
+          option.image_id = imageId;
+          option.image_url = imageUrl;
+        }
+        return option;
+      })
+    : [];
+
+  // أعد صور الاختيارات إلى question_images مع أشكال السؤال
+  const choiceImageEntries = isMcq
+    ? choices
+        .map((_, i) => {
+          const img = choiceImages[i];
+          const imageUrl =
+            (typeof img === "string" ? img : img?.image_url || img?.url) || null;
+          if (!imageUrl) return null;
+          return {
+            image_id:
+              (typeof img === "object" && img?.image_id) ||
+              `draft-${draft.id}-opt-${i}`,
+            page_index: null,
+            image_type: "choice_option",
+            short_description: "",
+            image_url: imageUrl,
+          };
+        })
+        .filter(Boolean)
+    : [];
+
+  const allImages = [...questionImages];
+  for (const entry of choiceImageEntries) {
+    if (!allImages.some((img) => img.image_url === entry.image_url)) {
+      allImages.push(entry);
+    }
+  }
+
   return {
     number: normalizeQuestionNumber(
       String(draft.source_number ?? "").split("-")[0],
@@ -1200,7 +1448,7 @@ function draftToExtractionQuestion(draft, index) {
     passage_id: draft.passage_id ?? null,
     question_text:
       draft.question_text?.trim() ||
-      (questionImages.length > 0 ? "سؤال بالصورة" : ""),
+      (allImages.length > 0 ? "سؤال بالصورة" : ""),
     intro_text: draft.intro_text ?? null,
     stimulus_text: draft.stimulus_text ?? null,
     prompt_text: draft.prompt_text ?? null,
@@ -1211,13 +1459,15 @@ function draftToExtractionQuestion(draft, index) {
     poetry: !!draft.poetry || verses.length > 0,
     verses,
     score: draft.score ?? null,
-    options: isMcq
-      ? choices.map((text, i) => ({
-          label: labels[i] || QUESTION_BANK_OPTION_LABELS[i] || String(i + 1),
-          text,
-        }))
-      : [],
-    question_images: questionImages,
+    options,
+    question_images: allImages,
+    question_table: draft.questionTable?.content
+      ? {
+          role: draft.questionTable.role || "data",
+          format: draft.questionTable.format || "markdown",
+          content: String(draft.questionTable.content),
+        }
+      : null,
     correct_answer:
       correctAnswerIndex != null
         ? labels[correctAnswerIndex] ||

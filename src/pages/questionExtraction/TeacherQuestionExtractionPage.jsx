@@ -32,11 +32,11 @@ import {
   DailyQuizSurface,
   useDailyQuizTheme,
 } from "../dailyQuiz/DailyQuizChrome";
-import AiQuestionExtractionModal from "../exam/components/AiQuestionExtractionModal";
+import CropQuestionsFrameModal from "./components/CropQuestionsFrameModal";
 import PdfQuestionFrame from "./components/PdfQuestionFrame";
 import ScaledSheetPreview from "./components/ScaledSheetPreview";
 import { MOCK_PDF_PAGES, PDF_FRAME_THEMES, getThemeById } from "./mockPdfFrames";
-import { mapDraftsToFramedPages } from "./mapDraftsToFramedPages";
+import { mapCroppedQuestionsToFramedPages } from "./mapCroppedQuestionsToFramedPages";
 import { exportFramedQuestionsPdf } from "./exportFramedQuestionsPdf.jsx";
 
 function resolveTeacherTitle(user) {
@@ -171,10 +171,13 @@ export default function TeacherQuestionExtractionPage() {
     extractModal.onOpen();
   };
 
-  const handleConfirmDrafts = async (drafts) => {
-    const pages = mapDraftsToFramedPages(drafts, selectedThemeId);
+  const handleConfirmCropped = async (croppedQuestions) => {
+    const pages = mapCroppedQuestionsToFramedPages(
+      croppedQuestions,
+      selectedThemeId,
+    );
     if (!pages.length) {
-      throw new Error("لا توجد أسئلة صالحة للعرض");
+      throw new Error("لا توجد أسئلة مقصوصة صالحة للعرض");
     }
     setFramedPages(pages);
     setTimeout(() => {
@@ -217,7 +220,7 @@ export default function TeacherQuestionExtractionPage() {
       <DailyQuizHero
         eyebrow="أدوات المدرس"
         title="استخراج الأسئلة"
-        subtitle="اختر إطار PDF، استخرج الأسئلة بالذكاء الاصطناعي، ثم نزّلها بنفس التصميم."
+        subtitle="اختر إطار PDF، قص كل سؤال كصورة كاملة بالذكاء الاصطناعي، ثم نزّلها بنفس التصميم."
         icon={MdAutoAwesome}
         badges={
           <>
@@ -268,7 +271,7 @@ export default function TeacherQuestionExtractionPage() {
               borderRadius="xl"
               onClick={openExtraction}
             >
-              استخراج أسئلة على الإطار
+              قص أسئلة على الإطار
             </Button>
           </HStack>
         </Flex>
@@ -393,11 +396,11 @@ export default function TeacherQuestionExtractionPage() {
         <DailyQuizSurface p={{ base: 6, md: 8 }} textAlign="center" mb={8}>
           <Icon as={MdAutoAwesome} boxSize={10} color="purple.400" mb={3} />
           <Heading size="sm" mb={2} color={theme.heading}>
-            جاهز للاستخراج
+            جاهز لقص الأسئلة
           </Heading>
           <Text fontSize="sm" color={theme.muted} mb={4} maxW="480px" mx="auto">
-            بعد اختيار الإطار اضغط «استخراج أسئلة على الإطار»، راجع المسودة، ثم
-            طبّقها — ستظهر كل سؤال كصفحة PDF قابلة للتنزيل.
+            بعد اختيار الإطار اضغط «قص أسئلة على الإطار» — كل سؤال يُقص كصورة
+            كاملة ثم يُوضع داخل الإطار للتنزيل كـ PDF.
           </Text>
           <Button
             leftIcon={<FaMagic />}
@@ -405,17 +408,17 @@ export default function TeacherQuestionExtractionPage() {
             borderRadius="xl"
             onClick={openExtraction}
           >
-            بدء الاستخراج
+            بدء القص
           </Button>
         </DailyQuizSurface>
       )}
 
-      <AiQuestionExtractionModal
+      <CropQuestionsFrameModal
         isOpen={extractModal.isOpen}
         onClose={extractModal.onClose}
-        examTitle={`إطار ${selectedTheme?.name || ""}`}
+        frameName={selectedTheme?.name || ""}
         confirmLabel="تطبيق على الإطار"
-        onConfirmDrafts={handleConfirmDrafts}
+        onConfirmCropped={handleConfirmCropped}
       />
     </DailyQuizPageShell>
   );

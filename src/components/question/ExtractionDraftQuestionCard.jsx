@@ -18,6 +18,7 @@ import {
 } from "@chakra-ui/react";
 import { FaPlus, FaTrash } from "react-icons/fa";
 import {
+  choiceHasContent,
   getChoiceLetter,
   MCQ_CHOICE_MAX,
   MCQ_CHOICE_MIN,
@@ -55,6 +56,7 @@ export default function ExtractionDraftQuestionCard({
   const inputBg = useColorModeValue("white", "gray.700");
 
   const choices = Array.isArray(draft.choices) ? draft.choices : [];
+  const choiceImages = Array.isArray(draft.choiceImages) ? draft.choiceImages : [];
   const isChoice = draft.question_type === "choice";
   const canAddChoice = choices.length < MCQ_CHOICE_MAX;
   const canRemoveChoice = choices.length > MCQ_CHOICE_MIN;
@@ -63,6 +65,13 @@ export default function ExtractionDraftQuestionCard({
 
   const letterFor = (cIdx) =>
     draft.optionLabels?.[cIdx] || getChoiceLetter(cIdx, "ar");
+
+  const choiceImageUrl = (cIdx) => {
+    const img = choiceImages[cIdx];
+    if (!img) return null;
+    if (typeof img === "string") return img;
+    return img.image_url || img.url || null;
+  };
 
   const patch = (data) => onUpdate(draft.id, data);
 
@@ -79,15 +88,24 @@ export default function ExtractionDraftQuestionCard({
     if (!canAddChoice) return;
     const nextLabels = [...(draft.optionLabels || [])];
     nextLabels[choices.length] = getChoiceLetter(choices.length, "ar");
-    patch({ choices: [...choices, ""], optionLabels: nextLabels });
+    patch({
+      choices: [...choices, ""],
+      choiceImages: [...choiceImages, null],
+      optionLabels: nextLabels,
+    });
   };
 
   const removeChoice = (cIdx) => {
     if (!canRemoveChoice) return;
     const removed = choices[cIdx];
     const next = choices.filter((_, i) => i !== cIdx);
+    const nextImages = choiceImages.filter((_, i) => i !== cIdx);
     const nextLabels = (draft.optionLabels || []).filter((_, i) => i !== cIdx);
-    const update = { choices: next, optionLabels: nextLabels };
+    const update = {
+      choices: next,
+      choiceImages: nextImages,
+      optionLabels: nextLabels,
+    };
     if (Number.isInteger(draft.correctAnswerIndex)) {
       if (draft.correctAnswerIndex === cIdx) {
         update.correctAnswerIndex = null;
@@ -104,10 +122,10 @@ export default function ExtractionDraftQuestionCard({
   };
 
   const selectCorrect = (cIdx) => {
-    if (!choices[cIdx]?.trim()) return;
+    if (!choiceHasContent(choices[cIdx], choiceImages[cIdx])) return;
     patch({
       correctAnswerIndex: cIdx,
-      answer: choices[cIdx],
+      answer: choices[cIdx] || "",
       answerInferred: false,
     });
   };
@@ -394,6 +412,41 @@ export default function ExtractionDraftQuestionCard({
         )}
       </FormControl>
 
+      {draft.questionTable?.content ? (
+        <FormControl mb={4}>
+          <FormLabel fontSize="sm" fontWeight="semibold">
+            {draft.questionTable.role === "options"
+              ? "جدول الاختيارات (مرجع)"
+              : "جدول بيانات مرفق مع السؤال"}
+          </FormLabel>
+          <Box
+            as="pre"
+            dir="auto"
+            whiteSpace="pre-wrap"
+            fontSize="sm"
+            p={3}
+            borderRadius="lg"
+            borderWidth="1px"
+            borderColor={borderColor}
+            bg="gray.50"
+            maxH="220px"
+            overflowY="auto"
+          >
+            {draft.questionTable.content}
+          </Box>
+          {draft.questionTable.role === "data" && (
+            <Text fontSize="xs" color={muted} mt={1}>
+              هذا الجدول مرفق مع نص السؤال وليس اختيارات — الاختيارات تظهر بالأسفل إن وُجدت.
+            </Text>
+          )}
+          {draft.questionTable.role === "options" && (
+            <Text fontSize="xs" color={muted} mt={1}>
+              تم تحويل صفوف الجدول إلى اختيارات نصية بالأسفل؛ هذا العرض مرجع بصري.
+            </Text>
+          )}
+        </FormControl>
+      ) : null}
+
       {isChoice && (
         <Box>
           <Flex justify="space-between" align="center" mb={3} gap={2} flexWrap="wrap">
@@ -417,6 +470,7 @@ export default function ExtractionDraftQuestionCard({
             {choices.map((choice, cIdx) => {
               const letter = letterFor(cIdx);
               const isCorrect = draft.correctAnswerIndex === cIdx;
+              const imgUrl = choiceImageUrl(cIdx);
               return (
                 <Box
                   key={`${draft.id}-opt-${cIdx}`}
@@ -453,6 +507,19 @@ export default function ExtractionDraftQuestionCard({
                       {letter}
                     </Box>
                     <Box flex={1} minW={0}>
+                      {imgUrl ? (
+                        <Image
+                          src={imgUrl}
+                          alt={`اختيار ${letter}`}
+                          maxH="120px"
+                          objectFit="contain"
+                          borderRadius="md"
+                          borderWidth="1px"
+                          borderColor={borderColor}
+                          bg="gray.50"
+                          mb={2}
+                        />
+                      ) : null}
                       <Input
                         value={choice}
                         onChange={(e) => setChoiceAt(cIdx, e.target.value)}
@@ -460,7 +527,11 @@ export default function ExtractionDraftQuestionCard({
                         fontSize="md"
                         borderRadius="lg"
                         bg={inputBg}
-                        placeholder={`الاختيار ${letter}`}
+                        placeholder={
+                          imgUrl
+                            ? `وصف اختياري للاختيار ${letter}`
+                            : `الاختيار ${letter}`
+                        }
                       />
                       {choice?.trim() && (
                         <Box mt={2} dir="auto" fontSize="sm" color={textColor} lineHeight="1.7">
@@ -510,18 +581,31 @@ export default function ExtractionDraftQuestionCard({
               dir="rtl"
               borderRadius="xl"
             >
-              {choices.map((c, cIdx) => (
-                <option key={`${cIdx}-${c}`} value={cIdx} disabled={!String(c).trim()}>
-                  {String(c).trim()
-                    ? `${letterFor(cIdx)}: ${
-                        c.length > 60 ? `${c.slice(0, 60)}…` : c
-                      }`
-                    : `اختيار ${letterFor(cIdx)}`}
-                </option>
-              ))}
+              {choices.map((c, cIdx) => {
+                const hasContent = choiceHasContent(c, choiceImages[cIdx]);
+                const label = String(c).trim()
+                  ? `${letterFor(cIdx)}: ${
+                      c.length > 60 ? `${c.slice(0, 60)}…` : c
+                    }`
+                  : choiceImageUrl(cIdx)
+                    ? `${letterFor(cIdx)}: (صورة)`
+                    : `اختيار ${letterFor(cIdx)}`;
+                return (
+                  <option
+                    key={`${cIdx}-${c}`}
+                    value={cIdx}
+                    disabled={!hasContent}
+                  >
+                    {label}
+                  </option>
+                );
+              })}
             </Select>
             {Number.isInteger(draft.correctAnswerIndex) &&
-              choices[draft.correctAnswerIndex]?.trim() && (
+              choiceHasContent(
+                choices[draft.correctAnswerIndex],
+                choiceImages[draft.correctAnswerIndex],
+              ) && (
                 <Box
                   mt={3}
                   p={3}
@@ -533,14 +617,26 @@ export default function ExtractionDraftQuestionCard({
                   <Text fontSize="xs" color="green.700" mb={1} fontWeight="bold">
                     الإجابة المحددة: {letterFor(draft.correctAnswerIndex)}
                   </Text>
-                  <Box dir="auto">
-                    <FormattedQuestionText
-                      value={choices[draft.correctAnswerIndex]}
-                      fontSize="md"
-                      lineHeight="1.75"
-                      color={textColor}
+                  {choiceImageUrl(draft.correctAnswerIndex) ? (
+                    <Image
+                      src={choiceImageUrl(draft.correctAnswerIndex)}
+                      alt="الإجابة الصحيحة"
+                      maxH="100px"
+                      objectFit="contain"
+                      borderRadius="md"
+                      mb={2}
                     />
-                  </Box>
+                  ) : null}
+                  {choices[draft.correctAnswerIndex]?.trim() ? (
+                    <Box dir="auto">
+                      <FormattedQuestionText
+                        value={choices[draft.correctAnswerIndex]}
+                        fontSize="md"
+                        lineHeight="1.75"
+                        color={textColor}
+                      />
+                    </Box>
+                  ) : null}
                 </Box>
               )}
           </FormControl>

@@ -1,9 +1,168 @@
-import { useEffect, useRef } from "react";
-import { Box, Flex, Grid, Image, Text, VStack } from "@chakra-ui/react";
+import { useEffect, useMemo, useRef } from "react";
+import { Badge, Box, Flex, Grid, Image, Text, VStack } from "@chakra-ui/react";
 import { FaBookOpen, FaGraduationCap, FaLightbulb, FaPhoneAlt, FaUserGraduate } from "react-icons/fa";
+import FormattedQuestionText from "../../../components/question/FormattedQuestionText";
 import { getThemeById } from "../mockPdfFrames";
 
 const PLATFORM_LOGO = "/Picsart_25-08-26_23-28-39-014.png";
+
+const MATH_TEXT_SX = {
+  fontFamily:
+    '"Noto Sans Arabic", "Noto Naskh Arabic", "Segoe UI Symbol", "Cambria Math", Tahoma, sans-serif',
+  fontFeatureSettings: '"liga" 1, "calt" 1',
+  textRendering: "optimizeLegibility",
+  wordBreak: "break-word",
+};
+
+/** جدول markdown بسيط (| a | b |) لعرض جداول الفيزياء/الاختيارات */
+function MarkdownTable({ content, primary, ink, soft, sheet }) {
+  const rows = useMemo(() => {
+    const lines = String(content || "")
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    const parsed = [];
+    for (const line of lines) {
+      if (!line.includes("|")) continue;
+      // صف فاصل markdown: |---|---|
+      if (/^\|?[\s:-|]+$/.test(line)) continue;
+      const cells = line
+        .replace(/^\|/, "")
+        .replace(/\|$/, "")
+        .split("|")
+        .map((c) => c.trim());
+      if (cells.length) parsed.push(cells);
+    }
+    return parsed;
+  }, [content]);
+
+  if (!rows.length) {
+    return (
+      <Text
+        as="pre"
+        whiteSpace="pre-wrap"
+        fontSize={sheet ? "13px" : "9px"}
+        fontWeight="700"
+        style={{ color: ink, ...MATH_TEXT_SX }}
+        dir="auto"
+      >
+        {content}
+      </Text>
+    );
+  }
+
+  const colCount = Math.max(...rows.map((r) => r.length));
+
+  return (
+    <Box
+      overflowX="auto"
+      borderRadius="lg"
+      border="1.5px solid"
+      style={{ borderColor: `${primary}55`, background: soft }}
+    >
+      <Box
+        as="table"
+        w="100%"
+        style={{ borderCollapse: "collapse", direction: "rtl" }}
+      >
+        <tbody>
+          {rows.map((row, ri) => (
+            <tr key={`tr-${ri}`}>
+              {Array.from({ length: colCount }).map((_, ci) => {
+                const cell = row[ci] ?? "";
+                const Tag = ri === 0 ? "th" : "td";
+                return (
+                  <Box
+                    as={Tag}
+                    key={`td-${ri}-${ci}`}
+                    px={sheet ? 2.5 : 1.5}
+                    py={sheet ? 2 : 1}
+                    fontSize={sheet ? "13px" : "9px"}
+                    fontWeight={ri === 0 ? 900 : 700}
+                    textAlign="center"
+                    style={{
+                      color: ink,
+                      border: `1px solid ${primary}33`,
+                      background: ri === 0 ? `${primary}14` : "transparent",
+                      ...MATH_TEXT_SX,
+                    }}
+                    dir="auto"
+                  >
+                    <FormattedQuestionText
+                      value={cell}
+                      fontSize="inherit"
+                      fontWeight="inherit"
+                      lineHeight="1.55"
+                      color="inherit"
+                      sx={MATH_TEXT_SX}
+                    />
+                  </Box>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </Box>
+    </Box>
+  );
+}
+
+function QuestionFigures({ figures, primary, soft, sheet }) {
+  const list = Array.isArray(figures) ? figures.filter((f) => f?.url) : [];
+  if (!list.length) return null;
+
+  const multi = list.length > 1;
+
+  return (
+    <VStack align="stretch" spacing={sheet ? 3 : 2}>
+      <Grid
+        templateColumns={
+          multi
+            ? sheet
+              ? "1fr 1fr"
+              : { base: "1fr", sm: "1fr 1fr" }
+            : "1fr"
+        }
+        gap={sheet ? 3 : 2}
+      >
+        {list.map((fig, i) => (
+          <Box key={fig.url || i}>
+            <Box
+              borderRadius="xl"
+              overflow="hidden"
+              border="2px solid"
+              style={{ borderColor: primary, background: soft }}
+              maxH={sheet ? (multi ? "220px" : "300px") : multi ? "90px" : "120px"}
+              boxShadow={`0 8px 24px -12px ${primary}55`}
+            >
+              <Image
+                src={fig.url}
+                alt={fig.label || "شكل السؤال"}
+                w="100%"
+                maxH={sheet ? (multi ? "220px" : "300px") : multi ? "90px" : "120px"}
+                objectFit="contain"
+                mx="auto"
+                crossOrigin="anonymous"
+              />
+            </Box>
+            {fig.label ? (
+              <Text
+                mt={1}
+                fontSize={sheet ? "12px" : "8px"}
+                textAlign="center"
+                fontWeight="800"
+                style={{ color: primary }}
+                noOfLines={2}
+              >
+                {fig.label}
+              </Text>
+            ) : null}
+          </Box>
+        ))}
+      </Grid>
+    </VStack>
+  );
+}
 
 function FrameDecorations({ shape, primary, secondary }) {
   if (shape === "angled") {
@@ -353,7 +512,38 @@ export default function PdfQuestionFrame({
   ).trim();
   const phone = String(branding.phone || page.phone || "").trim();
   const watermarkSrc = branding.watermarkLogo || null;
-  const hasFigure = page.figureType && page.figureType !== "none";
+  const figures = Array.isArray(page.figures)
+    ? page.figures.filter((f) => f?.url)
+    : page.questionImage
+      ? [
+          {
+            url: page.questionImage,
+            label: page.figureLabel || "شكل السؤال",
+            imageType: "question_figure",
+          },
+        ]
+      : [];
+  const mockFigureType =
+    !figures.length &&
+    page.figureType &&
+    page.figureType !== "none" &&
+    page.figureType !== "image"
+      ? page.figureType
+      : null;
+  const hasFigure = figures.length > 0 || Boolean(mockFigureType);
+  const pageOptions = Array.isArray(page.options) ? page.options : [];
+  const hasOptions =
+    page.hasOptions !== false && pageOptions.length > 0;
+  const hasImageOptions = Boolean(page.hasImageOptions) && hasOptions;
+  const questionTable = page.questionTable?.content ? page.questionTable : null;
+  // جدول الاختيارات كمرجع بصري فقط إن لم تكن الاختيارات مصوّرة
+  const showOptionsTableImage = figures.some(
+    (f) => f.imageType === "options_table",
+  );
+  const verses = Array.isArray(page.verses) ? page.verses : [];
+  const isCropLayout =
+    page.layout === "crop" && Boolean(page.cropImageUrl || page.questionImage);
+  const cropImageUrl = page.cropImageUrl || page.questionImage || null;
   const interactive = Boolean(onSelect) && !isSheet;
 
   return (
@@ -603,9 +793,62 @@ export default function PdfQuestionFrame({
           </Box>
         ) : null}
 
+        {isCropLayout && cropImageUrl ? (
+          <Flex
+            direction="column"
+            align="center"
+            justify="center"
+            position="relative"
+            zIndex={1}
+            minH={isSheet ? "560px" : "180px"}
+            gap={isSheet ? 3 : 2}
+          >
+            {page.sourceNumber ? (
+              <Badge
+                alignSelf="flex-start"
+                colorScheme="blackAlpha"
+                bg={`${primary}18`}
+                color={primary}
+                borderRadius="full"
+                px={3}
+                py={1}
+                fontWeight="900"
+                fontSize={isSheet ? "sm" : "xs"}
+              >
+                سؤال {page.sourceNumber}
+              </Badge>
+            ) : null}
+            <Box
+              w="100%"
+              flex="1"
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              borderRadius="xl"
+              overflow="hidden"
+              border="1.5px solid"
+              style={{ borderColor: `${primary}33`, background: soft }}
+              p={isSheet ? 3 : 1.5}
+            >
+              <Image
+                src={cropImageUrl}
+                alt={
+                  page.sourceNumber
+                    ? `سؤال ${page.sourceNumber}`
+                    : `صفحة ${page.pageNumber}`
+                }
+                maxW="100%"
+                maxH={isSheet ? "540px" : "200px"}
+                objectFit="contain"
+                mx="auto"
+                crossOrigin="anonymous"
+              />
+            </Box>
+          </Flex>
+        ) : (
         <Grid
           templateColumns={
-            hasFigure
+            hasFigure && !hasImageOptions
               ? isSheet
                 ? "0.95fr 1.05fr"
                 : { base: "1fr", sm: "0.9fr 1.1fr" }
@@ -616,26 +859,36 @@ export default function PdfQuestionFrame({
           position="relative"
           zIndex={1}
         >
-          {hasFigure ? (
+          {hasFigure && !hasImageOptions ? (
             <Box order={{ base: 2, sm: 1 }}>
-              <MockFigure
-                type={page.figureType}
-                primary={primary}
-                soft={soft}
-                imageUrl={page.questionImage}
-                sheet={isSheet}
-              />
-              {page.figureLabel ? (
-                <Text
-                  mt={2}
-                  fontSize={isSheet ? "13px" : "9px"}
-                  textAlign="center"
-                  fontWeight="800"
-                  style={{ color: primary }}
-                >
-                  {page.figureLabel}
-                </Text>
-              ) : null}
+              {figures.length > 0 ? (
+                <QuestionFigures
+                  figures={figures}
+                  primary={primary}
+                  soft={soft}
+                  sheet={isSheet}
+                />
+              ) : (
+                <>
+                  <MockFigure
+                    type={mockFigureType}
+                    primary={primary}
+                    soft={soft}
+                    sheet={isSheet}
+                  />
+                  {page.figureLabel ? (
+                    <Text
+                      mt={2}
+                      fontSize={isSheet ? "13px" : "9px"}
+                      textAlign="center"
+                      fontWeight="800"
+                      style={{ color: primary }}
+                    >
+                      {page.figureLabel}
+                    </Text>
+                  ) : null}
+                </>
+              )}
             </Box>
           ) : null}
 
@@ -645,51 +898,248 @@ export default function PdfQuestionFrame({
             order={{ base: 1, sm: 2 }}
             pb={isSheet ? 12 : 8}
           >
-            <Text
-              fontSize={isSheet ? "18px" : "11px"}
-              fontWeight="800"
-              lineHeight="1.9"
-              noOfLines={isSheet ? undefined : 5}
-              whiteSpace="pre-wrap"
-              style={{ color: ink }}
-            >
-              {page.questionText}
-            </Text>
-            <Grid templateColumns="1fr 1fr" gap={isSheet ? 3 : 1.5}>
-              {(page.options || []).map((opt) => (
-                <Flex
-                  key={opt.key}
-                  align="center"
-                  gap={isSheet ? 2.5 : 1.5}
-                  minW={0}
-                  p={isSheet ? 2.5 : 0}
-                  borderRadius="lg"
-                  style={
-                    isSheet
-                      ? { background: soft, border: `1px solid ${primary}22` }
-                      : undefined
-                  }
-                >
-                  <OptionKeyCircle
-                    label={opt.key}
-                    primary={primary}
-                    soft="#FFFFFF"
-                    sheet={isSheet}
-                  />
-                  <Text
+            {page.poetry && verses.length > 0 ? (
+              <VStack align="stretch" spacing={isSheet ? 2 : 1}>
+                {page.introText ? (
+                  <Box
                     fontSize={isSheet ? "15px" : "10px"}
-                    fontWeight="700"
-                    noOfLines={isSheet ? undefined : 1}
-                    lineHeight="1.7"
+                    fontWeight="800"
                     style={{ color: ink }}
+                    dir="auto"
                   >
-                    {opt.text}
-                  </Text>
-                </Flex>
-              ))}
-            </Grid>
+                    <FormattedQuestionText
+                      value={page.introText}
+                      fontSize="inherit"
+                      fontWeight="inherit"
+                      lineHeight="1.7"
+                      color="inherit"
+                      sx={MATH_TEXT_SX}
+                    />
+                  </Box>
+                ) : null}
+                {verses.map((verse, vi) => (
+                  <Flex
+                    key={`verse-${vi}`}
+                    gap={isSheet ? 4 : 2}
+                    justify="space-between"
+                    px={isSheet ? 3 : 1.5}
+                    py={isSheet ? 2 : 1}
+                    borderRadius="lg"
+                    style={{
+                      background: soft,
+                      border: `1px solid ${primary}33`,
+                    }}
+                    dir="rtl"
+                  >
+                    <Box flex="1" textAlign="right">
+                      <FormattedQuestionText
+                        value={verse.firstHemistich || ""}
+                        fontSize={isSheet ? "15px" : "10px"}
+                        fontWeight="700"
+                        lineHeight="1.8"
+                        color={ink}
+                        sx={MATH_TEXT_SX}
+                      />
+                    </Box>
+                    <Box flex="1" textAlign="left">
+                      <FormattedQuestionText
+                        value={verse.secondHemistich || ""}
+                        fontSize={isSheet ? "15px" : "10px"}
+                        fontWeight="700"
+                        lineHeight="1.8"
+                        color={ink}
+                        sx={MATH_TEXT_SX}
+                      />
+                    </Box>
+                  </Flex>
+                ))}
+                {page.promptText ? (
+                  <Box
+                    fontSize={isSheet ? "18px" : "11px"}
+                    fontWeight="800"
+                    lineHeight="1.9"
+                    style={{ color: ink }}
+                    dir="auto"
+                  >
+                    <FormattedQuestionText
+                      value={page.promptText}
+                      fontSize="inherit"
+                      fontWeight="inherit"
+                      lineHeight="inherit"
+                      color="inherit"
+                      sx={MATH_TEXT_SX}
+                    />
+                  </Box>
+                ) : null}
+              </VStack>
+            ) : (
+              <Box
+                fontSize={isSheet ? "18px" : "11px"}
+                fontWeight="800"
+                lineHeight="1.9"
+                whiteSpace="pre-wrap"
+                noOfLines={isSheet ? undefined : 5}
+                style={{ color: ink }}
+                dir="auto"
+              >
+                <FormattedQuestionText
+                  value={page.questionText}
+                  fontSize="inherit"
+                  fontWeight="inherit"
+                  lineHeight="inherit"
+                  color="inherit"
+                  sx={MATH_TEXT_SX}
+                />
+              </Box>
+            )}
+
+            {hasFigure && hasImageOptions ? (
+              <QuestionFigures
+                figures={figures.filter((f) => f.imageType !== "choice_option")}
+                primary={primary}
+                soft={soft}
+                sheet={isSheet}
+              />
+            ) : null}
+
+            {questionTable &&
+            (questionTable.role === "data" ||
+              (questionTable.role === "options" && !showOptionsTableImage)) ? (
+              <Box>
+                <Text
+                  mb={1}
+                  fontSize={isSheet ? "12px" : "8px"}
+                  fontWeight="900"
+                  style={{ color: primary }}
+                >
+                  {questionTable.role === "options"
+                    ? "جدول الاختيارات"
+                    : "جدول البيانات"}
+                </Text>
+                <MarkdownTable
+                  content={questionTable.content}
+                  primary={primary}
+                  ink={ink}
+                  soft={soft}
+                  sheet={isSheet}
+                />
+              </Box>
+            ) : null}
+
+            {hasOptions ? (
+              hasImageOptions ? (
+                <Grid
+                  templateColumns={
+                    isSheet
+                      ? "1fr 1fr"
+                      : { base: "1fr 1fr", sm: "1fr 1fr" }
+                  }
+                  gap={isSheet ? 3 : 1.5}
+                >
+                  {pageOptions.map((opt) => (
+                    <Flex
+                      key={opt.key}
+                      direction="column"
+                      align="center"
+                      gap={isSheet ? 2 : 1}
+                      minW={0}
+                      p={isSheet ? 2.5 : 1.5}
+                      borderRadius="lg"
+                      style={{
+                        background: soft,
+                        border: `1px solid ${primary}33`,
+                      }}
+                    >
+                      <OptionKeyCircle
+                        label={opt.key}
+                        primary={primary}
+                        soft="#FFFFFF"
+                        sheet={isSheet}
+                      />
+                      {opt.imageUrl ? (
+                        <Image
+                          src={opt.imageUrl}
+                          alt={`اختيار ${opt.key}`}
+                          maxH={isSheet ? "140px" : "56px"}
+                          w="100%"
+                          objectFit="contain"
+                          borderRadius="md"
+                          crossOrigin="anonymous"
+                        />
+                      ) : null}
+                      {opt.text ? (
+                        <Box
+                          fontSize={isSheet ? "13px" : "9px"}
+                          fontWeight="700"
+                          textAlign="center"
+                          style={{ color: ink }}
+                          dir="auto"
+                        >
+                          <FormattedQuestionText
+                            value={opt.text}
+                            fontSize="inherit"
+                            fontWeight="inherit"
+                            lineHeight="1.5"
+                            color="inherit"
+                            sx={MATH_TEXT_SX}
+                          />
+                        </Box>
+                      ) : null}
+                    </Flex>
+                  ))}
+                </Grid>
+              ) : (
+                <Grid templateColumns="1fr 1fr" gap={isSheet ? 3 : 1.5}>
+                  {pageOptions.map((opt) => (
+                    <Flex
+                      key={opt.key}
+                      align="center"
+                      gap={isSheet ? 2.5 : 1.5}
+                      minW={0}
+                      p={isSheet ? 2.5 : 0}
+                      borderRadius="lg"
+                      style={
+                        isSheet
+                          ? {
+                              background: soft,
+                              border: `1px solid ${primary}22`,
+                            }
+                          : undefined
+                      }
+                    >
+                      <OptionKeyCircle
+                        label={opt.key}
+                        primary={primary}
+                        soft="#FFFFFF"
+                        sheet={isSheet}
+                      />
+                      <Box
+                        fontSize={isSheet ? "15px" : "10px"}
+                        fontWeight="700"
+                        noOfLines={isSheet ? undefined : 2}
+                        lineHeight="1.7"
+                        style={{ color: ink }}
+                        minW={0}
+                        flex="1"
+                        dir="auto"
+                      >
+                        <FormattedQuestionText
+                          value={opt.text || "—"}
+                          fontSize="inherit"
+                          fontWeight="inherit"
+                          lineHeight="inherit"
+                          color="inherit"
+                          sx={MATH_TEXT_SX}
+                        />
+                      </Box>
+                    </Flex>
+                  ))}
+                </Grid>
+              )
+            ) : null}
           </VStack>
         </Grid>
+        )}
       </Box>
 
       {/* Footer — اسم المدرس كامل بدون قصّ */}
