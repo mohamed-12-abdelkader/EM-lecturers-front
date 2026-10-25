@@ -1,5 +1,5 @@
 import baseUrl from "./baseUrl";
-import { parseCourseExamsResponse } from "../utils/courseLevelExamUtils";
+import { normalizeStudentCodeInput, parseCourseExamsResponse } from "../utils/courseLevelExamUtils";
 import { isNetworkError } from "../utils/network";
 
 function authHeaders(token) {
@@ -292,6 +292,78 @@ export async function patchAssignmentQuestionCorrectAnswers(
         Accept: "application/json",
       },
     },
+  );
+  return data;
+}
+
+function normalizeLateAccessGrant(row = {}) {
+  const rawCode = row.studentCode ?? row.student_code ?? "";
+  return {
+    id: row.id ?? null,
+    examId: row.examId ?? row.exam_id ?? null,
+    studentId: row.studentId ?? row.student_id ?? null,
+    studentCode: normalizeStudentCodeInput(rawCode) || null,
+    studentName: row.studentName ?? row.student_name ?? "طالب",
+    remainingAttempts: Number(row.remainingAttempts ?? row.remaining_attempts ?? 0) || 0,
+    note: row.note ?? null,
+    grantedBy: row.grantedBy ?? row.granted_by ?? null,
+    updatedAt: row.updatedAt ?? row.updated_at ?? null,
+  };
+}
+
+function unwrapLateAccessList(data) {
+  const payload = data?.data ?? data;
+  const list = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.grants)
+      ? payload.grants
+      : Array.isArray(payload?.items)
+        ? payload.items
+        : [];
+  return list.map(normalizeLateAccessGrant);
+}
+
+/** GET /api/exams/:examId/late-access */
+export async function fetchExamLateAccess(examId, token) {
+  const { data } = await baseUrl.get(`/api/exams/${encodeURIComponent(examId)}/late-access`, {
+    headers: authHeaders(token),
+  });
+  return unwrapLateAccessList(data);
+}
+
+/** POST /api/exams/:examId/late-access — الجسم: { studentCode, extraAttempts } */
+export async function grantExamLateAccess(
+  examId,
+  { studentCode, extraAttempts = 1, note } = {},
+  token,
+) {
+  const code = normalizeStudentCodeInput(studentCode);
+  const body = { studentCode: code };
+  const extra = Number(extraAttempts);
+  if (Number.isInteger(extra) && extra >= 1) body.extraAttempts = Math.min(10, extra);
+  if (note != null && String(note).trim()) body.note = String(note).trim();
+  const { data } = await baseUrl.post(
+    `/api/exams/${encodeURIComponent(examId)}/late-access`,
+    body,
+    {
+      headers: {
+        ...authHeaders(token),
+        "Content-Type": "application/json",
+      },
+    },
+  );
+  return {
+    grant: normalizeLateAccessGrant(data?.data ?? data),
+    message: data?.message || "تم السماح للطالب بمحاولة إضافية",
+  };
+}
+
+/** DELETE /api/exams/:examId/late-access/:studentCode */
+export async function revokeExamLateAccess(examId, studentCode, token) {
+  const code = normalizeStudentCodeInput(studentCode);
+  const { data } = await baseUrl.delete(
+    `/api/exams/${encodeURIComponent(examId)}/late-access/${encodeURIComponent(code)}`,
+    { headers: authHeaders(token) },
   );
   return data;
 }

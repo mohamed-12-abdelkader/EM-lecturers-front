@@ -52,6 +52,7 @@ import {
   FaPlus,
   FaSync,
   FaTrash,
+  FaUserPlus,
 } from "react-icons/fa";
 import { AiOutlineRobot } from "react-icons/ai";
 import { MdLibraryBooks, MdPublic, MdSchool } from "react-icons/md";
@@ -81,6 +82,7 @@ import {
 } from "../../api/courseExamsApi";
 import { PlatformExamTeacherCard } from "../exam/components/PlatformExamQuestionCard";
 import AiQuestionExtractionModal from "../exam/components/AiQuestionExtractionModal";
+import LateAccessGrantModal from "../exam/components/LateAccessGrantModal";
 import {
   DailyQuizHero,
   DailyQuizPageShell,
@@ -134,6 +136,7 @@ export default function TeacherPublicExamManagePage() {
   const theme = useDailyQuizTheme();
   const addModal = useDisclosure();
   const aiModal = useDisclosure();
+  const lateAccess = useDisclosure();
   const deleteCancelRef = useRef();
 
   const [exam, setExam] = useState(null);
@@ -631,6 +634,14 @@ export default function TeacherPublicExamManagePage() {
                   onClick={togglePublish}
                 >
                   {exam.is_visible_to_students ? "إلغاء النشر" : "نشر للطلاب"}
+                </Button>
+                <Button
+                  leftIcon={<FaUserPlus />}
+                  colorScheme="orange"
+                  borderRadius="xl"
+                  onClick={lateAccess.onOpen}
+                >
+                  محاولة إضافية
                 </Button>
                 <Button
                   as={RouterLink}
@@ -1133,6 +1144,14 @@ export default function TeacherPublicExamManagePage() {
         examTitle={exam?.title}
         examKind="course"
         onImported={loadAll}
+      />
+
+      <LateAccessGrantModal
+        isOpen={lateAccess.isOpen}
+        onClose={lateAccess.onClose}
+        examId={examId}
+        examTitle={exam?.title}
+        scope="public"
       />
     </DailyQuizPageShell>
   );

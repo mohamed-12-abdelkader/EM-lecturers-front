@@ -215,6 +215,11 @@ export default function StudentPublicExamsPage() {
                         <Badge colorScheme={availability.colorScheme} borderRadius="full" px={2.5}>
                           {availability.label}
                         </Badge>
+                        {Number(exam.late_access_remaining) > 0 ? (
+                          <Badge colorScheme="orange" borderRadius="full" px={2.5}>
+                            محاولة إضافية ({exam.late_access_remaining})
+                          </Badge>
+                        ) : null}
                       </HStack>
                       <Text fontWeight="900" fontSize={{ base: "md", md: "lg" }} color={theme.heading} mb={1}>
                         {exam.title}

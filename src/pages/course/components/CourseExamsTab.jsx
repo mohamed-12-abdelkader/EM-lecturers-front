@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { VStack, Heading, Center, Spinner, Text, Icon, SimpleGrid, Box, HStack, Image, Button, useToast, Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton, FormControl, FormLabel, Input, NumberInput, NumberInputField, AlertDialog, AlertDialogOverlay, AlertDialogContent, AlertDialogHeader, AlertDialogBody, AlertDialogFooter, IconButton, Tooltip, Flex, useColorModeValue, Badge, InputGroup, InputRightElement, Switch, Divider, Tabs, TabList, TabPanels, Tab, TabPanel, RadioGroup, Radio, Textarea } from "@chakra-ui/react";
-import { FaGraduationCap, FaLightbulb, FaBookOpen, FaClock, FaStar, FaEdit, FaTrash, FaPlus, FaEye, FaEyeSlash, FaRegFileAlt, FaCog, FaTimes, FaCheck, FaCamera, FaChartBar } from "react-icons/fa";
+import { FaGraduationCap, FaLightbulb, FaBookOpen, FaClock, FaStar, FaEdit, FaTrash, FaPlus, FaEye, FaEyeSlash, FaRegFileAlt, FaCog, FaTimes, FaCheck, FaCamera, FaChartBar, FaUserPlus } from "react-icons/fa";
 import baseUrl from "../../../api/baseUrl";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -33,6 +33,7 @@ import ExamStudentSettingsFields, {
 } from "../../../components/exam/ExamStudentSettingsFields";
 import { startCourseExamAttempt, translateCourseExamStudentError } from "../../../api/courseExamsApi";
 import { persistAttemptId } from "../../../utils/examAttemptProgress";
+import LateAccessGrantModal from "../../exam/components/LateAccessGrantModal";
 
 const initialExamFormState = {
   title: "",
@@ -240,6 +241,7 @@ const ExamCard = ({
   onAddImageQuestions,
   onEdit,
   onDelete,
+  onLateAccess,
 }) => {
   const exam = normalizeCourseLevelExam(rawExam) || rawExam;
   const navigate = useNavigate();
@@ -497,6 +499,11 @@ const ExamCard = ({
                 استنفدت المحاولات
               </Badge>
             ) : null}
+            {!isTeacher && Number(exam.late_access_remaining) > 0 ? (
+              <Badge colorScheme="orange" variant="subtle" borderRadius="full" px={2.5} py={0.5} fontSize="10px" fontWeight="bold">
+                محاولة إضافية ({exam.late_access_remaining})
+              </Badge>
+            ) : null}
           </HStack>
         </Box>
       </Flex>
@@ -559,6 +566,17 @@ const ExamCard = ({
 
         {isTeacher ? (
           <HStack spacing={1.5} mt={2.5} justify="center">
+            <Tooltip label="محاولة إضافية لطالب" hasArrow>
+              <IconButton
+                aria-label="محاولة إضافية لطالب"
+                icon={<Icon as={FaUserPlus} />}
+                size="sm"
+                variant="ghost"
+                colorScheme="orange"
+                borderRadius="lg"
+                onClick={onLateAccess}
+              />
+            </Tooltip>
             <Tooltip label="التقرير" hasArrow>
               <IconButton
                 as={Link}
@@ -651,6 +669,7 @@ const CourseExamsTab = ({
   const toast = useToast();
   const [editModal, setEditModal] = useState({ isOpen: false, exam: null });
   const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, exam: null });
+  const [lateAccessExam, setLateAccessExam] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
@@ -1776,6 +1795,7 @@ const CourseExamsTab = ({
               onAddImageQuestions={() => handleOpenQuestionManagerModal(exam, 1)}
               onEdit={() => setEditModal({ isOpen: true, exam })}
               onDelete={() => setDeleteDialog({ isOpen: true, exam })}
+              onLateAccess={() => setLateAccessExam(exam)}
             />
           ))}
         </SimpleGrid>
@@ -1787,6 +1807,13 @@ const CourseExamsTab = ({
         exam={editModal.exam}
         onSubmit={handleEditExam}
         loading={actionLoading}
+      />
+      <LateAccessGrantModal
+        isOpen={Boolean(lateAccessExam)}
+        onClose={() => setLateAccessExam(null)}
+        examId={lateAccessExam?.id}
+        examTitle={lateAccessExam?.title}
+        scope="course"
       />
       <DeleteExamDialog
         isOpen={deleteDialog.isOpen}

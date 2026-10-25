@@ -2,6 +2,14 @@
 
 import { hasInProgressExamAttempt } from "./examAttemptProgress";
 
+/** يحوّل أرقامًا عربية/فارسية إلى 0-9 ثم يبقي الأرقام فقط. */
+export function normalizeStudentCodeInput(value) {
+  const mapped = String(value ?? "")
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)));
+  return mapped.replace(/\D/g, "");
+}
+
 export function parseDateSafe(value) {
   if (!value) return null;
   const date = new Date(value);
@@ -50,6 +58,10 @@ export function normalizeCourseLevelExam(raw = {}) {
     last_attempt_number:
       raw.last_attempt_number ?? raw.lastAttemptNumber ?? null,
     can_attempt: raw.can_attempt ?? raw.canAttempt ?? true,
+    late_access_remaining: Math.max(
+      0,
+      Number(raw.late_access_remaining ?? raw.lateAccessRemaining ?? 0) || 0,
+    ),
     attempts_remaining:
       raw.attempts_remaining ?? raw.attemptsRemaining ?? null,
     has_in_progress_attempt:
@@ -199,7 +211,13 @@ export function getStudentAttemptsRemaining(exam) {
 export function hasExhaustedCourseExamAttempts(exam) {
   const data = normalizeCourseLevelExam(exam);
   if (!data || data.attempt_limit == null || data.attempt_limit === "") return false;
+  if (Number(data.late_access_remaining) > 0) return false;
   return getStudentAttemptsRemaining(data) <= 0;
+}
+
+export function getLateAccessRemaining(exam) {
+  const data = normalizeCourseLevelExam(exam);
+  return Math.max(0, Number(data?.late_access_remaining) || 0);
 }
 
 export function isCourseExamEnded(exam) {
@@ -270,9 +288,19 @@ export function getStudentExamCta(exam) {
   const remaining = getStudentAttemptsRemaining(data);
   const canStartNew = remaining === Infinity || remaining > 0;
   const examOpen = Boolean(data.is_active) && !ended && data.availability_status !== "expired";
+  const lateRemaining = Number(data.late_access_remaining) || 0;
 
   if (inProgress) {
     return { label: "استكمل المحاولة", disabled: false, kind: "start" };
+  }
+
+  // سماح المدرس بمحاولة إضافية بعد انتهاء الوقت أو استنفاد المحاولات
+  if (lateRemaining > 0 && data.is_active !== false) {
+    return {
+      label: `بدء محاولة إضافية (${lateRemaining})`,
+      disabled: false,
+      kind: "start",
+    };
   }
 
   if (examOpen && canStartNew) {

@@ -73,6 +73,7 @@ import {
 import { renderFormattedExamText } from "../../utils/renderFormattedExamText";
 import ExamEnrollmentSummary from "./components/ExamEnrollmentSummary";
 import ExamReportGroupExportButtons from "./components/ExamReportGroupExportButtons";
+import LateAccessGrantModal from "./components/LateAccessGrantModal";
 
 const NAVY = "#0E4C92";
 const NAVY_DEEP = "#082B57";
@@ -979,6 +980,9 @@ export default function ExamReportPage() {
   const enrollmentSummary = report?.enrollmentSummary;
   const notExaminedStudents = report?.notExaminedStudents || [];
   const examinedStudents = report?.examinedStudents || [];
+  const [lateAccessOpen, setLateAccessOpen] = useState(false);
+  const canGrantLateAccess =
+    isStaff && (kind === "course-level" || kind === "public");
   const groupFilter = report?.groupFilter;
   const studyGroups = useMemo(() => {
     const merged = new Map();
@@ -1263,6 +1267,18 @@ export default function ExamReportPage() {
                   <Text>المشتركون: {enrollmentSummary.enrolledTotal}</Text>
                 ) : null}
               </HStack>
+
+              {canGrantLateAccess ? (
+                <Button
+                  mt={4}
+                  size="sm"
+                  colorScheme="orange"
+                  borderRadius="full"
+                  onClick={() => setLateAccessOpen(true)}
+                >
+                  منح محاولة إضافية لطالب
+                </Button>
+              ) : null}
 
               <HStack mt={4} spacing={3} align="center" flexWrap="wrap">
                 <Text fontSize="sm" fontWeight="bold" opacity={0.95}>
@@ -1585,6 +1601,15 @@ export default function ExamReportPage() {
           )}
         </VStack>
       </Container>
+
+      <LateAccessGrantModal
+        isOpen={lateAccessOpen}
+        onClose={() => setLateAccessOpen(false)}
+        examId={examId}
+        examTitle={reportExam.title}
+        scope={kind === "public" ? "public" : "course"}
+        students={[...examinedStudents, ...notExaminedStudents]}
+      />
 
       <Modal
         isOpen={Boolean(imageZoomSrc)}

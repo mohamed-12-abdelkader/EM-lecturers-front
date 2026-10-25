@@ -13,11 +13,12 @@ import UserType from "../../Hooks/auth/userType";
 import { useTeacherCourseGroups } from "../../Hooks/course/useCourseGroups";
 import { fetchExamGrades } from "../../api/courseAssignmentReportsApi";
 import { normalizeStudyGroups } from "./utils/examReportUtils";
-import { FaBookOpen, FaUser, FaImage, FaChartBar, FaCompass, FaFilePdf } from "react-icons/fa";
+import { FaBookOpen, FaUser, FaImage, FaChartBar, FaCompass, FaFilePdf, FaUserPlus } from "react-icons/fa";
 import { BiSearch } from "react-icons/bi";
 import { FiDownload } from "react-icons/fi";
 import { PlatformExamTeacherCard } from "./components/PlatformExamQuestionCard";
 import AiQuestionExtractionModal from "./components/AiQuestionExtractionModal";
+import LateAccessGrantModal from "./components/LateAccessGrantModal";
 import { SubmissionCard } from "./components/ExamSubmissionsView";
 import { downloadExamGradesExcel, downloadExamGradesPdf, matchesStudentSearch } from "./utils/examSubmissionUtils";
 import { PaginationBar } from "../centerMgmt/components/UiBits";
@@ -113,6 +114,7 @@ const Exam = () => {
   const [imageUploadLoading, setImageUploadLoading] = useState(false);
   const [aiExtractionModalOpen, setAiExtractionModalOpen] = useState(false);
   const [examTourOpen, setExamTourOpen] = useState(false);
+  const [lateAccessOpen, setLateAccessOpen] = useState(false);
   const questionImageInputRef = useRef(null);
 
   const token = localStorage.getItem("token");
@@ -730,6 +732,20 @@ const Exam = () => {
                 {showGrades ? "الأسئلة" : "الدرجات"}
               </Button>
               <Button
+                size="sm"
+                bg="orange.400"
+                color="white"
+                borderRadius="lg"
+                leftIcon={<FaUserPlus />}
+                onClick={() => {
+                  if (gradesData.length === 0) fetchGrades();
+                  setLateAccessOpen(true);
+                }}
+                _hover={{ bg: "orange.500" }}
+              >
+                محاولة إضافية
+              </Button>
+              <Button
                 data-tour-id="platform-exam-report"
                 size="sm"
                 bg="whiteAlpha.200"
@@ -1231,6 +1247,15 @@ const Exam = () => {
           </ModalBody>
         </ModalContent>
       </Modal>
+
+      <LateAccessGrantModal
+        isOpen={lateAccessOpen}
+        onClose={() => setLateAccessOpen(false)}
+        examId={examId}
+        examTitle={examMeta?.examTitle || examTitle}
+        scope="course"
+        students={gradesData}
+      />
 
       <AiQuestionExtractionModal
         isOpen={aiExtractionModalOpen}
