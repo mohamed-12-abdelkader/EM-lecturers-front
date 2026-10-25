@@ -31,7 +31,7 @@ import {
   saveTeacherParentExamSettings,
   setTeacherParentExamEnabled,
   testTeacherParentExam,
-} from "../../../api/whatsappTeacherApi";
+} from "../../api/whatsappTeacherApi";
 
 function applyTeacherTemplate(template, title, score, total) {
   const text = template || "";
