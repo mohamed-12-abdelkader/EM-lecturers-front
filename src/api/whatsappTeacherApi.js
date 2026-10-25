@@ -96,3 +96,45 @@ export async function fetchTeacherCourseStudents() {
   });
   return data?.students || data?.data?.students || [];
 }
+
+export async function fetchTeacherParentExamSettings() {
+  const { data } = await baseUrl.get(`${API}/parents-exam/settings`, { headers: authHeaders() });
+  return data?.data || data;
+}
+
+export async function saveTeacherParentExamSettings(payload) {
+  const { data } = await baseUrl.put(`${API}/parents-exam/settings`, payload, {
+    headers: authHeaders("application/json"),
+  });
+  return data?.data || data;
+}
+
+export async function fetchTeacherParentExams() {
+  const { data } = await baseUrl.get(`${API}/parents-exam/exams`, { headers: authHeaders() });
+  return data?.data?.exams || [];
+}
+
+export async function fetchTeacherParentExamPreview(examId) {
+  const { data } = await baseUrl.get(`${API}/parents-exam/exams/${examId}/preview`, {
+    headers: authHeaders(),
+  });
+  return data?.data || data;
+}
+
+export async function setTeacherParentExamEnabled(examId, enabled) {
+  const { data } = await baseUrl.put(
+    `${API}/parents-exam/exams/${examId}`,
+    { enabled },
+    { headers: authHeaders("application/json") },
+  );
+  return data?.data || data;
+}
+
+export async function testTeacherParentExam(examId, studentId, cohort) {
+  const { data } = await baseUrl.post(
+    `${API}/parents-exam/exams/${examId}/test`,
+    { studentId, cohort },
+    { headers: authHeaders("application/json") },
+  );
+  return data?.data || data;
+}

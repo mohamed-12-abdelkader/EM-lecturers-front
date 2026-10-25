@@ -35,6 +35,7 @@ import {
 } from "@chakra-ui/react";
 import { MdRefresh, MdAdd, MdQrCode, MdDelete, MdSync, MdSend } from "react-icons/md";
 import { FaWhatsapp } from "react-icons/fa";
+import TeacherParentExamPanel from "./TeacherParentExamPanel";
 import {
   fetchTeacherWaStatus,
   fetchTeacherWaServices,
@@ -379,6 +380,8 @@ export default function TeacherWhatsAppPage() {
               </SimpleGrid>
             )}
           </Box>
+
+          <TeacherParentExamPanel cardBg={cardBg} border={border} muted={muted} />
 
           {/* Services */}
           <Box bg={cardBg} border="1px solid" borderColor={border} borderRadius="xl" p={5}>
