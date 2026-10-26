@@ -138,3 +138,12 @@ export async function testTeacherParentExam(examId, studentId, cohort) {
   );
   return data?.data || data;
 }
+
+export async function sendMissingTeacherParentExam(examId) {
+  const { data } = await baseUrl.post(
+    `${API}/parents-exam/exams/${examId}/send-missing`,
+    {},
+    { headers: authHeaders("application/json") },
+  );
+  return data?.data || data;
+}

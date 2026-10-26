@@ -34,6 +34,7 @@ import ExamStudentSettingsFields, {
 import { startCourseExamAttempt, translateCourseExamStudentError } from "../../../api/courseExamsApi";
 import {
   fetchTeacherParentExams,
+  sendMissingTeacherParentExam,
   setTeacherParentExamEnabled,
 } from "../../../api/whatsappTeacherApi";
 import { persistAttemptId } from "../../../utils/examAttemptProgress";
@@ -252,6 +253,7 @@ const ExamCard = ({
   const navigate = useNavigate();
   const toast = useToast();
   const [startingExam, setStartingExam] = useState(false);
+  const [sendingParents, setSendingParents] = useState(false);
   const cardBg = useColorModeValue("white", "gray.800");
   const border = useColorModeValue("blackAlpha.100", "whiteAlpha.150");
   const titleColor = useColorModeValue("slate.800", "white");
@@ -651,6 +653,44 @@ const ExamCard = ({
               />
             </Tooltip>
           </HStack>
+          <Button
+            mt={2}
+            size="sm"
+            w="full"
+            variant="outline"
+            colorScheme="green"
+            isLoading={sendingParents}
+            onClick={() => {
+              const ok = window.confirm(
+                "هيتم إرسال رسالة لكل ولي أمر ما وصلتهوش نتيجة الامتحان ده. الإرسال متباعد، ومش هتتبعت تاني للي وصلته.",
+              );
+              if (!ok) return;
+              setSendingParents(true);
+              void sendMissingTeacherParentExam(exam.id)
+                .then((result) => {
+                  const placed = Number(result?.placed || 0);
+                  toast({
+                    title: placed
+                      ? `اتجدولت ${placed} رسالة لأولياء الأمور`
+                      : "مفيش أولياء أمور ناقصين رسالة",
+                    description: result?.notReady
+                      ? "اللي لسه بيحل، أو اللي ما دخلش والامتحان لسه مفتوح، هيستنوا."
+                      : undefined,
+                    status: "success",
+                  });
+                })
+                .catch((err) => {
+                  toast({
+                    title: "تعذّر إرسال إشعارات أولياء الأمور",
+                    description: err?.response?.data?.message || err.message,
+                    status: "error",
+                  });
+                })
+                .finally(() => setSendingParents(false));
+            }}
+          >
+            إرسال إشعارات أولياء الأمور الناقصة
+          </Button>
         ) : null}
       </Box>
     </Box>

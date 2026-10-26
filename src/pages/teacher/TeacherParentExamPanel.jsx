@@ -30,6 +30,7 @@ import {
   fetchTeacherParentExams,
   saveTeacherParentExamSettings,
   setTeacherParentExamEnabled,
+  sendMissingTeacherParentExam,
   testTeacherParentExam,
 } from "../../api/whatsappTeacherApi";
 
@@ -224,6 +225,43 @@ export default function TeacherParentExamPanel({ cardBg, border, muted }) {
                       <Text fontSize="sm">{applyTeacherTemplate(prefs.template_failed, exam.title, 8, 20)}</Text>
                       <Text fontSize="sm">{applyTeacherTemplate(prefs.template_absent, exam.title, 0, 20)}</Text>
                       <HStack>
+                        <Button
+                          size="sm"
+                          colorScheme="blue"
+                          type="button"
+                          onClick={() => {
+                            const ok = window.confirm(
+                              "هيتم إرسال رسالة لكل ولي أمر ما وصلتهوش نتيجة الامتحان ده. الإرسال متباعد، ومش هتتبعت تاني للي وصلته.",
+                            );
+                            if (!ok) return;
+                            void sendMissingTeacherParentExam(exam.id)
+                              .then((result) => {
+                                const placed = Number(result?.placed || 0);
+                                toast({
+                                  title: placed
+                                    ? `اتجدولت ${placed} رسالة لأولياء الأمور`
+                                    : "مفيش أولياء أمور ناقصين رسالة",
+                                  description: result?.notReady
+                                    ? "اللي لسه بيحل، أو اللي ما دخلش والامتحان لسه مفتوح، هيستنوا."
+                                    : undefined,
+                                  status: "success",
+                                });
+                                return fetchTeacherParentExamPreview(exam.id);
+                              })
+                              .then((next) => {
+                                if (next) setPreview(next);
+                              })
+                              .catch((err) => {
+                                toast({
+                                  title: "تعذّر الإرسال",
+                                  description: err?.response?.data?.message || err.message,
+                                  status: "error",
+                                });
+                              });
+                          }}
+                        >
+                          إرسال الناقص
+                        </Button>
                         <Button
                           size="sm"
                           type="button"
