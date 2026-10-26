@@ -38,7 +38,7 @@ import {
   saveParentsExamSettings,
 } from "../../../api/whatsappAdminApi";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 500;
 
 const STATUS_AR = {
   scheduled: "متجدول",
