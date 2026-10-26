@@ -51,6 +51,15 @@ const STATUS_AR = {
 
 const COHORT_AR = { passed: "ناجح", failed: "راسب", absent: "لم يدخل" };
 
+const SESSION_AR = {
+  ready: "جاهز",
+  qr: "بانتظار المسح",
+  pending: "قيد الاتصال",
+  authenticated: "تم التحقق",
+  disconnected: "غير متصل",
+  failed: "فشل",
+};
+
 function formatWhen(value) {
   if (!value) return "—";
   return new Date(value).toLocaleString("en-GB", {
@@ -63,6 +72,12 @@ function formatWhen(value) {
     minute: "2-digit",
     second: "2-digit",
   });
+}
+
+function sessionColor(status) {
+  if (status === "ready") return "green";
+  if (status === "qr" || status === "pending" || status === "authenticated") return "orange";
+  return "red";
 }
 
 function statusColor(status) {
@@ -283,6 +298,52 @@ export default function ParentsExamNotifyPage() {
             </Badge>
           ))}
         </HStack>
+        <Box bg={cardBg} border="1px solid" borderColor={border} borderRadius="xl" p={4} mb={4}>
+          <Heading size="sm" mb={3}>أرقام المدرسين</Heading>
+          {(monitor?.teachers?.missing || []).length ? (
+            <Alert status="warning" borderRadius="lg" mb={3}>
+              <AlertIcon />
+              بدون رقم جاهز على إشعارات الطلاب: {(monitor.teachers.missing || []).map((t) => t.teacherName).join("، ")}
+            </Alert>
+          ) : null}
+          <Box overflowX="auto">
+            <Table size="sm">
+              <Thead>
+                <Tr>
+                  <Th>المدرس</Th>
+                  <Th>الرقم</Th>
+                  <Th>الحالة</Th>
+                  <Th>الخدمة</Th>
+                  <Th>آخر اتصال</Th>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {(monitor?.teachers?.numbers || [])
+                  .filter((row) => {
+                    const needle = query.trim();
+                    if (!needle) return true;
+                    return `${row.teacherName} ${row.phone} ${row.serviceName}`.includes(needle);
+                  })
+                  .map((row) => (
+                    <Tr key={`${row.slug}-${row.serviceKey || "none"}`}>
+                      <Td>{row.teacherName}</Td>
+                      <Td dir="ltr" textAlign="right">{row.phone || "—"}</Td>
+                      <Td>
+                        <Badge colorScheme={sessionColor(row.status)}>
+                          {SESSION_AR[row.status] || row.status}
+                        </Badge>
+                        {!row.enabled || (row.serviceKey && !row.linkEnabled) ? (
+                          <Badge ml={1} colorScheme="gray">موقوف</Badge>
+                        ) : null}
+                      </Td>
+                      <Td>{row.serviceName || "غير مربوط بخدمة"}</Td>
+                      <Td>{formatWhen(row.lastReadyAt)}</Td>
+                    </Tr>
+                  ))}
+              </Tbody>
+            </Table>
+          </Box>
+        </Box>
         <HStack mb={3} wrap="wrap">
           <Input
             placeholder="اسم المدرس أو الامتحان أو الطالب"
