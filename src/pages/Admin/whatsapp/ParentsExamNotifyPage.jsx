@@ -51,6 +51,20 @@ const STATUS_AR = {
 
 const COHORT_AR = { passed: "ناجح", failed: "راسب", absent: "لم يدخل" };
 
+function formatWhen(value) {
+  if (!value) return "—";
+  return new Date(value).toLocaleString("en-GB", {
+    timeZone: "Africa/Cairo",
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
 function statusColor(status) {
   if (status === "sent") return "green";
   if (status === "failed" || status === "dead" || status === "skipped") return "red";
@@ -255,7 +269,7 @@ export default function ParentsExamNotifyPage() {
         </Box>
         <Text color={muted} mb={2}>
           اتبعتت النهاردة على كل المدرسين: {settings?.sentToday ?? 0}. الحد اليومي لكل مدرس: {draft.daily_cap}.
-          أقرب رسالة في الطابور: {monitor?.nextAt ? new Date(monitor.nextAt).toLocaleString("ar-EG") : "مفيش"}.
+          أقرب رسالة في الطابور: {monitor?.nextAt ? formatWhen(monitor.nextAt) : "مفيش"}.
         </Text>
         <HStack mb={3} wrap="wrap">
           {(monitor?.summary || []).map((item) => (
@@ -363,7 +377,7 @@ export default function ParentsExamNotifyPage() {
                       "—"
                     )}
                   </Td>
-                  <Td>{row.scheduledAt ? new Date(row.scheduledAt).toLocaleString("ar-EG") : "—"}</Td>
+                  <Td>{formatWhen(row.scheduledAt)}</Td>
                   <Td maxW="240px">
                     <Text fontSize="xs" noOfLines={3}>
                       {row.error || row.skipReason || "—"}
