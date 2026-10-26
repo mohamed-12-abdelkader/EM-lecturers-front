@@ -174,11 +174,16 @@ export default function ParentsExamNotifyPage() {
   const runAction = async (action, scope, ids) => {
     const chosen = ids || selected;
     const allMatching = scope === "filter";
-    const label = action === "cancel" ? "إلغاء" : "إرسال الآن";
+    const removing = action === "remove";
+    const label = removing ? "حذف" : "إرسال الآن";
     const ok = window.confirm(
       allMatching
-        ? `${label} لكل الرسائل المتجدولة التي تطابق البحث الحالي، وليس الصفحة الظاهرة فقط.`
-        : `${label} للرسائل المحددة (${chosen.length}).`,
+        ? removing
+          ? "هتتحذف كل الرسائل المتجدولة اللي تطابق البحث. لو المدرس ضغط إرسال الناقص هتجدول تاني."
+          : `${label} لكل الرسائل المتجدولة التي تطابق البحث الحالي، وليس الصفحة الظاهرة فقط.`
+        : removing
+          ? `هتتحذف الرسائل المحددة (${chosen.length}). لو المدرس ضغط إرسال الناقص هتجدول تاني.`
+          : `${label} للرسائل المحددة (${chosen.length}).`,
     );
     if (!ok) return;
     if (!allMatching && !chosen.length) return;
@@ -193,7 +198,7 @@ export default function ParentsExamNotifyPage() {
         cohort: cohort || null,
       });
       toast({
-        title: action === "cancel" ? `اتلغى ${result?.affected || 0}` : `اتقدم ${result?.affected || 0} للإرسال الآن`,
+        title: action === "remove" ? `اتمسح ${result?.affected || 0}` : `اتقدم ${result?.affected || 0} للإرسال الآن`,
         status: "success",
       });
       await load({ ...filters, page });
@@ -390,14 +395,14 @@ export default function ParentsExamNotifyPage() {
           <Button size="sm" colorScheme="blue" isDisabled={!selected.length} isLoading={acting} onClick={() => void runAction("send_now", "selected")}>
             إرسال المحدد الآن
           </Button>
-          <Button size="sm" colorScheme="red" variant="outline" isDisabled={!selected.length} isLoading={acting} onClick={() => void runAction("cancel", "selected")}>
-            إلغاء المحدد
+          <Button size="sm" colorScheme="red" variant="outline" isDisabled={!selected.length} isLoading={acting} onClick={() => void runAction("remove", "selected")}>
+            حذف المحدد
           </Button>
           <Button size="sm" variant="outline" isLoading={acting} onClick={() => void runAction("send_now", "filter")}>
             إرسال نتائج البحث الآن
           </Button>
-          <Button size="sm" colorScheme="red" variant="ghost" isLoading={acting} onClick={() => void runAction("cancel", "filter")}>
-            إلغاء نتائج البحث المتجدولة
+          <Button size="sm" colorScheme="red" variant="ghost" isLoading={acting} onClick={() => void runAction("remove", "filter")}>
+            حذف نتائج البحث المتجدولة
           </Button>
         </HStack>
         <Box overflowX="auto" border="1px solid" borderColor={border} borderRadius="xl">
@@ -466,8 +471,8 @@ export default function ParentsExamNotifyPage() {
                         <Button size="xs" colorScheme="blue" isLoading={acting} onClick={() => void runAction("send_now", "selected", [row.id])}>
                           الآن
                         </Button>
-                        <Button size="xs" colorScheme="red" variant="outline" isLoading={acting} onClick={() => void runAction("cancel", "selected", [row.id])}>
-                          إلغاء
+                        <Button size="xs" colorScheme="red" variant="outline" isLoading={acting} onClick={() => void runAction("remove", "selected", [row.id])}>
+                          حذف
                         </Button>
                       </HStack>
                     ) : null}
