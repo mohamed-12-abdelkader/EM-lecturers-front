@@ -256,11 +256,21 @@ export default function ParentsExamNotifyPage() {
                 <NumberInput
                   min={1}
                   max={5000}
-                  value={draft.daily_cap}
-                  onChange={(_t, n) => setDraft({ ...draft, daily_cap: n })}
+                  value={draft.daily_cap || ""}
+                  isDisabled={!draft.daily_cap}
+                  onChange={(_t, n) => setDraft({ ...draft, daily_cap: Number.isFinite(n) ? n : draft.daily_cap })}
                 >
-                  <NumberInputField />
+                  <NumberInputField placeholder="غير محدود" />
                 </NumberInput>
+                <FormControl display="flex" alignItems="center" mt={2}>
+                  <FormLabel mb={0} fontSize="sm">بدون حد</FormLabel>
+                  <Switch
+                    isChecked={!draft.daily_cap}
+                    onChange={(e) =>
+                      setDraft({ ...draft, daily_cap: e.target.checked ? 0 : 800 })
+                    }
+                  />
+                </FormControl>
               </FormControl>
             </HStack>
             <FormControl display="flex" alignItems="center">
@@ -283,7 +293,7 @@ export default function ParentsExamNotifyPage() {
           </VStack>
         </Box>
         <Text color={muted} mb={2}>
-          اتبعتت النهاردة على كل المدرسين: {settings?.sentToday ?? 0}. الحد اليومي لكل مدرس: {draft.daily_cap}.
+          اتبعتت النهاردة على كل المدرسين: {settings?.sentToday ?? 0}. الحد اليومي لكل مدرس: {draft.daily_cap ? draft.daily_cap : "غير محدود"}.
           أقرب رسالة في الطابور: {monitor?.nextAt ? formatWhen(monitor.nextAt) : "مفيش"}.
         </Text>
         <HStack mb={3} wrap="wrap">
