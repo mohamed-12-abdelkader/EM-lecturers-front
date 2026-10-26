@@ -572,6 +572,7 @@ const ExamCard = ({
         {primaryButton}
 
         {isTeacher ? (
+          <>
           <HStack spacing={1.5} mt={2.5} justify="center">
             <Tooltip label="محاولة إضافية لطالب" hasArrow>
               <IconButton
@@ -691,6 +692,7 @@ const ExamCard = ({
           >
             إرسال إشعارات أولياء الأمور الناقصة
           </Button>
+          </>
         ) : null}
       </Box>
     </Box>
