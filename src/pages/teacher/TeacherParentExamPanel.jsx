@@ -270,7 +270,9 @@ export default function TeacherParentExamPanel({ cardBg, border, muted }) {
                               .then(() => load())
                               .then(() =>
                                 toast({
-                                  title: exam.enabled ? "تم كتم الامتحان" : "تم تشغيل الامتحان",
+                                  title: exam.enabled
+                                    ? "تم كتم الامتحان وتوقفت رسائله المتجدولة"
+                                    : "تم تشغيل الامتحان",
                                   status: "success",
                                 }),
                               )
