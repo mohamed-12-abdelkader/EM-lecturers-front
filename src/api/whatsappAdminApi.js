@@ -208,6 +208,13 @@ export async function fetchParentsExamMonitor(params = {}) {
   return data?.data || data;
 }
 
+export async function controlParentsExamQueue(payload) {
+  const { data } = await baseUrl.post(`${API}/parents-exam/monitor/actions`, payload, {
+    headers: authHeaders(getToken(), "application/json"),
+  });
+  return data?.data || data;
+}
+
 export async function fetchParentsExamQueue() {
   const { data } = await baseUrl.get(`${API}/parents-exam/queue`, {
     headers: authHeaders(getToken()),

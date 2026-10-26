@@ -21,6 +21,7 @@ import {
   Th,
   Thead,
   Tr,
+  Checkbox,
   Badge,
   Input,
   Select,
@@ -31,6 +32,7 @@ import {
 import { FaWhatsapp } from "react-icons/fa";
 import { MdRefresh, MdSave } from "react-icons/md";
 import {
+  controlParentsExamQueue,
   fetchParentsExamMonitor,
   fetchParentsExamSettings,
   saveParentsExamSettings,
@@ -65,6 +67,9 @@ export default function ParentsExamNotifyPage() {
   const [monitor, setMonitor] = useState(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
+  const [cohort, setCohort] = useState("");
+  const [selected, setSelected] = useState([]);
+  const [acting, setActing] = useState(false);
   const pageBg = useColorModeValue("gray.50", "gray.900");
   const cardBg = useColorModeValue("white", "gray.800");
   const border = useColorModeValue("gray.200", "gray.700");
@@ -73,15 +78,22 @@ export default function ParentsExamNotifyPage() {
   const load = useCallback(async (filters) => {
     const q = filters?.q ?? "";
     const st = filters?.status ?? "";
+    const co = filters?.cohort ?? "";
     setLoading(true);
     try {
       const [next, activity] = await Promise.all([
         fetchParentsExamSettings(),
-        fetchParentsExamMonitor({ q: q || undefined, status: st || undefined, limit: 80 }),
+        fetchParentsExamMonitor({
+          q: q || undefined,
+          status: st || undefined,
+          cohort: co || undefined,
+          limit: 80,
+        }),
       ]);
       setSettings(next);
       setDraft(next?.config || null);
       setMonitor(activity);
+      setSelected([]);
     } catch (err) {
       toast({
         title: "تعذّر تحميل الإعدادات",
@@ -120,6 +132,47 @@ export default function ParentsExamNotifyPage() {
     }
   };
 
+  const filters = { q: query, status, cohort };
+  const visibleIds = (monitor?.rows || []).map((row) => row.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.includes(id));
+
+  const runAction = async (action, scope, ids) => {
+    const chosen = ids || selected;
+    const allMatching = scope === "filter";
+    const label = action === "cancel" ? "إلغاء" : "إرسال الآن";
+    const ok = window.confirm(
+      allMatching
+        ? `${label} لكل الرسائل المتجدولة التي تطابق البحث الحالي، وليس الصفحة الظاهرة فقط.`
+        : `${label} للرسائل المحددة (${chosen.length}).`,
+    );
+    if (!ok) return;
+    if (!allMatching && !chosen.length) return;
+    setActing(true);
+    try {
+      const result = await controlParentsExamQueue({
+        action,
+        ids: allMatching ? undefined : chosen,
+        allMatching,
+        q: query || null,
+        status: status || null,
+        cohort: cohort || null,
+      });
+      toast({
+        title: action === "cancel" ? `اتلغى ${result?.affected || 0}` : `اتقدم ${result?.affected || 0} للإرسال الآن`,
+        status: "success",
+      });
+      await load(filters);
+    } catch (err) {
+      toast({
+        title: "تعذّر تنفيذ الأمر",
+        description: err?.response?.data?.message || err.message,
+        status: "error",
+      });
+    } finally {
+      setActing(false);
+    }
+  };
+
   if (!draft) {
     return (
       <Flex minH="40vh" align="center" justify="center">
@@ -130,13 +183,13 @@ export default function ParentsExamNotifyPage() {
 
   return (
     <Box bg={pageBg} minH="40vh" py={4}>
-      <Container maxW="4xl">
+      <Container maxW="7xl">
         <Flex justify="space-between" align="center" mb={4}>
           <HStack>
             <FaWhatsapp color="#25D366" />
             <Heading size="md">حدود إرسال أولياء الأمور</Heading>
           </HStack>
-          <Button leftIcon={<MdRefresh />} size="sm" isLoading={loading} onClick={() => void load({ q: query, status })}>
+          <Button leftIcon={<MdRefresh />} size="sm" isLoading={loading} onClick={() => void load(filters)}>
             تحديث
           </Button>
         </Flex>
@@ -216,29 +269,56 @@ export default function ParentsExamNotifyPage() {
             </Badge>
           ))}
         </HStack>
-        <HStack mb={3}>
+        <HStack mb={3} wrap="wrap">
           <Input
             placeholder="اسم المدرس أو الامتحان أو الطالب"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             bg={cardBg}
           />
-          <Select value={status} onChange={(e) => setStatus(e.target.value)} bg={cardBg} maxW="220px">
+          <Select value={status} onChange={(e) => setStatus(e.target.value)} bg={cardBg} maxW="180px">
             <option value="">كل الحالات</option>
             <option value="scheduled">متجدول</option>
             <option value="sent">اتبعت</option>
             <option value="failed">فشل</option>
             <option value="dead">وقف</option>
             <option value="skipped">اتقفّز</option>
+            <option value="cancelled">اتلغى</option>
           </Select>
-          <Button size="sm" onClick={() => void load({ q: query, status })}>
+          <Select value={cohort} onChange={(e) => setCohort(e.target.value)} bg={cardBg} maxW="160px">
+            <option value="">كل الأنواع</option>
+            <option value="passed">ناجح</option>
+            <option value="failed">راسب</option>
+            <option value="absent">لم يدخل</option>
+          </Select>
+          <Button size="sm" onClick={() => void load(filters)}>
             بحث
+          </Button>
+        </HStack>
+        <HStack mb={3} wrap="wrap">
+          <Button size="sm" colorScheme="blue" isDisabled={!selected.length} isLoading={acting} onClick={() => void runAction("send_now", "selected")}>
+            إرسال المحدد الآن
+          </Button>
+          <Button size="sm" colorScheme="red" variant="outline" isDisabled={!selected.length} isLoading={acting} onClick={() => void runAction("cancel", "selected")}>
+            إلغاء المحدد
+          </Button>
+          <Button size="sm" variant="outline" isLoading={acting} onClick={() => void runAction("send_now", "filter")}>
+            إرسال نتائج البحث الآن
+          </Button>
+          <Button size="sm" colorScheme="red" variant="ghost" isLoading={acting} onClick={() => void runAction("cancel", "filter")}>
+            إلغاء نتائج البحث المتجدولة
           </Button>
         </HStack>
         <Box overflowX="auto" border="1px solid" borderColor={border} borderRadius="xl">
           <Table size="sm" bg={cardBg}>
             <Thead>
               <Tr>
+                <Th>
+                  <Checkbox
+                    isChecked={allVisibleSelected}
+                    onChange={(e) => setSelected(e.target.checked ? visibleIds : [])}
+                  />
+                </Th>
                 <Th>المدرس</Th>
                 <Th>الامتحان</Th>
                 <Th>الطالب</Th>
@@ -246,11 +326,22 @@ export default function ParentsExamNotifyPage() {
                 <Th>الطابور</Th>
                 <Th>الموعد</Th>
                 <Th>الخطأ</Th>
+                <Th></Th>
               </Tr>
             </Thead>
             <Tbody>
               {(monitor?.rows || []).map((row) => (
                 <Tr key={row.id}>
+                  <Td>
+                    <Checkbox
+                      isChecked={selected.includes(row.id)}
+                      onChange={(e) =>
+                        setSelected((current) =>
+                          e.target.checked ? [...current, row.id] : current.filter((id) => id !== row.id),
+                        )
+                      }
+                    />
+                  </Td>
                   <Td>{row.teacherName || "—"}</Td>
                   <Td>{row.examTitle}</Td>
                   <Td>
@@ -277,6 +368,18 @@ export default function ParentsExamNotifyPage() {
                     <Text fontSize="xs" noOfLines={3}>
                       {row.error || row.skipReason || "—"}
                     </Text>
+                  </Td>
+                  <Td>
+                    {row.status === "scheduled" ? (
+                      <HStack>
+                        <Button size="xs" colorScheme="blue" isLoading={acting} onClick={() => void runAction("send_now", "selected", [row.id])}>
+                          الآن
+                        </Button>
+                        <Button size="xs" colorScheme="red" variant="outline" isLoading={acting} onClick={() => void runAction("cancel", "selected", [row.id])}>
+                          إلغاء
+                        </Button>
+                      </HStack>
+                    ) : null}
                   </Td>
                 </Tr>
               ))}
