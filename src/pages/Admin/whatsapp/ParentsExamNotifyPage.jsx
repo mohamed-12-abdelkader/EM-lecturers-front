@@ -38,6 +38,8 @@ import {
   saveParentsExamSettings,
 } from "../../../api/whatsappAdminApi";
 
+const PAGE_SIZE = 50;
+
 const STATUS_AR = {
   scheduled: "متجدول",
   sent: "اتبعت",
@@ -97,6 +99,7 @@ export default function ParentsExamNotifyPage() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
   const [cohort, setCohort] = useState("");
+  const [page, setPage] = useState(1);
   const [selected, setSelected] = useState([]);
   const [acting, setActing] = useState(false);
   const pageBg = useColorModeValue("gray.50", "gray.900");
@@ -108,6 +111,7 @@ export default function ParentsExamNotifyPage() {
     const q = filters?.q ?? "";
     const st = filters?.status ?? "";
     const co = filters?.cohort ?? "";
+    const nextPage = Math.max(1, Number(filters?.page) || 1);
     setLoading(true);
     try {
       const [next, activity] = await Promise.all([
@@ -116,12 +120,14 @@ export default function ParentsExamNotifyPage() {
           q: q || undefined,
           status: st || undefined,
           cohort: co || undefined,
-          limit: 80,
+          page: nextPage,
+          limit: PAGE_SIZE,
         }),
       ]);
       setSettings(next);
       setDraft(next?.config || null);
       setMonitor(activity);
+      setPage(activity?.page || nextPage);
       setSelected([]);
     } catch (err) {
       toast({
@@ -190,7 +196,7 @@ export default function ParentsExamNotifyPage() {
         title: action === "cancel" ? `اتلغى ${result?.affected || 0}` : `اتقدم ${result?.affected || 0} للإرسال الآن`,
         status: "success",
       });
-      await load(filters);
+      await load({ ...filters, page });
     } catch (err) {
       toast({
         title: "تعذّر تنفيذ الأمر",
@@ -376,7 +382,7 @@ export default function ParentsExamNotifyPage() {
             <option value="failed">راسب</option>
             <option value="absent">لم يدخل</option>
           </Select>
-          <Button size="sm" onClick={() => void load(filters)}>
+          <Button size="sm" onClick={() => void load({ ...filters, page: 1 })}>
             بحث
           </Button>
         </HStack>
@@ -470,6 +476,47 @@ export default function ParentsExamNotifyPage() {
               ))}
             </Tbody>
           </Table>
+          <Flex
+            justify="space-between"
+            align="center"
+            px={3}
+            py={2}
+            borderTop="1px solid"
+            borderColor={border}
+            bg={cardBg}
+            wrap="wrap"
+            gap={2}
+          >
+            <Text fontSize="sm" color={muted}>
+              {monitor?.total
+                ? `${(page - 1) * (monitor.pageSize || PAGE_SIZE) + 1}–${Math.min(
+                    page * (monitor.pageSize || PAGE_SIZE),
+                    monitor.total,
+                  )} من ${monitor.total}`
+                : "لا توجد رسائل"}
+            </Text>
+            <HStack>
+              <Button
+                size="sm"
+                variant="outline"
+                isDisabled={page <= 1 || loading}
+                onClick={() => void load({ ...filters, page: page - 1 })}
+              >
+                السابق
+              </Button>
+              <Text fontSize="sm">
+                {page} / {monitor?.totalPages || 1}
+              </Text>
+              <Button
+                size="sm"
+                variant="outline"
+                isDisabled={page >= (monitor?.totalPages || 1) || loading}
+                onClick={() => void load({ ...filters, page: page + 1 })}
+              >
+                التالي
+              </Button>
+            </HStack>
+          </Flex>
         </Box>
       </Container>
     </Box>
