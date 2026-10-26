@@ -200,6 +200,14 @@ export async function saveParentsExamSettings(payload) {
   return data?.data || data;
 }
 
+export async function fetchParentsExamMonitor(params = {}) {
+  const { data } = await baseUrl.get(`${API}/parents-exam/monitor`, {
+    headers: authHeaders(getToken()),
+    params,
+  });
+  return data?.data || data;
+}
+
 export async function fetchParentsExamQueue() {
   const { data } = await baseUrl.get(`${API}/parents-exam/queue`, {
     headers: authHeaders(getToken()),
