@@ -32,6 +32,10 @@ import ExamStudentSettingsFields, {
   inferAnswersReleaseMode,
 } from "../../../components/exam/ExamStudentSettingsFields";
 import { startCourseExamAttempt, translateCourseExamStudentError } from "../../../api/courseExamsApi";
+import {
+  fetchTeacherParentExams,
+  setTeacherParentExamEnabled,
+} from "../../../api/whatsappTeacherApi";
 import { persistAttemptId } from "../../../utils/examAttemptProgress";
 import LateAccessGrantModal from "../../exam/components/LateAccessGrantModal";
 
@@ -50,6 +54,7 @@ const initialExamFormState = {
   answers_visible_at: "",
   is_active: true,
   attempt_limit: "",
+  notify_parents: true,
 };
 
 const validateExamFlowSettings = (payload) => {
@@ -818,7 +823,19 @@ const CourseExamsTab = ({
         }
       } : {};
 
-      await baseUrl.post(`/api/exams`, requestData, config);
+      const created = await baseUrl.post(`/api/exams`, requestData, config);
+      const examId = created.data?.exam?.id;
+      if (examId) {
+        try {
+          await setTeacherParentExamEnabled(examId, Boolean(form.notify_parents));
+        } catch (notifyErr) {
+          toast({
+            title: "تم إنشاء الامتحان، وتعذّر حفظ إشعار ولي الأمر",
+            description: notifyErr.response?.data?.message || notifyErr.message,
+            status: "warning",
+          });
+        }
+      }
       toast({ title: "تم إنشاء الامتحان بنجاح", status: "success" });
       setCreateModalOpen(false);
       setForm({ ...initialExamFormState });
@@ -855,11 +872,32 @@ const CourseExamsTab = ({
       answers_visible_at: toDateTimeLocalValue(exam?.answers_visible_at),
       is_active: exam?.is_active ?? true,
       attempt_limit: exam?.attempt_limit?.toString() || "",
+      notify_parents: true,
     });
 
     React.useEffect(() => {
+      if (!exam?.id) return;
+      let cancelled = false;
+      fetchTeacherParentExams()
+        .then((rows) => {
+          if (cancelled) return;
+          const row = (Array.isArray(rows) ? rows : []).find(
+            (item) => Number(item.id) === Number(exam.id),
+          );
+          setFormData((prev) => ({
+            ...prev,
+            notify_parents: row ? row.enabled !== false : true,
+          }));
+        })
+        .catch(() => {});
+      return () => {
+        cancelled = true;
+      };
+    }, [exam?.id]);
+
+    React.useEffect(() => {
       if (exam) {
-        setFormData({
+        setFormData((prev) => ({
           title: exam.title || "",
           questions_count: exam.questions_count?.toString() || "",
           question_display_mode:
@@ -880,7 +918,8 @@ const CourseExamsTab = ({
           answers_visible_at: toDateTimeLocalValue(exam.answers_visible_at),
           is_active: exam.is_active ?? true,
           attempt_limit: exam.attempt_limit?.toString() || "",
-        });
+          notify_parents: prev.notify_parents !== false,
+        }));
       }
     }, [exam]);
 
@@ -913,6 +952,13 @@ const CourseExamsTab = ({
         answers_visible_at: fromDateTimeLocalValue(formData.answers_visible_at),
       });
       const payloadToSend = buildExamPayload(normalizedPayload);
+      setTeacherParentExamEnabled(exam.id, Boolean(formData.notify_parents)).catch((notifyErr) => {
+        toast({
+          title: "تعذّر حفظ إشعار ولي الأمر",
+          description: notifyErr.response?.data?.message || notifyErr.message,
+          status: "warning",
+        });
+      });
       onSubmit(exam.id, payloadToSend);
     };
 
@@ -1112,6 +1158,18 @@ const CourseExamsTab = ({
                         }
                       />
                     </FormControl>
+                    <ExamSwitchRow
+                      label="إشعار ولي الأمر تلقائياً"
+                      hint="عند الإغلاق يُرسل لولي الأمر نتيجة النجاح أو الرسوب أو عدم الدخول"
+                      colorScheme="green"
+                      isChecked={Boolean(formData.notify_parents)}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          notify_parents: e.target.checked,
+                        }))
+                      }
+                    />
                     <FormControl>
                       <FormLabel>حد المحاولات</FormLabel>
                       <NumberInput
@@ -1686,6 +1744,15 @@ const CourseExamsTab = ({
                         setForm((f) => ({ ...f, is_active: e.target.checked }))
                         }
                       />
+                    <ExamSwitchRow
+                      label="إشعار ولي الأمر تلقائياً"
+                      hint="عند الإغلاق يُرسل لولي الأمر نتيجة النجاح أو الرسوب أو عدم الدخول"
+                      colorScheme="green"
+                      isChecked={form.notify_parents}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, notify_parents: e.target.checked }))
+                      }
+                    />
                     <FormControl>
                       <FormLabel fontSize="sm" fontWeight="600">
                         حد المحاولات
