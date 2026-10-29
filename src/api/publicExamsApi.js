@@ -473,10 +473,27 @@ export async function addPublicExamPassageQuestions(examId, passageId, token) {
   return data;
 }
 
-/** PUT /api/questions/:questionId */
-export async function updatePublicExamQuestion(questionId, payload, token) {
+function unwrapPublicQuestionResult(data) {
+  const raw = data?.question ?? null;
+  const question = raw ? normalizeExamQuestionsFromApi([raw])[0] || null : null;
+  const image =
+    question?.image ??
+    raw?.questionImage ??
+    raw?.question_image ??
+    null;
+  return {
+    question,
+    image,
+    message: data?.message || "",
+    correctAnswers: data?.correctAnswers,
+    regrade: data?.regrade,
+  };
+}
+
+/** PUT /api/public-exams/:examId/questions/:questionId */
+export async function updatePublicExamQuestion(examId, questionId, payload = {}, token) {
   const { data } = await baseUrl.put(
-    `${QUESTIONS_API}/${encodeURIComponent(questionId)}`,
+    `${API}/${encodeURIComponent(examId)}/questions/${encodeURIComponent(questionId)}`,
     payload,
     {
       headers: {
@@ -485,7 +502,33 @@ export async function updatePublicExamQuestion(questionId, payload, token) {
       },
     },
   );
-  return data?.question ?? data;
+  return unwrapPublicQuestionResult(data);
+}
+
+/**
+ * POST /api/public-exams/:examId/questions/:questionId/image
+ * ملف questionImage أو رابط { questionImage }.
+ */
+export async function uploadPublicExamQuestionImage(examId, questionId, fileOrUrl, token) {
+  const isFile = typeof File !== "undefined" && fileOrUrl instanceof File;
+  const url = `${API}/${encodeURIComponent(examId)}/questions/${encodeURIComponent(questionId)}/image`;
+  if (isFile) {
+    const formData = new FormData();
+    formData.append("questionImage", fileOrUrl);
+    const { data } = await baseUrl.post(url, formData, { headers: authHeaders(token) });
+    return unwrapPublicQuestionResult(data);
+  }
+  const { data } = await baseUrl.post(
+    url,
+    { questionImage: fileOrUrl },
+    {
+      headers: {
+        ...authHeaders(token),
+        "Content-Type": "application/json",
+      },
+    },
+  );
+  return unwrapPublicQuestionResult(data);
 }
 
 /** DELETE /api/questions/:questionId */

@@ -36,6 +36,7 @@ import {
   Tabs,
   Text,
   Textarea,
+  Tooltip,
   useDisclosure,
   useToast,
   VStack,
@@ -48,6 +49,7 @@ import {
   FaChartBar,
   FaEye,
   FaEyeSlash,
+  FaEdit,
   FaImage,
   FaPlus,
   FaSync,
@@ -66,11 +68,12 @@ import {
   addPublicExamTextQuestion,
   deletePublicExamQuestion,
   fetchPublicExam,
+  uploadPublicExamQuestionImage,
   fetchPublicExamQuestions,
-  patchPublicExamQuestionCorrectAnswers,
   publicExamsApiError,
   publishPublicExam,
   unpublishPublicExam,
+  updatePublicExamQuestion,
 } from "../../api/publicExamsApi";
 import {
   fetchTeacherLibraryGrades,
@@ -83,6 +86,8 @@ import {
 import { PlatformExamTeacherCard } from "../exam/components/PlatformExamQuestionCard";
 import AiQuestionExtractionModal from "../exam/components/AiQuestionExtractionModal";
 import LateAccessGrantModal from "../exam/components/LateAccessGrantModal";
+import FormattedQuestionText from "../../components/question/FormattedQuestionText";
+import { filesFromClipboardEvent } from "../../api/ocrQuestionExtractionApi";
 import {
   DailyQuizHero,
   DailyQuizPageShell,
@@ -147,6 +152,14 @@ export default function TeacherPublicExamManagePage() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [imageZoom, setImageZoom] = useState(null);
+  const [imageUploadQuestionId, setImageUploadQuestionId] = useState(null);
+  const [imageUploadLoading, setImageUploadLoading] = useState(false);
+  const [imagePasteQuestion, setImagePasteQuestion] = useState(null);
+  const questionImageInputRef = useRef(null);
+  const imagePasteZoneRef = useRef(null);
+  const [editModal, setEditModal] = useState({ open: false, question: null });
+  const [editForm, setEditForm] = useState({ text: "", choices: [], correctLetters: [] });
+  const [editSaving, setEditSaving] = useState(false);
 
   const [bulkText, setBulkText] = useState("");
   const [bulkAnswers, setBulkAnswers] = useState("");
@@ -373,13 +386,21 @@ export default function TeacherPublicExamManagePage() {
     );
     setPendingCorrect((prev) => ({ ...prev, [qid]: true }));
     try {
-      const patchRes = await patchPublicExamQuestionCorrectAnswers(qid, next, token);
-      const saved = normalizeCorrectAnswerLetters(patchRes?.correctAnswers || next);
+      const result = await updatePublicExamQuestion(examId, qid, { correctAnswers: next }, token);
+      const saved = normalizeCorrectAnswerLetters(result.correctAnswers || next);
       setQuestions((prev) =>
-        prev.map((q) => (q.id === qid ? applyCorrectLetters(q, saved) : q)),
+        prev.map((q) =>
+          q.id === qid
+            ? applyCorrectLetters(result.question ? { ...q, ...result.question } : q, saved)
+            : q,
+        ),
       );
+      const regrade = result.regrade;
       toast({
-        title: patchRes?.message || "تم تحديث الإجابة الصحيحة",
+        title: result.message || "تم تحديث الإجابة الصحيحة",
+        description: regrade
+          ? `تمت مراجعة ${regrade.answersReviewed ?? 0} إجابة · تحديث ${regrade.attemptsUpdated ?? 0} محاولة`
+          : undefined,
         status: "success",
         isClosable: true,
       });
@@ -419,6 +440,267 @@ export default function TeacherPublicExamManagePage() {
       });
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const triggerQuestionImageInput = (question) => {
+    setImagePasteQuestion(question);
+  };
+
+  const imageUploadLock = useRef(false);
+
+  const uploadQuestionImageFile = async (questionId, file) => {
+    if (!file || !questionId || imageUploadLock.current) return;
+    imageUploadLock.current = true;
+
+    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
+    if (!allowed.includes(file.type)) {
+      imageUploadLock.current = false;
+      toast({
+        title: "صيغة غير مدعومة",
+        description: "المدعوم: jpeg, jpg, png, gif, webp",
+        status: "warning",
+        isClosable: true,
+      });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      imageUploadLock.current = false;
+      toast({
+        title: "الملف كبير",
+        description: "الحد الأقصى 10 ميجابايت",
+        status: "warning",
+        isClosable: true,
+      });
+      return;
+    }
+
+    setImageUploadQuestionId(questionId);
+    setImageUploadLoading(true);
+    try {
+      const result = await uploadPublicExamQuestionImage(examId, questionId, file, token);
+      if (result.image) {
+        setQuestions((prev) =>
+          prev.map((question) =>
+            question.id === questionId
+              ? {
+                  ...question,
+                  image: result.image,
+                  questionImage: result.image,
+                  question_image: result.image,
+                }
+              : question,
+          ),
+        );
+      } else {
+        const qs = await fetchPublicExamQuestions(examId, token);
+        setQuestions(qs);
+      }
+      setImagePasteQuestion(null);
+      toast({
+        title: result.message || "تمت إضافة صورة السؤال بنجاح",
+        status: "success",
+        isClosable: true,
+      });
+    } catch (err) {
+      toast({
+        title: publicExamsApiError(err, "فشل رفع الصورة"),
+        status: "error",
+        isClosable: true,
+      });
+    } finally {
+      imageUploadLock.current = false;
+      setImageUploadLoading(false);
+      setImageUploadQuestionId(null);
+    }
+  };
+
+  const handleQuestionImageUpload = async (event) => {
+    const file = event.target?.files?.[0];
+    const questionId = imagePasteQuestion?.id;
+    event.target.value = "";
+    if (!file || !questionId) return;
+    await uploadQuestionImageFile(questionId, file);
+  };
+
+  const pastedImageFile = (event) => {
+    const [fromItems] = filesFromClipboardEvent(event);
+    if (fromItems) return fromItems;
+    const file = event.clipboardData?.files?.[0];
+    if (file && String(file.type || "").startsWith("image/")) return file;
+    return null;
+  };
+
+  const handlePasteQuestionImage = async (event) => {
+    const file = pastedImageFile(event);
+    const questionId = imagePasteQuestion?.id;
+    if (!file || !questionId || imageUploadLoading) return;
+    event.preventDefault();
+    await uploadQuestionImageFile(questionId, file);
+  };
+
+  useEffect(() => {
+    if (!imagePasteQuestion) return undefined;
+    const timer = window.setTimeout(() => imagePasteZoneRef.current?.focus(), 50);
+    const onPaste = (event) => {
+      const tag = event.target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      const file = pastedImageFile(event);
+      if (!file) return;
+      event.preventDefault();
+      uploadQuestionImageFile(imagePasteQuestion.id, file);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("paste", onPaste);
+    };
+  }, [imagePasteQuestion]);
+
+  useEffect(() => {
+    if (!editModal.open) return undefined;
+    const onPaste = (event) => {
+      const tag = event.target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      const file = pastedImageFile(event);
+      if (!file) return;
+      event.preventDefault();
+      setEditForm((prev) => ({ ...prev, imageFile: file, removeImage: false }));
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [editModal.open]);
+
+  const openEditModal = (question) => {
+    const correctLetters = getQuestionCorrectLetters(question);
+    setEditForm({
+      text: question.text || "",
+      choices: (question.choices || []).map((choice, index) => ({
+        ...choice,
+        text: choice.text || choice.image || "",
+        letter: getChoiceLetter(choice, index),
+        is_correct: correctLetters.includes(getChoiceLetter(choice, index)),
+      })),
+      correctLetters,
+      imageFile: null,
+      removeImage: false,
+    });
+    setEditModal({ open: true, question });
+  };
+
+  const handleEditSave = async () => {
+    const { question } = editModal;
+    if (!question) return;
+    const correctLetters = normalizeCorrectAnswerLetters(editForm.correctLetters || []);
+    if (editForm.choices.length > 0 && (correctLetters.length < 1 || correctLetters.length > 2)) {
+      toast({
+        title: "حدد الإجابة الصحيحة",
+        description: "اختر إجابة واحدة أو إجابتين من A–D قبل الحفظ",
+        status: "warning",
+        isClosable: true,
+      });
+      return;
+    }
+
+    const payload = {};
+    if ((editForm.text || "") !== (question.text || "")) {
+      payload.questionText = editForm.text;
+    }
+    editForm.choices.forEach((choice, index) => {
+      const letter = getChoiceLetter(choice, index);
+      const original = (question.choices || []).find(
+        (item, itemIndex) => getChoiceLetter(item, itemIndex) === letter,
+      );
+      const originalText = original?.text || original?.image || "";
+      if ((choice.text ?? "") !== originalText) {
+        payload[`option${letter}`] = choice.text ?? "";
+      }
+    });
+    const originalLetters = getQuestionCorrectLetters(question).join(",");
+    if (editForm.choices.length > 0 && correctLetters.join(",") !== originalLetters) {
+      payload.correctAnswers = correctLetters;
+    }
+    if (editForm.removeImage && question.image) {
+      payload.questionImage = null;
+    }
+    if (editForm.imageFile) {
+      const allowed = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
+      if (!allowed.includes(editForm.imageFile.type)) {
+        toast({
+          title: "صيغة غير مدعومة",
+          description: "المدعوم: jpeg, jpg, png, gif, webp",
+          status: "warning",
+          isClosable: true,
+        });
+        return;
+      }
+      if (editForm.imageFile.size > 10 * 1024 * 1024) {
+        toast({
+          title: "الملف كبير",
+          description: "الحد الأقصى 10 ميجابايت",
+          status: "warning",
+          isClosable: true,
+        });
+        return;
+      }
+    }
+    if (!Object.keys(payload).length && !editForm.imageFile) {
+      toast({ title: "لا يوجد تغيير للحفظ", status: "info", isClosable: true });
+      return;
+    }
+
+    setEditSaving(true);
+    try {
+      let result = null;
+      if (Object.keys(payload).length) {
+        result = await updatePublicExamQuestion(examId, question.id, payload, token);
+      }
+      if (editForm.imageFile) {
+        result = await uploadPublicExamQuestionImage(
+          examId,
+          question.id,
+          editForm.imageFile,
+          token,
+        );
+      }
+      const savedLetters = normalizeCorrectAnswerLetters(
+        result?.correctAnswers || correctLetters,
+      );
+      setQuestions((prev) =>
+        prev.map((item) =>
+          item.id === question.id
+            ? applyCorrectLetters(
+                {
+                  ...(result?.question ? { ...item, ...result.question } : item),
+                  text: editForm.text,
+                  image: editForm.removeImage && !editForm.imageFile
+                    ? null
+                    : result?.image || item.image,
+                  choices: editForm.choices.map((choice) => ({ ...choice })),
+                },
+                savedLetters,
+              )
+            : item,
+        ),
+      );
+      setEditModal({ open: false, question: null });
+      const regrade = result?.regrade;
+      toast({
+        title: result?.message || "تم تعديل السؤال",
+        description: regrade
+          ? `تمت مراجعة ${regrade.answersReviewed ?? 0} إجابة · تحديث ${regrade.attemptsUpdated ?? 0} محاولة`
+          : undefined,
+        status: "success",
+        isClosable: true,
+      });
+    } catch (err) {
+      toast({
+        title: publicExamsApiError(err, "فشل تعديل السؤال"),
+        status: "error",
+        isClosable: true,
+      });
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -784,15 +1066,40 @@ export default function TeacherPublicExamManagePage() {
                   onSetCorrect={handleToggleCorrect}
                   onZoomImage={setImageZoom}
                   actions={
-                    <IconButton
-                      aria-label="حذف السؤال"
-                      icon={<FaTrash />}
-                      size="sm"
-                      colorScheme="red"
-                      variant="ghost"
-                      borderRadius="lg"
-                      onClick={() => setDeleteTarget(q.id)}
-                    />
+                    <HStack spacing={0}>
+                      <Tooltip label="إضافة أو لصق صورة السؤال" placement="top" hasArrow>
+                        <IconButton
+                          aria-label="صورة السؤال"
+                          icon={<FaImage />}
+                          size="sm"
+                          colorScheme="blue"
+                          variant="ghost"
+                          borderRadius="lg"
+                          onClick={() => triggerQuestionImageInput(q)}
+                          isLoading={imageUploadLoading && imageUploadQuestionId === q.id}
+                        />
+                      </Tooltip>
+                      <Tooltip label="تعديل السؤال" placement="top" hasArrow>
+                        <IconButton
+                          aria-label="تعديل السؤال"
+                          icon={<FaEdit />}
+                          size="sm"
+                          colorScheme="yellow"
+                          variant="ghost"
+                          borderRadius="lg"
+                          onClick={() => openEditModal(q)}
+                        />
+                      </Tooltip>
+                      <IconButton
+                        aria-label="حذف السؤال"
+                        icon={<FaTrash />}
+                        size="sm"
+                        colorScheme="red"
+                        variant="ghost"
+                        borderRadius="lg"
+                        onClick={() => setDeleteTarget(q.id)}
+                      />
+                    </HStack>
                   }
                 />
               ))}
@@ -1021,6 +1328,29 @@ export default function TeacherPublicExamManagePage() {
                     ))}
                     <FormControl>
                       <FormLabel fontSize="sm">صورة السؤال (اختياري)</FormLabel>
+                      <Box
+                        tabIndex={0}
+                        borderWidth="1px"
+                        borderStyle="dashed"
+                        borderColor="blue.200"
+                        borderRadius="xl"
+                        p={3}
+                        mb={2}
+                        outline="none"
+                        textAlign="center"
+                        _focus={{ borderColor: "blue.400" }}
+                        onPaste={(event) => {
+                          const file = pastedImageFile(event);
+                          if (!file) return;
+                          event.preventDefault();
+                          setSingleForm((current) => ({ ...current, imageFile: file }));
+                        }}
+                      >
+                        <Text fontSize="xs" color={theme.muted}>
+                          الصق صورة منسوخة هنا بـ Ctrl+V
+                          {singleForm.imageFile ? ` — ${singleForm.imageFile.name}` : ""}
+                        </Text>
+                      </Box>
                       <Input
                         type="file"
                         accept="image/*"
@@ -1039,9 +1369,28 @@ export default function TeacherPublicExamManagePage() {
                 </TabPanel>
                 <TabPanel px={0}>
                   <VStack align="stretch" spacing={3}>
-                    <Text fontSize="sm" color={theme.muted}>
-                      ارفع حتى 10 صور — كل صورة سؤال مستقل.
-                    </Text>
+                    <Box
+                      tabIndex={0}
+                      borderWidth="2px"
+                      borderStyle="dashed"
+                      borderColor="blue.200"
+                      borderRadius="xl"
+                      p={4}
+                      textAlign="center"
+                      outline="none"
+                      _focus={{ borderColor: "blue.400", bg: "blue.50" }}
+                      onPaste={(event) => {
+                        const pasted = filesFromClipboardEvent(event);
+                        if (!pasted.length) return;
+                        event.preventDefault();
+                        setImageFiles((prev) => [...prev, ...pasted].slice(0, 10));
+                      }}
+                    >
+                      <Text fontSize="sm" fontWeight="700">الصق الصور هنا</Text>
+                      <Text fontSize="xs" color={theme.muted} mt={1}>
+                        انسخ الصورة ثم اضغط هنا والصق بـ Ctrl+V — حتى 10 صور
+                      </Text>
+                    </Box>
                     <Input
                       type="file"
                       accept="image/*"
@@ -1134,6 +1483,240 @@ export default function TeacherPublicExamManagePage() {
               <Box as="img" src={imageZoom} maxH="85vh" maxW="100%" borderRadius="lg" />
             ) : null}
           </ModalBody>
+        </ModalContent>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(imagePasteQuestion)}
+        onClose={() => !imageUploadLoading && setImagePasteQuestion(null)}
+        isCentered
+        size="md"
+      >
+        <ModalOverlay />
+        <ModalContent borderRadius="2xl" mx={3} dir="rtl">
+          <ModalHeader>إضافة صورة للسؤال</ModalHeader>
+          <ModalCloseButton isDisabled={imageUploadLoading} />
+          <ModalBody pb={6}>
+            <VStack align="stretch" spacing={4}>
+              <Box
+                ref={imagePasteZoneRef}
+                tabIndex={0}
+                borderWidth="2px"
+                borderStyle="dashed"
+                borderColor="blue.300"
+                borderRadius="xl"
+                p={8}
+                textAlign="center"
+                outline="none"
+                _focus={{ borderColor: "blue.500", bg: "blue.50" }}
+                onPaste={handlePasteQuestionImage}
+              >
+                <Icon as={FaImage} boxSize={8} color="blue.400" mb={3} />
+                <Text fontWeight="800">الصق الصورة المنسوخة</Text>
+                <Text fontSize="sm" color={theme.muted} mt={2}>
+                  انسخ الصورة ثم اضغط Ctrl+V
+                </Text>
+              </Box>
+              <Input
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                ref={questionImageInputRef}
+                borderRadius="lg"
+                p={1}
+                isDisabled={imageUploadLoading}
+                onChange={handleQuestionImageUpload}
+              />
+              {imageUploadLoading ? (
+                <Text fontSize="sm" color={theme.muted} textAlign="center">
+                  جاري رفع الصورة...
+                </Text>
+              ) : null}
+            </VStack>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
+
+      <Modal
+        isOpen={editModal.open}
+        onClose={() => !editSaving && setEditModal({ open: false, question: null })}
+        size="xl"
+        isCentered
+        scrollBehavior="inside"
+      >
+        <ModalOverlay />
+        <ModalContent borderRadius="2xl" mx={4} dir="rtl">
+          <ModalHeader borderBottomWidth="1px" pb={4}>تعديل السؤال</ModalHeader>
+          <ModalCloseButton />
+          <ModalBody py={6}>
+            <VStack spacing={5} align="stretch">
+              <Box>
+                <Text mb={2} fontWeight="700" fontSize="sm" color={theme.muted}>نص السؤال</Text>
+                <Textarea
+                  value={editForm.text}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, text: e.target.value }))}
+                  placeholder="نص السؤال — يدعم الرموز الرياضية والكيميائية"
+                  borderRadius="lg"
+                  minH="100px"
+                />
+                {editForm.text?.trim() ? (
+                  <Box mt={3} p={3} borderRadius="lg" borderWidth="1px">
+                    <Text fontSize="xs" color={theme.muted} mb={2}>معاينة</Text>
+                    <FormattedQuestionText value={editForm.text} fontSize="md" lineHeight="1.85" />
+                  </Box>
+                ) : null}
+              </Box>
+              <Box
+                tabIndex={0}
+                borderWidth="2px"
+                borderStyle="dashed"
+                borderColor="blue.200"
+                borderRadius="xl"
+                p={4}
+                outline="none"
+                _focus={{ borderColor: "blue.400" }}
+                onPaste={(event) => {
+                  const file = pastedImageFile(event);
+                  if (!file) return;
+                  event.preventDefault();
+                  setEditForm((prev) => ({ ...prev, imageFile: file, removeImage: false }));
+                }}
+              >
+                <Text mb={2} fontWeight="700" fontSize="sm" color={theme.muted}>صورة السؤال</Text>
+                <Text fontSize="xs" color={theme.muted} mb={3}>
+                  الصق صورة منسوخة هنا بـ Ctrl+V، أو اختر ملفًا
+                </Text>
+                {editModal.question?.image && !editForm.removeImage && !editForm.imageFile ? (
+                  <Box
+                    as="img"
+                    src={editModal.question.image}
+                    alt="صورة السؤال"
+                    maxH="180px"
+                    borderRadius="lg"
+                    mb={3}
+                  />
+                ) : null}
+                {editForm.imageFile ? (
+                  <Text fontSize="sm" mb={2}>{editForm.imageFile.name}</Text>
+                ) : null}
+                {editForm.removeImage ? (
+                  <Text fontSize="sm" color="red.500" mb={2}>سيتم حذف الصورة عند الحفظ</Text>
+                ) : null}
+                <Input
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                  borderRadius="lg"
+                  p={1}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setEditForm((prev) => ({
+                      ...prev,
+                      imageFile: file,
+                      removeImage: false,
+                    }));
+                  }}
+                />
+                {editModal.question?.image && !editForm.removeImage ? (
+                  <Button
+                    mt={3}
+                    size="sm"
+                    variant="outline"
+                    colorScheme="red"
+                    borderRadius="lg"
+                    onClick={() =>
+                      setEditForm((prev) => ({ ...prev, removeImage: true, imageFile: null }))
+                    }
+                  >
+                    حذف الصورة
+                  </Button>
+                ) : null}
+              </Box>
+              {editForm.choices.length > 0 ? (
+                <Box>
+                  <Flex justify="space-between" align="center" mb={2} gap={3}>
+                    <Text fontWeight="700" fontSize="sm" color={theme.muted}>الاختيارات</Text>
+                    <Badge
+                      colorScheme={(editForm.correctLetters || []).length >= 1 ? "green" : "orange"}
+                      borderRadius="full"
+                    >
+                      إجابات صحيحة: {(editForm.correctLetters || []).length}/2
+                    </Badge>
+                  </Flex>
+                  <Text fontSize="xs" color={theme.muted} mb={3}>
+                    اختر إجابة واحدة أو إجابتين من A–D
+                  </Text>
+                  <VStack spacing={3}>
+                    {editForm.choices.map((choice, idx) => {
+                      const letter = getChoiceLetter(choice, idx);
+                      const selected = (editForm.correctLetters || []).includes(letter);
+                      return (
+                        <Box key={choice.id ?? letter} w="full">
+                          <Flex justify="space-between" align="center" mb={1} gap={2}>
+                            <Text fontSize="xs" color={theme.muted}>{letter}</Text>
+                            <Button
+                              size="xs"
+                              variant={selected ? "solid" : "outline"}
+                              colorScheme={selected ? "green" : "gray"}
+                              borderRadius="full"
+                              onClick={() =>
+                                setEditForm((prev) => {
+                                  const next = toggleCorrectAnswerLetter(
+                                    prev.correctLetters || [],
+                                    letter,
+                                    2,
+                                  );
+                                  return {
+                                    ...prev,
+                                    correctLetters: next,
+                                    choices: prev.choices.map((item, i) => ({
+                                      ...item,
+                                      is_correct: next.includes(getChoiceLetter(item, i)),
+                                    })),
+                                  };
+                                })
+                              }
+                            >
+                              {selected ? "صحيحة ✓" : "تعيين كصحيحة"}
+                            </Button>
+                          </Flex>
+                          <Textarea
+                            value={choice.text}
+                            onChange={(e) =>
+                              setEditForm((prev) => {
+                                const choices = [...prev.choices];
+                                choices[idx] = { ...choices[idx], text: e.target.value };
+                                return { ...prev, choices };
+                              })
+                            }
+                            placeholder={`اختيار ${letter}`}
+                            borderRadius="lg"
+                            minH="60px"
+                            borderColor={selected ? "green.300" : undefined}
+                          />
+                          {choice.text?.trim() ? (
+                            <Box mt={2} p={2} borderRadius="md" borderWidth="1px">
+                              <FormattedQuestionText value={choice.text} fontSize="sm" lineHeight="1.75" />
+                            </Box>
+                          ) : null}
+                        </Box>
+                      );
+                    })}
+                  </VStack>
+                </Box>
+              ) : null}
+            </VStack>
+          </ModalBody>
+          <ModalFooter borderTopWidth="1px" pt={4} gap={2}>
+            <Button colorScheme="blue" onClick={handleEditSave} isLoading={editSaving} borderRadius="lg">
+              حفظ التعديل
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setEditModal({ open: false, question: null })}
+              isDisabled={editSaving}
+            >
+              إلغاء
+            </Button>
+          </ModalFooter>
         </ModalContent>
       </Modal>
 
