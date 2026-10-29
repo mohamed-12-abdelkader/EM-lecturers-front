@@ -428,10 +428,18 @@ export default function TeacherPublicExamManagePage() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await deletePublicExamQuestion(deleteTarget, token);
+      const result = await deletePublicExamQuestion(examId, deleteTarget, token);
       setQuestions((prev) => prev.filter((q) => q.id !== deleteTarget));
       setDeleteTarget(null);
-      toast({ title: "تم حذف السؤال", status: "success", isClosable: true });
+      const regrade = result?.regrade;
+      toast({
+        title: result?.message || "تم حذف السؤال من الامتحان",
+        description: regrade
+          ? `تمت مراجعة ${regrade.attemptsReviewed ?? 0} محاولة · تحديث ${regrade.attemptsUpdated ?? 0}`
+          : undefined,
+        status: "success",
+        isClosable: true,
+      });
     } catch (err) {
       toast({
         title: publicExamsApiError(err, "فشل حذف السؤال"),
@@ -1461,7 +1469,9 @@ export default function TeacherPublicExamManagePage() {
         <AlertDialogOverlay>
           <AlertDialogContent borderRadius="2xl" mx={3} dir="rtl">
             <AlertDialogHeader>حذف السؤال</AlertDialogHeader>
-            <AlertDialogBody>هل تريد حذف هذا السؤال من الامتحان؟</AlertDialogBody>
+            <AlertDialogBody>
+              السؤال هيختفي من هذا الامتحان فقط. نسخته في بنك الأسئلة تبقى، والمحاولات التي اتسلمت قبل الحذف تتعاد درجاتها على الأسئلة المتبقية.
+            </AlertDialogBody>
             <AlertDialogFooter>
               <Button ref={deleteCancelRef} onClick={() => setDeleteTarget(null)} isDisabled={deleting}>
                 إلغاء

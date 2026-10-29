@@ -531,10 +531,10 @@ export async function uploadPublicExamQuestionImage(examId, questionId, fileOrUr
   return unwrapPublicQuestionResult(data);
 }
 
-/** DELETE /api/questions/:questionId */
-export async function deletePublicExamQuestion(questionId, token) {
+/** DELETE /api/public-exams/:examId/questions/:questionId */
+export async function deletePublicExamQuestion(examId, questionId, token) {
   const { data } = await baseUrl.delete(
-    `${QUESTIONS_API}/${encodeURIComponent(questionId)}`,
+    `${API}/${encodeURIComponent(examId)}/questions/${encodeURIComponent(questionId)}`,
     { headers: authHeaders(token) },
   );
   return data;
