@@ -32,7 +32,10 @@ export default function usePWA() {
     return () => window.removeEventListener(PWA_UPDATE_EVENT, onUpdate);
   }, []);
 
-  const update = useCallback(() => applyPWAUpdate(), []);
+  const update = useCallback(async () => {
+    const result = await applyPWAUpdate();
+    return result?.ok !== false;
+  }, []);
 
   return {
     // التثبيت

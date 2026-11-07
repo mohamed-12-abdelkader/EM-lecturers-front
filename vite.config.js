@@ -46,6 +46,41 @@ function devServiceWorkerKillSwitch() {
   };
 }
 
+/** يكتب/يخدم version.json لكشف التحديثات بدون إعادة تحميل */
+function emitAppVersionJson(appBuildId) {
+  const payload = () =>
+    JSON.stringify(
+      {
+        buildId: appBuildId,
+        builtAt: new Date().toISOString(),
+      },
+      null,
+      2,
+    );
+  return {
+    name: "emit-app-version-json",
+    generateBundle() {
+      this.emitFile({
+        type: "asset",
+        fileName: "version.json",
+        source: `${payload()}\n`,
+      });
+    },
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = String(req.url || "");
+        if (url === "/version.json" || url.startsWith("/version.json?")) {
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
+          res.setHeader("Cache-Control", "no-store");
+          res.end(payload());
+          return;
+        }
+        next();
+      });
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -127,6 +162,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       devServiceWorkerKillSwitch(),
+      emitAppVersionJson(appBuildId),
       drivePdfProxyPlugin(),
       tenantSeoPlugin({
         apiBase: proxyTarget,

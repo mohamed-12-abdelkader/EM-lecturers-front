@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import EssayQuestionModal from "../../components/exam/EssayQuestionModal";
 import {
   Alert,
   AlertDialog,
@@ -160,6 +161,7 @@ export default function TeacherPublicExamManagePage() {
   const [editModal, setEditModal] = useState({ open: false, question: null });
   const [editForm, setEditForm] = useState({ text: "", choices: [], correctLetters: [] });
   const [editSaving, setEditSaving] = useState(false);
+  const [essayModalOpen, setEssayModalOpen] = useState(false);
 
   const [bulkText, setBulkText] = useState("");
   const [bulkAnswers, setBulkAnswers] = useState("");
@@ -987,6 +989,9 @@ export default function TeacherPublicExamManagePage() {
               >
                 إضافة أسئلة
               </Button>
+              <Button borderRadius="xl" variant="outline" onClick={() => setEssayModalOpen(true)}>
+                سؤال مقالي
+              </Button>
               <Button
                 leftIcon={<FaBook />}
                 as={RouterLink}
@@ -1116,6 +1121,13 @@ export default function TeacherPublicExamManagePage() {
         </>
       )}
 
+      <EssayQuestionModal
+        isOpen={essayModalOpen}
+        onClose={() => setEssayModalOpen(false)}
+        examId={examId}
+        scope="course"
+        onSaved={loadAll}
+      />
       <Modal isOpen={addModal.isOpen} onClose={addModal.onClose} size="xl" scrollBehavior="inside">
         <ModalOverlay />
         <ModalContent borderRadius="2xl" mx={3} dir="rtl">

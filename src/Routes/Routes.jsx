@@ -114,6 +114,7 @@ const TeacherCourseGroupsPage = lazyPage(() => import("../pages/teacher/CourseGr
 const TeacherAssignmentsPage = lazyPage(() => import("../pages/assignments/TeacherAssignmentsPage"));
 const TeacherCourseExamsPage = lazyPage(() => import("../pages/exams/TeacherCourseExamsPage"));
 const TeacherPublicExamsPage = lazyPage(() => import("../pages/publicExams/TeacherPublicExamsPage"));
+const EssayReviewPage = lazyPage(() => import("../pages/exam/EssayReviewPage"));
 const TeacherPublicExamManagePage = lazyPage(() =>
   import("../pages/publicExams/TeacherPublicExamManagePage"),
 );
@@ -741,6 +742,7 @@ const AppRouter = () => {
           <Route path="teacher-assignments" element={<TeacherAssignmentsPage />} />
           <Route path="teacher-exams" element={<TeacherCourseExamsPage />} />
           <Route path="teacher-public-exams" element={<TeacherPublicExamsPage />} />
+          <Route path="essay-reviews" element={<EssayReviewPage />} />
           <Route path="public-exams/:examId" element={<TeacherPublicExamManagePage />} />
           <Route path="public-exams/:examId/report" element={<ExamReportPage />} />
           <Route path="teacher-question-extraction" element={<TeacherQuestionExtractionPage />} />

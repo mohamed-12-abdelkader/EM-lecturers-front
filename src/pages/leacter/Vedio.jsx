@@ -26,6 +26,8 @@ import {
   fetchSecurePlayback,
   sendPlaybackHeartbeat,
 } from "../../api/videoSecurityApi";
+import useCriticalActivity from "../../Hooks/activity/useCriticalActivity";
+import { ACTIVITY_TYPES } from "../../utils/applicationActivityManager";
 
 const MotionBox = motion(Box);
 
@@ -47,6 +49,10 @@ function isPlaybackContextAllowed() {
 const Video = () => {
   const { videoId, token: urlToken } = useParams();
   const navigate = useNavigate();
+  useCriticalActivity(ACTIVITY_TYPES.LECTURE, {
+    enabled: Boolean(videoId),
+    id: videoId ? `video:${videoId}` : "video",
+  });
 
   const [playback, setPlayback] = useState(null);
   const [loading, setLoading] = useState(true);

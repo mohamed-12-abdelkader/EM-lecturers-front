@@ -16,6 +16,8 @@ import {
 } from '@chakra-ui/react';
 import { FaPlay, FaPause, FaExpand, FaCompress, FaTimes } from 'react-icons/fa';
 import { getYouTubeEmbedUrl, getYouTubeVideoId, isYouTubeUrl } from '../../../utils/youtubeEmbed';
+import useCriticalActivity from '../../../Hooks/activity/useCriticalActivity';
+import { ACTIVITY_TYPES } from '../../../utils/applicationActivityManager';
 
 const VideoPlayer = ({ 
   videoUrl, 
@@ -25,6 +27,10 @@ const VideoPlayer = ({
   onToggleVisibility,
   isTeacher = false 
 }) => {
+  useCriticalActivity(ACTIVITY_TYPES.LECTURE, {
+    enabled: Boolean(isVisible && videoUrl),
+    id: videoUrl ? `modal:${String(videoUrl).slice(-48)}` : 'modal-video',
+  });
   const [isPlaying, setIsPlaying] = React.useState(false);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);

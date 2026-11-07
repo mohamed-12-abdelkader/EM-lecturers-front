@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { VStack, Heading, Center, Spinner, Text, Icon, SimpleGrid, Box, HStack, Image, Button, useToast, Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter, ModalBody, ModalCloseButton, FormControl, FormLabel, Input, NumberInput, NumberInputField, AlertDialog, AlertDialogOverlay, AlertDialogContent, AlertDialogHeader, AlertDialogBody, AlertDialogFooter, IconButton, Tooltip, Flex, useColorModeValue, Badge, InputGroup, InputRightElement, Switch, Divider, Tabs, TabList, TabPanels, Tab, TabPanel, RadioGroup, Radio, Textarea } from "@chakra-ui/react";
-import { FaGraduationCap, FaLightbulb, FaBookOpen, FaClock, FaStar, FaEdit, FaTrash, FaPlus, FaEye, FaEyeSlash, FaRegFileAlt, FaCog, FaTimes, FaCheck, FaCamera, FaChartBar, FaUserPlus } from "react-icons/fa";
+import { FaGraduationCap, FaLightbulb, FaBookOpen, FaClock, FaStar, FaEdit, FaTrash, FaPlus, FaEye, FaEyeSlash, FaRegFileAlt, FaCog, FaTimes, FaCheck, FaCamera, FaChartBar, FaUserPlus, FaAlignLeft } from "react-icons/fa";
 import baseUrl from "../../../api/baseUrl";
+import EssayQuestionModal from "../../../components/exam/EssayQuestionModal";
 import { Link, useNavigate } from "react-router-dom";
 import {
   TOUR_CLOSE_CREATE_EXAM,
@@ -248,6 +249,7 @@ const ExamCard = ({
   onEdit,
   onDelete,
   onLateAccess,
+  onAddEssay,
 }) => {
   const exam = normalizeCourseLevelExam(rawExam) || rawExam;
   const navigate = useNavigate();
@@ -585,6 +587,17 @@ const ExamCard = ({
                 onClick={onLateAccess}
               />
             </Tooltip>
+            <Tooltip label="سؤال مقالي" hasArrow>
+              <IconButton
+                aria-label="سؤال مقالي"
+                icon={<Icon as={FaAlignLeft} />}
+                size="sm"
+                variant="ghost"
+                colorScheme="blue"
+                borderRadius="lg"
+                onClick={onAddEssay}
+              />
+            </Tooltip>
             <Tooltip label="التقرير" hasArrow>
               <IconButton
                 as={Link}
@@ -717,6 +730,7 @@ const CourseExamsTab = ({
   const [editModal, setEditModal] = useState({ isOpen: false, exam: null });
   const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, exam: null });
   const [lateAccessExam, setLateAccessExam] = useState(null);
+  const [essayExam, setEssayExam] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
@@ -1905,11 +1919,22 @@ const CourseExamsTab = ({
               onEdit={() => setEditModal({ isOpen: true, exam })}
               onDelete={() => setDeleteDialog({ isOpen: true, exam })}
               onLateAccess={() => setLateAccessExam(exam)}
+              onAddEssay={() => setEssayExam(exam)}
             />
           ))}
         </SimpleGrid>
       )}
       {/* Modals */}
+      <EssayQuestionModal
+        isOpen={!!essayExam}
+        onClose={() => setEssayExam(null)}
+        examId={essayExam?.id}
+        scope="course"
+        onSaved={() => {
+          setEssayExam(null);
+          refreshExams?.();
+        }}
+      />
       <EditExamModal
         isOpen={editModal.isOpen}
         onClose={() => setEditModal({ isOpen: false, exam: null })}

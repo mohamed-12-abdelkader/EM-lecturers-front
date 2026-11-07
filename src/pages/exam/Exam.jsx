@@ -13,11 +13,12 @@ import UserType from "../../Hooks/auth/userType";
 import { useTeacherCourseGroups } from "../../Hooks/course/useCourseGroups";
 import { fetchExamGrades } from "../../api/courseAssignmentReportsApi";
 import { normalizeStudyGroups } from "./utils/examReportUtils";
-import { FaBookOpen, FaUser, FaImage, FaChartBar, FaCompass, FaFilePdf, FaUserPlus } from "react-icons/fa";
+import { FaAlignLeft, FaBookOpen, FaUser, FaImage, FaChartBar, FaCompass, FaFilePdf, FaUserPlus } from "react-icons/fa";
 import { BiSearch } from "react-icons/bi";
 import { FiDownload } from "react-icons/fi";
 import { PlatformExamTeacherCard } from "./components/PlatformExamQuestionCard";
 import AiQuestionExtractionModal from "./components/AiQuestionExtractionModal";
+import EssayQuestionModal from "../../components/exam/EssayQuestionModal";
 import LateAccessGrantModal from "./components/LateAccessGrantModal";
 import { SubmissionCard } from "./components/ExamSubmissionsView";
 import { downloadExamGradesExcel, downloadExamGradesPdf, matchesStudentSearch } from "./utils/examSubmissionUtils";
@@ -113,6 +114,7 @@ const Exam = () => {
   const [imageUploadQuestionId, setImageUploadQuestionId] = useState(null);
   const [imageUploadLoading, setImageUploadLoading] = useState(false);
   const [aiExtractionModalOpen, setAiExtractionModalOpen] = useState(false);
+  const [essayModalOpen, setEssayModalOpen] = useState(false);
   const [examTourOpen, setExamTourOpen] = useState(false);
   const [lateAccessOpen, setLateAccessOpen] = useState(false);
   const questionImageInputRef = useRef(null);
@@ -301,10 +303,18 @@ const Exam = () => {
   };
 
   const openEditModal = (q) => {
+    if (String(q?.type || "").toUpperCase() === "ESSAY") {
+      toast({
+        title: "السؤال المقالي يُدار من المراجعة",
+        description: "احذف السؤال وأعد إنشاؤه إن احتجت تعديله.",
+        status: "info",
+      });
+      return;
+    }
     const correctLetters = getQuestionCorrectLetters(q);
     setEditForm({
       text: q.text,
-      choices: q.choices.map((c, i) => ({
+      choices: (q.choices || []).map((c, i) => ({
         ...c,
         text: c.text || c.image || "",
         letter: getChoiceLetter(c, i),
@@ -705,6 +715,17 @@ const Exam = () => {
                 جولة
               </Button>
               <Button
+                size="sm"
+                bg="whiteAlpha.200"
+                color="white"
+                borderRadius="lg"
+                leftIcon={<FaAlignLeft />}
+                onClick={() => setEssayModalOpen(true)}
+                _hover={{ bg: "whiteAlpha.300" }}
+              >
+                سؤال مقالي
+              </Button>
+              <Button
                 data-tour-id="platform-exam-ai"
                 size="sm"
                 bg="whiteAlpha.200"
@@ -1047,27 +1068,31 @@ const Exam = () => {
                   onZoomImage={(src) => { setImageModalSrc(src); setImageModalOpen(true); }}
                   actions={
                     <HStack spacing={0}>
-                      <Tooltip label="إضافة أو تحديث صورة السؤال" placement="top" hasArrow>
+                      {String(q.type || "").toUpperCase() !== "ESSAY" && (
+                        <Tooltip label="إضافة أو تحديث صورة السؤال" placement="top" hasArrow>
+                          <IconButton
+                            data-tour-id={idx === 0 ? "exam-question-add-image" : undefined}
+                            icon={<FaImage />}
+                            colorScheme="blue"
+                            variant="ghost"
+                            size="xs"
+                            aria-label="صورة السؤال"
+                            onClick={() => triggerQuestionImageInput(q)}
+                            isLoading={imageUploadLoading && imageUploadQuestionId === q.id}
+                          />
+                        </Tooltip>
+                      )}
+                      {String(q.type || "").toUpperCase() !== "ESSAY" && (
                         <IconButton
-                          data-tour-id={idx === 0 ? "exam-question-add-image" : undefined}
-                          icon={<FaImage />}
-                          colorScheme="blue"
+                          data-tour-id={idx === 0 ? "exam-question-edit" : undefined}
+                          icon={<AiFillEdit />}
+                          colorScheme="yellow"
                           variant="ghost"
                           size="xs"
-                          aria-label="صورة السؤال"
-                          onClick={() => triggerQuestionImageInput(q)}
-                          isLoading={imageUploadLoading && imageUploadQuestionId === q.id}
+                          aria-label="تعديل"
+                          onClick={() => openEditModal(q)}
                         />
-                      </Tooltip>
-                      <IconButton
-                        data-tour-id={idx === 0 ? "exam-question-edit" : undefined}
-                        icon={<AiFillEdit />}
-                        colorScheme="yellow"
-                        variant="ghost"
-                        size="xs"
-                        aria-label="تعديل"
-                        onClick={() => openEditModal(q)}
-                      />
+                      )}
                       <IconButton
                         data-tour-id={idx === 0 ? "exam-question-delete" : undefined}
                         icon={<AiFillDelete />}
@@ -1255,6 +1280,14 @@ const Exam = () => {
         examTitle={examMeta?.examTitle || examTitle}
         scope="course"
         students={gradesData}
+      />
+
+      <EssayQuestionModal
+        isOpen={essayModalOpen}
+        onClose={() => setEssayModalOpen(false)}
+        examId={examId}
+        scope="course"
+        onSaved={fetchQuestions}
       />
 
       <AiQuestionExtractionModal

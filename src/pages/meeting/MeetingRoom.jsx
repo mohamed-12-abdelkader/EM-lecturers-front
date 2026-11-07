@@ -25,10 +25,16 @@ import {
   FaCompress,
 } from 'react-icons/fa';
 import { useParams, useNavigate } from 'react-router-dom';
+import useCriticalActivity from '../../Hooks/activity/useCriticalActivity';
+import { ACTIVITY_TYPES } from '../../utils/applicationActivityManager';
 
 const MeetingRoom = () => {
   const { meetingId } = useParams();
   const navigate = useNavigate();
+  useCriticalActivity(ACTIVITY_TYPES.LIVE_LECTURE, {
+    enabled: Boolean(meetingId),
+    id: meetingId ? `meeting:${meetingId}` : 'meeting',
+  });
   
   // States
   const [isCameraOn, setIsCameraOn] = useState(true);

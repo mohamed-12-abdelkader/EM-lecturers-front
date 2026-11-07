@@ -56,6 +56,10 @@ import baseUrl from "../../api/baseUrl";
 import { fetchAdminTenantById, fetchAdminTenants, patchAdminTenant, patchAdminTenantMultipart, createAdminTenant, createAdminTenantMultipart } from "../../api/adminTenantsApi";
 import { compressImage, TENANT_MEDIA_COMPRESS } from "../../utils/compressImage";
 import { buildTenantPublicUrl } from "../../utils/tenantHost";
+import {
+  TENANT_LANDING_DESIGNS,
+  resolveLandingLayout,
+} from "../../pages/tenantPublic/tenantLandingDesigns";
 
 const SUBDOMAIN_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const BRAND_BLUE = "#3182CE";
@@ -93,14 +97,14 @@ function hasAnyUpload(files) {
   return !!(files.avatar || files.favicon || files.og_image || files.hero_image);
 }
 
-/** صورة الهيرو تُرسل داخل landing.hero.image_url (أو عبر ملف hero_image) */
-function buildLandingPayload(heroImageUrl, hasHeroFile = false) {
+/** صورة الهيرو تُرسل داخل landing.hero.image_url، والتصميم داخل landing.layout */
+function buildLandingPayload(heroImageUrl, hasHeroFile = false, layout = "bento") {
   const image_url = String(heroImageUrl || "").trim();
-  if (hasHeroFile) {
-    return image_url ? { hero: { image_url } } : { hero: {} };
+  const base = { layout: resolveLandingLayout(layout) };
+  if (hasHeroFile || image_url) {
+    return { ...base, hero: image_url ? { image_url } : {} };
   }
-  if (!image_url) return null;
-  return { hero: { image_url } };
+  return base;
 }
 
 function emptyOwnerState() {
@@ -959,6 +963,7 @@ const AddTeacher = ({ publicMode = false }) => {
     hero_image: null,
   });
   const [heroImageUrl, setHeroImageUrl] = useState("");
+  const [landingLayout, setLandingLayout] = useState("bento");
   const [uploadKey, setUploadKey] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadingTenant, setLoadingTenant] = useState(false);
@@ -1084,6 +1089,7 @@ const AddTeacher = ({ publicMode = false }) => {
     setSettingsJson("");
     setMediaFiles(emptyMediaFiles());
     setHeroImageUrl("");
+    setLandingLayout("bento");
     ["avatar", "favicon", "og_image", "hero_image"].forEach((k) => {
       const u = mediaPreview[k];
       if (u && u.startsWith("blob:")) URL.revokeObjectURL(u);
@@ -1232,6 +1238,7 @@ const AddTeacher = ({ publicMode = false }) => {
 
     const heroUrl = tenantData.landing?.hero?.image_url || "";
     setHeroImageUrl(heroUrl);
+    setLandingLayout(resolveLandingLayout(tenantData.landing?.layout));
 
     setMediaPreview((prev) => ({
       ...prev,
@@ -1610,9 +1617,11 @@ const AddTeacher = ({ publicMode = false }) => {
     }
 
     const ownerPatch = buildOwnerPatch(owner, ownerEnabled);
-    const landingPayload =
-      buildLandingPayload(heroImageUrl, !!mediaFiles.hero_image) ||
-      (formMode === "create" ? {} : null);
+    const landingPayload = buildLandingPayload(
+      heroImageUrl,
+      !!mediaFiles.hero_image,
+      landingLayout,
+    );
     const useMultipart = hasAnyUpload(mediaFiles);
 
     setLoading(true);
@@ -2469,6 +2478,61 @@ const AddTeacher = ({ publicMode = false }) => {
 
               <SectionCard
                 step="2"
+                title="تصميم صفحة المنصة"
+                subtitle="اختَر شكل اللاندينج. المنصة تظهر للزوار بنفس التصميم، والمنصات القديمة تبقى على بينتو أكاديمي."
+                accent="purple"
+              >
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                  {TENANT_LANDING_DESIGNS.map((design) => {
+                    const selected = landingLayout === design.id;
+                    return (
+                      <Button
+                        key={design.id}
+                        type="button"
+                        onClick={() => setLandingLayout(design.id)}
+                        variant="outline"
+                        h="auto"
+                        py={4}
+                        px={4}
+                        justifyContent="flex-start"
+                        textAlign="right"
+                        whiteSpace="normal"
+                        borderWidth="2px"
+                        borderColor={selected ? design.swatches[1] : borderColor}
+                        bg={selected ? "blackAlpha.50" : "transparent"}
+                        _hover={{ borderColor: design.swatches[1] }}
+                      >
+                        <HStack spacing={3} align="center" w="full">
+                          <HStack spacing={1}>
+                            {design.swatches.map((color) => (
+                              <Box
+                                key={color}
+                                w="14px"
+                                h="28px"
+                                borderRadius="full"
+                                bg={color}
+                                border="1px solid"
+                                borderColor="blackAlpha.200"
+                              />
+                            ))}
+                          </HStack>
+                          <Box flex="1">
+                            <Text fontWeight="800" color={textColor}>
+                              {design.name}
+                            </Text>
+                            <Text fontSize="sm" color={mutedColor} mt={1}>
+                              {design.tagline}
+                            </Text>
+                          </Box>
+                        </HStack>
+                      </Button>
+                    );
+                  })}
+                </SimpleGrid>
+              </SectionCard>
+
+              <SectionCard
+                step="3"
                 title="الصور والروابط"
                 subtitle="رابط نصي أو رفع ملف — الملف المرفوع يتغلب على الرابط."
                 accent="orange"
@@ -2626,7 +2690,7 @@ const AddTeacher = ({ publicMode = false }) => {
               </Accordion>
 
               <SectionCard
-                step="3"
+                step="4"
                 title="حساب مالك المنصة"
                 subtitle="مطلوب عند الإنشاء بمدرس: الاسم، البريد، وكلمة المرور (6 أحرف على الأقل)."
                 accent="blue"
@@ -2833,7 +2897,7 @@ const AddTeacher = ({ publicMode = false }) => {
 
               {!publicMode ? (
               <SectionCard
-                step="4"
+                step="5"
                 title="إعدادات إضافية"
                 subtitle="اختياري — كائن JSON يُخزَّن مع إعدادات المستأجر."
                 accent="orange"

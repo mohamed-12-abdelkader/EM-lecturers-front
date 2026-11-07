@@ -127,6 +127,9 @@ export function isQuestionAnswered(question, answers = {}) {
   if (!question) return false;
   const qId = question.type === "passage_sub" ? question.sub_question?.id : question.id;
   const value = answers[qId] ?? answers[String(qId)];
+  if (value && typeof value === "object") {
+    return Boolean(String(value.text || "").trim() || (value.images || []).length);
+  }
   return value != null && String(value).trim() !== "";
 }
 

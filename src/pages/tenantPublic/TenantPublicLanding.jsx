@@ -37,6 +37,8 @@ import {
 } from "../../utils/highQualityImageUrl";
 import TenantSeoHead from "./components/TenantSeoHead";
 import TenantLandingLoader from "./components/landing/TenantLandingLoader";
+import TenantAlternateLanding from "./components/landing/TenantAlternateLanding";
+import { getLandingDesign, landingNavChrome, resolveLandingLayout } from "./tenantLandingDesigns";
 
 const TENANT_FONT_LINK_ID = "tenant-public-arabic-fonts";
 const TENANT_FONT_BODY = "'Cairo', 'Segoe UI', Tahoma, sans-serif";
@@ -455,7 +457,26 @@ export default function TenantPublicLanding({ subdomain }) {
   const bioSnippet = (tenant.bio || about.bio || "منصة تعليمية متكاملة تساعدك تحقق أفضل النتائج.").slice(0, 140);
   const bioSuffix = (tenant.bio || about.bio || "").length > 140 ? "…" : "";
 
+  const landingLayout = resolveLandingLayout(landing?.layout);
+  const landingDesign = getLandingDesign(landingLayout);
+  const navChrome = landingNavChrome(landingDesign);
   const themeCssVars = getTenantThemeCssVars(isDarkMode);
+  const alternateModel = {
+    brandName,
+    specialty,
+    teacherName,
+    heroTitle,
+    heroTagline,
+    bioText,
+    teacherPortraitUrl,
+    services: displayServices,
+    courses,
+    stats: heroStats,
+    signupHref,
+    loginHref,
+    hideSignup: !selfRegistrationEnabled,
+    courseFallbackImage,
+  };
 
   return (
     <motion.div
@@ -464,16 +485,17 @@ export default function TenantPublicLanding({ subdomain }) {
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
       dir="rtl"
       data-theme={isDarkMode ? "dark" : "light"}
+      data-landing={landingLayout}
       className={`tenant-public-page ${isDarkMode ? "tenant-dark" : "tenant-light"} relative min-h-screen overflow-x-hidden antialiased transition-colors duration-300`}
       style={{
         ...cssVars,
-        ...themeCssVars,
-        fontFamily: TENANT_FONT_BODY,
+        ...(landingLayout === "bento" ? themeCssVars : {}),
+        fontFamily: landingDesign.bodyFont || TENANT_FONT_BODY,
         fontSize: "var(--t-font-body)",
         lineHeight: "var(--t-line-body)",
         WebkitFontSmoothing: "antialiased",
-        background: "var(--tl-page-bg)",
-        color: "var(--tl-fg)",
+        background: landingLayout === "bento" ? "var(--tl-page-bg)" : landingDesign.pageBg,
+        color: landingLayout === "bento" ? "var(--tl-fg)" : landingDesign.fg,
       }}
     >
       <TenantSeoHead subdomain={subdomain} />
@@ -519,9 +541,15 @@ export default function TenantPublicLanding({ subdomain }) {
         navScrolled={navScrolled}
         brandHref="#home"
         navLinks={landingNavLinks}
+        chrome={navChrome}
       />
 
       <main>
+        {landingLayout !== "bento" ? (
+          <TenantAlternateLanding layout={landingLayout} model={alternateModel} />
+        ) : null}
+        {landingLayout === "bento" ? (
+        <>
         <TenantProHero
           specialty={specialty}
           teacherName={teacherName}
@@ -577,8 +605,11 @@ export default function TenantPublicLanding({ subdomain }) {
           loginHref={loginHref}
           hideSignup={!selfRegistrationEnabled}
         />
+        </>
+        ) : null}
       </main>
 
+      {landingLayout === "bento" ? (
       <TenantProFooter
         brandName={brandName}
         tenantAvatar={tenant.avatar_url}
@@ -590,6 +621,7 @@ export default function TenantPublicLanding({ subdomain }) {
         contact={socialLinks}
         quickLinks={footerQuickLinks}
       />
+      ) : null}
 
       <FreeLecturePlayerModal lecture={activeFreeLecture} onClose={() => setActiveFreeLecture(null)} />
     </motion.div>

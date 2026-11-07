@@ -16,6 +16,8 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FaExternalLinkAlt, FaVideo } from "react-icons/fa";
 import { getYouTubeEmbedUrl, isYouTubeUrl } from "../../utils/youtubeEmbed";
+import useCriticalActivity from "../../Hooks/activity/useCriticalActivity";
+import { ACTIVITY_TYPES } from "../../utils/applicationActivityManager";
 
 /**
  * يحوّل روابط Bunny Stream إلى رابط embed صالح للـ iframe.
@@ -107,6 +109,10 @@ export default function MeetingRecordingPlayerModal({
   videoUrl,
   title = "تسجيل المحاضرة",
 }) {
+  useCriticalActivity(ACTIVITY_TYPES.LECTURE, {
+    enabled: Boolean(isOpen && videoUrl),
+    id: videoUrl ? `recording:${String(videoUrl).slice(-48)}` : "recording",
+  });
   const [loading, setLoading] = useState(true);
   const [mediaError, setMediaError] = useState(false);
   const videoRef = useRef(null);

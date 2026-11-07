@@ -1078,13 +1078,19 @@ export function PlatformExamTeacherCard({
 
   const accentBar = useColorModeValue("blue.500", "blue.400");
 
+  const essayHintBg = useColorModeValue("teal.50", "whiteAlpha.100");
+
+  const essayHintBorder = useColorModeValue("teal.100", "teal.700");
+
 
 
   const hasText = Boolean(question.text?.trim());
 
   const hasImage = Boolean(question.image);
 
-  const isImageQuestion = question.type === "IMAGE" || (!hasText && hasImage);
+  const isEssay = String(question.type || "").toUpperCase() === "ESSAY";
+
+  const isImageQuestion = !isEssay && (question.type === "IMAGE" || (!hasText && hasImage));
 
 
 
@@ -1122,9 +1128,13 @@ export function PlatformExamTeacherCard({
 
           </Text>
 
-          <Badge variant="subtle" colorScheme={isImageQuestion ? "purple" : "blue"} fontSize="9px">
+          <Badge
+            variant="subtle"
+            colorScheme={isEssay ? "teal" : isImageQuestion ? "purple" : "blue"}
+            fontSize="9px"
+          >
 
-            {isImageQuestion ? "صورة" : "نص"}
+            {isEssay ? "مقالي" : isImageQuestion ? "صورة" : "نص"}
 
           </Badge>
 
@@ -1210,23 +1220,30 @@ export function PlatformExamTeacherCard({
 
 
 
-        <ChoicesSection
-
-          choices={question.choices}
-
-          mode="teacher"
-
-          questionId={question.id}
-
-          pendingCorrect={pendingCorrect}
-
-          onSetCorrect={onSetCorrect}
-
-          onZoomImage={onZoomImage}
-
-          tourTargetId={isTourTarget ? "exam-question-choices" : undefined}
-
-        />
+        {isEssay ? (
+          <Box
+            mt={2}
+            p={3}
+            borderRadius="xl"
+            bg={essayHintBg}
+            borderWidth="1px"
+            borderColor={essayHintBorder}
+          >
+            <Text fontSize="xs" color={muted}>
+              سؤال مقالي — يُصحَّح آليًا ثم يراجعه المدرس عند الحاجة.
+            </Text>
+          </Box>
+        ) : (
+          <ChoicesSection
+            choices={question.choices}
+            mode="teacher"
+            questionId={question.id}
+            pendingCorrect={pendingCorrect}
+            onSetCorrect={onSetCorrect}
+            onZoomImage={onZoomImage}
+            tourTargetId={isTourTarget ? "exam-question-choices" : undefined}
+          />
+        )}
 
       </Box>
 

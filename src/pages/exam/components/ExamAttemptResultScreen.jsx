@@ -54,19 +54,21 @@ function StatCard({ icon, label, value, colorScheme = "blue" }) {
 function WrongQuestionCard({ question, index, onZoomImage }) {
   const cardBg = useColorModeValue("white", "gray.800");
   const border = useColorModeValue("gray.200", "gray.700");
+  const isEssay = String(question.type || "").toUpperCase() === "ESSAY";
   const yourAnswer = question.yourAnswer;
   const correctAnswers = Array.isArray(question.correctAnswers) && question.correctAnswers.length
     ? question.correctAnswers
     : [question.correctAnswer, question.correctAnswer2].filter(Boolean);
   const yourText =
     (question.yourAnswerText && String(question.yourAnswerText).trim()) ||
-    getAnswerTextFromQuestion(question, yourAnswer);
+    (!isEssay ? getAnswerTextFromQuestion(question, yourAnswer) : "");
   const correctParts = correctAnswers.map((letter) => ({
     letter,
     text: getAnswerTextFromQuestion(question, letter),
   }));
-  const correctText =
-    correctParts.length > 1
+  const correctText = isEssay
+    ? (question.correctAnswerText && String(question.correctAnswerText).trim()) || "—"
+    : correctParts.length > 1
       ? correctParts.map((p) => `${getAnswerLetterLabel(p.letter)} — ${p.text}`).join(" · ")
       : correctParts[0]?.text ||
         (question.correctAnswerText && String(question.correctAnswerText).trim()) ||
@@ -76,8 +78,10 @@ function WrongQuestionCard({ question, index, onZoomImage }) {
     .filter(Boolean)
     .join(" / ");
   const yourImg = yourText && isImageUrl(yourText) ? yourText : null;
-  const correctImg =
-    correctParts.length === 1 && correctParts[0]?.text && isImageUrl(correctParts[0].text)
+  const yourAnswerImages = Array.isArray(question.yourAnswerImages) ? question.yourAnswerImages : [];
+  const correctImg = isEssay
+    ? question.correctAnswerImage || null
+    : correctParts.length === 1 && correctParts[0]?.text && isImageUrl(correctParts[0].text)
       ? correctParts[0].text
       : null;
 
@@ -90,15 +94,22 @@ function WrongQuestionCard({ question, index, onZoomImage }) {
       bg={cardBg}
       boxShadow="sm"
     >
-      <HStack justify="space-between" mb={3}>
+      <HStack justify="space-between" mb={3} wrap="wrap">
         <Badge colorScheme="red" borderRadius="full" px={3}>
           سؤال خاطئ {index + 1}
         </Badge>
-        {question.unanswered ? (
-          <Badge colorScheme="orange" borderRadius="full" px={3}>
-            بدون إجابة
-          </Badge>
-        ) : null}
+        <HStack spacing={2}>
+          {isEssay ? (
+            <Badge colorScheme="purple" borderRadius="full" px={3}>
+              مقالي
+            </Badge>
+          ) : null}
+          {question.unanswered ? (
+            <Badge colorScheme="orange" borderRadius="full" px={3}>
+              بدون إجابة
+            </Badge>
+          ) : null}
+        </HStack>
       </HStack>
 
       {question.questionText ? (
@@ -144,10 +155,17 @@ function WrongQuestionCard({ question, index, onZoomImage }) {
             <AiOutlineCloseCircle color="#DC2626" size={18} style={{ marginTop: 4, flexShrink: 0 }} />
             <Box flex={1}>
               <Text fontSize="sm" fontWeight="bold" color="red.600" mb={1}>
-                إجابتك {yourAnswer ? `(${getAnswerLetterLabel(yourAnswer)})` : ""}
+                إجابتك{" "}
+                {!isEssay && yourAnswer ? `(${getAnswerLetterLabel(yourAnswer)})` : ""}
               </Text>
               <FormattedQuestionText
-                value={question.unanswered ? "لم يجب" : yourImg ? "صورة" : yourText}
+                value={
+                  question.unanswered
+                    ? "لم يجب"
+                    : yourImg
+                      ? "صورة"
+                      : yourText || (yourAnswerImages.length ? "صورة مرفقة" : "—")
+                }
                 fontSize="sm"
                 color="red.600"
               />
@@ -162,6 +180,18 @@ function WrongQuestionCard({ question, index, onZoomImage }) {
                   onClick={() => onZoomImage?.(yourImg)}
                 />
               )}
+              {yourAnswerImages.map((src) => (
+                <Image
+                  key={src}
+                  src={src}
+                  mt={2}
+                  maxH="140px"
+                  objectFit="contain"
+                  borderRadius="md"
+                  cursor="pointer"
+                  onClick={() => onZoomImage?.(src)}
+                />
+              ))}
             </Box>
           </HStack>
         </Box>
@@ -178,9 +208,15 @@ function WrongQuestionCard({ question, index, onZoomImage }) {
             <AiOutlineCheckCircle color="#16A34A" size={18} style={{ marginTop: 4, flexShrink: 0 }} />
             <Box flex={1}>
               <Text fontSize="sm" fontWeight="bold" color="green.600" mb={1}>
-                الإجابة الصحيحة {correctLettersLabel ? `(${correctLettersLabel})` : ""}
+                {isEssay
+                  ? "الإجابة النموذجية"
+                  : `الإجابة الصحيحة${correctLettersLabel ? ` (${correctLettersLabel})` : ""}`}
               </Text>
-              <FormattedQuestionText value={correctImg ? "صورة" : correctText} fontSize="sm" color="green.600" />
+              <FormattedQuestionText
+                value={correctImg && !correctText ? "صورة" : correctText}
+                fontSize="sm"
+                color="green.600"
+              />
               {correctImg && (
                 <Image
                   src={correctImg}
@@ -263,6 +299,22 @@ export default function ExamAttemptResultScreen({
                 <Text fontSize="sm" color="orange.600" lineHeight="1.8" maxW="lg">
                   {result.message}
                 </Text>
+              )}
+              {Array.isArray(result?.essayQuestions) &&
+                result.essayQuestions.some((item) => item.pending) && (
+                <VStack align="stretch" spacing={2} w="full" maxW="lg">
+                  {result.essayQuestions
+                    .filter((item) => item.pending)
+                    .map((item) => (
+                      <Box key={item.questionId} p={3} borderWidth="1px" borderRadius="xl" textAlign="right">
+                        <Text fontWeight="700" fontSize="sm">{item.statusLabel}</Text>
+                        <Text fontSize="sm" color={muted}>
+                          الدرجة معلّقة حتى مراجعة المدرس
+                        </Text>
+                        {item.teacherNote && <Text fontSize="sm">{item.teacherNote}</Text>}
+                      </Box>
+                    ))}
+                </VStack>
               )}
             </VStack>
 

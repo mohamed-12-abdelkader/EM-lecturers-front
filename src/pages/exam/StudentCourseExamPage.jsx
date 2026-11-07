@@ -19,6 +19,7 @@ import { MdArrowBack } from "react-icons/md";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import {
+  fetchExamAttemptReport,
   startCourseExamAttempt,
   submitCourseExamAttempt,
   autosaveCourseExamAnswers,
@@ -72,6 +73,40 @@ export default function StudentCourseExamPage() {
   const [examEndsAt, setExamEndsAt] = useState(null);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitResult, setSubmitResult] = useState(null);
+
+  useEffect(() => {
+    if (!submitResult?.essayNotice || !examId) return undefined;
+    let stopped = false;
+    let tries = 0;
+    const timer = setInterval(async () => {
+      tries += 1;
+      if (tries > 6) {
+        clearInterval(timer);
+        return;
+      }
+      try {
+        const token = localStorage.getItem("token");
+        const report = await fetchExamAttemptReport(examId, token);
+        if (stopped || !report) return;
+        const attempt = report.attempt || {};
+        const essayQuestions = report.essayQuestions || [];
+        setSubmitResult((prev) => prev && ({
+          ...prev,
+          totalGrade: attempt.totalGrade ?? prev.totalGrade,
+          maxGrade: attempt.maxGrade ?? prev.maxGrade,
+          essayQuestions,
+          essayNotice: report.essayNotice || null,
+        }));
+        if (!essayQuestions.some((item) => item.pending)) clearInterval(timer);
+      } catch {
+        /* تبقى النتيجة الحالية حتى تنتهي المراجعة */
+      }
+    }, 4000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [examId, submitResult?.essayNotice]);
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [imageModalSrc, setImageModalSrc] = useState(null);
 

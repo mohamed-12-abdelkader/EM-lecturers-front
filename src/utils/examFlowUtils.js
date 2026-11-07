@@ -70,16 +70,26 @@ export function buildLectureExamUpdatePayload(data) {
 
 export function buildExamSubmitAnswers(studentAnswers = {}) {
   return Object.entries(studentAnswers)
-    .map(([questionId, selectedAnswer]) => ({
-      questionId: Number(questionId),
-      selectedAnswer: String(selectedAnswer || "").trim().toUpperCase(),
-    }))
-    .filter(
-      (row) =>
-        Number.isInteger(row.questionId) &&
-        row.questionId > 0 &&
-        ["A", "B", "C", "D"].includes(row.selectedAnswer),
-    );
+    .map(([questionId, selectedAnswer]) => {
+      const id = Number(questionId);
+      if (!Number.isInteger(id) || id <= 0) return null;
+      if (selectedAnswer && typeof selectedAnswer === "object") {
+        const text = String(selectedAnswer.text || "");
+        const images = Array.isArray(selectedAnswer.images) ? selectedAnswer.images.filter(Boolean) : [];
+        if (!text.trim() && !images.length) return null;
+        return {
+          questionId: id,
+          essay: true,
+          answerText: text,
+          answerImages: images,
+          ocrText: selectedAnswer.ocrText || "",
+        };
+      }
+      const letter = String(selectedAnswer || "").trim().toUpperCase();
+      if (!["A", "B", "C", "D"].includes(letter)) return null;
+      return { questionId: id, selectedAnswer: letter };
+    })
+    .filter(Boolean);
 }
 
 /** إجابات محفوظة من السيرفر → خريطة { questionId: "A" } */
@@ -89,6 +99,17 @@ export function savedCourseExamAnswersToMap(savedAnswers = []) {
   for (const row of rows) {
     if (!row || typeof row !== "object") continue;
     const questionId = Number(row.questionId ?? row.question_id);
+    if (row.essay || row.answerText || row.answer_text || (Array.isArray(row.answerImages) && row.answerImages.length)) {
+      if (Number.isInteger(questionId) && questionId > 0) {
+        map[questionId] = {
+          essay: true,
+          text: row.answerText || row.answer_text || "",
+          images: row.answerImages || row.answer_images || [],
+          ocrText: row.ocrText || row.ocr_text || "",
+        };
+      }
+      continue;
+    }
     const letter = String(row.selectedAnswer ?? row.selected_answer ?? "")
       .trim()
       .toUpperCase();
@@ -241,17 +262,33 @@ export function formatLectureExamDurationLabel(exam) {
   return `${exam.duration} دقيقة`;
 }
 
-/** إجابات محفوظة لواجب/امتحان محاضرة → { questionId: choiceId } */
+/** إجابات محفوظة لواجب/امتحان محاضرة → { questionId: choiceId | essayObject } */
 export function savedLectureExamAnswersToMap(savedAnswers = []) {
   const map = {};
   const rows = Array.isArray(savedAnswers) ? savedAnswers : [];
   for (const row of rows) {
     if (!row || typeof row !== "object") continue;
     const questionId = Number(row.questionId ?? row.question_id);
+    if (!(Number.isInteger(questionId) && questionId > 0)) continue;
+    if (
+      row.essay ||
+      row.answerText ||
+      row.answer_text ||
+      (Array.isArray(row.answerImages) && row.answerImages.length) ||
+      (Array.isArray(row.answer_images) && row.answer_images.length)
+    ) {
+      map[questionId] = {
+        essay: true,
+        text: row.answerText || row.answer_text || "",
+        images: row.answerImages || row.answer_images || [],
+        ocrText: row.ocrText || row.ocr_text || "",
+      };
+      continue;
+    }
     const choiceId = Number(
       row.choiceId ?? row.choice_id ?? row.selectedChoiceId ?? row.selected_choice_id,
     );
-    if (Number.isInteger(questionId) && questionId > 0 && Number.isFinite(choiceId) && choiceId !== 0) {
+    if (Number.isFinite(choiceId) && choiceId !== 0) {
       map[questionId] = choiceId;
     }
   }
@@ -312,6 +349,17 @@ export function normalizeSingleExamQuestion(q) {
     q.questionText ?? q.question_text ?? q.text ?? q.question ?? null;
   const questionImageRaw =
     q.questionImage ?? q.question_image ?? q.image ?? q.image_url ?? null;
+  if (String(q.type || "").toUpperCase() === "ESSAY") {
+    return {
+      id: questionId,
+      text: questionTextRaw != null ? String(questionTextRaw) : "",
+      image: questionImageRaw,
+      type: "ESSAY",
+      grade: Number(q.points ?? q.grade ?? 1),
+      points: Number(q.points ?? q.grade ?? 1),
+      choices: [],
+    };
+  }
   const passageText =
     q.passageText ||
     q.passage_text ||

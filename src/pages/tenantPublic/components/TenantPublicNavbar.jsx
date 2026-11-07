@@ -90,7 +90,7 @@ function ThemeToggle({ isDark, onToggle }) {
   );
 }
 
-function NavLinkItem({ href, label, onClick }) {
+function NavLinkItem({ href, label, onClick, accent, accent2 }) {
   return (
     <TenantAppLink
       href={href}
@@ -100,7 +100,7 @@ function NavLinkItem({ href, label, onClick }) {
       {label}
       <span
         className="absolute inset-x-3 -bottom-0.5 h-[2px] origin-right scale-x-0 rounded-full transition-transform duration-300 group-hover:origin-left group-hover:scale-x-100"
-        style={{ background: `linear-gradient(90deg, ${TL_LIME}, ${TL_CYAN})` }}
+        style={{ background: `linear-gradient(90deg, ${accent2 || TL_LIME}, ${accent || TL_CYAN})` }}
         aria-hidden
       />
     </TenantAppLink>
@@ -124,9 +124,14 @@ export function TenantPublicNavbar({
   brandHref = "/",
   navLinks = TENANT_SITE_NAV_LINKS,
   extraNav = null,
+  chrome = null,
 }) {
   const handleToggleTheme = onToggleTheme || toggleTheme;
   const solidNav = alwaysSolid || navScrolled || isMobileMenuOpen;
+  const navBg = chrome ? (solidNav ? chrome.navSolid : chrome.nav) : null;
+  const accent = chrome?.accent || TL_CYAN;
+  const accent2 = chrome?.accent2 || TL_LIME;
+  const signupFg = chrome?.signupFg || "#FFFFFF";
   const avatarSrc = resolvePublicImageUrl(tenantAvatar);
 
   return (
@@ -139,16 +144,19 @@ export function TenantPublicNavbar({
     >
       <div
         className={`pointer-events-auto mx-auto max-w-[1200px] overflow-hidden rounded-2xl border border-white/15 backdrop-blur-xl transition-all duration-400 ${
-          solidNav
+          chrome
+            ? "shadow-[0_12px_40px_-12px_rgba(0,0,0,0.45)]"
+            : solidNav
             ? "bg-[#0A1628]/92 shadow-[0_12px_40px_-12px_rgba(0,0,0,0.45)]"
             : "bg-[#0A1628]/40 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.35)]"
         }`}
+        style={navBg ? { background: navBg } : undefined}
       >
         {/* Accent hairline */}
         <div
           className="h-[2px] w-full"
           style={{
-            background: `linear-gradient(90deg, ${TL_CYAN}, ${TL_LIME}, transparent)`,
+            background: `linear-gradient(90deg, ${accent}, ${accent2}, transparent)`,
           }}
           aria-hidden
         />
@@ -170,7 +178,7 @@ export function TenantPublicNavbar({
                 <span
                   className="flex h-10 w-10 items-center justify-center rounded-xl text-sm font-black text-white shadow-sm"
                   style={{
-                    background: `linear-gradient(145deg, ${TL_CYAN}, #0A4A6E)`,
+                    background: `linear-gradient(145deg, ${accent}, #0A4A6E)`,
                   }}
                 >
                   {(brandName || "م").slice(0, 1)}
@@ -178,7 +186,7 @@ export function TenantPublicNavbar({
               )}
               <span
                 className="absolute -bottom-0.5 -left-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-[#0A1628]"
-                style={{ background: TL_LIME }}
+                style={{ background: accent2 }}
                 aria-hidden
               />
             </span>
@@ -200,7 +208,7 @@ export function TenantPublicNavbar({
             aria-label="التنقل الرئيسي"
           >
             {navLinks.map(([href, label]) => (
-              <NavLinkItem key={href} href={href} label={label} />
+              <NavLinkItem key={href} href={href} label={label} accent={accent} accent2={accent2} />
             ))}
           </nav>
 
@@ -223,8 +231,8 @@ export function TenantPublicNavbar({
               {showSignup ? (
                 <TenantAppLink
                   href={signupHref}
-                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-bold text-white shadow-[0_8px_20px_-8px_#00A0E399] transition-[filter,transform] duration-200 hover:brightness-110 active:scale-[0.98]"
-                  style={{ background: TL_CYAN }}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-bold shadow-[0_8px_20px_-8px_rgba(0,0,0,0.35)] transition-[filter,transform] duration-200 hover:brightness-110 active:scale-[0.98]"
+                  style={{ background: accent, color: signupFg }}
                 >
                   إنشاء حساب
                   <FaArrowLeft className="text-[9px] opacity-90" />
@@ -253,7 +261,8 @@ export function TenantPublicNavbar({
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-              className="overflow-hidden border-t border-white/10 bg-[#0A1628]/95 min-[920px]:hidden"
+              className="overflow-hidden border-t border-white/10 min-[920px]:hidden"
+              style={{ background: chrome?.navSolid || "rgba(10,22,40,0.95)" }}
             >
               <nav className="grid gap-0.5 px-3 py-3" aria-label="قائمة الجوال">
                 {navLinks.map(([href, label], i) => (
@@ -286,8 +295,8 @@ export function TenantPublicNavbar({
                   <TenantAppLink
                     href={signupHref}
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="inline-flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl text-sm font-bold text-white"
-                    style={{ background: TL_CYAN }}
+                    className="inline-flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl text-sm font-bold"
+                    style={{ background: accent, color: signupFg }}
                   >
                     إنشاء حساب
                     <FaArrowLeft className="text-[9px]" />

@@ -124,6 +124,8 @@ export function normalizeWrongQuestions(list = []) {
             .map((v) => String(v).trim().toUpperCase());
       const uniqueCorrectLetters = [...new Set(correctLetters)];
 
+      const yourChoiceText = item.yourChoice?.text ?? null;
+      const correctChoiceText = item.correctChoice?.text ?? null;
       return {
         id: item.questionId ?? item.id ?? index,
         questionId: item.questionId ?? item.id ?? null,
@@ -135,8 +137,22 @@ export function normalizeWrongQuestions(list = []) {
         correctAnswer2: uniqueCorrectLetters[1] ?? item.correctAnswer2 ?? null,
         correctAnswers: uniqueCorrectLetters,
         yourAnswer: item.yourAnswer ?? item.yourChoice?.letter ?? null,
-        yourAnswerText: item.yourAnswerText ?? item.your_answer_text ?? null,
-        correctAnswerText: item.correctAnswerText ?? item.correct_answer_text ?? null,
+        yourAnswerText:
+          item.yourAnswerText ??
+          item.your_answer_text ??
+          yourChoiceText ??
+          null,
+        yourAnswerImages: Array.isArray(item.yourAnswerImages)
+          ? item.yourAnswerImages
+          : Array.isArray(item.your_answer_images)
+            ? item.your_answer_images
+            : [],
+        correctAnswerText:
+          item.correctAnswerText ??
+          item.correct_answer_text ??
+          correctChoiceText ??
+          null,
+        correctAnswerImage: item.correctAnswerImage ?? item.correct_answer_image ?? null,
         optionA: item.optionA ?? null,
         optionB: item.optionB ?? null,
         optionC: item.optionC ?? null,
@@ -204,7 +220,8 @@ function normalizeFromSubmitResult(raw = {}) {
   return {
     mode: "submitted",
     title: raw.timedOut || raw.timed_out ? "انتهى الوقت — تم التسليم تلقائياً" : "تم تسليم الامتحان",
-    message: null,
+    message: raw.essayNotice || null,
+    essayQuestions: Array.isArray(raw.essayQuestions) ? raw.essayQuestions : [],
     attemptId: raw.attemptId ?? null,
     totalGrade,
     maxGrade,
@@ -277,7 +294,8 @@ export function normalizeAttemptReport(raw = {}) {
   return {
     mode: showAnswers ? "report" : "blocked",
     title: showAnswers ? "تقرير المحاولة" : "نتيجة الامتحان",
-    message: localizeAttemptReportMessage(payload.message, payload),
+    message: payload.essayNotice || localizeAttemptReportMessage(payload.message, payload),
+    essayQuestions: Array.isArray(payload.essayQuestions) ? payload.essayQuestions : [],
     attemptId: attempt.attemptId ?? payload.attemptId ?? null,
     attemptNumber: attempt.attemptNumber ?? null,
     totalGrade,

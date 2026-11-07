@@ -13,6 +13,7 @@ import {
 } from "@chakra-ui/react";
 import { MdCheck, MdZoomIn } from "react-icons/md";
 import { examQuestionTextSx } from "../../../components/question/FormattedQuestionText";
+import EssayAnswerEditor from "../../../components/exam/EssayAnswerEditor";
 import { renderFormattedExamText } from "../../../utils/renderFormattedExamText";
 import { isImageUrl } from "./PlatformExamQuestionCard";
 import { ExamPassageBlock } from "./ExamQuestionDisplay";
@@ -327,6 +328,28 @@ export default function LectureExamStudentQuestionCard({
   const imageChoices = normalizedChoices.filter((choice) => choice.isImageOnly || choice.image);
   const hasLongChoices = textChoices.some((choice) => (choice.text || "").length > 70);
   const textChoiceColumns = hasLongChoices ? 1 : { base: 1, md: 2 };
+
+  if (question?.type === "ESSAY") {
+    return (
+      <Box bg={cardBg} borderRadius="3xl" borderWidth="1px" borderColor={border} p={{ base: 4, md: 5 }} dir="rtl">
+        <Text fontSize="sm" color="blue.500" fontWeight="800" mb={3}>
+          سؤال مقالي {question.points || question.grade ? `· ${question.points || question.grade} درجات` : ""}
+        </Text>
+        {hasText && (
+          <Text fontSize={{ base: "md", md: "lg" }} fontWeight="700" color={textColor} lineHeight="2" mb={3} sx={examQuestionTextSx}>
+            {question.text}
+          </Text>
+        )}
+        {hasImage && (
+          <Image src={question.image} alt="السؤال" maxH="280px" borderRadius="xl" mb={4} cursor="pointer" onClick={() => onZoomImage?.(question.image)} />
+        )}
+        <EssayAnswerEditor
+          value={selectedLetter && typeof selectedLetter === "object" ? selectedLetter : null}
+          onChange={(next) => onSelectLetter?.(question.id, next)}
+        />
+      </Box>
+    );
+  }
 
   return (
     <Box

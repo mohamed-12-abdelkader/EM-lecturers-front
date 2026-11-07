@@ -200,6 +200,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
         { to: "/admin/whatsapp/parents-exam", Icon: FaWhatsapp, label: "إشعارات أولياء الأمور" },
         { to: "/admin/whatsapp/policy", Icon: FaWhatsapp, label: "تخصيص الدعم" },
         { to: "/teacher-points", Icon: MdEmojiEvents, label: "النقاط والترتيب" },
+        { to: "/essay-reviews", Icon: MdGrading, label: "مراجعة الأسئلة المقالية" },
         { to: "/all_students", Icon: MdPeople, label: "كل الطلاب" },
         {
           to: "/question-bank-dashboard",
@@ -237,6 +238,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
         { to: "/teacher-assignments", Icon: MdAssignment, label: "الواجبات" },
         { to: "/teacher-exams", Icon: MdQuiz, label: "الامتحانات" },
         { to: "/teacher-public-exams", Icon: MdPublic, label: "الامتحانات العامة" },
+        { to: "/essay-reviews", Icon: MdGrading, label: "مراجعة الأسئلة المقالية" },
         { to: "/teacher-daily-quizzes", Icon: MdWhatshot, label: "المسابقات اليومية" },
         { to: "/teacher-points", Icon: MdEmojiEvents, label: "النقاط والترتيب" },
         { to: "/exam-builder-chat", Icon: MdQuiz, label: "مساعد الامتحانات" },
@@ -312,6 +314,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
       links: [
         { to: "/teacher-exams", Icon: MdQuiz, label: "الامتحانات" },
         { to: "/teacher-public-exams", Icon: MdPublic, label: "الامتحانات العامة" },
+        { to: "/essay-reviews", Icon: MdGrading, label: "مراجعة الأسئلة المقالية" },
         { to: "/teacher-question-extraction", Icon: MdAutoAwesome, label: "استخراج الأسئلة" },
         { to: "/teacher-assignments", Icon: MdAssignment, label: "الواجبات" },
         { to: "/teacher-points", Icon: MdEmojiEvents, label: "النقاط والترتيب" },

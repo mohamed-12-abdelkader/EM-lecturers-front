@@ -6,13 +6,11 @@
  * - Runtime caching للصور والخطوط الخارجية.
  * - صفحة offline.html عند انقطاع الإنترنت أثناء التنقل.
  * - Web Push + النقر على الإشعارات.
- * - التحديثات: تنتظر موافقة المستخدم (SKIP_WAITING) قبل التفعيل.
+ * - التحديثات: لا تفعيل تلقائي — فقط عبر رسالة SKIP_WAITING بعد موافقة المستخدم.
  */
 
-import { clientsClaim } from "workbox-core";
 import {
   precacheAndRoute,
-  cleanupOutdatedCaches,
   getCacheKeyForURL,
 } from "workbox-precaching";
 import { registerRoute, setCatchHandler, NavigationRoute } from "workbox-routing";
@@ -176,12 +174,8 @@ registerRoute(
 
 /* --------------------------- Precache (البناء) --------------------------- */
 precacheAndRoute(self.__WB_MANIFEST);
-cleanupOutdatedCaches();
-
-self.addEventListener("install", () => {
-  self.skipWaiting();
-});
-clientsClaim();
+// لا نستدعي cleanupOutdatedCaches هنا: العملاء على نسخة قديمة قد يحتاجون
+// أصول البناء السابق أثناء جلسة نشطة بعد النشر.
 
 self.addEventListener("message", (event) => {
   const data = event.data;
@@ -193,6 +187,11 @@ self.addEventListener("message", (event) => {
   if (data.type === "SET_TENANT_PWA_BRANDING" && data.branding) {
     event.waitUntil(writeTenantPwaBranding(data.branding));
   }
+});
+
+self.addEventListener("activate", (event) => {
+  // نسيطر على العملاء فقط بعد تفعيل صريح (SKIP_WAITING من المستخدم)
+  event.waitUntil(self.clients.claim());
 });
 
 /* ---------------------------- Runtime caching ---------------------------- */

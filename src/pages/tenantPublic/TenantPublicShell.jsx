@@ -8,6 +8,7 @@ import {
 import TenantSearchBar from "./components/TenantSearchBar";
 import { useTenantPageMetadata } from "../../Hooks/tenantPublic/useTenantPageMetadata";
 import TenantSeoHead from "./components/TenantSeoHead";
+import { getLandingDesign, landingNavChrome, resolveLandingLayout } from "./tenantLandingDesigns";
 
 const TENANT_FONT_LINK_ID = "tenant-public-arabic-fonts";
 
@@ -67,6 +68,8 @@ export default function TenantPublicShell({
   useTenantPageMetadata(subdomain, seoPage, seoSlug, seoFallback);
 
   const brandName = tenant?.display_name || subdomain;
+  const landingDesign = getLandingDesign(resolveLandingLayout(payload?.landing?.layout));
+  const navChrome = landingNavChrome(landingDesign);
   const cssVars = useMemo(() => {
     const theme = payload?.landing?.theme;
     if (!theme) return {};
@@ -86,8 +89,14 @@ export default function TenantPublicShell({
 
   return (
     <div
-      className={`tenant-public-page ${isDarkMode ? "dark tenant-dark" : "tenant-light"} min-h-screen bg-white text-[var(--t-text,#1e293b)] antialiased ${className}`}
-      style={cssVars}
+      data-landing={landingDesign.id}
+      className={`tenant-public-page ${isDarkMode ? "dark tenant-dark" : "tenant-light"} min-h-screen antialiased ${landingDesign.id === "bento" ? "bg-white text-[var(--t-text,#1e293b)]" : ""} ${className}`}
+      style={{
+        ...cssVars,
+        background: landingDesign.id === "bento" ? undefined : landingDesign.pageBg,
+        color: landingDesign.id === "bento" ? undefined : landingDesign.fg,
+        fontFamily: landingDesign.bodyFont,
+      }}
       dir="rtl"
     >
       <TenantSeoHead subdomain={subdomain} />
@@ -103,6 +112,7 @@ export default function TenantPublicShell({
         loginHref="/login"
         signupHref="/signup"
         alwaysSolid
+        chrome={navChrome}
         extraNav={
           showSearch ? (
             <div className="hidden lg:block">

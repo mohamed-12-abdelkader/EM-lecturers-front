@@ -1,4 +1,8 @@
 import { useEffect, useRef } from "react";
+import applicationActivityManager, {
+  ACTIVITY_TYPES,
+} from "../../utils/applicationActivityManager";
+import { flushDeferredPWAUpdate } from "../../pwa/registerPWA";
 
 const EXAM_TAKING_FLAG = "em-lecture-exam-taking";
 
@@ -6,13 +10,18 @@ const EXAM_TAKING_FLAG = "em-lecture-exam-taking";
 export function isExamTakingActive() {
   if (typeof window === "undefined") return false;
   try {
-    return (
+    if (
       sessionStorage.getItem(EXAM_TAKING_FLAG) === "1" ||
       localStorage.getItem(EXAM_TAKING_FLAG) === "1"
-    );
+    ) {
+      return true;
+    }
   } catch {
-    return false;
+    /* ignore */
   }
+  return applicationActivityManager
+    .getActiveActivities()
+    .some((item) => item.type === ACTIVITY_TYPES.EXAM);
 }
 
 function setExamTakingFlag(active) {
@@ -34,18 +43,14 @@ function setExamTakingFlag(active) {
  * حماية جلسة حل الامتحان/الواجب:
  * - تحذير قبل إغلاق/تحديث الصفحة
  * - حفظ فوري عند إخفاء الصفحة
- * - علامة تمنع reload الـ service worker أثناء الحل
- *
- * @param {{ enabled: boolean, onPersist?: () => void, message?: string }} options
+ * - تسجيل نشاط حرج يمنع تطبيق تحديث الفرونت
  */
-/** يُستدعى بعد تسليم الامتحان لإزالة العلم وتطبيق تحديث PWA مؤجّل إن وُجد */
+/** يُستدعى بعد تسليم الامتحان لإزالة العلم وإظهار التحديث المؤجّل إن وُجد */
 export function clearExamTakingFlag() {
   setExamTakingFlag(false);
+  applicationActivityManager.endAll(ACTIVITY_TYPES.EXAM);
   try {
-    // استيراد كسول لتجنب دورة اعتماد عند تحميل الـ PWA
-    import("../../pwa/registerPWA").then((mod) => {
-      mod.flushDeferredPWAUpdate?.();
-    });
+    flushDeferredPWAUpdate?.();
   } catch {
     // ignore
   }
@@ -63,7 +68,11 @@ export default function useExamTakingProtection({
 
   useEffect(() => {
     setExamTakingFlag(Boolean(enabled));
-    return () => setExamTakingFlag(false);
+    if (!enabled) {
+      applicationActivityManager.endAll(ACTIVITY_TYPES.EXAM);
+      return undefined;
+    }
+    return applicationActivityManager.startActivity(ACTIVITY_TYPES.EXAM, "taking");
   }, [enabled]);
 
   useEffect(() => {

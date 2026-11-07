@@ -1,3 +1,6 @@
+import applicationActivityManager from "./applicationActivityManager";
+import { notifyChunkMismatchUpdate } from "../pwa/chunkMismatchBridge";
+
 const RELOAD_GUARD_KEY = "em_chunk_reload_ts";
 const RELOAD_COOLDOWN_MS = 12_000;
 
@@ -16,9 +19,18 @@ export function isChunkLoadError(error) {
   );
 }
 
-/** إعادة تحميل واحدة عند تعارض نسخة PWA/كاش — يمنع حلقة لا نهائية */
+/**
+ * عند فشل تحميل chunk بعد نشر جديد:
+ * - أثناء نشاط حرج: لا نعيد التحميل — نعلّم بوجود تحديث فقط
+ * - خارج النشاط الحرج: إعادة تحميل واحدة محمية بـ cooldown
+ */
 export function recoverFromChunkError(error) {
   if (typeof window === "undefined" || !isChunkLoadError(error)) return false;
+
+  if (applicationActivityManager.isLocalCriticalActivityActive()) {
+    notifyChunkMismatchUpdate();
+    return true;
+  }
 
   try {
     const lastReload = Number(sessionStorage.getItem(RELOAD_GUARD_KEY) || 0);

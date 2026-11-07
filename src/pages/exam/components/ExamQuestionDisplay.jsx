@@ -1,4 +1,5 @@
 import React from "react";
+import EssayAnswerEditor from "../../../components/exam/EssayAnswerEditor";
 import {
   Box,
   VStack,
@@ -547,6 +548,7 @@ export function TeacherQuestionCard({
   onDelete,
   onSetCorrect,
   isTourTarget = false,
+  questionType,
 }) {
   const cardBg = useColorModeValue("white", "gray.900");
   const borderColor = useColorModeValue("gray.200", "gray.700");
@@ -554,7 +556,11 @@ export function TeacherQuestionCard({
   const muted = useColorModeValue("gray.500", "gray.400");
   const indexBg = useColorModeValue("blue.50", "whiteAlpha.100");
   const indexColor = useColorModeValue("#0E4C92", "blue.200");
-  const hasCorrect = (displayChoices || []).some((c) => c.is_correct);
+  const essayHintBg = useColorModeValue("teal.50", "whiteAlpha.100");
+  const essayHintBorder = useColorModeValue("teal.100", "teal.700");
+  const isEssay =
+    String(questionType || questionRef?.type || "").toUpperCase() === "ESSAY";
+  const hasCorrect = !isEssay && (displayChoices || []).some((c) => c.is_correct);
 
   return (
     <Box
@@ -590,6 +596,11 @@ export function TeacherQuestionCard({
             {index + 1}
           </Flex>
           <HStack spacing={2} flexWrap="wrap">
+            {isEssay ? (
+              <Badge colorScheme="teal" variant="subtle" borderRadius="full" fontSize="10px">
+                مقالي
+              </Badge>
+            ) : null}
             {passageContent ? (
               <Badge colorScheme="blue" variant="subtle" borderRadius="full" fontSize="10px">
                 قطعة
@@ -600,7 +611,7 @@ export function TeacherQuestionCard({
                 صورة
               </Badge>
             ) : null}
-            {!hasCorrect ? (
+            {!isEssay && !hasCorrect ? (
               <Badge colorScheme="orange" variant="subtle" borderRadius="full" fontSize="10px">
                 حدد إجابة أو إجابتين صحيحتين
               </Badge>
@@ -609,31 +620,35 @@ export function TeacherQuestionCard({
         </HStack>
 
         <HStack spacing={1} flexShrink={0} justify={{ base: "flex-end", sm: "flex-end" }}>
-          <Tooltip label="إضافة صورة" hasArrow>
-            <IconButton
-              aria-label="إضافة صورة"
-              size="sm"
-              variant="ghost"
-              borderRadius="lg"
-              icon={<AiFillPicture />}
-              onClick={() => onAddImage(displayId)}
-              cursor="pointer"
-              data-tour-id={isTourTarget ? "exam-question-add-image" : undefined}
-            />
-          </Tooltip>
-          <Tooltip label="تعديل السؤال" hasArrow>
-            <IconButton
-              aria-label="تعديل"
-              size="sm"
-              variant="ghost"
-              colorScheme="blue"
-              borderRadius="lg"
-              icon={<AiFillEdit />}
-              onClick={() => onEdit(questionRef)}
-              cursor="pointer"
-              data-tour-id={isTourTarget ? "exam-question-edit" : undefined}
-            />
-          </Tooltip>
+          {!isEssay && (
+            <Tooltip label="إضافة صورة" hasArrow>
+              <IconButton
+                aria-label="إضافة صورة"
+                size="sm"
+                variant="ghost"
+                borderRadius="lg"
+                icon={<AiFillPicture />}
+                onClick={() => onAddImage(displayId)}
+                cursor="pointer"
+                data-tour-id={isTourTarget ? "exam-question-add-image" : undefined}
+              />
+            </Tooltip>
+          )}
+          {!isEssay && (
+            <Tooltip label="تعديل السؤال" hasArrow>
+              <IconButton
+                aria-label="تعديل"
+                size="sm"
+                variant="ghost"
+                colorScheme="blue"
+                borderRadius="lg"
+                icon={<AiFillEdit />}
+                onClick={() => onEdit(questionRef)}
+                cursor="pointer"
+                data-tour-id={isTourTarget ? "exam-question-edit" : undefined}
+              />
+            </Tooltip>
+          )}
           <Tooltip label="حذف السؤال" hasArrow>
             <IconButton
               aria-label="حذف"
@@ -664,7 +679,7 @@ export function TeacherQuestionCard({
             color={textColor}
             lineHeight="1.95"
             dir="auto"
-            mb={displayImage || displayChoices?.length ? 4 : 0}
+            mb={displayImage || (!isEssay && displayChoices?.length) ? 4 : 0}
             whiteSpace="pre-wrap"
             sx={examQuestionTextSx}
           >
@@ -673,7 +688,7 @@ export function TeacherQuestionCard({
         ) : null}
 
         {displayImage ? (
-          <Box mb={displayChoices?.length ? 4 : 0}>
+          <Box mb={!isEssay && displayChoices?.length ? 4 : 0}>
             <ExamQuestionImage
               src={displayImage}
               onZoom={onZoomImage}
@@ -689,16 +704,33 @@ export function TeacherQuestionCard({
           </Text>
         ) : null}
 
-        <ExamChoicesSection
-          choices={displayChoices}
-          mode="teacher"
-          displayId={displayId}
-          pendingCorrect={pendingCorrect}
-          onSetCorrect={onSetCorrect}
-          onZoomImage={onZoomImage}
-          headingColor={textColor}
-          tourTargetId={isTourTarget ? "exam-question-choices" : undefined}
-        />
+        {isEssay ? (
+          <Box
+            mt={displayText || displayImage ? 3 : 0}
+            p={3}
+            borderRadius="xl"
+            bg={essayHintBg}
+            borderWidth="1px"
+            borderColor={essayHintBorder}
+          >
+            <Text fontSize="sm" color={muted}>
+              سؤال مقالي — يُصحَّح آليًا ثم يراجعه المدرس عند الحاجة.
+              {" "}
+              الدرجة: {questionRef?.points ?? questionRef?.grade ?? "—"}
+            </Text>
+          </Box>
+        ) : (
+          <ExamChoicesSection
+            choices={displayChoices}
+            mode="teacher"
+            displayId={displayId}
+            pendingCorrect={pendingCorrect}
+            onSetCorrect={onSetCorrect}
+            onZoomImage={onZoomImage}
+            headingColor={textColor}
+            tourTargetId={isTourTarget ? "exam-question-choices" : undefined}
+          />
+        )}
       </Box>
     </Box>
   );
@@ -721,6 +753,7 @@ export function StudentQuestionPanel({
   cardBg,
   cardBorder,
   compactHeader = false,
+  questionType,
 }) {
   const border = cardBorder || useColorModeValue("gray.200", "gray.600");
   const bg = cardBg || useColorModeValue("white", "gray.800");
@@ -731,7 +764,11 @@ export function StudentQuestionPanel({
   const muted = subtextColor || useColorModeValue("gray.500", "gray.400");
   const textColor = headingColor || useColorModeValue("gray.800", "white");
   const questionBg = useColorModeValue("blue.50", "whiteAlpha.50");
-  const isAnswered = !!studentAnswers[questionId];
+  const isEssay = questionType === "ESSAY";
+  const currentAnswer = studentAnswers?.[questionId];
+  const isAnswered = isEssay
+    ? Boolean(String(currentAnswer?.text || "").trim() || currentAnswer?.images?.length)
+    : !!currentAnswer;
 
   return (
     <Box
@@ -774,7 +811,7 @@ export function StudentQuestionPanel({
               السؤال {questionIndex + 1} من {totalQuestions}
             </Text>
             <Text fontSize="xs" color="blue.500" fontWeight="800">
-              اختر إجابة واحدة فقط
+              {isEssay ? "سؤال مقالي" : "اختر إجابة واحدة فقط"}
             </Text>
           </Box>
         </HStack>
@@ -830,6 +867,13 @@ export function StudentQuestionPanel({
           </Box>
         )}
 
+        {isEssay ? (
+          <EssayAnswerEditor
+            value={currentAnswer}
+            disabled={!!submitResult}
+            onChange={(next) => onChoice?.(questionId, next)}
+          />
+        ) : (
         <ExamChoicesSection
           choices={questionChoices}
           mode="student"
@@ -840,6 +884,7 @@ export function StudentQuestionPanel({
           onZoomImage={onZoomImage}
           headingColor={textColor}
         />
+        )}
       </Box>
     </Box>
   );

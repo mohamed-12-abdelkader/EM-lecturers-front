@@ -65,6 +65,7 @@ export default function TeacherExamShell({
   onGrades,
   onReport,
   onAddImages,
+  onAddEssay,
   onBulkText,
   onPassage,
   onAiExtract,
@@ -202,6 +203,9 @@ export default function TeacherExamShell({
               <HeaderBtn tourId="exam-teacher-bulk" icon={FaAlignLeft} label="أسئلة كنص" onClick={onBulkText} />
               <HeaderBtn tourId="exam-teacher-passage" icon={FaBookOpen} label="من قطعة" onClick={onPassage} />
               <HeaderBtn tourId="exam-teacher-images" icon={FaImage} label="أسئلة كصور" onClick={onAddImages} />
+              {onAddEssay && (
+                <HeaderBtn tourId="exam-teacher-essay" icon={FaAlignLeft} label="سؤال مقالي" onClick={onAddEssay} />
+              )}
             </HStack>
             <HStack spacing={2} flexWrap="wrap">
               <HeaderBtn tourId="exam-teacher-grades" icon={FaUsers} label="درجات الطلاب" onClick={onGrades} />

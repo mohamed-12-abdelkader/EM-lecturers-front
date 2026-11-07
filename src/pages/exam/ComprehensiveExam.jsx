@@ -62,6 +62,7 @@ import {
 } from "./components/ExamQuestionDisplay";
 import ExamSubmissionsView from "./components/ExamSubmissionsView";
 import TeacherExamTour from "../../components/onboarding/TeacherExamTour";
+import EssayQuestionModal from "../../components/exam/EssayQuestionModal";
 import {
   TOUR_CLOSE_AI,
   TOUR_CLOSE_ALL,
@@ -107,6 +108,7 @@ import {
 import { normalizeExamAttemptResult } from "../../utils/examAttemptResultUtils";
 import ExamAttemptResultScreen from "./components/ExamAttemptResultScreen";
 import {
+  fetchExamAttemptReport,
   patchLectureExamQuestionCorrectAnswers,
   normalizeCorrectAnswerLetters,
   toggleCorrectAnswerLetter,
@@ -119,6 +121,9 @@ function countLectureAnswered(questions, answers) {
   return (questions || []).filter((q) => {
     const id = q?.type === "passage_sub" ? q.sub_question?.id : q?.id;
     const ans = answers?.[id];
+    if (ans && typeof ans === "object") {
+      return Boolean(String(ans.text || "").trim() || (ans.images || []).length);
+    }
     return ans != null && ans !== "";
   }).length;
 }
@@ -144,6 +149,43 @@ const ComprehensiveExam = () => {
   const [studentAnswers, setStudentAnswers] = useState({}); // { [questionId]: choiceId }
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitResult, setSubmitResult] = useState(null);
+
+  useEffect(() => {
+    if (!submitResult?.essayNotice || !id) return undefined;
+    let stopped = false;
+    let tries = 0;
+    const timer = setInterval(async () => {
+      tries += 1;
+      if (tries > 6) {
+        clearInterval(timer);
+        return;
+      }
+      try {
+        const token = localStorage.getItem("token");
+        const report = await fetchExamAttemptReport(id, token);
+        if (stopped || !report) return;
+        const attempt = report.attempt || {};
+        const essayQuestions = report.essayQuestions || [];
+        setSubmitResult((prev) =>
+          prev && {
+            ...prev,
+            totalGrade: attempt.totalGrade ?? prev.totalGrade,
+            maxGrade: attempt.maxGrade ?? prev.maxGrade,
+            essayQuestions,
+            essayNotice: report.essayNotice || null,
+          },
+        );
+        if (!essayQuestions.some((item) => item.pending)) clearInterval(timer);
+      } catch {
+        /* تبقى النتيجة الحالية حتى تنتهي المراجعة */
+      }
+    }, 4000);
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [id, submitResult?.essayNotice]);
+
   // State لعرض درجات الطلاب
   const [showGrades, setShowGrades] = useState(false);
   const [gradesData, setGradesData] = useState(null);
@@ -168,6 +210,7 @@ const ComprehensiveExam = () => {
   const [blockedAttemptResult, setBlockedAttemptResult] = useState(null);
   // State لإضافة الأسئلة كصور
   const [addImageModal, setAddImageModal] = useState({ open: false });
+  const [essayModalOpen, setEssayModalOpen] = useState(false);
   const [selectedImages, setSelectedImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [uploadingImages, setUploadingImages] = useState(false);
@@ -1459,11 +1502,24 @@ const ComprehensiveExam = () => {
     const attemptId = toPositiveAttemptId(attemptIdRef.current);
     if (!token || !attemptId || !id) return;
     const answers = Object.entries(studentAnswersRef.current || {})
-      .map(([questionId, choiceId]) => ({
-        questionId: Number(questionId),
-        choiceId: Number(choiceId),
-      }))
-      .filter((row) => Number.isInteger(row.questionId) && row.questionId > 0 && Number.isFinite(row.choiceId) && row.choiceId !== 0);
+      .map(([questionId, choiceId]) => {
+        if (choiceId && typeof choiceId === "object") {
+          const text = String(choiceId.text || "");
+          const images = Array.isArray(choiceId.images) ? choiceId.images.filter(Boolean) : [];
+          if (!text.trim() && !images.length) return null;
+          return {
+            questionId: Number(questionId),
+            essay: true,
+            answerText: text,
+            answerImages: images,
+            ocrText: choiceId.ocrText || "",
+          };
+        }
+        const numericChoice = Number(choiceId);
+        if (!Number.isFinite(numericChoice) || numericChoice === 0) return null;
+        return { questionId: Number(questionId), choiceId: numericChoice };
+      })
+      .filter(Boolean);
     try {
       const res = await baseUrl.post(
         `/api/exams/${id}/autosave`,
@@ -1552,12 +1608,28 @@ const ComprehensiveExam = () => {
     setSubmitLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const answersArr = Object.entries(studentAnswersRef.current || {}).map(
-        ([questionId, choiceId]) => ({
-          questionId: Number(questionId),
-          choiceId: Number(choiceId),
+      const answersArr = Object.entries(studentAnswersRef.current || {})
+        .map(([questionId, choiceId]) => {
+          if (choiceId && typeof choiceId === "object") {
+            const text = String(choiceId.text || "");
+            const images = Array.isArray(choiceId.images) ? choiceId.images.filter(Boolean) : [];
+            if (!text.trim() && !images.length) return null;
+            return {
+              questionId: Number(questionId),
+              essay: true,
+              answerText: text,
+              answerImages: images,
+              ocrText: choiceId.ocrText || "",
+            };
+          }
+          const numericChoice = Number(choiceId);
+          if (!Number.isFinite(numericChoice) || numericChoice === 0) return null;
+          return {
+            questionId: Number(questionId),
+            choiceId: numericChoice,
+          };
         })
-      );
+        .filter(Boolean);
       const attemptId = toPositiveAttemptId(attemptIdRef.current);
       const res = await baseUrl.post(
         `/api/exams/${id}/submit`,
@@ -2303,6 +2375,7 @@ const ComprehensiveExam = () => {
   return (
     <>
       {isStaff ? (
+        <>
         <TeacherExamShell
           examTitle={examData?.title}
           examData={examData}
@@ -2314,6 +2387,7 @@ const ComprehensiveExam = () => {
           onGrades={openGrades}
           onReport={() => navigate(`/lecture-exam/${id}/report`)}
           onAddImages={openAddImageModal}
+          onAddEssay={() => setEssayModalOpen(true)}
           onBulkText={() => setBulkTextModalOpen(true)}
           onPassage={() => setPassageModalOpen(true)}
           onAiExtract={() => setAiExtractionModalOpen(true)}
@@ -2347,6 +2421,7 @@ const ComprehensiveExam = () => {
                     displayImage={displayImage}
                     displayChoices={displayChoices}
                     passageContent={passageContent}
+                    questionType={isPassageSub ? q.sub_question?.type : q.type}
                     questionRef={isPassageSub ? { ...q.sub_question } : q}
                     pendingCorrect={pendingCorrect}
                     isTourTarget={
@@ -2384,6 +2459,14 @@ const ComprehensiveExam = () => {
             />
           )}
         </TeacherExamShell>
+        <EssayQuestionModal
+          isOpen={essayModalOpen}
+          onClose={() => setEssayModalOpen(false)}
+          examId={id}
+          scope="lecture"
+          onSaved={fetchExamData}
+        />
+        </>
       ) : (
     (() => {
       const lectureAnswered = countLectureAnswered(questions, studentAnswers);
@@ -2404,7 +2487,15 @@ const ComprehensiveExam = () => {
         const normalizedSubmit = submitResult
           ? normalizeExamAttemptResult(submitResult)
           : null;
-        if (normalizedSubmit?.wrongQuestions?.length > 0 || normalizedSubmit?.showAnswers) {
+        const hasEssayResult =
+          Boolean(normalizedSubmit?.message) ||
+          (Array.isArray(normalizedSubmit?.essayQuestions) &&
+            normalizedSubmit.essayQuestions.length > 0);
+        if (
+          normalizedSubmit?.wrongQuestions?.length > 0 ||
+          normalizedSubmit?.showAnswers ||
+          hasEssayResult
+        ) {
           return (
             <ExamAttemptResultScreen
               result={normalizedSubmit}
@@ -2513,6 +2604,7 @@ const ComprehensiveExam = () => {
               questionText={questionText}
               questionImage={questionImage}
               questionChoices={questionChoices}
+              questionType={currentItem?.type}
               passageContent={passageContent}
               studentAnswers={studentAnswers}
               submitResult={submitResult}

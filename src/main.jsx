@@ -21,6 +21,7 @@ import SessionProvider from "./providers/SessionProvider.jsx";
 import AxiosProvider from "./providers/AxiosProvider.jsx";
 import OfflineScreen from "./components/network/OfflineScreen.jsx";
 import InstallAppPrompt from "./components/pwa/InstallAppPrompt.jsx";
+import AppUpdateBanner from "./components/pwa/AppUpdateBanner.jsx";
 import BrandLoadingOverlayHost from "./components/loading/BrandLoadingOverlayHost.jsx";
 import { initPWA } from "./pwa/registerPWA.js";
 import { registerChunkLoadRecovery } from "./utils/chunkLoadRecovery.js";
@@ -95,6 +96,7 @@ const RootContent = () => {
       <SessionExpiredModal />
       <OfflineScreen />
       <InstallAppPrompt />
+      <AppUpdateBanner />
       <BrandLoadingOverlayHost />
     </NotificationProvider>
   );

@@ -1,132 +1,303 @@
 /**
- * تسجيل الـ Service Worker + تطبيق التحديثات تلقائياً.
+ * تسجيل Service Worker + كشف التحديثات بدون أي إعادة تحميل تلقائية.
  *
- * عند توفر إصدار جديد: يُفعَّل فوراً ويُعاد تحميل التطبيق بالنسخة الجديدة.
- * أثناء حل امتحان/واجب: يؤجَّل الـ reload حتى لا تضيع جلسة الطالب.
+ * القواعد:
+ * - لا skipWaiting / clientsClaim تلقائي من جهة العميل
+ * - لا window.location.reload بسبب نشر جديد
+ * - كشف الإصدار عبر version.json + SW waiting
+ * - التطبيق فقط بعد موافقة المستخدم وعندما لا يوجد نشاط حرج
  */
 
-import { isExamTakingActive } from "../Hooks/exam/useExamTakingProtection";
+import applicationActivityManager from "../utils/applicationActivityManager";
+import {
+  fetchDeployedVersion,
+  getRunningBuildId,
+  isNewerBuild,
+} from "../utils/appVersion";
+import {
+  PWA_OFFLINE_READY_EVENT,
+  PWA_UPDATE_DISMISSED_EVENT,
+  PWA_UPDATE_EVENT,
+} from "./pwaEvents";
 
-export const PWA_UPDATE_EVENT = "pwa:update-available";
-export const PWA_OFFLINE_READY_EVENT = "pwa:offline-ready";
+export {
+  PWA_OFFLINE_READY_EVENT,
+  PWA_UPDATE_DISMISSED_EVENT,
+  PWA_UPDATE_EVENT,
+};
 
 const BUILD_ID_STORAGE_KEY = "em-app-build-id";
-const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+const PENDING_UPDATE_KEY = "em-app-update-pending";
+const FORCE_RELOAD_KEY = "em-app-force-reload";
+const DISMISSED_SESSION_KEY = "em-app-update-dismissed";
+const VERSION_CHECK_INTERVAL_MS = 60_000;
+const SW_UPDATE_CHECK_INTERVAL_MS = 5 * 60_000;
 
 let updateServiceWorker = null;
+let registrationRef = null;
 let pendingUserReload = false;
-let autoUpdateInProgress = false;
-let deferredUpdateWhileExam = false;
+let updateInProgress = false;
+let updateAvailable = false;
+let remoteBuildId = null;
+let versionCheckTimer = null;
+let initialized = false;
 
-/** هل يوجد تحديث قيد التطبيق؟ */
-export function isUpdateAvailable() {
-  return autoUpdateInProgress || typeof updateServiceWorker === "function";
-}
-
-/** تفعيل التحديث (يعيد تحميل الصفحة بالنسخة الجديدة) */
-export async function applyPWAUpdate() {
-  if (typeof updateServiceWorker !== "function") return false;
-  if (autoUpdateInProgress) return true;
-
-  if (isExamTakingActive()) {
-    deferredUpdateWhileExam = true;
+function isDismissedThisSession() {
+  try {
+    return sessionStorage.getItem(DISMISSED_SESSION_KEY) === "1";
+  } catch {
     return false;
   }
+}
 
-  autoUpdateInProgress = true;
-  pendingUserReload = true;
-  deferredUpdateWhileExam = false;
-
+function notifyUpdateAvailable(detail = {}) {
+  updateAvailable = true;
   try {
-    await updateServiceWorker(true);
-    return true;
-  } catch {
-    if (typeof window !== "undefined") window.location.reload();
-    return true;
-  }
-}
-
-/** إن وُجد تحديث مؤجّل بسبب امتحان نشط — طبّقه بعد انتهاء الجلسة */
-export function flushDeferredPWAUpdate() {
-  if (!deferredUpdateWhileExam) return false;
-  if (isExamTakingActive()) return false;
-  return applyPWAUpdate();
-}
-
-function scheduleUpdateCheck(registration) {
-  if (!registration) return;
-  registration.update().catch(() => undefined);
-}
-
-async function purgePwaCachesAndUnregister() {
-  try {
-    if ("caches" in window) {
-      const keys = await caches.keys();
-      await Promise.all(keys.map((key) => caches.delete(key)));
-    }
+    localStorage.setItem(
+      PENDING_UPDATE_KEY,
+      JSON.stringify({
+        at: Date.now(),
+        remoteBuildId: detail.remoteBuildId || remoteBuildId,
+        source: detail.source || "unknown",
+      }),
+    );
   } catch {
     /* ignore */
   }
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent(PWA_UPDATE_EVENT, {
+        detail: {
+          remoteBuildId: detail.remoteBuildId || remoteBuildId,
+          source: detail.source || "unknown",
+          criticalActive: applicationActivityManager.isCriticalActivityActive(),
+          dismissed: isDismissedThisSession(),
+        },
+      }),
+    );
+  }
+}
 
+function clearPendingUpdateFlag() {
   try {
-    if ("serviceWorker" in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(registrations.map((registration) => registration.unregister()));
-    }
+    localStorage.removeItem(PENDING_UPDATE_KEY);
   } catch {
     /* ignore */
   }
 }
 
-async function ensureFreshBuild() {
-  const buildId = typeof __APP_BUILD_ID__ !== "undefined" ? __APP_BUILD_ID__ : "";
-  if (!buildId) return false;
+export function isUpdateAvailable() {
+  return updateAvailable || Boolean(readPendingUpdate());
+}
 
-  const stored = localStorage.getItem(BUILD_ID_STORAGE_KEY);
-  if (stored === buildId) return false;
+export function getPendingUpdateInfo() {
+  return {
+    available: isUpdateAvailable(),
+    remoteBuildId,
+    localBuildId: getRunningBuildId(),
+  };
+}
 
-  if (stored) {
-    await purgePwaCachesAndUnregister();
+function readPendingUpdate() {
+  try {
+    const raw = localStorage.getItem(PENDING_UPDATE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function storeRunningBuildId() {
+  const buildId = getRunningBuildId();
+  if (!buildId) return;
+  try {
     localStorage.setItem(BUILD_ID_STORAGE_KEY, buildId);
-    if (isExamTakingActive()) {
-      deferredUpdateWhileExam = true;
-      return false;
-    }
-    window.location.reload();
+  } catch {
+    /* ignore */
+  }
+}
+
+async function checkVersionManifest() {
+  const remote = await fetchDeployedVersion();
+  if (!remote?.buildId) return false;
+  remoteBuildId = remote.buildId;
+  if (isNewerBuild(remote.buildId)) {
+    notifyUpdateAvailable({ remoteBuildId: remote.buildId, source: "version.json" });
     return true;
   }
-
-  localStorage.setItem(BUILD_ID_STORAGE_KEY, buildId);
   return false;
+}
+
+function scheduleVersionChecks() {
+  if (versionCheckTimer) return;
+  const run = () => {
+    void checkVersionManifest();
+  };
+  run();
+  versionCheckTimer = window.setInterval(run, VERSION_CHECK_INTERVAL_MS);
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") run();
+  });
+  window.addEventListener("online", run);
+}
+
+function scheduleSwUpdateChecks(registration) {
+  if (!registration) return;
+  const poke = () => {
+    registration.update().catch(() => undefined);
+  };
+  poke();
+  setInterval(poke, SW_UPDATE_CHECK_INTERVAL_MS);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") poke();
+  });
+  window.addEventListener("focus", poke);
+}
+
+function reloadSafely() {
+  pendingUserReload = true;
+  try {
+    localStorage.setItem(FORCE_RELOAD_KEY, String(Date.now()));
+  } catch {
+    /* ignore */
+  }
+  window.location.reload();
+}
+
+/**
+ * تطبيق التحديث بعد موافقة المستخدم فقط.
+ * @returns {Promise<{ ok: boolean, reason?: string }>}
+ */
+export async function applyPWAUpdate() {
+  if (updateInProgress) return { ok: true, reason: "in_progress" };
+
+  if (applicationActivityManager.isCriticalActivityActive()) {
+    return { ok: false, reason: "critical_activity" };
+  }
+
+  updateInProgress = true;
+  pendingUserReload = true;
+
+  try {
+    if (typeof updateServiceWorker === "function") {
+      await updateServiceWorker(true);
+      // virtual:pwa-register يرسل SKIP_WAITING؛ نعيد التحميل عند controllerchange
+      // وإن لم يحدث خلال مهلة قصيرة نُحمّل يدويًا
+      window.setTimeout(() => {
+        if (pendingUserReload && !applicationActivityManager.isCriticalActivityActive()) {
+          reloadSafely();
+        }
+      }, 2500);
+      return { ok: true };
+    }
+
+    if (registrationRef?.waiting) {
+      registrationRef.waiting.postMessage({ type: "SKIP_WAITING" });
+      window.setTimeout(() => {
+        if (pendingUserReload && !applicationActivityManager.isCriticalActivityActive()) {
+          reloadSafely();
+        }
+      }, 2500);
+      return { ok: true };
+    }
+
+    // لا يوجد SW waiting — التحديث عبر version.json فقط
+    clearPendingUpdateFlag();
+    reloadSafely();
+    return { ok: true };
+  } catch {
+    if (!applicationActivityManager.isCriticalActivityActive()) {
+      reloadSafely();
+      return { ok: true };
+    }
+    updateInProgress = false;
+    pendingUserReload = false;
+    return { ok: false, reason: "error" };
+  }
+}
+
+/** بعد انتهاء نشاط حرج — إن وُجد تحديث معلّق أبلغ الواجهة */
+export function flushDeferredPWAUpdate() {
+  if (!isUpdateAvailable()) return false;
+  if (applicationActivityManager.isCriticalActivityActive()) return false;
+  notifyUpdateAvailable({
+    remoteBuildId,
+    source: "activity-ended",
+  });
+  return true;
+}
+
+export function dismissUpdatePrompt() {
+  try {
+    sessionStorage.setItem(DISMISSED_SESSION_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(PWA_UPDATE_DISMISSED_EVENT));
+  }
+}
+
+/** هل يمكن إظهار بانر التحديث في هذا التبويب؟ */
+export function shouldShowUpdatePrompt() {
+  if (!isUpdateAvailable()) return false;
+  if (isDismissedThisSession()) return false;
+  if (applicationActivityManager.isLocalCriticalActivityActive()) return false;
+  return true;
+}
+
+function onControllerChange() {
+  if (!pendingUserReload) return;
+  if (applicationActivityManager.isLocalCriticalActivityActive()) {
+    pendingUserReload = false;
+    updateInProgress = false;
+    notifyUpdateAvailable({ remoteBuildId, source: "deferred-controllerchange" });
+    return;
+  }
+  reloadSafely();
+}
+
+function onForceReloadStorage(event) {
+  if (event.key !== FORCE_RELOAD_KEY || !event.newValue) return;
+  if (applicationActivityManager.isLocalCriticalActivityActive()) {
+    notifyUpdateAvailable({ remoteBuildId, source: "other-tab-deferred" });
+    return;
+  }
+  // تبويب آخر طبّق التحديث — أعد التحميل هنا أيضًا إن كان آمنًا
+  window.location.reload();
+}
+
+function onActivityChanged() {
+  if (!isUpdateAvailable()) return;
+  if (applicationActivityManager.isLocalCriticalActivityActive()) return;
+  notifyUpdateAvailable({ remoteBuildId, source: "activity-cleared" });
 }
 
 /** يُستدعى مرة واحدة من main.jsx */
 export async function initPWA() {
-  if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+  if (typeof window === "undefined") return;
+  if (initialized) return;
+  initialized = true;
+
+  storeRunningBuildId();
+
+  // استعادة حالة تحديث معلّق من جلسة سابقة
+  if (readPendingUpdate()) {
+    updateAvailable = true;
+  }
+
+  scheduleVersionChecks();
+
+  window.addEventListener("storage", onForceReloadStorage);
+  applicationActivityManager.subscribe(onActivityChanged);
+  window.addEventListener("em:critical-activity-changed", onActivityChanged);
+
+  if (!("serviceWorker" in navigator)) return;
   if (!import.meta.env.PROD) return;
 
-  if (await ensureFreshBuild()) return;
-
-  let reloading = false;
-  navigator.serviceWorker.addEventListener("controllerchange", () => {
-    if (!pendingUserReload) return;
-    if (reloading) return;
-    if (isExamTakingActive()) {
-      deferredUpdateWhileExam = true;
-      pendingUserReload = false;
-      autoUpdateInProgress = false;
-      return;
-    }
-    reloading = true;
-    window.location.reload();
-  });
-
-  // بعد انتهاء الامتحان طبّق التحديث المؤجّل إن وُجد
-  window.addEventListener("storage", (event) => {
-    if (event.key === "em-lecture-exam-taking" && event.newValue == null) {
-      void flushDeferredPWAUpdate();
-    }
-  });
+  navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
 
   try {
     const { registerSW } = await import("virtual:pwa-register");
@@ -134,33 +305,23 @@ export async function initPWA() {
       immediate: true,
       onNeedRefresh() {
         updateServiceWorker = update;
-        void applyPWAUpdate();
+        notifyUpdateAvailable({ remoteBuildId, source: "service-worker" });
       },
       onOfflineReady() {
         window.dispatchEvent(new CustomEvent(PWA_OFFLINE_READY_EVENT));
       },
       onRegisteredSW(_url, registration) {
-        if (!registration) return;
-
+        registrationRef = registration || null;
         updateServiceWorker = update;
 
-        if (registration.waiting) {
-          void applyPWAUpdate();
+        if (registration?.waiting) {
+          notifyUpdateAvailable({ remoteBuildId, source: "service-worker-waiting" });
         }
 
-        scheduleUpdateCheck(registration);
-        setInterval(() => scheduleUpdateCheck(registration), UPDATE_CHECK_INTERVAL_MS);
-
-        document.addEventListener("visibilitychange", () => {
-          if (document.visibilityState === "visible") {
-            scheduleUpdateCheck(registration);
-          }
-        });
-
-        window.addEventListener("focus", () => scheduleUpdateCheck(registration));
+        scheduleSwUpdateChecks(registration);
       },
     });
   } catch {
-    // متصفح غير داعم — التطبيق يعمل بدون PWA
+    // المتصفح لا يدعم PWA — يبقى فحص version.json
   }
 }
