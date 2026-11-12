@@ -343,15 +343,6 @@ export const mapOcrQuestionToDraft = (q) => {
     : [];
 
   const rawOptions = Array.isArray(q.options) ? q.options : [];
-  const labelRank = (label) => {
-    const normalized = String(label || "")
-      .trim()
-      .replace(/^[اإآ]$/u, "أ");
-    const idx = CHOICE_LETTERS_AR.indexOf(normalized);
-    if (idx >= 0) return idx;
-    const latin = "ABCDE".indexOf(normalized.toUpperCase());
-    return latin >= 0 ? latin : 99;
-  };
   const mappedOptions = rawOptions
     .map((o, i) => {
       const text = o?.text == null ? "" : String(o.text).trim();
@@ -364,8 +355,6 @@ export const mapOcrQuestionToDraft = (q) => {
       };
     })
     .filter(Boolean)
-    // ثبّت أ→ب→ج→د حسب حرف الاختيار وليس ترتيب الظهور في المصفوفة
-    .sort((a, b) => labelRank(a.label) - labelRank(b.label))
     .slice(0, MCQ_CHOICE_MAX);
 
   const optionTexts = mappedOptions.map((o) => o.text);

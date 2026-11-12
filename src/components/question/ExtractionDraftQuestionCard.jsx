@@ -14,7 +14,6 @@ import {
   Select,
   IconButton,
   Flex,
-  SimpleGrid,
   useColorModeValue,
 } from "@chakra-ui/react";
 import { FaPlus, FaTrash } from "react-icons/fa";
@@ -494,16 +493,7 @@ export default function ExtractionDraftQuestionCard({
             </Button>
           </Flex>
 
-          <SimpleGrid
-            dir="rtl"
-            columns={
-              choices.length === 4 &&
-              choices.every((c) => String(c || "").trim().length > 0 && String(c).trim().length <= 40)
-                ? 2
-                : 1
-            }
-            spacing={2.5}
-          >
+          <VStack align="stretch" spacing={2.5}>
             {choices.map((choice, cIdx) => {
               const letter = letterFor(cIdx);
               const isCorrect = draft.correctAnswerIndex === cIdx;
@@ -594,7 +584,7 @@ export default function ExtractionDraftQuestionCard({
                 </Box>
               );
             })}
-          </SimpleGrid>
+          </VStack>
 
           <FormControl mt={4}>
             <FormLabel fontSize="sm" fontWeight="semibold">

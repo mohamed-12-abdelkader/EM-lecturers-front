@@ -556,7 +556,6 @@ export default function LessonQuestionCard({
           ) : null}
 
           <Grid
-            dir="rtl"
             templateColumns={
               stackOptions
                 ? "1fr"
@@ -572,8 +571,6 @@ export default function LessonQuestionCard({
               const content = getOptionContent(opt);
               const canSelectCorrect = canManage && !isCorrect && !isUpdating;
               const isStudentSelected = selectedAnswerIndex === i;
-              // الترتيب الثابت: فهرس 0=أ، 1=ب، 2=ج، 3=د
-              // مع dir=rtl للشبكة 2×2 يظهر: أ ب / ج د
               const letter = CHOICE_LETTERS[i] || String.fromCharCode(65 + i);
 
               return (
