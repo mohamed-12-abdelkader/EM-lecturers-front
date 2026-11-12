@@ -27,6 +27,8 @@ export default function ExamStudentSessionHeader({
   totalQuestions,
   answeredCount = 0,
   remainingSeconds,
+  scheduleEndAt = null,
+  timingMode = null,
   questions,
   studentAnswers,
   onBack,
@@ -35,6 +37,12 @@ export default function ExamStudentSessionHeader({
   hasActiveAttempt = true,
 }) {
   const isUrgent = remainingSeconds != null && remainingSeconds < 300;
+  const scheduleEndLabel = (() => {
+    if (timingMode !== "fixed" || !scheduleEndAt) return null;
+    const end = new Date(scheduleEndAt);
+    if (Number.isNaN(end.getTime())) return null;
+    return end.toLocaleString("ar-EG", { dateStyle: "short", timeStyle: "short" });
+  })();
 
   return (
     <Box
@@ -82,6 +90,7 @@ export default function ExamStudentSessionHeader({
             <Text fontSize="xs" color="whiteAlpha.800" fontWeight="600">
               سؤال {currentIndex + 1} من {totalQuestions}
               {answeredCount > 0 ? ` · ${answeredCount} مجاب` : ""}
+              {scheduleEndLabel ? ` · ينتهي ${scheduleEndLabel}` : ""}
             </Text>
           </Box>
           {remainingSeconds != null ? (
@@ -97,6 +106,7 @@ export default function ExamStudentSessionHeader({
               bg={isUrgent ? "red.500" : "white"}
               color={isUrgent ? "white" : "blue.700"}
               boxShadow={isUrgent ? "0 0 0 3px rgba(229,62,62,0.25)" : "sm"}
+              title={scheduleEndLabel ? `موعد النهاية: ${scheduleEndLabel}` : undefined}
             >
               {formatRemainingTime(remainingSeconds)}
             </Badge>

@@ -14,6 +14,7 @@ import {
   Select,
   IconButton,
   Flex,
+  SimpleGrid,
   useColorModeValue,
 } from "@chakra-ui/react";
 import { FaPlus, FaTrash } from "react-icons/fa";
@@ -39,6 +40,7 @@ export default function ExtractionDraftQuestionCard({
   draft,
   index,
   accentScheme = "purple",
+  availablePassages = [],
   onUpdate,
   onRemove,
 }) {
@@ -158,6 +160,32 @@ export default function ExtractionDraftQuestionCard({
             <Badge colorScheme="blue" variant="subtle" borderRadius="full">
               سؤال قطعة
             </Badge>
+          )}
+          {Array.isArray(availablePassages) && availablePassages.length > 0 && (
+            <FormControl maxW="220px">
+              <Select
+                size="sm"
+                value={draft.passage_id || ""}
+                onChange={(e) => {
+                  const nextId = e.target.value || null;
+                  const linked = availablePassages.find((p) => p.passage_id === nextId);
+                  patch({
+                    passage_id: nextId,
+                    passage_text: linked?.content || null,
+                    passage_title: linked?.title || null,
+                  });
+                }}
+                bg={inputBg}
+              >
+                <option value="">مستقل (بدون قطعة)</option>
+                {availablePassages.map((passage, pIdx) => (
+                  <option key={passage.passage_id || pIdx} value={passage.passage_id}>
+                    قطعة {pIdx + 1}
+                    {passage.title ? ` — ${passage.title}` : ""}
+                  </option>
+                ))}
+              </Select>
+            </FormControl>
           )}
           {draft.poetry && (
             <Badge colorScheme="pink" variant="subtle" borderRadius="full">
@@ -466,7 +494,16 @@ export default function ExtractionDraftQuestionCard({
             </Button>
           </Flex>
 
-          <VStack align="stretch" spacing={2.5}>
+          <SimpleGrid
+            dir="rtl"
+            columns={
+              choices.length === 4 &&
+              choices.every((c) => String(c || "").trim().length > 0 && String(c).trim().length <= 40)
+                ? 2
+                : 1
+            }
+            spacing={2.5}
+          >
             {choices.map((choice, cIdx) => {
               const letter = letterFor(cIdx);
               const isCorrect = draft.correctAnswerIndex === cIdx;
@@ -557,7 +594,7 @@ export default function ExtractionDraftQuestionCard({
                 </Box>
               );
             })}
-          </VStack>
+          </SimpleGrid>
 
           <FormControl mt={4}>
             <FormLabel fontSize="sm" fontWeight="semibold">

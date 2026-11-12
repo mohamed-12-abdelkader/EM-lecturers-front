@@ -220,6 +220,13 @@ export default function StudentCourseExamPage() {
       durationUnlimited,
       questionsCount: session.questionsCount || normalizedQuestions.length,
       startedAt,
+      timingMode: session.timingMode || session.timing_mode || null,
+      scheduleEndAt:
+        session.scheduleEndAt ||
+        session.schedule_end_at ||
+        session.attemptExpiresAt ||
+        session.attempt_expires_at ||
+        null,
       courseId: session.courseId || session.course_id || location.state?.courseId || null,
     });
     writeExamProgress(examId, resolvedAttemptId, {
@@ -529,6 +536,8 @@ export default function StudentCourseExamPage() {
         totalQuestions={questions.length}
         answeredCount={answeredCount}
         remainingSeconds={remainingSeconds}
+        timingMode={examMeta?.timingMode || null}
+        scheduleEndAt={examMeta?.scheduleEndAt || examEndsAt}
         questions={questions}
         studentAnswers={studentAnswers}
         onBack={goToCourseExams}

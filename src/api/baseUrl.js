@@ -3,7 +3,7 @@
  * بدون withCredentials / بدون cookie refresh.
  *
  * Base URL:
- * - DEV  → http://localhost:8000  (غالباً عبر Vite proxy "/")
+ * - DEV  → http://localhost:8000 عبر Vite proxy "/" (لا يستخدم بروداكشن إلا مع VITE_FORCE_PROD_API)
  * - PROD → https://api.em-online.online/
  * يُحدَّد تلقائياً من getApiBaseURL() حسب وضع التشغيل.
  */

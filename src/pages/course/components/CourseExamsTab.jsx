@@ -32,6 +32,9 @@ import QuestionDisplayModeFields from "../../../components/exam/QuestionDisplayM
 import ExamStudentSettingsFields, {
   inferAnswersReleaseMode,
 } from "../../../components/exam/ExamStudentSettingsFields";
+import ExamTimingAndAudienceFields, {
+  validateExamTimingAndAudience,
+} from "../../../components/exam/ExamTimingAndAudienceFields";
 import { startCourseExamAttempt, translateCourseExamStudentError } from "../../../api/courseExamsApi";
 import {
   fetchTeacherParentExams,
@@ -47,6 +50,9 @@ const initialExamFormState = {
   question_display_mode: QUESTION_DISPLAY_MODES.ORDERED,
   duration_minutes: "",
   duration_unlimited: false,
+  timing_mode: "relative",
+  audience_type: "all",
+  group_ids: [],
   is_visible_to_students: true,
   available_from: "",
   visibility_end_date: "",
@@ -88,6 +94,8 @@ const normalizeExamPayload = (payload) => {
   // إزالة الحقول الفارغة — أبقِ duration_minutes: null (= بدون حد زمني)
   Object.keys(normalized).forEach((key) => {
     if (key === "duration_minutes" && normalized[key] === null) return;
+    if (key === "group_ids") return;
+    if (key === "timing_mode" || key === "audience_type") return;
     if (key === "duration_unlimited") {
       delete normalized[key];
       return;
@@ -115,6 +123,9 @@ const buildExamPayload = (payload) => {
     jsonPayload.questionDisplayMode = normalizeQuestionDisplayMode(payload.question_display_mode);
   }
   if (payload.duration_minutes !== undefined) jsonPayload.durationMinutes = payload.duration_minutes;
+  if (payload.timing_mode !== undefined) jsonPayload.timingMode = payload.timing_mode;
+  if (payload.audience_type !== undefined) jsonPayload.audienceType = payload.audience_type;
+  if (payload.group_ids !== undefined) jsonPayload.groupIds = payload.group_ids;
   if (payload.is_visible_to_students !== undefined) jsonPayload.isVisibleToStudents = payload.is_visible_to_students;
   if (payload.available_from !== undefined && payload.available_from !== "") {
     jsonPayload.availableFrom = payload.available_from;
@@ -284,6 +295,15 @@ const ExamCard = ({
       icon: FaStar,
       text: formatAttemptLimitLabel(exam, { isTeacher }),
     },
+    ...(isTeacher && exam.audience_type === "groups"
+      ? [
+          {
+            key: "g",
+            icon: FaGraduationCap,
+            text: `${Array.isArray(exam.group_ids) ? exam.group_ids.length : 0} مجموعة`,
+          },
+        ]
+      : []),
   ];
 
   const handleStudentStart = async () => {
@@ -837,8 +857,9 @@ const CourseExamsTab = ({
         setCreateLoading(false);
         return;
       }
-      if (!form.duration_unlimited && (!form.duration_minutes || Number(form.duration_minutes) <= 0)) {
-        toast({ title: "حدد مدة الامتحان بالدقائق، أو فعّل بدون حد زمني", status: "error" });
+      const timingMessage = validateExamTimingAndAudience(form);
+      if (timingMessage) {
+        toast({ title: timingMessage, status: "error" });
         setCreateLoading(false);
         return;
       }
@@ -856,6 +877,9 @@ const CourseExamsTab = ({
         question_display_mode: form.question_display_mode,
         duration_minutes: form.duration_minutes,
         duration_unlimited: form.duration_unlimited,
+        timing_mode: form.timing_mode === "fixed" ? "fixed" : "relative",
+        audience_type: form.audience_type === "groups" ? "groups" : "all",
+        group_ids: form.audience_type === "groups" ? form.group_ids || [] : [],
         is_visible_to_students: form.is_visible_to_students,
         available_from: fromDateTimeLocalValue(form.available_from),
         visibility_end_date: fromDateTimeLocalValue(form.visibility_end_date),
@@ -919,6 +943,19 @@ const CourseExamsTab = ({
           exam?.duration_minutes === "" ||
           Number(exam?.duration_minutes) <= 0,
       ),
+      timing_mode:
+        exam?.timing_mode === "fixed" || exam?.timingMode === "fixed"
+          ? "fixed"
+          : "relative",
+      audience_type:
+        exam?.audience_type === "groups" || exam?.audienceType === "groups"
+          ? "groups"
+          : "all",
+      group_ids: Array.isArray(exam?.group_ids)
+        ? exam.group_ids.map(Number)
+        : Array.isArray(exam?.groupIds)
+          ? exam.groupIds.map(Number)
+          : [],
       is_visible_to_students: exam?.is_visible_to_students ?? true,
       available_from: toDateTimeLocalValue(exam?.available_from),
       visibility_end_date: toDateTimeLocalValue(exam?.visibility_end_date),
@@ -965,6 +1002,19 @@ const CourseExamsTab = ({
               exam.duration_minutes === "" ||
               Number(exam.duration_minutes) <= 0,
           ),
+          timing_mode:
+            exam.timing_mode === "fixed" || exam.timingMode === "fixed"
+              ? "fixed"
+              : "relative",
+          audience_type:
+            exam.audience_type === "groups" || exam.audienceType === "groups"
+              ? "groups"
+              : "all",
+          group_ids: Array.isArray(exam.group_ids)
+            ? exam.group_ids.map(Number)
+            : Array.isArray(exam.groupIds)
+              ? exam.groupIds.map(Number)
+              : [],
           is_visible_to_students: exam.is_visible_to_students ?? true,
           available_from: toDateTimeLocalValue(exam.available_from),
           visibility_end_date: toDateTimeLocalValue(exam.visibility_end_date),
@@ -989,8 +1039,9 @@ const CourseExamsTab = ({
         toast({ title: "عدد الأسئلة يجب أن يكون أكبر من صفر", status: "error" });
         return;
       }
-      if (!formData.duration_unlimited && (!formData.duration_minutes || Number(formData.duration_minutes) <= 0)) {
-        toast({ title: "حدد مدة الامتحان بالدقائق، أو فعّل بدون حد زمني", status: "error" });
+      const timingMessage = validateExamTimingAndAudience(formData);
+      if (timingMessage) {
+        toast({ title: timingMessage, status: "error" });
         return;
       }
 
@@ -1003,6 +1054,10 @@ const CourseExamsTab = ({
       const normalizedPayload = normalizeExamPayload({
         ...formData,
         title: formData.title.trim(),
+        timing_mode: formData.timing_mode === "fixed" ? "fixed" : "relative",
+        audience_type: formData.audience_type === "groups" ? "groups" : "all",
+        group_ids:
+          formData.audience_type === "groups" ? formData.group_ids || [] : [],
         available_from: fromDateTimeLocalValue(formData.available_from),
         visibility_end_date: fromDateTimeLocalValue(formData.visibility_end_date),
         answers_visible_at: fromDateTimeLocalValue(formData.answers_visible_at),
@@ -1146,14 +1201,16 @@ const CourseExamsTab = ({
                           }
                         />
                       </FormControl>
-                      <DurationMinutesFields
-                        minutes={formData.duration_minutes}
-                        unlimited={formData.duration_unlimited}
-                        isDisabled={loading}
-                        onChange={(partial) =>
-                          setFormData((prev) => ({ ...prev, ...partial }))
-                        }
-                      />
+                      {formData.timing_mode !== "fixed" && (
+                        <DurationMinutesFields
+                          minutes={formData.duration_minutes}
+                          unlimited={formData.duration_unlimited}
+                          isDisabled={loading}
+                          onChange={(partial) =>
+                            setFormData((prev) => ({ ...prev, ...partial }))
+                          }
+                        />
+                      )}
                       <FormControl display="flex" alignItems="center">
                         <FormLabel mb="0">إظهار الامتحان للطلاب</FormLabel>
                         <Switch
@@ -1178,6 +1235,13 @@ const CourseExamsTab = ({
                         }))
                       }
                       questionsCount={formData.questions_count}
+                    />
+                    <ExamTimingAndAudienceFields
+                      formData={formData}
+                      loading={loading}
+                      onPatch={(partial) =>
+                        setFormData((prev) => ({ ...prev, ...partial }))
+                      }
                     />
                     <ExamStudentSettingsFields
                       formData={formData}
@@ -1748,11 +1812,13 @@ const CourseExamsTab = ({
                           borderRadius="lg"
                         />
                       </FormControl>
-                      <DurationMinutesFields
-                        minutes={form.duration_minutes}
-                        unlimited={form.duration_unlimited}
-                        onChange={(partial) => setForm((f) => ({ ...f, ...partial }))}
-                      />
+                      {form.timing_mode !== "fixed" && (
+                        <DurationMinutesFields
+                          minutes={form.duration_minutes}
+                          unlimited={form.duration_unlimited}
+                          onChange={(partial) => setForm((f) => ({ ...f, ...partial }))}
+                        />
+                      )}
                     </SimpleGrid>
 
                     <QuestionDisplayModeFields
@@ -1763,6 +1829,13 @@ const CourseExamsTab = ({
                       questionsCount={form.questions_count}
                     />
                   </VStack>
+                </ExamModalSection>
+
+                <ExamModalSection icon={FaClock} title="الوقت والمجموعات" accent="purple">
+                  <ExamTimingAndAudienceFields
+                    formData={form}
+                    onPatch={(partial) => setForm((f) => ({ ...f, ...partial }))}
+                  />
                 </ExamModalSection>
 
                 <ExamModalSection icon={FaEye} title="الظهور للطلاب" accent="green">

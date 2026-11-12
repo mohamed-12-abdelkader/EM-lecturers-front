@@ -160,6 +160,15 @@ export function translateCourseExamStudentError(err, fallback = "حدث خطأ �
   if (lower.includes("already completed") || lower.includes("only one attempt")) {
     return "أنهيت هذا الامتحان مسبقاً. يُسمح بمحاولة واحدة فقط.";
   }
+  if (
+    raw.includes("غير متاح لمجموعتك") ||
+    raw.includes("مجموعات محددة فقط") ||
+    lower.includes("group")
+  ) {
+    return raw.includes("غير مرتبط")
+      ? "الامتحان متاح لمجموعات محددة فقط — أنت غير مرتبط بمجموعة مسموح بها."
+      : "هذا الامتحان غير متاح لمجموعتك.";
+  }
   if (lower.includes("exam not found") || status === 404) return "الامتحان غير موجود.";
   if (lower.includes("attempt has already been submitted")) return "تم تسليم هذه المحاولة مسبقاً.";
   if (lower.includes("attemptid is required") || lower.includes("attempt id is required")) {

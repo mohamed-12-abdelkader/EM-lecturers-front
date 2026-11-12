@@ -343,6 +343,15 @@ export const mapOcrQuestionToDraft = (q) => {
     : [];
 
   const rawOptions = Array.isArray(q.options) ? q.options : [];
+  const labelRank = (label) => {
+    const normalized = String(label || "")
+      .trim()
+      .replace(/^[اإآ]$/u, "أ");
+    const idx = CHOICE_LETTERS_AR.indexOf(normalized);
+    if (idx >= 0) return idx;
+    const latin = "ABCDE".indexOf(normalized.toUpperCase());
+    return latin >= 0 ? latin : 99;
+  };
   const mappedOptions = rawOptions
     .map((o, i) => {
       const text = o?.text == null ? "" : String(o.text).trim();
@@ -355,6 +364,8 @@ export const mapOcrQuestionToDraft = (q) => {
       };
     })
     .filter(Boolean)
+    // ثبّت أ→ب→ج→د حسب حرف الاختيار وليس ترتيب الظهور في المصفوفة
+    .sort((a, b) => labelRank(a.label) - labelRank(b.label))
     .slice(0, MCQ_CHOICE_MAX);
 
   const optionTexts = mappedOptions.map((o) => o.text);
@@ -437,6 +448,8 @@ export const mapOcrQuestionToDraft = (q) => {
         ? Number(q.confidence)
         : null,
     passage_id: q.passage_id ?? null,
+    passage_text: q.passage_text ?? q.passageText ?? null,
+    passage_title: q.passage_title ?? q.passageTitle ?? null,
     question_type: questionType,
     choices,
     choiceImages: draftChoiceImages,
@@ -623,6 +636,7 @@ function buildBulkTextFromDrafts(drafts) {
  *   startPage?: number|string,
  *   endPage?: number|string,
  *   subject?: string,
+ *   contentMode?: 'auto'|'general'|'reading_passage',
  * }} options
  * @param {string} token
  */
@@ -634,6 +648,7 @@ export async function extractQuestions(
     startPage,
     endPage,
     subject,
+    contentMode = "auto",
   } = {},
   token,
 ) {
@@ -671,6 +686,22 @@ export async function extractQuestions(
 
   if (typeof subject === "string" && subject.trim()) {
     formData.append("subject", subject.trim());
+  }
+
+  const normalizedContentMode = String(contentMode || "auto")
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, "_");
+  if (
+    normalizedContentMode === "reading_passage" ||
+    normalizedContentMode === "passage" ||
+    normalizedContentMode === "general" ||
+    normalizedContentMode === "auto"
+  ) {
+    formData.append(
+      "extraction_content_mode",
+      normalizedContentMode === "passage" ? "reading_passage" : normalizedContentMode,
+    );
   }
 
   if (singlePdf) {
@@ -987,10 +1018,12 @@ async function attachCourseExamQuestionImageFromUrl(questionId, imageUrl, token)
   }
 }
 
-async function importMcqDraftWithImageToCourseExam(examId, draft, token) {
+async function importMcqDraftWithImageToCourseExam(examId, draft, token, passageSnapshot = {}) {
   const choices = normalizeMcqChoices(draft.choices);
   const imageUrl = getDraftImageUrl(draft);
   const correctAnswer = getDraftCorrectAnswerLetter(draft);
+  const passageText = passageSnapshot.passageText || draft.passage_text || null;
+  const passageTitle = passageSnapshot.passageTitle || draft.passage_title || null;
 
   // أفضّل إرسال رابط الصورة مباشرة مع إنشاء السؤال (بدون CORS download)
   if (imageUrl) {
@@ -1006,6 +1039,7 @@ async function importMcqDraftWithImageToCourseExam(examId, draft, token) {
           optionD: choices[3] || "",
           correctAnswer,
           questionImage: imageUrl,
+          ...(passageText ? { passageText, passageTitle } : {}),
         },
         {
           headers: {
@@ -1028,6 +1062,8 @@ async function importMcqDraftWithImageToCourseExam(examId, draft, token) {
   formData.append("optionC", choices[2] || "");
   formData.append("optionD", choices[3] || "");
   formData.append("correctAnswer", correctAnswer);
+  if (passageText) formData.append("passageText", passageText);
+  if (passageTitle) formData.append("passageTitle", passageTitle);
 
   let imageAttached = false;
   if (imageUrl) {
@@ -1097,25 +1133,63 @@ export async function importDraftsToCourseExam(examId, draftPassages, draftQuest
   const headers = { ...authHeaders(token), "Content-Type": "application/json" };
   const mcqDrafts = draftQuestions.filter((q) => isDraftMcq(q));
   const imageDrafts = draftQuestions.filter((q) => isDraftImageQuestion(q) && !isDraftMcq(q));
+  const passageById = new Map(
+    (Array.isArray(draftPassages) ? draftPassages : []).map((p) => [p.passage_id, p]),
+  );
+
+  const resolvePassageSnapshot = (draft) => {
+    const linked = draft.passage_id ? passageById.get(draft.passage_id) : null;
+    const passageText =
+      (linked?.content && String(linked.content).trim()) ||
+      (draft.passage_text && String(draft.passage_text).trim()) ||
+      null;
+    const passageTitle =
+      (linked?.title && String(linked.title).trim()) ||
+      (draft.passage_title && String(draft.passage_title).trim()) ||
+      null;
+    return { passageText, passageTitle };
+  };
 
   const mcqWithImages = mcqDrafts.filter((d) => getDraftImageUrl(d));
   const mcqWithoutImages = mcqDrafts.filter((d) => !getDraftImageUrl(d));
+  const mcqWithPassage = mcqWithoutImages.filter((d) => resolvePassageSnapshot(d).passageText);
+  const mcqStandaloneText = mcqWithoutImages.filter((d) => !resolvePassageSnapshot(d).passageText);
 
   let totalAdded = 0;
   let imagesAttached = 0;
   const errors = [];
   const warnings = [];
 
-  if (draftPassages.length > 0) {
-    warnings.push(
-      "قطع القراءة غير مدعومة في امتحان الكورس — تُستورد أسئلة القطعة كأسئلة مستقلة"
-    );
+  // أسئلة مرتبطة بقطعة: إنشاء فردي مع حفظ لقطة نص القطعة
+  for (const draft of mcqWithPassage) {
+    try {
+      const choices = normalizeMcqChoices(draft.choices);
+      const { passageText, passageTitle } = resolvePassageSnapshot(draft);
+      await baseUrl.post(
+        `/api/exams/${examId}/questions`,
+        {
+          type: "TEXT",
+          questionText: String(draft.question_text || "").trim(),
+          optionA: choices[0] || "",
+          optionB: choices[1] || "",
+          optionC: choices[2] || "",
+          optionD: choices[3] || "",
+          correctAnswer: getDraftCorrectAnswerLetter(draft),
+          passageText,
+          passageTitle,
+        },
+        { headers },
+      );
+      totalAdded += 1;
+    } catch (err) {
+      errors.push(err.response?.data?.message || err.message || "فشل استيراد سؤال قطعة");
+    }
   }
 
-  // أسئلة بدون صور: bulk سريع
-  if (mcqWithoutImages.length > 0) {
-    const text = buildBulkTextFromDrafts(mcqWithoutImages);
-    const correctAnswers = mcqWithoutImages.map((d) => getDraftCorrectAnswerLetter(d));
+  // أسئلة بدون صور وبدون قطعة: bulk سريع
+  if (mcqStandaloneText.length > 0) {
+    const text = buildBulkTextFromDrafts(mcqStandaloneText);
+    const correctAnswers = mcqStandaloneText.map((d) => getDraftCorrectAnswerLetter(d));
     try {
       const res = await baseUrl.post(
         `/api/exams/${examId}/questions/bulk`,
@@ -1128,10 +1202,15 @@ export async function importDraftsToCourseExam(examId, draftPassages, draftQuest
     }
   }
 
-  // أسئلة مع صور: إنشاء فردي مع questionImage
+  // أسئلة مع صور: إنشاء فردي مع questionImage (+ لقطة القطعة إن وُجدت)
   for (const draft of mcqWithImages) {
     try {
-      const result = await importMcqDraftWithImageToCourseExam(examId, draft, token);
+      const result = await importMcqDraftWithImageToCourseExam(
+        examId,
+        draft,
+        token,
+        resolvePassageSnapshot(draft),
+      );
       totalAdded += result.added;
       if (result.imageAttached) imagesAttached += 1;
       else {

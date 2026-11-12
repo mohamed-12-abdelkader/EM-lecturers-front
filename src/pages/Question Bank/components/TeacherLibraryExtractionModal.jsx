@@ -29,6 +29,9 @@ import {
   Image,
   IconButton,
   SimpleGrid,
+  Radio,
+  RadioGroup,
+  Stack,
 } from "@chakra-ui/react";
 import { FaPlus, FaUpload, FaFilePdf, FaImage, FaPaste, FaTimes, FaMagic } from "react-icons/fa";
 import {
@@ -66,6 +69,7 @@ export default function TeacherLibraryExtractionModal({
   const [inferCorrectAnswer, setInferCorrectAnswer] = useState(false);
   const [includeQuestionImages, setIncludeQuestionImages] = useState(true);
   const [extractionSubject, setExtractionSubject] = useState("");
+  const [contentMode, setContentMode] = useState("auto");
   const [pdfStartPage, setPdfStartPage] = useState("");
   const [pdfEndPage, setPdfEndPage] = useState("");
   const [ocrNotes, setOcrNotes] = useState("");
@@ -112,6 +116,7 @@ export default function TeacherLibraryExtractionModal({
     setInferCorrectAnswer(false);
     setIncludeQuestionImages(true);
     setExtractionSubject("");
+    setContentMode("auto");
   };
 
   const handleClose = () => {
@@ -125,6 +130,19 @@ export default function TeacherLibraryExtractionModal({
         passage.passage_id === passageId ? { ...passage, ...patch } : passage
       )
     );
+    if (patch.content !== undefined || patch.title !== undefined) {
+      setDraftQuestions((prev) =>
+        prev.map((q) =>
+          q.passage_id === passageId
+            ? {
+                ...q,
+                ...(patch.content !== undefined ? { passage_text: patch.content } : {}),
+                ...(patch.title !== undefined ? { passage_title: patch.title } : {}),
+              }
+            : q,
+        ),
+      );
+    }
   };
 
   const updateDraftQuestion = (id, patch) => {
@@ -241,6 +259,7 @@ export default function TeacherLibraryExtractionModal({
           startPage: pdfStartPage || undefined,
           endPage: pdfEndPage || undefined,
           subject: extractionSubject.trim() || undefined,
+          contentMode,
         },
         token,
       );
@@ -460,6 +479,7 @@ export default function TeacherLibraryExtractionModal({
       draft={draft}
       index={index}
       accentScheme="blue"
+      availablePassages={draftPassages}
       onUpdate={updateDraftQuestion}
       onRemove={removeDraftQuestion}
     />
@@ -509,9 +529,30 @@ export default function TeacherLibraryExtractionModal({
                   _dark={{ bg: "gray.800" }}
                 />
                 <Text fontSize="xs" color={subTextColor} mt={1}>
-                  للعربية: ARABIC_HIGH_ACCURACY_MODE. لغيرها: STANDARD_EXTRACTION_MODE. القطع
-                  تُملأ تلقائياً عند content_type=reading_passage.
+                  للعربية: ARABIC_HIGH_ACCURACY_MODE. لغيرها: STANDARD_EXTRACTION_MODE.
                 </Text>
+              </FormControl>
+              <FormControl mb={3}>
+                <FormLabel mb={2} fontSize="sm">
+                  نوع الاستخراج
+                </FormLabel>
+                <RadioGroup
+                  value={contentMode}
+                  onChange={setContentMode}
+                  isDisabled={isExtractingOcr || isImporting}
+                >
+                  <Stack spacing={1}>
+                    <Radio value="general" colorScheme="purple" size="sm">
+                      استخراج أسئلة عادي
+                    </Radio>
+                    <Radio value="reading_passage" colorScheme="blue" size="sm">
+                      استخراج قطعة وأسئلتها
+                    </Radio>
+                    <Radio value="auto" colorScheme="gray" size="sm">
+                      اكتشاف تلقائي
+                    </Radio>
+                  </Stack>
+                </RadioGroup>
               </FormControl>
               <FormControl display="flex" alignItems="center" mb={3}>
                 <FormLabel htmlFor="infer-answer-library" mb={0} flex="1" fontSize="sm">

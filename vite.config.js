@@ -89,12 +89,24 @@ export default defineConfig(({ mode }) => {
     env.VITE_APP_BUILD_ID ||
     process.env.GITHUB_SHA?.slice(0, 12) ||
     `${Date.now().toString(36)}`;
-  const proxyTarget = (
+  const rawProxyTarget = (
     env.VITE_API_PROXY_TARGET ||
     env.VITE_API_BASE_URL ||
-    (isProd ? "https://api.em-online.online/" : "http://localhost:8000")
+    (isProd ? "https://api.em-online.online/" : "http://127.0.0.1:8000")
   ).replace(/\/$/, "");
+  // في التطوير: لا تسمح لـ proxy أن يشير بالخطأ إلى API البروداكشن
+  // وفضّل 127.0.0.1 على localhost لتفادي IPv6 (::1) مع سيرفر آخر على نفس المنفذ
+  let proxyTarget =
+    !isProd && /api\.em-online\.online/i.test(rawProxyTarget)
+      ? "http://127.0.0.1:8000"
+      : rawProxyTarget;
+  if (!isProd) {
+    proxyTarget = proxyTarget.replace(/^(https?:\/\/)localhost(?=[:/]|$)/i, "$1127.0.0.1");
+  }
   const isCapacitorBuild = env.CAPACITOR_BUILD === "true";
+  if (!isProd) {
+    console.info(`[vite][dev] API proxy → ${proxyTarget}`);
+  }
 
   return {
     base: isCapacitorBuild ? "./" : "/",
@@ -120,6 +132,20 @@ export default defineConfig(({ mode }) => {
               if (tenantMatch?.[1] && !proxyReq.getHeader("X-Tenant-Subdomain")) {
                 proxyReq.setHeader("X-Tenant-Subdomain", tenantMatch[1]);
               }
+              console.info(
+                `[vite][proxy] ${String(req.method || "GET").toUpperCase()} ${req.url} → ${proxyTarget}${req.url}`,
+              );
+            });
+            proxy.on("proxyRes", (proxyRes, req) => {
+              console.info(
+                `[vite][proxy] ← ${proxyRes.statusCode} ${String(req.method || "GET").toUpperCase()} ${req.url}`,
+              );
+            });
+            proxy.on("error", (err, req) => {
+              console.error(
+                `[vite][proxy] ERROR ${String(req?.method || "GET").toUpperCase()} ${req?.url} → ${proxyTarget}:`,
+                err?.message || err,
+              );
             });
           },
         },

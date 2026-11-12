@@ -29,6 +29,9 @@ import {
   Image,
   IconButton,
   SimpleGrid,
+  Radio,
+  RadioGroup,
+  Stack,
 } from "@chakra-ui/react";
 import { FaPlus, FaUpload, FaFilePdf, FaImage, FaPaste, FaTimes, FaMagic } from "react-icons/fa";
 import {
@@ -74,6 +77,8 @@ export default function AiQuestionExtractionModal({
   const [inferCorrectAnswer, setInferCorrectAnswer] = useState(false);
   const [includeQuestionImages, setIncludeQuestionImages] = useState(true);
   const [extractionSubject, setExtractionSubject] = useState("");
+  /** auto | general | reading_passage */
+  const [contentMode, setContentMode] = useState("auto");
   const [pdfStartPage, setPdfStartPage] = useState("");
   const [pdfEndPage, setPdfEndPage] = useState("");
   const [ocrNotes, setOcrNotes] = useState("");
@@ -120,6 +125,7 @@ export default function AiQuestionExtractionModal({
     setInferCorrectAnswer(false);
     setIncludeQuestionImages(true);
     setExtractionSubject("");
+    setContentMode("auto");
   };
 
   const handleClose = () => {
@@ -133,6 +139,19 @@ export default function AiQuestionExtractionModal({
         passage.passage_id === passageId ? { ...passage, ...patch } : passage
       )
     );
+    if (patch.content !== undefined || patch.title !== undefined) {
+      setDraftQuestions((prev) =>
+        prev.map((q) =>
+          q.passage_id === passageId
+            ? {
+                ...q,
+                ...(patch.content !== undefined ? { passage_text: patch.content } : {}),
+                ...(patch.title !== undefined ? { passage_title: patch.title } : {}),
+              }
+            : q,
+        ),
+      );
+    }
   };
 
   const updateDraftQuestion = (id, patch) => {
@@ -251,6 +270,7 @@ export default function AiQuestionExtractionModal({
           startPage: pdfStartPage || undefined,
           endPage: pdfEndPage || undefined,
           subject: extractionSubject.trim() || undefined,
+          contentMode,
         },
         token,
       );
@@ -487,6 +507,7 @@ export default function AiQuestionExtractionModal({
       draft={draft}
       index={index}
       accentScheme="purple"
+      availablePassages={draftPassages}
       onUpdate={updateDraftQuestion}
       onRemove={removeDraftQuestion}
     />
@@ -535,7 +556,30 @@ export default function AiQuestionExtractionModal({
                 />
                 <Text fontSize="xs" color={subTextColor} mt={1}>
                   للعربية يُفعَّل ARABIC_HIGH_ACCURACY_MODE (تشكيل + أبيات). لباقي المواد
-                  STANDARD_EXTRACTION_MODE. عند وجود قطعة قراءة تُملأ passages تلقائياً.
+                  STANDARD_EXTRACTION_MODE.
+                </Text>
+              </FormControl>
+              <FormControl mb={4}>
+                <FormLabel mb={2}>نوع الاستخراج</FormLabel>
+                <RadioGroup
+                  value={contentMode}
+                  onChange={setContentMode}
+                  isDisabled={isExtractingOcr || isImporting}
+                >
+                  <Stack spacing={2}>
+                    <Radio value="general" colorScheme="purple">
+                      استخراج أسئلة عادي (النظام الحالي)
+                    </Radio>
+                    <Radio value="reading_passage" colorScheme="blue">
+                      استخراج قطعة وأسئلتها
+                    </Radio>
+                    <Radio value="auto" colorScheme="gray">
+                      اكتشاف تلقائي
+                    </Radio>
+                  </Stack>
+                </RadioGroup>
+                <Text fontSize="xs" color={subTextColor} mt={1}>
+                  وضع القطعة يستخرج النص كاملاً ويربط كل سؤال بنص قطعته. الوضع العادي يبقي الاستخراج كما كان.
                 </Text>
               </FormControl>
               <FormControl display="flex" alignItems="center" mb={4}>

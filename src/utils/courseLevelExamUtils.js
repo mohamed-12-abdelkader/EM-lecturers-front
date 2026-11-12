@@ -45,6 +45,21 @@ export function normalizeCourseLevelExam(raw = {}) {
     visibility_end_date:
       raw.visibility_end_date ?? raw.visibilityEndDate ?? raw.examEndAt ?? raw.exam_end_at ?? null,
     exam_end_at: raw.examEndAt ?? raw.exam_end_at ?? raw.visibility_end_date ?? raw.visibilityEndDate ?? null,
+    timing_mode: raw.timing_mode ?? raw.timingMode ?? null,
+    audience_type: raw.audience_type ?? raw.audienceType ?? "all",
+    group_ids: Array.isArray(raw.group_ids)
+      ? raw.group_ids
+      : Array.isArray(raw.groupIds)
+        ? raw.groupIds
+        : [],
+    schedule_start_at:
+      raw.schedule_start_at ?? raw.scheduleStartAt ?? raw.available_from ?? raw.availableFrom ?? null,
+    schedule_end_at:
+      raw.schedule_end_at ??
+      raw.scheduleEndAt ??
+      raw.visibility_end_date ??
+      raw.visibilityEndDate ??
+      null,
     availability_status: raw.availability_status ?? raw.availabilityStatus ?? null,
     can_start: raw.can_start ?? raw.canStart ?? raw.can_attempt ?? raw.canAttempt,
     show_answers_immediately:
@@ -115,20 +130,37 @@ export function getCourseExamAvailabilityStatus(exam) {
   }
 
   const showAt = parseDateSafe(data.available_from);
+  const isFixed = data.timing_mode === "fixed";
   if (showAt && now < showAt) {
-    return { label: "لم يظهر بعد", colorScheme: "blue" };
+    return {
+      label: isFixed ? "لم يبدأ الموعد الثابت بعد" : "لم يظهر بعد",
+      colorScheme: "blue",
+    };
   }
 
   const visibilityEnd = parseDateSafe(data.visibility_end_date);
   if (visibilityEnd && now >= visibilityEnd) {
-    return { label: "انتهى — ظاهر ولا يمكن الدخول", colorScheme: "orange" };
+    return {
+      label: isFixed
+        ? "انتهى الموعد الثابت — لا يمكن الدخول"
+        : "انتهى — ظاهر ولا يمكن الدخول",
+      colorScheme: "orange",
+    };
   }
 
   if (data.availability_status === "expired") {
-    return { label: "انتهى — ظاهر ولا يمكن الدخول", colorScheme: "orange" };
+    return {
+      label: isFixed
+        ? "انتهى الموعد الثابت — لا يمكن الدخول"
+        : "انتهى — ظاهر ولا يمكن الدخول",
+      colorScheme: "orange",
+    };
   }
 
-  return { label: "متاح الآن", colorScheme: "green" };
+  return {
+    label: isFixed ? "موعد ثابت — متاح الآن" : "متاح الآن",
+    colorScheme: "green",
+  };
 }
 
 export function getAnswersVisibilityInfo(exam) {
@@ -191,6 +223,16 @@ export function formatAttemptLimitLabel(exam, { isTeacher = false } = {}) {
 export function formatCourseExamDurationLabel(exam) {
   const data = normalizeCourseLevelExam(exam);
   if (!data) return "—";
+  if (data.timing_mode === "fixed") {
+    const end = parseDateSafe(data.schedule_end_at || data.visibility_end_date);
+    if (end) {
+      return `ينتهي ${end.toLocaleString("ar-EG", {
+        dateStyle: "short",
+        timeStyle: "short",
+      })}`;
+    }
+    return "موعد ثابت";
+  }
   if (data.duration_unlimited) return "بدون حد زمني";
   const minutes = Number(data.duration_minutes);
   if (!Number.isFinite(minutes) || minutes <= 0) return "بدون حد زمني";
@@ -315,9 +357,20 @@ export function getStudentExamCta(exam) {
     return { label: "الامتحان غير نشط", disabled: true };
   }
 
+  if (data.availability_status === "upcoming" || (parseDateSafe(data.available_from) && new Date() < parseDateSafe(data.available_from))) {
+    return {
+      label: data.timing_mode === "fixed" ? "لم يبدأ الموعد بعد" : "لم يُفتح بعد",
+      disabled: true,
+    };
+  }
+
   if (ended) {
     return {
-      label: hasAttempt ? "عرض التقرير" : "انتهى — لا يمكن الدخول",
+      label: hasAttempt
+        ? "عرض التقرير"
+        : data.timing_mode === "fixed"
+          ? "انتهى الموعد الثابت"
+          : "انتهى — لا يمكن الدخول",
       disabled: !hasAttempt,
       kind: hasAttempt ? "report" : undefined,
     };

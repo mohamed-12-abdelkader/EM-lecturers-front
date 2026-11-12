@@ -1,5 +1,6 @@
 /** عناوين الـ API الافتراضية حسب وضع التشغيل */
-export const DEV_API_BASE_URL = "http://localhost:8000";
+/** 127.0.0.1 وليس localhost — على Windows قد يروح localhost إلى IPv6 (::1) ويصطدم بسيرفر آخر على نفس المنفذ */
+export const DEV_API_BASE_URL = "http://127.0.0.1:8000";
 export const PROD_API_BASE_URL = "https://api.em-online.online/";
 
 function trimUrl(url) {
@@ -18,12 +19,24 @@ function readEnvUrl() {
   return trimUrl(import.meta.env.VITE_API_BASE_URL);
 }
 
+function readProxyTargetEnv() {
+  return trimUrl(import.meta.env.VITE_API_PROXY_TARGET);
+}
+
 function isProductionBuild() {
   return import.meta.env.PROD === true;
 }
 
+function isDevRuntime() {
+  return import.meta.env.DEV === true && !isProductionBuild();
+}
+
 function isProductionApiUrl(url) {
   return /api\.em-online\.online/i.test(String(url || ""));
+}
+
+function forceProdApiInDev() {
+  return import.meta.env.VITE_FORCE_PROD_API === "true";
 }
 
 /** نطاقات المدرس في التطوير: teacher.localhost — تحتاج proxy لتجنب CORS مع :8000 */
@@ -34,14 +47,33 @@ function isTenantDevHost() {
 }
 
 /**
+ * عنوان الـ API المحلي للتطوير — يتجاهل أي قيمة بروداكشن بالخطأ في env.
+ */
+function preferIpv4Loopback(url) {
+  return withoutTrailingSlash(url).replace(
+    /^(https?:\/\/)localhost(?=[:/]|$)/i,
+    "$1127.0.0.1",
+  );
+}
+
+function resolveDevApiTarget() {
+  const candidates = [readProxyTargetEnv(), readEnvUrl(), DEV_API_BASE_URL];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    if (isProductionApiUrl(candidate)) continue;
+    return preferIpv4Loopback(candidate);
+  }
+  return withoutTrailingSlash(DEV_API_BASE_URL);
+}
+
+/**
  * في التطوير فقط: Vite proxy (/) → localhost:8000
  * يتجنب مشاكل CORS مع نطاقات مثل mo-adbo.localhost:3000
  * يمكن إجبار الاتصال بـ API البروداكشن عبر VITE_FORCE_PROD_API=true
  */
 export function useDevViteProxy() {
-  if (isProductionBuild()) return false;
-  if (!import.meta.env.DEV) return false;
-  if (import.meta.env.VITE_FORCE_PROD_API === "true") return false;
+  if (!isDevRuntime()) return false;
+  if (forceProdApiInDev()) return false;
   // منصات المدرس على *.localhost:3000 — دائماً proxy
   if (isTenantDevHost()) return true;
   return import.meta.env.VITE_USE_VITE_PROXY !== "false";
@@ -53,32 +85,17 @@ export function getResolvedApiTarget() {
     return withoutTrailingSlash(readEnvUrl() || PROD_API_BASE_URL);
   }
 
-  // تطوير: تجاهل عنوان البروداكشن في .env إلا لو تم الإجبار صراحة
-  if (import.meta.env.VITE_FORCE_PROD_API === "true") {
+  if (forceProdApiInDev()) {
     return withoutTrailingSlash(readEnvUrl() || PROD_API_BASE_URL);
   }
 
-  if (useDevViteProxy()) {
-    const proxyTarget =
-      import.meta.env.VITE_API_PROXY_TARGET ||
-      (isProductionApiUrl(readEnvUrl()) ? "" : readEnvUrl()) ||
-      DEV_API_BASE_URL;
-    return withoutTrailingSlash(
-      isProductionApiUrl(proxyTarget) ? DEV_API_BASE_URL : proxyTarget,
-    );
-  }
-
-  const fromEnv = readEnvUrl();
-  if (fromEnv && !isProductionApiUrl(fromEnv)) {
-    return withoutTrailingSlash(fromEnv);
-  }
-
-  return withoutTrailingSlash(DEV_API_BASE_URL);
+  // تطوير: دائمًا السيرفر المحلي — لا تستخدم API البروداكشن بالخطأ
+  return resolveDevApiTarget();
 }
 
 /**
  * @returns {string} Base URL لـ axios — "/" في dev مع proxy، أو عنوان API مباشر
- * - DEV → localhost:8000 (عبر proxy غالباً)
+ * - DEV → http://localhost:8000 (عبر proxy غالبًا)
  * - PROD → https://api.em-online.online/
  */
 export function getApiBaseURL() {
@@ -86,7 +103,7 @@ export function getApiBaseURL() {
     return withTrailingSlash(readEnvUrl() || PROD_API_BASE_URL);
   }
 
-  if (import.meta.env.VITE_FORCE_PROD_API === "true") {
+  if (forceProdApiInDev()) {
     return withTrailingSlash(readEnvUrl() || PROD_API_BASE_URL);
   }
 
@@ -94,12 +111,7 @@ export function getApiBaseURL() {
     return "/";
   }
 
-  const fromEnv = readEnvUrl();
-  if (fromEnv && !isProductionApiUrl(fromEnv)) {
-    return withTrailingSlash(fromEnv);
-  }
-
-  return withTrailingSlash(DEV_API_BASE_URL);
+  return withTrailingSlash(resolveDevApiTarget());
 }
 
 /**
@@ -112,7 +124,7 @@ export function getApiOrigin() {
   return getApiBaseURL().replace(/\/$/, "");
 }
 
-if (import.meta.env.DEV && typeof console !== "undefined") {
+if (isDevRuntime() && typeof console !== "undefined") {
   const mode = useDevViteProxy() ? "Vite proxy →" : "مباشر →";
-  console.info(`[API] ${mode} ${getResolvedApiTarget()}`);
+  console.info(`[API][dev] ${mode} ${getResolvedApiTarget()}`);
 }
