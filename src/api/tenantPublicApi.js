@@ -6,11 +6,11 @@ async function fetchPublicJson(path, { cacheKey } = {}) {
   const res = await fetch(url, {
     method: "GET",
     // لا تستخدم كاش المتصفح — بعد تغيير تصميم اللاندينج كان يظهر الرد القديم (304)
+    // مهم: لا ترسل Cache-Control/Pragma كـ request headers — ده بيعمل CORS preflight
+    // ويفشل في البرودكشن لأن الـ API ماكانش بيسمح بيهم.
     cache: "no-store",
     headers: {
       Accept: "application/json",
-      "Cache-Control": "no-cache",
-      Pragma: "no-cache",
     },
   });
 
