@@ -156,11 +156,12 @@ export default function TenantPublicLanding({ subdomain }) {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["tenant-public", subdomain],
     queryFn: () => fetchTenantPublic(subdomain),
-    staleTime: 5 * 60_000,
-    gcTime: 30 * 60_000,
-    initialData: cachedTenant,
-    // اعتبر الكاش قديماً قليلاً ليعمل refetch هادئ في الخلفية
-    initialDataUpdatedAt: cachedTenant ? Date.now() - 60_000 : undefined,
+    // التصميم (landing.layout) لازم يتحدّث فور التعديل — لا تمسك رد قديم دقائق
+    staleTime: 0,
+    gcTime: 5 * 60_000,
+    placeholderData: cachedTenant,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   // الكورسات والمحاضرات بالتوازي مع بيانات المنصة (مش بعد ما تخلص)
@@ -460,7 +461,9 @@ export default function TenantPublicLanding({ subdomain }) {
   const landingLayout = resolveLandingLayout(landing?.layout);
   const landingDesign = getLandingDesign(landingLayout);
   const navChrome = landingNavChrome(landingDesign);
-  const themeCssVars = getTenantThemeCssVars(isDarkMode);
+  const forcedDarkLanding = landingDesign.heroTone === "dark";
+  const pageIsDark = forcedDarkLanding || isDarkMode;
+  const themeCssVars = getTenantThemeCssVars(pageIsDark);
   const alternateModel = {
     brandName,
     specialty,
@@ -468,12 +471,20 @@ export default function TenantPublicLanding({ subdomain }) {
     heroTitle,
     heroTagline,
     bioText,
+    bioSnippet: bioSnippet + bioSuffix,
     teacherPortraitUrl,
+    tenantAvatar: tenant.avatar_url,
     services: displayServices,
-    courses,
+    courses: showCourses ? courses : [],
+    freeLectures: showFreeLectures ? freeLectures : [],
+    onPlayFreeLecture: setActiveFreeLecture,
     stats: heroStats,
+    testimonials: displayTestimonials,
     signupHref,
     loginHref,
+    whatsappHref,
+    contact: socialLinks,
+    quickLinks: footerQuickLinks,
     hideSignup: !selfRegistrationEnabled,
     courseFallbackImage,
   };
@@ -484,9 +495,9 @@ export default function TenantPublicLanding({ subdomain }) {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
       dir="rtl"
-      data-theme={isDarkMode ? "dark" : "light"}
+      data-theme={pageIsDark ? "dark" : "light"}
       data-landing={landingLayout}
-      className={`tenant-public-page ${isDarkMode ? "tenant-dark" : "tenant-light"} relative min-h-screen overflow-x-hidden antialiased transition-colors duration-300`}
+      className={`tenant-public-page ${pageIsDark ? "tenant-dark" : "tenant-light"} relative min-h-screen overflow-x-hidden antialiased transition-colors duration-300`}
       style={{
         ...cssVars,
         ...(landingLayout === "bento" ? themeCssVars : {}),
@@ -510,17 +521,19 @@ export default function TenantPublicLanding({ subdomain }) {
         }
         .tenant-public-page {
           font-family: ${TENANT_FONT_BODY};
+        }
+        .tenant-public-page[data-landing="bento"] {
           background: var(--tl-page-bg) !important;
           color: var(--tl-fg);
         }
         html { scroll-behavior: smooth; }
         body:has(.tenant-public-page.tenant-light) {
           overflow-x: hidden;
-          background: #F4F7FB;
+          background: ${landingLayout === "bento" ? "#F4F7FB" : landingDesign.pageBg};
         }
         body:has(.tenant-public-page.tenant-dark) {
           overflow-x: hidden;
-          background: #0A1628;
+          background: ${landingLayout === "bento" ? "#0A1628" : landingDesign.pageBg};
         }
         @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
       `}</style>
@@ -534,8 +547,8 @@ export default function TenantPublicLanding({ subdomain }) {
         loginHref={loginHref}
         signupHref={signupHref || "/signup"}
         showSignup={selfRegistrationEnabled}
-        isDarkMode={isDarkMode}
-        onToggleTheme={toggleTheme}
+        isDarkMode={pageIsDark}
+        onToggleTheme={forcedDarkLanding ? undefined : toggleTheme}
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         navScrolled={navScrolled}

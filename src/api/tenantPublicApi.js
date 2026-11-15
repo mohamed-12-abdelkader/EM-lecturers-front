@@ -5,19 +5,14 @@ async function fetchPublicJson(path, { cacheKey } = {}) {
   const url = base ? `${base}${path}` : path;
   const res = await fetch(url, {
     method: "GET",
-    // السماح لكاش المتصفح على البيانات العامة يسرّع إعادة الزيارة
-    cache: "default",
-    headers: { Accept: "application/json" },
+    // لا تستخدم كاش المتصفح — بعد تغيير تصميم اللاندينج كان يظهر الرد القديم (304)
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+    },
   });
-
-  if (res.status === 304 && cacheKey) {
-    try {
-      const cached = sessionStorage.getItem(cacheKey);
-      if (cached) return JSON.parse(cached);
-    } catch {
-      // ignore cache parse errors and continue to error below
-    }
-  }
 
   const json = await res.json().catch(() => ({}));
   if (json && json.success === false) {
@@ -52,6 +47,22 @@ export function readCachedTenantPublic(subdomain) {
     return raw ? JSON.parse(raw) : undefined;
   } catch {
     return undefined;
+  }
+}
+
+/** امسح كاش اللاندينج بعد إنشاء/تعديل المنصة حتى يظهر التصميم الجديد فورًا */
+export function clearCachedTenantPublic(subdomain) {
+  if (!subdomain || typeof sessionStorage === "undefined") return;
+  const key = String(subdomain).trim().toLowerCase();
+  if (!key) return;
+  try {
+    sessionStorage.removeItem(`tenant-public:${key}`);
+    sessionStorage.removeItem(`tenant-seo:${key}`);
+    sessionStorage.removeItem(`tenant-meta:${key}:home:`);
+    sessionStorage.removeItem(`platform-free-lectures:${key}`);
+    sessionStorage.removeItem(`platform-courses:${key}:all`);
+  } catch {
+    // ignore
   }
 }
 

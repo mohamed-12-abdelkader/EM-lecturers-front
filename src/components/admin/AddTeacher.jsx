@@ -30,6 +30,8 @@ import {
   Image,
   Checkbox,
   CheckboxGroup,
+  Alert,
+  AlertIcon,
 } from "@chakra-ui/react";
 import {
   FaUserTie,
@@ -54,10 +56,13 @@ import {
 import { useSearchParams, useLocation, useNavigate, Link as RouterLink } from "react-router-dom";
 import baseUrl from "../../api/baseUrl";
 import { fetchAdminTenantById, fetchAdminTenants, patchAdminTenant, patchAdminTenantMultipart, createAdminTenant, createAdminTenantMultipart } from "../../api/adminTenantsApi";
+import { clearCachedTenantPublic } from "../../api/tenantPublicApi";
 import { compressImage, TENANT_MEDIA_COMPRESS } from "../../utils/compressImage";
 import { buildTenantPublicUrl } from "../../utils/tenantHost";
 import {
+  DEFAULT_LANDING_LAYOUT,
   TENANT_LANDING_DESIGNS,
+  getLandingDesign,
   resolveLandingLayout,
 } from "../../pages/tenantPublic/tenantLandingDesigns";
 
@@ -98,7 +103,7 @@ function hasAnyUpload(files) {
 }
 
 /** صورة الهيرو تُرسل داخل landing.hero.image_url، والتصميم داخل landing.layout */
-function buildLandingPayload(heroImageUrl, hasHeroFile = false, layout = "bento") {
+function buildLandingPayload(heroImageUrl, hasHeroFile = false, layout = DEFAULT_LANDING_LAYOUT) {
   const image_url = String(heroImageUrl || "").trim();
   const base = { layout: resolveLandingLayout(layout) };
   if (hasHeroFile || image_url) {
@@ -963,7 +968,7 @@ const AddTeacher = ({ publicMode = false }) => {
     hero_image: null,
   });
   const [heroImageUrl, setHeroImageUrl] = useState("");
-  const [landingLayout, setLandingLayout] = useState("bento");
+  const [landingLayout, setLandingLayout] = useState(DEFAULT_LANDING_LAYOUT);
   const [uploadKey, setUploadKey] = useState(0);
   const [loading, setLoading] = useState(false);
   const [loadingTenant, setLoadingTenant] = useState(false);
@@ -1089,7 +1094,7 @@ const AddTeacher = ({ publicMode = false }) => {
     setSettingsJson("");
     setMediaFiles(emptyMediaFiles());
     setHeroImageUrl("");
-    setLandingLayout("bento");
+    setLandingLayout(DEFAULT_LANDING_LAYOUT);
     ["avatar", "favicon", "og_image", "hero_image"].forEach((k) => {
       const u = mediaPreview[k];
       if (u && u.startsWith("blob:")) URL.revokeObjectURL(u);
@@ -1617,10 +1622,15 @@ const AddTeacher = ({ publicMode = false }) => {
     }
 
     const ownerPatch = buildOwnerPatch(owner, ownerEnabled);
+    // عند الإنشاء: لا نحفظ bento بالخطأ لو فضل من وضع التعديل السابق
+    const layoutForSave =
+      !isEditMode && (landingLayout === "bento" || !landingLayout)
+        ? DEFAULT_LANDING_LAYOUT
+        : resolveLandingLayout(landingLayout);
     const landingPayload = buildLandingPayload(
       heroImageUrl,
       !!mediaFiles.hero_image,
-      landingLayout,
+      layoutForSave,
     );
     const useMultipart = hasAnyUpload(mediaFiles);
 
@@ -1689,38 +1699,43 @@ const AddTeacher = ({ publicMode = false }) => {
         }
       }
 
-      const t = response.data?.data ?? response.data?.tenant;
-      if (t?.subdomain) {
-        const key = String(t.subdomain).trim().toLowerCase();
+      const t = response.data?.data ?? response.data?.tenant ?? response?.tenant ?? response?.data;
+      const savedSubdomain = String(t?.subdomain || sub || tenant.subdomain || "")
+        .trim()
+        .toLowerCase();
+      if (savedSubdomain) {
+        clearCachedTenantPublic(savedSubdomain);
         setExistingSubdomains((prev) => {
           const next = new Map(prev);
-          next.set(key, {
-            id: t.id,
-            display_name: t.display_name || t.subdomain,
-            is_active: t.is_active !== false,
-            subdomain: t.subdomain,
+          next.set(savedSubdomain, {
+            id: t?.id,
+            display_name: t?.display_name || savedSubdomain,
+            is_active: t?.is_active !== false,
+            subdomain: savedSubdomain,
           });
           return next;
         });
       }
       const extra =
-        t?.subdomain != null
-          ? ` النطاق: ${t.subdomain}${t.id != null ? ` — المعرف: ${t.id}` : ""}`
+        savedSubdomain
+          ? ` النطاق: ${savedSubdomain}${t?.id != null ? ` — المعرف: ${t.id}` : ""}`
           : "";
 
+      const layoutLabel = getLandingDesign(layoutForSave).name;
       toast({
         title: formMode === "edit" ? "تم التعديل" : "تم الإنشاء",
         description:
           (response.data?.message ||
             (formMode === "edit" ? "تم تحديث المنصة والمدرس بنجاح." : "تم إنشاء منصة المدرس بنجاح.")) +
+          ` · تصميم اللاندينج: ${layoutLabel}` +
           extra,
         status: "success",
         duration: 5500,
         isClosable: true,
       });
 
-      if (publicMode && t?.subdomain) {
-        const platformUrl = buildTenantPublicUrl(t.subdomain);
+      if (publicMode && savedSubdomain) {
+        const platformUrl = buildTenantPublicUrl(savedSubdomain);
         resetForm();
         if (platformUrl) {
           window.setTimeout(() => {
@@ -2365,7 +2380,14 @@ const AddTeacher = ({ publicMode = false }) => {
                       <Select
                         {...inputProps}
                         value={formMode}
-                        onChange={(e) => setFormMode(e.target.value)}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setFormMode(next);
+                          if (next === "create") {
+                            setLandingLayout(DEFAULT_LANDING_LAYOUT);
+                            setTargetTenantId("");
+                          }
+                        }}
                       >
                         <option value="create">إنشاء منصة جديدة</option>
                         <option value="edit">تعديل منصة موجودة</option>
@@ -2479,12 +2501,57 @@ const AddTeacher = ({ publicMode = false }) => {
               <SectionCard
                 step="2"
                 title="تصميم صفحة المنصة"
-                subtitle="اختَر شكل اللاندينج. المنصة تظهر للزوار بنفس التصميم، والمنصات القديمة تبقى على بينتو أكاديمي."
+                subtitle={
+                  isEditMode
+                    ? "يمكنك تغيير تصميم اللاندينج في أي وقت. بعد الحفظ تظهر المنصة للزوار بالشكل الجديد فورًا."
+                    : "اختَر واحدًا من 3 تصاميم لاندينج. المنصة تظهر للزوار بنفس الشكل المختار."
+                }
                 accent="purple"
               >
-                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                {isEditMode ? (
+                  <Alert
+                    status={
+                      TENANT_LANDING_DESIGNS.some((d) => d.id === landingLayout)
+                        ? "info"
+                        : "warning"
+                    }
+                    borderRadius="xl"
+                    mb={4}
+                  >
+                    <AlertIcon />
+                    <Box>
+                      <Text fontWeight="700" fontSize="sm">
+                        التصميم الحالي:{" "}
+                        {TENANT_LANDING_DESIGNS.some((d) => d.id === landingLayout)
+                          ? getLandingDesign(landingLayout).name
+                          : landingLayout === "bento"
+                            ? "بينتو أكاديمي (قديم)"
+                            : "غير محدد"}
+                      </Text>
+                      <Text fontSize="sm" mt={1}>
+                        {TENANT_LANDING_DESIGNS.some((d) => d.id === landingLayout)
+                          ? "اضغط على تصميم آخر بالأسفل لتغييره، ثم احفظ التعديل."
+                          : "اختر أحد التصاميم الثلاثة بالأسفل ثم اضغط «تحديث المنصة» لتطبيقه. بدون اختيار سيبقى الشكل القديم."}
+                      </Text>
+                    </Box>
+                  </Alert>
+                ) : (
+                  <Text fontSize="sm" color={mutedColor} mb={3}>
+                    التصميم المختار الآن:{" "}
+                    <Text as="span" fontWeight="700" color={textColor}>
+                      {getLandingDesign(
+                        landingLayout === "bento" ? DEFAULT_LANDING_LAYOUT : landingLayout,
+                      ).name}
+                    </Text>
+                  </Text>
+                )}
+                <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
                   {TENANT_LANDING_DESIGNS.map((design) => {
-                    const selected = landingLayout === design.id;
+                    const selected =
+                      landingLayout === design.id ||
+                      (!isEditMode &&
+                        landingLayout === "bento" &&
+                        design.id === DEFAULT_LANDING_LAYOUT);
                     return (
                       <Button
                         key={design.id}
@@ -2500,6 +2567,7 @@ const AddTeacher = ({ publicMode = false }) => {
                         borderWidth="2px"
                         borderColor={selected ? design.swatches[1] : borderColor}
                         bg={selected ? "blackAlpha.50" : "transparent"}
+                        boxShadow={selected ? "md" : "none"}
                         _hover={{ borderColor: design.swatches[1] }}
                       >
                         <HStack spacing={3} align="center" w="full">
@@ -2517,9 +2585,16 @@ const AddTeacher = ({ publicMode = false }) => {
                             ))}
                           </HStack>
                           <Box flex="1">
-                            <Text fontWeight="800" color={textColor}>
-                              {design.name}
-                            </Text>
+                            <HStack justify="space-between" align="start">
+                              <Text fontWeight="800" color={textColor}>
+                                {design.name}
+                              </Text>
+                              {selected ? (
+                                <Badge colorScheme="purple" borderRadius="full">
+                                  المختار
+                                </Badge>
+                              ) : null}
+                            </HStack>
                             <Text fontSize="sm" color={mutedColor} mt={1}>
                               {design.tagline}
                             </Text>

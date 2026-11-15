@@ -51,7 +51,8 @@ export default function TenantPublicShell({
   const { data: tenantData } = useQuery({
     queryKey: ["tenant-public", subdomain],
     queryFn: () => fetchTenantPublic(subdomain),
-    staleTime: 120_000,
+    staleTime: 0,
+    refetchOnMount: "always",
     enabled: Boolean(subdomain),
   });
 
