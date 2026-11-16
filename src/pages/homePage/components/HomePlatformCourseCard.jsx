@@ -56,6 +56,7 @@ export default function HomePlatformCourseCard({
       return;
     }
     if (isFree) {
+      // كورس مجاني → دخول مباشر (تفعيل صامت إن لزم)
       if (onActivateFree) onActivateFree();
       else onEnter?.();
       return;
@@ -63,13 +64,10 @@ export default function HomePlatformCourseCard({
     onSubscribe?.();
   };
 
-  const buttonLabel = isEnrolled
-    ? "دخول للكورس"
-    : isFree
-      ? "تفعيل مجاني"
-      : "تفعيل الكورس";
+  const buttonLabel = isEnrolled || isFree ? "دخول للكورس" : "تفعيل الكورس";
+  const loadingLabel = isFree ? "جاري الدخول…" : "جاري التفعيل…";
 
-  const showPreview = !isEnrolled;
+  const showPreview = !isEnrolled && !isFree;
 
   return (
     <article
@@ -177,7 +175,7 @@ export default function HomePlatformCourseCard({
             }`}
             style={{ background: accent }}
           >
-            {isActivating ? "جاري التفعيل…" : buttonLabel}
+            {isActivating ? loadingLabel : buttonLabel}
             {!isActivating ? <FaChevronLeft className="text-[9px]" /> : null}
           </button>
         </div>

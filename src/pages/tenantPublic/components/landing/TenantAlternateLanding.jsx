@@ -49,6 +49,27 @@ function courseHref(course) {
   return slug ? `/course/${slug}` : "/courses";
 }
 
+/** يلوّن اسم المدرس داخل عنوان الهيرو بلون التمييز */
+function highlightTeacherName(text, teacherName, accentColor) {
+  if (!text) return text;
+  const name = String(teacherName || "").trim();
+  if (!name) return text;
+
+  const candidates = [`أستاذ ${name}`, `استاذ ${name}`, name];
+  for (const needle of candidates) {
+    const idx = text.indexOf(needle);
+    if (idx === -1) continue;
+    return (
+      <>
+        {text.slice(0, idx)}
+        <span style={{ color: accentColor }}>{needle}</span>
+        {text.slice(idx + needle.length)}
+      </>
+    );
+  }
+  return text;
+}
+
 function courseTitle(course) {
   return (course?.title || course?.name || "كورس").trim();
 }
@@ -58,6 +79,128 @@ function coursePrice(course) {
   const price = Number(course?.price);
   if (!Number.isFinite(price) || price <= 0) return "مجاني";
   return `${price.toLocaleString("ar-EG")} ج.م`;
+}
+
+function courseIsFree(course) {
+  if (course?.is_free || course?.isFree) return true;
+  const price = Number(course?.price);
+  return !Number.isFinite(price) || price <= 0;
+}
+
+function courseGrade(course) {
+  return course?.grade?.name || course?.grade_name || course?.grade || "";
+}
+
+function courseLessons(course) {
+  const n = course?.lessons_count ?? course?.lectures_count ?? course?.videos_count;
+  const num = Number(n);
+  return Number.isFinite(num) && num > 0 ? num : null;
+}
+
+function courseDescription(course) {
+  return String(course?.description || course?.short_description || "").trim();
+}
+
+function CourseCard({ course, design, softBorder, cardShadow, fallbackImage }) {
+  const img = getCardImageUrl(
+    course.image_url || course.cover_url || course.thumbnail || fallbackImage,
+  );
+  const free = courseIsFree(course);
+  const grade = courseGrade(course);
+  const lessons = courseLessons(course);
+  const description = courseDescription(course);
+  const href = courseHref(course);
+
+  return (
+    <article
+      className="group flex h-full flex-col overflow-hidden transition duration-200 hover:-translate-y-1"
+      style={{
+        background: design.card,
+        borderRadius: design.radius,
+        border: `1px solid ${softBorder}`,
+        boxShadow: cardShadow,
+      }}
+    >
+      <div className="relative aspect-[16/10] overflow-hidden" style={{ background: `${design.accent}12` }}>
+        {img ? (
+          <img
+            src={img}
+            alt=""
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center">
+            <FaBookOpen className="text-3xl opacity-35" style={{ color: design.accent }} />
+          </div>
+        )}
+        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/45 to-transparent" />
+        <div className="absolute right-3 top-3 flex flex-wrap gap-1.5">
+          <span
+            className="rounded-full px-2.5 py-1 text-[10px] font-bold text-white shadow-sm"
+            style={{ background: free ? "#16A34A" : design.accent }}
+          >
+            {free ? "مجاني" : "مدفوع"}
+          </span>
+          {grade ? (
+            <span className="rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-bold shadow-sm backdrop-blur" style={{ color: design.fg }}>
+              {grade}
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="flex flex-1 flex-col p-4 sm:p-5">
+        <h3 className="line-clamp-2 text-[1.05rem] font-extrabold leading-7" style={{ color: design.fg }}>
+          {courseTitle(course)}
+        </h3>
+
+        <p className="mt-2 line-clamp-2 text-sm leading-7" style={{ color: design.muted }}>
+          {description || "محاضرات منظمة ومتابعة مستمرة تساعدك تحقق أفضل نتيجة."}
+        </p>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          {lessons != null ? (
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+              style={{ background: `${design.accent}12`, color: design.accent }}
+            >
+              <FaPlay className="text-[8px]" />
+              {lessons.toLocaleString("ar-EG")} درس
+            </span>
+          ) : null}
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+            style={{ background: `${design.accent}12`, color: design.accent }}
+          >
+            <FaCheckCircle className="text-[10px]" />
+            متابعة ودعم
+          </span>
+        </div>
+
+        <div
+          className="mt-auto flex items-center justify-between gap-3 border-t pt-4"
+          style={{ borderColor: softBorder }}
+        >
+          <div>
+            <p className="text-[10px] font-medium" style={{ color: design.muted }}>
+              السعر
+            </p>
+            <p className="text-lg font-black" style={{ color: design.accent }}>
+              {coursePrice(course)}
+            </p>
+          </div>
+          <TenantAppLink
+            href={href}
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-extrabold transition hover:brightness-110"
+            style={solidBtn(design)}
+          >
+            التفاصيل
+            <FaArrowLeft className="text-[10px]" />
+          </TenantAppLink>
+        </div>
+      </div>
+    </article>
+  );
 }
 
 function useDesignFont(design) {
@@ -242,10 +385,10 @@ function HeroEmber({ design, model }) {
           </div>
 
           <h1
-            className="text-[2rem] font-black leading-[1.3] tracking-tight sm:text-4xl md:text-[2.75rem] lg:text-[3.1rem]"
-            style={{ fontFamily: design.headingFont }}
+            className="text-[2rem] font-black leading-[1.55] tracking-tight sm:text-4xl sm:leading-[1.5] md:text-[2.75rem] md:leading-[1.45] lg:text-[3.1rem] lg:leading-[1.4]"
+            style={{ fontFamily: design.headingFont, color: design.fg }}
           >
-            {model.heroTitle}
+            {highlightTeacherName(model.heroTitle, model.teacherName, design.accent)}
           </h1>
           <div
             className="mt-4 h-1.5 w-16 rounded-full"
@@ -368,10 +511,10 @@ function HeroSky({ design, model }) {
             </div>
 
             <h1
-              className="text-[2rem] font-black leading-[1.28] sm:text-4xl md:text-[2.7rem] lg:text-[3rem]"
+              className="text-[2rem] font-black leading-[1.55] sm:text-4xl sm:leading-[1.5] md:text-[2.7rem] md:leading-[1.45] lg:text-[3rem] lg:leading-[1.4]"
               style={{ fontFamily: design.headingFont, color: design.fg }}
             >
-              {model.heroTitle}
+              {highlightTeacherName(model.heroTitle, model.teacherName, design.accent)}
             </h1>
             <p className="mt-5 max-w-xl text-[0.98rem] leading-8 md:text-[1.05rem]" style={{ color: design.muted }}>
               {heroDescription(model)}
@@ -484,10 +627,10 @@ function HeroNavy({ design, model }) {
           </span>
 
           <h1
-            className="text-[2rem] font-black leading-[1.28] sm:text-4xl md:text-[2.7rem] lg:text-[3.05rem]"
+            className="text-[2rem] font-black leading-[1.55] text-white sm:text-4xl sm:leading-[1.5] md:text-[2.7rem] md:leading-[1.45] lg:text-[3.05rem] lg:leading-[1.4]"
             style={{ fontFamily: design.headingFont }}
           >
-            <span className="text-white">{model.heroTitle}</span>
+            {highlightTeacherName(model.heroTitle, model.teacherName, design.accentSoft || design.accent)}
           </h1>
           {model.specialty ? (
             <p
@@ -924,12 +1067,6 @@ function StructuredLanding({ design, model }) {
   const testimonials = (model.testimonials || []).slice(0, 3);
   const journey = model.journey?.length ? model.journey : DEFAULT_JOURNEY;
   const freeLectures = model.freeLectures || [];
-  const featured = courses[0];
-  const featuredImg = featured
-    ? getCardImageUrl(
-        featured.image_url || featured.cover_url || featured.thumbnail || model.courseFallbackImage,
-      )
-    : null;
   const contact = model.contact || {};
   const softBorder = isDark ? `${design.accent}28` : "rgba(15,23,42,0.07)";
   const cardShadow = isDark
@@ -1070,109 +1207,33 @@ function StructuredLanding({ design, model }) {
               aside={
                 <TenantAppLink
                   href="/courses"
-                  className="mb-2 text-sm font-bold"
+                  className="mb-2 inline-flex items-center gap-2 text-sm font-bold"
                   style={{ color: design.accent }}
                 >
                   عرض الكل
+                  <FaArrowLeft className="text-[10px]" />
                 </TenantAppLink>
               }
             />
 
-            {featured ? (
-              <article
-                className="mb-6 grid overflow-hidden md:grid-cols-[0.95fr_1.05fr]"
-                style={{
-                  background: design.card,
-                  borderRadius: design.radius,
-                  border: `1px solid ${softBorder}`,
-                  boxShadow: cardShadow,
-                }}
-              >
-                <div className="relative min-h-[240px]">
-                  {featuredImg ? (
-                    <img src={featuredImg} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="h-full min-h-[240px]" style={{ background: `${design.accent}18` }} />
-                  )}
-                  <span
-                    className="absolute right-4 top-4 rounded-full px-3 py-1 text-[11px] font-bold text-white"
-                    style={{ background: design.accent }}
-                  >
-                    الأكثر طلبًا
-                  </span>
-                </div>
-                <div className="flex flex-col justify-center p-6 md:p-8">
-                  <div className="flex flex-wrap gap-2">
-                    {(model.specialty ? [model.specialty, "مكثف"] : ["تعليمي", "مكثف"]).map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-full px-3 py-1 text-[11px] font-bold"
-                        style={{ background: `${design.accent}16`, color: design.accent }}
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                  <h3 className="mt-3 text-2xl font-extrabold md:text-3xl">{courseTitle(featured)}</h3>
-                  <ul className="mt-5 grid gap-2 text-sm sm:grid-cols-2" style={{ color: design.muted }}>
-                    {[
-                      "محاضرات مسجلة منظمة",
-                      "مذكرات وتمارين",
-                      "امتحانات ومتابعة",
-                      "دعم مستمر",
-                    ].map((line) => (
-                      <li key={line} className="flex items-center gap-2">
-                        <FaCheckCircle style={{ color: design.accent }} />
-                        {line}
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="mt-7 flex flex-wrap items-center gap-3">
-                    <p className="text-xl font-black" style={{ color: design.accent }}>
-                      {coursePrice(featured)}
-                    </p>
-                    <PrimaryButton design={design} href={courseHref(featured)}>
-                      اشترك الآن
-                    </PrimaryButton>
-                    <PrimaryButton design={design} href={courseHref(featured)} solid={false}>
-                      التفاصيل
-                    </PrimaryButton>
-                  </div>
-                </div>
-              </article>
-            ) : null}
+            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              {courses.slice(0, 6).map((course) => (
+                <CourseCard
+                  key={course.id || courseTitle(course)}
+                  course={course}
+                  design={design}
+                  softBorder={softBorder}
+                  cardShadow={cardShadow}
+                  fallbackImage={model.courseFallbackImage}
+                />
+              ))}
+            </div>
 
-            {courses.length > 1 ? (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {courses.slice(1, 7).map((course) => {
-                  const img = getCardImageUrl(
-                    course.image_url ||
-                      course.cover_url ||
-                      course.thumbnail ||
-                      model.courseFallbackImage,
-                  );
-                  return (
-                    <TenantAppLink
-                      key={course.id || courseTitle(course)}
-                      href={courseHref(course)}
-                      className="overflow-hidden transition hover:-translate-y-0.5"
-                      style={{
-                        background: design.card,
-                        borderRadius: design.radius,
-                        border: `1px solid ${softBorder}`,
-                        boxShadow: cardShadow,
-                      }}
-                    >
-                      {img ? <img src={img} alt="" className="h-40 w-full object-cover" /> : null}
-                      <div className="p-4">
-                        <p className="font-extrabold leading-6">{courseTitle(course)}</p>
-                        <p className="mt-2 text-sm font-bold" style={{ color: design.accent }}>
-                          {coursePrice(course)}
-                        </p>
-                      </div>
-                    </TenantAppLink>
-                  );
-                })}
+            {courses.length > 6 ? (
+              <div className="mt-8 flex justify-center">
+                <PrimaryButton design={design} href="/courses" solid={false}>
+                  عرض كل الكورسات ({courses.length.toLocaleString("ar-EG")})
+                </PrimaryButton>
               </div>
             ) : null}
           </div>

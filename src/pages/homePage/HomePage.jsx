@@ -368,6 +368,11 @@ const HomePage = () => {
 
   const handleActivateFreeCourse = async (course) => {
     if (!course?.id) return;
+    // لو مشترك بالفعل → دخول مباشر بدون تفعيل
+    if (course.is_enrolled) {
+      navigate(`/CourseDetailsPage/${course.id}`);
+      return;
+    }
     try {
       setActivatingFreeCourseId(course.id);
       await baseUrl.post(
@@ -376,14 +381,6 @@ const HomePage = () => {
         { headers: authHeader },
       );
       markCourseEnrolled(course.id);
-      const successCopy = getActivationSuccessCopy(course);
-      toast({
-        title: successCopy.title,
-        description: successCopy.message,
-        status: "success",
-        duration: 4000,
-        isClosable: true,
-      });
       navigate(`/CourseDetailsPage/${course.id}`);
     } catch (error) {
       const errorData = error?.response?.data || {};
@@ -394,10 +391,16 @@ const HomePage = () => {
         course,
         enrolledCourseIds,
       });
+      // مشترك مسبقاً → ادخل الكورس مباشرة
+      if (errCopy.kind === "already_enrolled") {
+        markCourseEnrolled(course.id);
+        navigate(`/CourseDetailsPage/${course.id}`);
+        return;
+      }
       toast({
         title: errCopy.message,
         description: errCopy.reason,
-        status: errCopy.kind === "already_enrolled" ? "info" : "error",
+        status: "error",
         duration: 4000,
         isClosable: true,
       });

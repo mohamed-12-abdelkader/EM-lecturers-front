@@ -1,228 +1,169 @@
-import { useLocation, NavLink } from "react-router-dom";
-import { useEffect, useState } from "react";
-import UserType from "../../Hooks/auth/userType";
-// أيقونات من react-icons
-import { MdDashboard, MdPersonAdd, MdCode, MdAccountBalanceWallet, MdPhoneIphone, MdDateRange, MdOndemandVideo, MdPictureAsPdf, MdGroupAdd, MdPersonAddAlt, MdQuiz, MdListAlt, MdAssignment, MdQuestionAnswer, MdCheckCircle, MdViewList, MdBook, MdPeople, MdCloudUpload, MdSchool } from "react-icons/md";
+import { useMemo } from "react";
+import { NavLink, useLocation } from "react-router-dom";
+import {
+  Box,
+  Flex,
+  Icon,
+  Text,
+  VStack,
+  useColorModeValue,
+} from "@chakra-ui/react";
+import {
+  MdDashboard,
+  MdPersonAdd,
+  MdCode,
+  MdAccountBalanceWallet,
+  MdPhoneIphone,
+  MdBook,
+  MdPeople,
+  MdCloudUpload,
+  MdSchool,
+  MdSupportAgent,
+  MdGroups,
+  MdBadge,
+} from "react-icons/md";
 import { FaWhatsapp } from "react-icons/fa";
+import UserType from "../../Hooks/auth/userType";
 
-const AdminLinks = ({ currentLink, setCurrentLink }) => {
-  const location = useLocation();
-  const [activeLink, setActiveLink] = useState("");
-  const [userData, isAdmin, isTeacher, student] = UserType();
+const ADMIN_SECTIONS = [
+  {
+    title: "المنصة",
+    items: [
+      { label: "إدارة المدرسين", path: "/admin/management", icon: MdDashboard },
+      { label: "إضافة مدرس", path: "/admin/addteacher", icon: MdPersonAdd },
+      { label: "الصفوف الدراسية", path: "/admin/grades", icon: MdSchool },
+      { label: "كل الطلاب", path: "/admin/students", icon: MdPeople },
+      { label: "الكورسات العامة", path: "/admin/general-courses", icon: MdBook },
+      { label: "رفع YouTube", path: "/admin/youtube-uploads", icon: MdCloudUpload },
+    ],
+  },
+  {
+    title: "الفريق",
+    items: [
+      { label: "إضافة موظف", path: "/admin/add_employees", icon: MdBadge },
+      { label: "إدارة الموظفين", path: "/admin/mange_employees", icon: MdGroups },
+    ],
+  },
+  {
+    title: "التواصل",
+    items: [
+      { label: "واتساب", path: "/admin/whatsapp/inbox", icon: FaWhatsapp },
+      { label: "أولياء الأمور", path: "/admin/whatsapp/parents-exam", icon: FaWhatsapp },
+      { label: "تخصيص الدعم", path: "/admin/whatsapp/policy", icon: MdSupportAgent },
+    ],
+  },
+  {
+    title: "المالية والأجهزة",
+    items: [
+      { label: "إنشاء أكواد شحن", path: "/admin/create_code", icon: MdCode },
+      { label: "أرصدة المدرسين", path: "/admin/cridet", icon: MdAccountBalanceWallet },
+      { label: "فتح جهاز للطالب", path: "/admin/open_phone", icon: MdPhoneIphone },
+    ],
+  },
+];
 
-  const adminLinks = [
-    {
-      id: Math.random(),
-      link: "أولياء الأمور",
-      path: "/admin/whatsapp/parents-exam",
-      icon: <FaWhatsapp size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "ادارة المنصة",
-      path: "/admin/management",
-      icon: <MdDashboard size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "الصفوف الدراسية",
-      path: "/admin/grades",
-      icon: <MdSchool size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "رفع YouTube",
-      path: "/admin/youtube-uploads",
-      icon: <MdCloudUpload size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: " اضافة موظف جديد",
-      path: "/admin/add_employees",
-      icon: <MdDashboard size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: " ادارة الموظفين ",
-      path: "/admin/mange_employees",
-      icon: <MdDashboard size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "اضافة مدرس جديد",
-      path: "/admin/addteacher",
-      icon: <MdPersonAdd size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "كل الطلاب",
-      path: "/admin/students",
-      icon: <MdPeople size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "واتساب",
-      path: "/admin/whatsapp/inbox",
-      icon: <FaWhatsapp size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "تخصيص الدعم",
-      path: "/admin/whatsapp/policy",
-      icon: <FaWhatsapp size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "انشاء اكواد شحن",
-      path: "/admin/create_code",
-      icon: <MdCode size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "ارصدة المدرسين",
-      path: "/admin/cridet",
-      icon: <MdAccountBalanceWallet size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: " فتح جهاز للطالب",
-      path: "/admin/open_phone",
-      icon: <MdPhoneIphone size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "إدارة الكورسات العامة",
-      path: "/admin/general-courses",
-      icon: <MdBook size={22} />,
-    },
-  ];
-
-  const teacherLinks = [
-    {
-      id: Math.random(),
-      link: "انشاء شهر ",
-      path: "/admin/add_month",
-      icon: <MdDateRange size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "اضافة  محاضرة للشهر  ",
-      path: "/admin/add_lecture_month",
-      icon: <MdAssignment size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "اضافة فيديوهات المحاضرات ",
-      path: "/admin/add_video",
-      icon: <MdOndemandVideo size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "اضافة  pdf ",
-      path: "/admin/add_pdf",
-      icon: <MdPictureAsPdf size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: " انشاء مجموعة  ",
-      path: "/admin/create_group",
-      icon: <MdGroupAdd size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "اضافة طالب الى المجموعة  ",
-      path: "/admin/add_student",
-      icon: <MdPersonAddAlt size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "   انشاء اكواد   ",
-      path: "/admin/create_codee",
-      icon: <MdCode size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "   عرض  اكواد   ",
-      path: "/admin/all_codee",
-      icon: <MdViewList size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "اضافة امتحان ",
-      path: "/admin/addexam",
-      icon: <MdQuiz size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "اضافة اسئلة للامتحان  ",
-      path: "/admin/add_question",
-      icon: <MdQuestionAnswer size={22} />,
-    },
-    {
-      id: Math.random(),
-      link: "  نتائج الامتحانات   ",
-      path: "/admin/result",
-      icon: <MdCheckCircle size={22} />,
-    },
-    // ... (remaining links)
-  ];
-
-  useEffect(() => {
-    const initialActiveLink =
-      adminLinks.find((link) => link.path === location.pathname) ||
-      teacherLinks.find((link) => link.path === location.pathname);
-
-    if (initialActiveLink) {
-      setActiveLink(initialActiveLink.path);
-      setCurrentLink(initialActiveLink.path);
-    }
-  }, [location.pathname, adminLinks, teacherLinks, setCurrentLink]);
-
-  useEffect(() => {
-    setActiveLink(currentLink);
-    localStorage.setItem("activeLink", currentLink);
-  }, [currentLink]);
-
-  useEffect(() => {
-    const storedActiveLink = localStorage.getItem("activeLink");
-    if (storedActiveLink) {
-      setActiveLink(storedActiveLink);
-    }
-  }, []);
-
-  const handleClick = (link) => {
-    setCurrentLink(link.path);
-  };
-
-  const linksToRender = isAdmin ? adminLinks : isTeacher ? teacherLinks : [];
+function NavItem({ item, active }) {
+  const idleBg = useColorModeValue("transparent", "transparent");
+  const hoverBg = useColorModeValue("blue.50", "whiteAlpha.100");
+  const activeBg = useColorModeValue("blue.500", "blue.400");
+  const idleColor = useColorModeValue("gray.700", "gray.200");
+  const muted = useColorModeValue("gray.500", "gray.400");
+  const iconIdleBg = useColorModeValue("gray.100", "whiteAlpha.100");
 
   return (
-    <>
-      <div className="links-container m-auto">
-        {linksToRender.map((link) => (
-          <NavLink
-            key={link.id}
-            to={link.path}
-            className="grid justify-center"
-            activeClassName="active-link"
-          >
-            <div
-              onClick={() => handleClick(link)}
-              className="flex items-center m-auto"
-              style={{
-                backgroundColor: activeLink === link.path ? "#3b82f6" : "white",
-                color: activeLink === link.path ? "white" : "black",
-                width: "250px",
-              }}
+    <NavLink to={item.path} style={{ textDecoration: "none", width: "100%" }}>
+      <Flex
+        align="center"
+        gap={3}
+        px={3}
+        py={2.5}
+        borderRadius="xl"
+        bg={active ? activeBg : idleBg}
+        color={active ? "white" : idleColor}
+        fontWeight={active ? "700" : "600"}
+        transition="all 0.15s ease"
+        _hover={{
+          bg: active ? activeBg : hoverBg,
+          transform: "translateX(-2px)",
+        }}
+      >
+        <Flex
+          w="34px"
+          h="34px"
+          align="center"
+          justify="center"
+          borderRadius="lg"
+          bg={active ? "whiteAlpha.200" : iconIdleBg}
+          flexShrink={0}
+        >
+          <Icon
+            as={item.icon}
+            boxSize={4}
+            color={active ? "white" : muted}
+          />
+        </Flex>
+        <Text fontSize="sm" noOfLines={1} lineHeight="1.4">
+          {item.label}
+        </Text>
+      </Flex>
+    </NavLink>
+  );
+}
+
+/**
+ * قائمة أدمن نظيفة — مجموعات + عناصر بدون تداخل CSS القديم.
+ * props القديمة (currentLink/setCurrentLink) اختيارية للتوافق.
+ */
+const AdminLinks = () => {
+  const location = useLocation();
+  const [, isAdmin] = UserType();
+  const sectionLabel = useColorModeValue("gray.400", "gray.500");
+  const divider = useColorModeValue("blackAlpha.100", "whiteAlpha.200");
+
+  const sections = useMemo(() => (isAdmin ? ADMIN_SECTIONS : []), [isAdmin]);
+
+  if (!sections.length) return null;
+
+  return (
+    <Box
+      className="admin-nav-modern"
+      p={3}
+      maxH={{ base: "none", lg: "calc(100vh - 160px)" }}
+      overflowY="auto"
+      css={{
+        "&::-webkit-scrollbar": { width: "6px" },
+        "&::-webkit-scrollbar-thumb": {
+          background: "rgba(49,130,206,0.35)",
+          borderRadius: "999px",
+        },
+      }}
+    >
+      <VStack align="stretch" spacing={5}>
+        {sections.map((section) => (
+          <Box key={section.title}>
+            <Text
+              fontSize="11px"
+              fontWeight="800"
+              letterSpacing="0.08em"
+              color={sectionLabel}
+              mb={2}
+              px={2}
             >
-              {/* الأيقونة */}
-              <span className="mr-2 flex items-center">{link.icon}</span>
-              <h5 className="font-bold p-2">{link.link}</h5>
-            </div>
-          </NavLink>
+              {section.title}
+            </Text>
+            <VStack align="stretch" spacing={1}>
+              {section.items.map((item) => {
+                const active =
+                  location.pathname === item.path ||
+                  location.pathname.startsWith(`${item.path}/`);
+                return <NavItem key={item.path} item={item} active={active} />;
+              })}
+            </VStack>
+            <Box mt={4} borderBottomWidth="1px" borderColor={divider} />
+          </Box>
         ))}
-      </div>
-    </>
+      </VStack>
+    </Box>
   );
 };
 

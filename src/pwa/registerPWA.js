@@ -1,11 +1,10 @@
 /**
- * تسجيل Service Worker + كشف التحديثات بدون أي إعادة تحميل تلقائية.
+ * تسجيل Service Worker + كشف التحديثات وتطبيقها بصمت في البروداكشن.
  *
  * القواعد:
- * - لا skipWaiting / clientsClaim تلقائي من جهة العميل
- * - لا window.location.reload بسبب نشر جديد
  * - كشف الإصدار عبر version.json + SW waiting
- * - التطبيق فقط بعد موافقة المستخدم وعندما لا يوجد نشاط حرج
+ * - تطبيق تلقائي فور توفر تحديث عندما لا يوجد نشاط حرج (امتحان/محاضرة)
+ * - أثناء النشاط الحرج: تأجيل ثم تطبيق فور انتهائه — بدون بانر للمستخدم
  */
 
 import applicationActivityManager from "../utils/applicationActivityManager";
@@ -50,6 +49,18 @@ function isDismissedThisSession() {
   }
 }
 
+function trySilentApply(source = "auto") {
+  // التحديث الصامت للبروداكشن فقط
+  if (!import.meta.env.PROD) return;
+  if (updateInProgress || pendingUserReload) return;
+  if (applicationActivityManager.isCriticalActivityActive()) return;
+  void applyPWAUpdate().then((result) => {
+    if (result?.ok === false && result?.reason === "critical_activity") {
+      // يبقى معلّقًا حتى ينتهي النشاط الحرج
+    }
+  });
+}
+
 function notifyUpdateAvailable(detail = {}) {
   updateAvailable = true;
   try {
@@ -72,10 +83,13 @@ function notifyUpdateAvailable(detail = {}) {
           source: detail.source || "unknown",
           criticalActive: applicationActivityManager.isCriticalActivityActive(),
           dismissed: isDismissedThisSession(),
+          silent: true,
         },
       }),
     );
   }
+  // بدون واجهة — طبّق فورًا إن كان آمنًا
+  trySilentApply(detail.source || "notify");
 }
 
 function clearPendingUpdateFlag() {
@@ -218,14 +232,11 @@ export async function applyPWAUpdate() {
   }
 }
 
-/** بعد انتهاء نشاط حرج — إن وُجد تحديث معلّق أبلغ الواجهة */
+/** بعد انتهاء نشاط حرج — إن وُجد تحديث معلّق طبّقه بصمت */
 export function flushDeferredPWAUpdate() {
   if (!isUpdateAvailable()) return false;
   if (applicationActivityManager.isCriticalActivityActive()) return false;
-  notifyUpdateAvailable({
-    remoteBuildId,
-    source: "activity-ended",
-  });
+  trySilentApply("activity-ended");
   return true;
 }
 
@@ -240,12 +251,9 @@ export function dismissUpdatePrompt() {
   }
 }
 
-/** هل يمكن إظهار بانر التحديث في هذا التبويب؟ */
+/** البانر معطّل — التحديث يتم بصمت */
 export function shouldShowUpdatePrompt() {
-  if (!isUpdateAvailable()) return false;
-  if (isDismissedThisSession()) return false;
-  if (applicationActivityManager.isLocalCriticalActivityActive()) return false;
-  return true;
+  return false;
 }
 
 function onControllerChange() {
@@ -272,7 +280,7 @@ function onForceReloadStorage(event) {
 function onActivityChanged() {
   if (!isUpdateAvailable()) return;
   if (applicationActivityManager.isLocalCriticalActivityActive()) return;
-  notifyUpdateAvailable({ remoteBuildId, source: "activity-cleared" });
+  trySilentApply("activity-cleared");
 }
 
 /** يُستدعى مرة واحدة من main.jsx */
@@ -286,6 +294,7 @@ export async function initPWA() {
   // استعادة حالة تحديث معلّق من جلسة سابقة
   if (readPendingUpdate()) {
     updateAvailable = true;
+    trySilentApply("init-pending");
   }
 
   scheduleVersionChecks();

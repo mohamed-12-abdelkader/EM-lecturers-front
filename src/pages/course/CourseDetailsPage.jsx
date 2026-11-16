@@ -186,12 +186,13 @@ import {
 import CourseStreams from "../../components/stream/courseStreams";
 import StudentStreamsList from "../../components/stream/studentStreamsList";
 import eduPlatformLogo from "../../img/2 (5).png";
-import { getTenantSubdomain } from "../../utils/tenantHost";
-import { fetchTenantPublic } from "../../api/tenantPublicApi";
+import { getTenantSubdomain, resolveTenantSubdomain } from "../../utils/tenantHost";
+import { fetchTenantPublic, readCachedTenantPublic } from "../../api/tenantPublicApi";
 import {
   readCachedTenantBrandLogo,
   resolveTenantBrandLogo,
 } from "../../utils/tenantBrandLogo";
+import { resolveActivationCardTheme } from "../../utils/activationCodeCardTheme";
 
 /** يحوّل صورة (رابط خارجي) إلى Data URL حتى لا يفشل html2canvas بسبب CORS */
 async function fetchImageAsDataUrl(url) {
@@ -2934,20 +2935,31 @@ D) has made`}
         ? eduPlatformLogo
         : `${window.location.origin}${eduPlatformLogo}`;
 
-      // لوجو المدرس صاحب المنصة — لو مش متاح نرجع للوجو الافتراضي
+      // لوجو المدرس + ثيم كروت PDF حسب تصميم لاندينج المنصة (navy / ember / sky)
       let logoUrl = defaultLogoUrl;
       let usesDefaultLogo = true;
-      const tenantSubdomain = getTenantSubdomain();
+      let cardTheme = resolveActivationCardTheme("sky");
+      const tenantSubdomain =
+        resolveTenantSubdomain() ||
+        getTenantSubdomain() ||
+        user?.tenant_subdomain ||
+        user?.subdomain ||
+        null;
       if (tenantSubdomain) {
         try {
+          let publicPayload = readCachedTenantPublic(tenantSubdomain);
           let teacherLogo = readCachedTenantBrandLogo(tenantSubdomain);
-          if (!teacherLogo) {
+          if (!publicPayload || !teacherLogo) {
             const res = await fetchTenantPublic(tenantSubdomain);
-            teacherLogo = resolveTenantBrandLogo(
-              res?.data?.tenant,
-              res?.data?.teacher,
-            );
+            publicPayload = res || publicPayload;
+            if (!teacherLogo) {
+              teacherLogo = resolveTenantBrandLogo(
+                res?.data?.tenant,
+                res?.data?.teacher,
+              );
+            }
           }
+          cardTheme = resolveActivationCardTheme(publicPayload);
           if (teacherLogo) {
             logoUrl = teacherLogo.startsWith("data:")
               ? teacherLogo
@@ -2989,10 +3001,10 @@ width:100%;
 height:100%;
 border-radius:14px;
 overflow:hidden;
-background:#ffffff;
+background:${cardTheme.cardBg};
 display:flex;
 flex-direction:column;
-border:1px solid #dbeafe;
+border:1px solid ${cardTheme.border};
 box-shadow:0 4px 10px rgba(0,0,0,0.08);
 position:relative;
 direction:rtl;
@@ -3001,7 +3013,7 @@ min-height:36mm;
 
 <!-- Header -->
 <div style="
-background:linear-gradient(90deg,#1e3a8a,#3b82f6);
+background:${cardTheme.headerGradient};
 color:#fff;
 padding:8px 10px;
 display:flex;
@@ -3015,7 +3027,7 @@ font-weight:700;
 
 <span style="
 font-size:${courseNameFontSize};
-background:rgba(255,255,255,0.2);
+background:${cardTheme.chipBg};
 padding:3px 8px;
 border-radius:6px;
 ">
@@ -3030,6 +3042,9 @@ ${teacherName}
 </span>
 
 </div>
+
+<!-- Accent strip -->
+<div style="height:3.5px;width:100%;background:${cardTheme.accentBar};flex-shrink:0;"></div>
 
 <!-- Content -->
 <div style="
@@ -3055,20 +3070,20 @@ width:90px;
 height:90px;
 background:#fff;
 border-radius:10px;
-border:2px solid #2563eb;
+border:2px solid ${cardTheme.qrBorder};
 padding:3px;
 object-fit:contain;
 "/>`
     : `<div style="
 width:90px;
 height:90px;
-border:2px dashed #2563eb;
+border:2px dashed ${cardTheme.qrDashed};
 border-radius:10px;
 display:flex;
 align-items:center;
 justify-content:center;
 font-size:10px;
-color:#2563eb;
+color:${cardTheme.qrDashed};
 ">QR</div>`
 }
 </div>
@@ -3085,7 +3100,7 @@ display:inline-flex;
 align-items:center;
 justify-content:center;
 background:#fff;
-border:1px solid #dbeafe;
+border:1px solid ${cardTheme.logoBorder};
 border-radius:10px;
 padding:6px 10px;
 ">
@@ -3113,7 +3128,7 @@ margin-right:10px;
 <div style="
 font-size:${activationLabelFontSize};
 font-weight:700;
-color:#fd7305;
+color:${cardTheme.codeLabelColor};
 margin-bottom:6px;
 ">
 كود التفعيل
@@ -3124,7 +3139,7 @@ font-size:${activationCodeFontSize};
 font-weight:800;
 font-family:monospace;
 letter-spacing:2px;
-color:#fd7305;
+color:${cardTheme.codeColor};
 ">
 ${code.code}
 </div>
@@ -3135,7 +3150,7 @@ ${code.code}
 
 <!-- Footer -->
 <div style="
-background:linear-gradient(90deg,#1e3a8a,#2563eb);
+background:${cardTheme.footerGradient};
 padding:6px 8px;
 text-align:center;
 ">

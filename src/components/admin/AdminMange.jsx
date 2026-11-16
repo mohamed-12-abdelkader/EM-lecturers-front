@@ -2,9 +2,6 @@ import React, { useState, useEffect } from "react";
 import {
   Box,
   Button,
-  Card,
-  CardBody,
-  CardHeader,
   Heading,
   Text,
   Avatar,
@@ -12,7 +9,6 @@ import {
   HStack,
   VStack,
   SimpleGrid,
-  Spinner,
   useToast,
   useDisclosure,
   AlertDialog,
@@ -24,14 +20,9 @@ import {
   IconButton,
   Tooltip,
   Flex,
-  Stat,
-  StatLabel,
-  StatNumber,
-  StatHelpText,
   useColorModeValue,
   Skeleton,
   SkeletonText,
-  Divider,
   Modal,
   ModalOverlay,
   ModalContent,
@@ -53,7 +44,6 @@ import {
   FaUserTie,
   FaBook,
   FaUsers,
-  FaGraduationCap,
   FaCalendar,
   FaEnvelope,
   FaPhone,
@@ -109,10 +99,10 @@ const AdminMange = () => {
   const toast = useToast();
 
   // ألوان الثيم
-  const bgColor = useColorModeValue("gray.50", "gray.900");
   const cardBg = useColorModeValue("white", "gray.800");
   const textColor = useColorModeValue("gray.800", "gray.100");
   const borderColor = useColorModeValue("gray.200", "gray.600");
+  const metaBg = useColorModeValue("gray.50", "whiteAlpha.50");
 
   // جلب المدرسين
   const fetchTeachers = async () => {
@@ -433,127 +423,184 @@ const AdminMange = () => {
 
   // تحميل البطاقات
   const TeacherCardSkeleton = () => (
-    <Card bg={cardBg} shadow="md" borderRadius="xl">
-      <CardBody p={6}>
-        <Skeleton height="120px" mb={4} />
-        <SkeletonText mt="4" noOfLines={4} spacing="4" />
-      </CardBody>
-    </Card>
+    <Box
+      bg={cardBg}
+      borderWidth="1px"
+      borderColor={borderColor}
+      borderRadius="2xl"
+      p={5}
+    >
+      <Skeleton height="72px" borderRadius="xl" mb={4} />
+      <SkeletonText mt="2" noOfLines={4} spacing="3" />
+    </Box>
   );
 
+  const formatCount = (value) => {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "0";
+    return n.toLocaleString("en-US");
+  };
+
+  const totalCourses = teachers.reduce(
+    (sum, teacher) => sum + (Number(teacher.courses_count) || 0),
+    0,
+  );
+  const totalStudents = teachers.reduce(
+    (sum, teacher) => sum + (Number(teacher.students_count) || 0),
+    0,
+  );
+
+  const kpiItems = [
+    {
+      label: "المدرسين",
+      value: formatCount(teachers.length),
+      hint: "حساب نشط",
+      color: "blue.600",
+      bg: "blue.50",
+      icon: FaUserTie,
+    },
+    {
+      label: "الكورسات",
+      value: formatCount(totalCourses),
+      hint: "كورس منشور",
+      color: "green.600",
+      bg: "green.50",
+      icon: FaBook,
+    },
+    {
+      label: "الطلاب",
+      value: formatCount(totalStudents),
+      hint: "طالب مسجّل",
+      color: "purple.600",
+      bg: "purple.50",
+      icon: FaUsers,
+    },
+  ];
+
   return (
-    <Box p={6} bg={bgColor} minH="100vh">
-      <VStack spacing={8} align="stretch">
-        {/* العنوان */}
-        <Box textAlign="center">
-          <Heading size="lg" color={textColor} mb={2}>
-            <HStack justify="center" spacing={3}>
-              <FaUserTie color="#3182CE" />
-              <Text>إدارة المدرسين</Text>
+    <Box p={{ base: 4, md: 6 }} bg="transparent" minH="60vh">
+      <VStack spacing={6} align="stretch">
+        <Flex
+          direction={{ base: "column", md: "row" }}
+          justify="space-between"
+          align={{ base: "stretch", md: "center" }}
+          gap={3}
+        >
+          <Box>
+            <HStack spacing={2} mb={1}>
+              <Box p={2} borderRadius="lg" bg="blue.50" color="blue.600">
+                <FaUserTie />
+              </Box>
+              <Heading size="md" color={textColor}>
+                إدارة المدرسين
+              </Heading>
             </HStack>
-          </Heading>
-          <Text color="gray.500" fontSize="lg">
-            عرض وإدارة جميع المدرسين في المنصة
-          </Text>
-        </Box>
+            <Text color="gray.500" fontSize="sm">
+              عرض وتعديل حسابات المدرسين على المنصة
+            </Text>
+          </Box>
+        </Flex>
 
-        {/* إحصائيات سريعة */}
         {!loading && (
-          <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6}>
-            <Card bg={cardBg} shadow="md" borderRadius="xl">
-              <CardBody>
-                <Stat>
-                  <StatLabel color="gray.500">إجمالي المدرسين</StatLabel>
-                  <StatNumber color="blue.500" fontSize="3xl">
-                    {teachers.length}
-                  </StatNumber>
-                  <StatHelpText>مدرس نشط</StatHelpText>
-                </Stat>
-              </CardBody>
-            </Card>
-
-            <Card bg={cardBg} shadow="md" borderRadius="xl">
-              <CardBody>
-                <Stat>
-                  <StatLabel color="gray.500">إجمالي الكورسات</StatLabel>
-                  <StatNumber color="green.500" fontSize="3xl">
-                    {teachers.reduce((sum, teacher) => sum + teacher.courses_count, 0)}
-                  </StatNumber>
-                  <StatHelpText>كورس متاح</StatHelpText>
-                </Stat>
-              </CardBody>
-            </Card>
-
-            <Card bg={cardBg} shadow="md" borderRadius="xl">
-              <CardBody>
-                <Stat>
-                  <StatLabel color="gray.500">إجمالي الطلاب</StatLabel>
-                  <StatNumber color="purple.500" fontSize="3xl">
-                    {teachers.reduce((sum, teacher) => sum + teacher.students_count, 0)}
-                  </StatNumber>
-                  <StatHelpText>طالب مسجل</StatHelpText>
-                </Stat>
-              </CardBody>
-            </Card>
+          <SimpleGrid columns={{ base: 1, sm: 3 }} spacing={4}>
+            {kpiItems.map((kpi) => (
+              <Box
+                key={kpi.label}
+                bg={cardBg}
+                borderWidth="1px"
+                borderColor={borderColor}
+                borderRadius="2xl"
+                p={4}
+              >
+                <HStack justify="space-between" mb={3}>
+                  <Text fontSize="sm" fontWeight="600" color="gray.500">
+                    {kpi.label}
+                  </Text>
+                  <Flex
+                    w="36px"
+                    h="36px"
+                    align="center"
+                    justify="center"
+                    borderRadius="xl"
+                    bg={kpi.bg}
+                    color={kpi.color}
+                  >
+                    <kpi.icon size={16} />
+                  </Flex>
+                </HStack>
+                <Text fontSize="2xl" fontWeight="800" color={kpi.color} letterSpacing="-0.03em">
+                  {kpi.value}
+                </Text>
+                <Text fontSize="xs" color="gray.400" mt={1}>
+                  {kpi.hint}
+                </Text>
+              </Box>
+            ))}
           </SimpleGrid>
         )}
 
-        {/* قائمة المدرسين */}
         {loading ? (
-          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
+          <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} spacing={4}>
             {[...Array(6)].map((_, index) => (
               <TeacherCardSkeleton key={index} />
             ))}
           </SimpleGrid>
         ) : teachers.length === 0 ? (
-          <Card bg={cardBg} shadow="md" borderRadius="xl">
-            <CardBody textAlign="center" py={12}>
-              <FaUserTie size={64} color="#CBD5E0" />
-              <Text fontSize="lg" color="gray.500" mt={4}>
-                لا يوجد مدرسين حالياً
-              </Text>
-            </CardBody>
-          </Card>
+          <Box
+            bg={cardBg}
+            borderWidth="1px"
+            borderColor={borderColor}
+            borderRadius="2xl"
+            textAlign="center"
+            py={14}
+          >
+            <FaUserTie size={48} color="#CBD5E0" />
+            <Text fontSize="md" color="gray.500" mt={4}>
+              لا يوجد مدرسين حالياً
+            </Text>
+          </Box>
         ) : (
-          <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
+          <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} spacing={4}>
             {teachers.map((teacher) => (
-              <Card
+              <Box
                 key={teacher.id}
                 bg={cardBg}
-                shadow="md"
-                borderRadius="xl"
-                _hover={{ shadow: "xl", transform: "translateY(-2px)" }}
-                transition="all 0.3s"
+                borderWidth="1px"
+                borderColor={borderColor}
+                borderRadius="2xl"
+                overflow="hidden"
+                transition="all 0.2s"
+                _hover={{ borderColor: "blue.200", shadow: "md", transform: "translateY(-2px)" }}
               >
-                <CardBody p={6}>
-                  {/* صورة المدرس */}
-                  <Box textAlign="center" mb={4}>
+                <Box
+                  h="72px"
+                  bgGradient="linear(135deg, blue.600, blue.400)"
+                  position="relative"
+                />
+                <Box px={5} pb={5} mt="-36px">
+                  <Flex justify="center" mb={3}>
                     <Avatar
-                      size="2xl"
+                      size="xl"
                       src={toAbsoluteAvatarUrl(teacher.avatar)}
                       name={teacher.name}
                       bg="blue.500"
                       border="4px solid"
-                      borderColor="blue.200"
-                      shadow="xl"
-                      mb={3}
-                      onError={(e) => {
-                        console.log("Avatar error for teacher:", teacher.name, "avatar:", teacher.avatar);
-                        e.target.style.display = 'none';
-                      }}
+                      borderColor={cardBg}
+                      shadow="md"
                     />
-                  </Box>
+                  </Flex>
 
-                  {/* معلومات المدرس */}
                   <VStack align="stretch" spacing={3}>
                     <Box textAlign="center">
-                      <Heading size="md" color={textColor} mb={1}>
+                      <Heading size="sm" color={textColor} mb={2}>
                         {teacher.name}
                       </Heading>
-                      <HStack justify="center" spacing={2}>
-                        <Badge colorScheme="blue" variant="subtle" fontSize="sm">
-                          {teacher.subject}
-                        </Badge>
+                      <HStack justify="center" spacing={2} flexWrap="wrap">
+                        {teacher.subject ? (
+                          <Badge colorScheme="blue" variant="subtle" borderRadius="full" px={2}>
+                            {teacher.subject}
+                          </Badge>
+                        ) : null}
                         <Badge
                           colorScheme={
                             packageColorSchemeMap[
@@ -561,9 +608,10 @@ const AdminMange = () => {
                             ] || "orange"
                           }
                           variant="subtle"
-                          fontSize="sm"
+                          borderRadius="full"
+                          px={2}
                         >
-                          باقة {(teacher.subscription_package || "bronze").toUpperCase()}
+                          {(teacher.subscription_package || "bronze").toUpperCase()}
                         </Badge>
                         <Badge
                           colorScheme={
@@ -574,7 +622,8 @@ const AdminMange = () => {
                                 : "orange"
                           }
                           variant="subtle"
-                          fontSize="sm"
+                          borderRadius="full"
+                          px={2}
                         >
                           {teacher.account_status === "active"
                             ? "نشط"
@@ -585,142 +634,70 @@ const AdminMange = () => {
                       </HStack>
                     </Box>
 
-                    <Divider />
-
-                    {/* معلومات الاتصال */}
-                    <VStack align="stretch" spacing={2}>
+                    <VStack align="stretch" spacing={1.5} fontSize="sm" color="gray.600">
                       <HStack spacing={2}>
-                        <FaEnvelope color="#3182CE" size={14} />
-                        <Text fontSize="sm" color="gray.600">
-                          {teacher.email}
-                        </Text>
+                        <FaEnvelope color="#3182CE" size={12} />
+                        <Text noOfLines={1}>{teacher.email}</Text>
                       </HStack>
-                      {teacher.phone && (
+                      {teacher.phone ? (
                         <HStack spacing={2}>
-                          <FaPhone color="#38A169" size={14} />
-                          <Text fontSize="sm" color="gray.600">
-                            {teacher.phone}
-                          </Text>
+                          <FaPhone color="#38A169" size={12} />
+                          <Text>{teacher.phone}</Text>
                         </HStack>
-                      )}
-                      {teacher.whatsapp_number && (
+                      ) : null}
+                      {teacher.whatsapp_number ? (
                         <HStack spacing={2}>
-                          <FaPhone color="#25D366" size={14} />
-                          <Text fontSize="sm" color="gray.600">
-                            واتساب: {teacher.whatsapp_number}
-                          </Text>
+                          <FaPhone color="#25D366" size={12} />
+                          <Text>واتساب: {teacher.whatsapp_number}</Text>
                         </HStack>
-                      )}
+                      ) : null}
                     </VStack>
 
-                    {/* الروابط الاجتماعية */}
-                    {(teacher.facebook_url || teacher.youtube_url || teacher.tiktok_url) && (
-                      <VStack align="stretch" spacing={2}>
-                        <Text fontSize="xs" color="gray.500" fontWeight="bold">
-                          الروابط الاجتماعية:
-                        </Text>
-                        <HStack spacing={3} justify="center" flexWrap="wrap">
-                          {teacher.facebook_url && (
-                            <Tooltip label="فيسبوك" hasArrow>
-                              <IconButton
-                                as="a"
-                                href={teacher.facebook_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                icon={<Text fontSize="xs">📘</Text>}
-                                size="xs"
-                                colorScheme="blue"
-                                variant="outline"
-                                aria-label="فيسبوك"
-                              />
-                            </Tooltip>
-                          )}
-                          {teacher.youtube_url && (
-                            <Tooltip label="يوتيوب" hasArrow>
-                              <IconButton
-                                as="a"
-                                href={teacher.youtube_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                icon={<Text fontSize="xs">📺</Text>}
-                                size="xs"
-                                colorScheme="red"
-                                variant="outline"
-                                aria-label="يوتيوب"
-                              />
-                            </Tooltip>
-                          )}
-                          {teacher.tiktok_url && (
-                            <Tooltip label="تيك توك" hasArrow>
-                              <IconButton
-                                as="a"
-                                href={teacher.tiktok_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                icon={<Text fontSize="xs">🎵</Text>}
-                                size="xs"
-                                colorScheme="purple"
-                                variant="outline"
-                                aria-label="تيك توك"
-                              />
-                            </Tooltip>
-                          )}
-                        </HStack>
-                      </VStack>
-                    )}
-
-                    {/* الوصف */}
-                    {teacher.description && (
-                      <Text fontSize="sm" color="gray.600" noOfLines={2}>
+                    {teacher.description ? (
+                      <Text fontSize="sm" color="gray.500" noOfLines={2}>
                         {teacher.description}
                       </Text>
-                    )}
+                    ) : null}
 
-                    <Divider />
-
-                    {/* الإحصائيات */}
-                    <SimpleGrid columns={2} spacing={4}>
-                      <VStack spacing={1}>
-                        <HStack spacing={1}>
-                          <FaBook color="#38A169" size={12} />
-                          <Text fontSize="xs" color="gray.500">
-                            الكورسات
-                          </Text>
-                        </HStack>
-                        <Text fontSize="lg" fontWeight="bold" color="green.500">
-                          {teacher.courses_count}
+                    <SimpleGrid
+                      columns={2}
+                      spacing={3}
+                      py={3}
+                      px={3}
+                      bg={metaBg}
+                      borderRadius="xl"
+                    >
+                      <VStack spacing={0}>
+                        <Text fontSize="xs" color="gray.500">
+                          الكورسات
+                        </Text>
+                        <Text fontWeight="800" color="green.600">
+                          {formatCount(teacher.courses_count)}
                         </Text>
                       </VStack>
-
-                      <VStack spacing={1}>
-                        <HStack spacing={1}>
-                          <FaUsers color="#805AD5" size={12} />
-                          <Text fontSize="xs" color="gray.500">
-                            الطلاب
-                          </Text>
-                        </HStack>
-                        <Text fontSize="lg" fontWeight="bold" color="purple.500">
-                          {teacher.students_count}
+                      <VStack spacing={0}>
+                        <Text fontSize="xs" color="gray.500">
+                          الطلاب
+                        </Text>
+                        <Text fontWeight="800" color="purple.600">
+                          {formatCount(teacher.students_count)}
                         </Text>
                       </VStack>
                     </SimpleGrid>
 
-                    {/* تاريخ الإنشاء */}
-                    <HStack spacing={2} pt={2} justify="center">
-                      <FaCalendar color="#E53E3E" size={12} />
-                      <Text fontSize="xs" color="gray.500">
-                        انضم في {formatDate(teacher.created_at)}
-                      </Text>
+                    <HStack spacing={2} justify="center" color="gray.400" fontSize="xs">
+                      <FaCalendar size={11} />
+                      <Text>انضم في {formatDate(teacher.created_at)}</Text>
                     </HStack>
 
-                    {/* أزرار الإجراءات */}
-                    <HStack spacing={2} justify="center" pt={2}>
+                    <HStack spacing={2} justify="center" pt={1}>
                       <Tooltip label="تعديل المدرس" hasArrow>
                         <IconButton
                           icon={<FaEdit />}
                           colorScheme="blue"
-                          variant="outline"
+                          variant="solid"
                           size="sm"
+                          borderRadius="lg"
                           aria-label="تعديل"
                           onClick={() => openEditModal(teacher)}
                         />
@@ -731,14 +708,15 @@ const AdminMange = () => {
                           colorScheme="red"
                           variant="outline"
                           size="sm"
+                          borderRadius="lg"
                           aria-label="حذف"
                           onClick={() => openDeleteDialog(teacher)}
                         />
                       </Tooltip>
                     </HStack>
                   </VStack>
-                </CardBody>
-              </Card>
+                </Box>
+              </Box>
             ))}
           </SimpleGrid>
         )}

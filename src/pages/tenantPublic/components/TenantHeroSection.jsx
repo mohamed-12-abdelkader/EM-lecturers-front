@@ -228,7 +228,7 @@ export default function TenantHeroSection({
               </HeroStaggerItem>
 
               <HeroStaggerItem as="h1">
-                <h1 className="font-heading text-[1.75rem] font-bold leading-snug text-slate-900 dark:text-white sm:text-3xl lg:text-[2.35rem] lg:leading-tight">
+                <h1 className="font-heading text-[1.75rem] font-bold leading-[1.5] text-slate-900 dark:text-white sm:text-3xl sm:leading-[1.45] lg:text-[2.35rem] lg:leading-[1.4]">
                   {highlightTeacherName(heroTitle, teacherName)}
                 </h1>
               </HeroStaggerItem>

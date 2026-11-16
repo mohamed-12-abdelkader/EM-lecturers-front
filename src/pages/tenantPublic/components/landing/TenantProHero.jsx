@@ -800,8 +800,8 @@ function HeroCopy({
         <h1
           className={`font-heading font-bold tracking-tight text-[var(--tl-hero-fg)] ${
             compact
-              ? "text-[2.05rem] leading-[1.22] sm:text-[2.45rem]"
-              : "text-[2.35rem] leading-[1.15] sm:text-[3rem] lg:text-[3.55rem] lg:leading-[1.1]"
+              ? "text-[2.05rem] leading-[1.45] sm:text-[2.45rem] sm:leading-[1.4]"
+              : "text-[2.35rem] leading-[1.45] sm:text-[3rem] sm:leading-[1.4] lg:text-[3.55rem] lg:leading-[1.35]"
           }`}
         >
           {brand}
