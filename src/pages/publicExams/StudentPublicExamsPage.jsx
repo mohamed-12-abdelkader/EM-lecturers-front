@@ -20,8 +20,14 @@ import {
   publicExamsApiError,
   startPublicExamAttempt,
 } from "../../api/publicExamsApi";
-import { translateCourseExamStudentError } from "../../api/courseExamsApi";
-import { persistAttemptId } from "../../utils/examAttemptProgress";
+import {
+  startUnansweredCompletion,
+  translateCourseExamStudentError,
+} from "../../api/courseExamsApi";
+import {
+  persistAttemptId,
+  persistUnansweredCompletionFlag,
+} from "../../utils/examAttemptProgress";
 import {
   formatAttemptLimitLabel,
   formatCourseExamDurationLabel,
@@ -75,17 +81,27 @@ export default function StudentPublicExamsPage() {
       });
       return;
     }
-    if (cta.disabled || cta.kind !== "start") return;
+    if (
+      cta.disabled ||
+      (cta.kind !== "start" && cta.kind !== "complete_unanswered")
+    ) {
+      return;
+    }
 
+    const completionMode = cta.kind === "complete_unanswered";
     setStartingId(exam.id);
     try {
-      const session = await startPublicExamAttempt(exam.id, token);
+      const session = completionMode
+        ? await startUnansweredCompletion(exam.id, token)
+        : await startPublicExamAttempt(exam.id, token);
       const attemptId = session?.attemptId ?? session?.attempt_id ?? session?.id;
       if (attemptId) persistAttemptId(exam.id, attemptId);
+      if (completionMode) persistUnansweredCompletionFlag(exam.id);
       navigate(`/exam/${exam.id}/take`, {
         state: {
           session,
           fromPublic: true,
+          completionMode,
         },
       });
     } catch (err) {
@@ -97,7 +113,14 @@ export default function StudentPublicExamsPage() {
         return;
       }
       toast({
-        title: translateCourseExamStudentError(err) || publicExamsApiError(err, "تعذر بدء الامتحان"),
+        title:
+          translateCourseExamStudentError(err) ||
+          publicExamsApiError(
+            err,
+            completionMode
+              ? "تعذر استكمال الأسئلة المتروكة"
+              : "تعذر بدء الامتحان",
+          ),
         status: "error",
         isClosable: true,
       });
@@ -172,7 +195,8 @@ export default function StudentPublicExamsPage() {
           {exams.map((exam) => {
             const availability = getCourseExamAvailabilityStatus(exam);
             const cta = getStudentExamCta(exam);
-            const isResume = cta.label?.includes("استكمل");
+            const isResume =
+              cta.label?.includes("استكمل") || cta.kind === "complete_unanswered";
             const canAct = !cta.disabled;
             return (
               <Box
@@ -191,9 +215,11 @@ export default function StudentPublicExamsPage() {
                   bg={
                     cta.kind === "report"
                       ? "blue.400"
-                      : canAct
-                        ? "orange.400"
-                        : "gray.300"
+                      : cta.kind === "complete_unanswered"
+                        ? "orange.500"
+                        : canAct
+                          ? "orange.400"
+                          : "gray.300"
                   }
                 />
                 <Box p={{ base: 4, md: 5 }}>
@@ -260,7 +286,13 @@ export default function StudentPublicExamsPage() {
                       </SimpleGrid>
                     </Box>
                     <Button
-                      colorScheme={cta.kind === "report" ? "blue" : "orange"}
+                      colorScheme={
+                        cta.kind === "report"
+                          ? "blue"
+                          : cta.kind === "complete_unanswered"
+                            ? "orange"
+                            : "orange"
+                      }
                       borderRadius="xl"
                       leftIcon={isResume ? <FaRedo /> : <FaPlay />}
                       isDisabled={cta.disabled}

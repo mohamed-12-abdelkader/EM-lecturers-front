@@ -13,6 +13,52 @@ export function examAttemptStorageKey(examId) {
   return `em-lecture-exam-attempt:${currentUserStorageId()}:${examId}`;
 }
 
+export function examUnansweredCompletionStorageKey(examId) {
+  return `em-lecture-exam-unanswered-completion:${currentUserStorageId()}:${examId}`;
+}
+
+export function readUnansweredCompletionFlag(examId) {
+  if (!examId || typeof window === "undefined") return false;
+  const key = examUnansweredCompletionStorageKey(examId);
+  try {
+    return (
+      sessionStorage.getItem(key) === "1" || localStorage.getItem(key) === "1"
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function persistUnansweredCompletionFlag(examId) {
+  if (!examId || typeof window === "undefined") return;
+  const key = examUnansweredCompletionStorageKey(examId);
+  try {
+    sessionStorage.setItem(key, "1");
+  } catch {
+    // ignore
+  }
+  try {
+    localStorage.setItem(key, "1");
+  } catch {
+    // ignore
+  }
+}
+
+export function clearUnansweredCompletionFlag(examId) {
+  if (!examId || typeof window === "undefined") return;
+  const key = examUnansweredCompletionStorageKey(examId);
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
 export function examProgressStorageKey(examId, attemptId) {
   return `em-lecture-exam-progress:${currentUserStorageId()}:${examId}:${attemptId}`;
 }
@@ -120,6 +166,7 @@ export function clearPersistedAttemptId(examId) {
 }
 
 export function hasInProgressExamAttempt(examId) {
+  if (readUnansweredCompletionFlag(examId)) return false;
   return Boolean(readPersistedAttemptId(examId));
 }
 

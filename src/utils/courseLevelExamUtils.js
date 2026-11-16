@@ -67,6 +67,25 @@ export function normalizeCourseLevelExam(raw = {}) {
     answers_visible_at: raw.answers_visible_at ?? raw.answersVisibleAt ?? null,
     is_active: raw.is_active ?? raw.isActive ?? true,
     attempt_limit: raw.attempt_limit ?? raw.attemptLimit ?? null,
+    points_enabled: raw.points_enabled !== false && raw.pointsEnabled !== false,
+    points_attempt_mode: raw.points_attempt_mode || raw.pointsAttemptMode || "first",
+    allow_unanswered_completion: Boolean(
+      raw.allow_unanswered_completion ?? raw.allowUnansweredCompletion,
+    ),
+    can_complete_unanswered: Boolean(
+      raw.can_complete_unanswered ?? raw.canCompleteUnanswered,
+    ),
+    unanswered_count: Math.max(
+      0,
+      Number(raw.unanswered_count ?? raw.unansweredCount ?? 0) || 0,
+    ),
+    unanswered_completion_open: Boolean(
+      raw.unanswered_completion_open ?? raw.unansweredCompletionOpen,
+    ),
+    unanswered_completion_attempt_id:
+      raw.unanswered_completion_attempt_id ??
+      raw.unansweredCompletionAttemptId ??
+      null,
     created_at: raw.created_at ?? raw.createdAt ?? null,
     updated_at: raw.updated_at ?? raw.updatedAt ?? null,
     attempts_count: raw.attempts_count ?? raw.attemptsCount ?? 0,
@@ -331,9 +350,23 @@ export function getStudentExamCta(exam) {
   const canStartNew = remaining === Infinity || remaining > 0;
   const examOpen = Boolean(data.is_active) && !ended && data.availability_status !== "expired";
   const lateRemaining = Number(data.late_access_remaining) || 0;
+  const canCompleteUnanswered =
+    Boolean(data.can_complete_unanswered) || Boolean(data.unanswered_completion_open);
 
   if (inProgress) {
     return { label: "استكمل المحاولة", disabled: false, kind: "start" };
+  }
+
+  if (canCompleteUnanswered) {
+    const count = Number(data.unanswered_count) || 0;
+    return {
+      label:
+        count > 0
+          ? `استكمال الأسئلة المتروكة (${count})`
+          : "استكمال الأسئلة المتروكة",
+      disabled: false,
+      kind: "complete_unanswered",
+    };
   }
 
   // سماح المدرس بمحاولة إضافية بعد انتهاء الوقت أو استنفاد المحاولات

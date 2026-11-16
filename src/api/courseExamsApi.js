@@ -136,6 +136,48 @@ export async function submitCourseExamAttempt(examId, token, { attemptId, answer
   return data;
 }
 
+/** POST /api/exams/:examId/unanswered-completion/start */
+export async function startUnansweredCompletion(examId, token) {
+  const { data } = await baseUrl.post(
+    `/api/exams/${examId}/unanswered-completion/start`,
+    {},
+    { headers: authHeaders(token) },
+  );
+  return data;
+}
+
+/** POST /api/exams/:examId/unanswered-completion/autosave */
+export async function autosaveUnansweredCompletion(examId, token, { attemptId, answers }) {
+  const { data } = await baseUrl.post(
+    `/api/exams/${examId}/unanswered-completion/autosave`,
+    { attemptId, attempt_id: attemptId, answers },
+    {
+      headers: {
+        ...authHeaders(token),
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+    },
+  );
+  return data;
+}
+
+/** POST /api/exams/:examId/unanswered-completion/submit */
+export async function submitUnansweredCompletion(examId, token, { attemptId, answers }) {
+  const { data } = await baseUrl.post(
+    `/api/exams/${examId}/unanswered-completion/submit`,
+    { attemptId, attempt_id: attemptId, answers },
+    {
+      headers: {
+        ...authHeaders(token),
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+    },
+  );
+  return data;
+}
+
 export function translateCourseExamStudentError(err, fallback = "حدث خطأ أثناء بدء الامتحان") {
   if (isNetworkError(err)) {
     return "تعذر الاتصال بالخادم. تحقق من الإنترنت ثم حاول مرة أخرى.";

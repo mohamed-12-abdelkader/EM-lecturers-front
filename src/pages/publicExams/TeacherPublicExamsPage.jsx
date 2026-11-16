@@ -24,6 +24,8 @@ import {
   ModalHeader,
   ModalOverlay,
   Progress,
+  Radio,
+  RadioGroup,
   Select,
   SimpleGrid,
   Skeleton,
@@ -95,7 +97,33 @@ const emptyForm = () => ({
   answers_visible_at: "",
   is_active: true,
   attempt_limit: "1",
+  points_enabled: true,
+  points_attempt_mode: "first",
+  allow_unanswered_completion: false,
 });
+
+const POINTS_ATTEMPT_MODE_OPTIONS = [
+  {
+    value: "first",
+    label: "المحاولة الأولى",
+    hint: "تُحسب النقاط من أول محاولة مُسلَّمة فقط.",
+  },
+  {
+    value: "last",
+    label: "المحاولة الأخيرة",
+    hint: "تُحسب النقاط من آخر محاولة قام بها الطالب.",
+  },
+  {
+    value: "highest",
+    label: "أعلى محاولة",
+    hint: "تُحسب النقاط من أفضل درجة بين كل المحاولات.",
+  },
+  {
+    value: "second",
+    label: "المحاولة الثانية",
+    hint: "تُحسب من المحاولة الثانية؛ إن لم توجد تُستخدم آخر محاولة متاحة.",
+  },
+];
 
 function examToForm(exam) {
   if (!exam) return emptyForm();
@@ -121,6 +149,12 @@ function examToForm(exam) {
     answers_visible_at: toDateTimeLocalValue(exam.answers_visible_at),
     is_active: exam.is_active ?? true,
     attempt_limit: exam.attempt_limit != null ? String(exam.attempt_limit) : "",
+    points_enabled: exam.points_enabled !== false && exam.pointsEnabled !== false,
+    points_attempt_mode:
+      exam.points_attempt_mode || exam.pointsAttemptMode || "first",
+    allow_unanswered_completion: Boolean(
+      exam.allow_unanswered_completion ?? exam.allowUnansweredCompletion,
+    ),
   };
 }
 
@@ -650,6 +684,69 @@ export default function TeacherPublicExamsPage() {
                   onChange={(e) => setForm((f) => ({ ...f, attempt_limit: e.target.value }))}
                   borderRadius="xl"
                 />
+              </FormControl>
+              <FormControl>
+                <HStack>
+                  <Switch
+                    colorScheme="purple"
+                    isChecked={form.points_enabled !== false}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, points_enabled: e.target.checked }))
+                    }
+                  />
+                  <Text fontSize="sm" fontWeight="600">
+                    احتساب نقاط لهذا الامتحان
+                  </Text>
+                </HStack>
+                <Text fontSize="xs" color={theme.muted} mt={1}>
+                  عند الإغلاق لن يحصل الطلاب على نقاط من هذا الامتحان
+                </Text>
+              </FormControl>
+              {form.points_enabled !== false ? (
+                <FormControl>
+                  <FormLabel>المحاولة المعتمدة للنقاط</FormLabel>
+                  <RadioGroup
+                    value={form.points_attempt_mode || "first"}
+                    onChange={(value) =>
+                      setForm((f) => ({ ...f, points_attempt_mode: value }))
+                    }
+                  >
+                    <VStack align="stretch" spacing={2}>
+                      {POINTS_ATTEMPT_MODE_OPTIONS.map((opt) => (
+                        <Box key={opt.value} borderWidth="1px" borderRadius="lg" px={3} py={2}>
+                          <Radio value={opt.value} colorScheme="purple">
+                            <Text fontWeight="600" fontSize="sm">
+                              {opt.label}
+                            </Text>
+                          </Radio>
+                          <Text fontSize="xs" color={theme.muted} mt={1} ms={6}>
+                            {opt.hint}
+                          </Text>
+                        </Box>
+                      ))}
+                    </VStack>
+                  </RadioGroup>
+                </FormControl>
+              ) : null}
+              <FormControl>
+                <HStack>
+                  <Switch
+                    colorScheme="orange"
+                    isChecked={Boolean(form.allow_unanswered_completion)}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        allow_unanswered_completion: e.target.checked,
+                      }))
+                    }
+                  />
+                  <Text fontSize="sm" fontWeight="600">
+                    السماح باستكمال الأسئلة المتروكة
+                  </Text>
+                </HStack>
+                <Text fontSize="xs" color={theme.muted} mt={1}>
+                  بعد انتهاء الامتحان يمكن للطالب حل الأسئلة المتروكة فقط وتُضاف درجتها على درجته السابقة
+                </Text>
               </FormControl>
               <ExamStudentSettingsFields
                 formData={form}

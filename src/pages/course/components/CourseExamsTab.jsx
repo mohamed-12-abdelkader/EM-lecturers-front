@@ -35,13 +35,20 @@ import ExamStudentSettingsFields, {
 import ExamTimingAndAudienceFields, {
   validateExamTimingAndAudience,
 } from "../../../components/exam/ExamTimingAndAudienceFields";
-import { startCourseExamAttempt, translateCourseExamStudentError } from "../../../api/courseExamsApi";
+import {
+  startCourseExamAttempt,
+  startUnansweredCompletion,
+  translateCourseExamStudentError,
+} from "../../../api/courseExamsApi";
 import {
   fetchTeacherParentExams,
   sendMissingTeacherParentExam,
   setTeacherParentExamEnabled,
 } from "../../../api/whatsappTeacherApi";
-import { persistAttemptId } from "../../../utils/examAttemptProgress";
+import {
+  persistAttemptId,
+  persistUnansweredCompletionFlag,
+} from "../../../utils/examAttemptProgress";
 import LateAccessGrantModal from "../../exam/components/LateAccessGrantModal";
 
 const initialExamFormState = {
@@ -62,8 +69,107 @@ const initialExamFormState = {
   answers_visible_at: "",
   is_active: true,
   attempt_limit: "",
+  points_enabled: true,
+  points_attempt_mode: "first",
+  allow_unanswered_completion: false,
   notify_parents: true,
 };
+
+const POINTS_ATTEMPT_MODE_OPTIONS = [
+  {
+    value: "first",
+    label: "المحاولة الأولى",
+    hint: "تُحسب النقاط من أول محاولة مُسلَّمة فقط.",
+  },
+  {
+    value: "last",
+    label: "المحاولة الأخيرة",
+    hint: "تُحسب النقاط من آخر محاولة قام بها الطالب.",
+  },
+  {
+    value: "highest",
+    label: "أعلى محاولة",
+    hint: "تُحسب النقاط من أفضل درجة بين كل المحاولات.",
+  },
+  {
+    value: "second",
+    label: "المحاولة الثانية",
+    hint: "تُحسب من المحاولة الثانية؛ إن لم توجد تُستخدم آخر محاولة متاحة.",
+  },
+];
+
+function ExamPointsSettingsFields({ formData, onPatch, isDisabled = false }) {
+  const enabled = formData.points_enabled !== false;
+  return (
+    <VStack spacing={3} align="stretch">
+      <ExamSwitchRow
+        label="احتساب نقاط لهذا الامتحان"
+        hint="عند الإغلاق لن يحصل الطلاب على نقاط من هذا الامتحان الشامل"
+        colorScheme="purple"
+        isChecked={enabled}
+        isDisabled={isDisabled}
+        onChange={(e) =>
+          onPatch({
+            points_enabled: e.target.checked,
+            points_attempt_mode: formData.points_attempt_mode || "first",
+          })
+        }
+      />
+      {enabled ? (
+        <FormControl isDisabled={isDisabled}>
+          <FormLabel fontSize="sm" fontWeight="600">
+            المحاولة المعتمدة للنقاط
+          </FormLabel>
+          <RadioGroup
+            value={formData.points_attempt_mode || "first"}
+            onChange={(value) => onPatch({ points_attempt_mode: value })}
+          >
+            <VStack align="stretch" spacing={2}>
+              {POINTS_ATTEMPT_MODE_OPTIONS.map((opt) => (
+                <Box
+                  key={opt.value}
+                  borderWidth="1px"
+                  borderRadius="lg"
+                  px={3}
+                  py={2}
+                  borderColor={
+                    (formData.points_attempt_mode || "first") === opt.value
+                      ? "purple.300"
+                      : "gray.200"
+                  }
+                  bg={
+                    (formData.points_attempt_mode || "first") === opt.value
+                      ? "purple.50"
+                      : "transparent"
+                  }
+                >
+                  <Radio value={opt.value} colorScheme="purple">
+                    <Text fontWeight="600" fontSize="sm">
+                      {opt.label}
+                    </Text>
+                  </Radio>
+                  <Text fontSize="xs" color="gray.500" mt={1} ms={6}>
+                    {opt.hint}
+                  </Text>
+                </Box>
+              ))}
+            </VStack>
+          </RadioGroup>
+        </FormControl>
+      ) : null}
+      <ExamSwitchRow
+        label="السماح باستكمال الأسئلة المتروكة"
+        hint="بعد انتهاء الامتحان، يمكن للطالب الذي سلّم مع أسئلة متروكة الدخول لحلها فقط وتُضاف درجتها على درجته السابقة"
+        colorScheme="orange"
+        isChecked={Boolean(formData.allow_unanswered_completion)}
+        isDisabled={isDisabled}
+        onChange={(e) =>
+          onPatch({ allow_unanswered_completion: e.target.checked })
+        }
+      />
+    </VStack>
+  );
+}
 
 const validateExamFlowSettings = (payload) => {
   if (payload.answers_release_mode === "scheduled" && !payload.answers_visible_at) {
@@ -96,6 +202,13 @@ const normalizeExamPayload = (payload) => {
     if (key === "duration_minutes" && normalized[key] === null) return;
     if (key === "group_ids") return;
     if (key === "timing_mode" || key === "audience_type") return;
+    if (
+      key === "points_enabled" ||
+      key === "points_attempt_mode" ||
+      key === "allow_unanswered_completion"
+    ) {
+      return;
+    }
     if (key === "duration_unlimited") {
       delete normalized[key];
       return;
@@ -143,6 +256,13 @@ const buildExamPayload = (payload) => {
   }
   if (payload.is_active !== undefined) jsonPayload.isActive = payload.is_active;
   if (payload.attempt_limit !== undefined) jsonPayload.attemptLimit = payload.attempt_limit;
+  if (payload.points_enabled !== undefined) jsonPayload.pointsEnabled = payload.points_enabled;
+  if (payload.points_attempt_mode !== undefined) {
+    jsonPayload.pointsAttemptMode = payload.points_attempt_mode;
+  }
+  if (payload.allow_unanswered_completion !== undefined) {
+    jsonPayload.allowUnansweredCompletion = Boolean(payload.allow_unanswered_completion);
+  }
 
   return jsonPayload;
 };
@@ -216,7 +336,14 @@ const ExamModalSection = ({ icon, title, accent = "blue", children }) => {
 };
 
 /** صف Switch بعنوان ووصف — أوضح من FormControl الأفقي */
-const ExamSwitchRow = ({ label, hint, isChecked, onChange, colorScheme = "blue" }) => {
+const ExamSwitchRow = ({
+  label,
+  hint,
+  isChecked,
+  onChange,
+  colorScheme = "blue",
+  isDisabled = false,
+}) => {
   const border = useColorModeValue("gray.200", "gray.600");
   const titleColor = useColorModeValue("gray.800", "white");
   const hintColor = useColorModeValue("gray.500", "gray.400");
@@ -231,6 +358,7 @@ const ExamSwitchRow = ({ label, hint, isChecked, onChange, colorScheme = "blue" 
       borderRadius="lg"
       px={3.5}
       py={3}
+      opacity={isDisabled ? 0.6 : 1}
     >
       <Box minW={0}>
         <Text fontWeight="600" fontSize="sm" color={titleColor}>
@@ -242,7 +370,12 @@ const ExamSwitchRow = ({ label, hint, isChecked, onChange, colorScheme = "blue" 
           </Text>
         ) : null}
       </Box>
-      <Switch colorScheme={colorScheme} isChecked={isChecked} onChange={onChange} />
+      <Switch
+        colorScheme={colorScheme}
+        isChecked={isChecked}
+        isDisabled={isDisabled}
+        onChange={onChange}
+      />
     </Flex>
   );
 };
@@ -319,10 +452,14 @@ const ExamCard = ({
       return;
     }
 
+    const completionMode = studentCta.kind === "complete_unanswered";
     setStartingExam(true);
     try {
-      const session = await startCourseExamAttempt(exam.id, token);
+      const session = completionMode
+        ? await startUnansweredCompletion(exam.id, token)
+        : await startCourseExamAttempt(exam.id, token);
       if (session?.attemptId) persistAttemptId(exam.id, session.attemptId);
+      if (completionMode) persistUnansweredCompletionFlag(exam.id);
       if (
         !isCourseExamTakingSession(session) &&
         !isCourseExamFinishedPayload(session)
@@ -330,11 +467,17 @@ const ExamCard = ({
         throw new Error("لم يتم تحميل أسئلة الامتحان");
       }
       navigate(`/exam/${exam.id}/take`, {
-        state: { session, courseId: courseId || exam.course_id || exam.courseId || null },
+        state: {
+          session,
+          courseId: courseId || exam.course_id || exam.courseId || null,
+          completionMode,
+        },
       });
     } catch (err) {
       toast({
-        title: "تعذر بدء الامتحان",
+        title: completionMode
+          ? "تعذر استكمال الأسئلة المتروكة"
+          : "تعذر بدء الامتحان",
         description: translateCourseExamStudentError(err),
         status: "error",
         duration: 6000,
@@ -365,12 +508,12 @@ const ExamCard = ({
         </Link>
       );
     }
-    if (studentCta.kind === "start") {
+    if (studentCta.kind === "start" || studentCta.kind === "complete_unanswered") {
       return (
         <>
           <Button
             w="full"
-            bg="#3182CE"
+            bg={studentCta.kind === "complete_unanswered" ? "orange.500" : "#3182CE"}
             color="white"
             borderRadius="xl"
             fontWeight="700"
@@ -379,8 +522,14 @@ const ExamCard = ({
             leftIcon={<Icon as={FaGraduationCap} />}
             onClick={handleStudentStart}
             isLoading={startingExam}
-            loadingText="جاري بدء الامتحان..."
-            _hover={{ bg: "blue.600" }}
+            loadingText={
+              studentCta.kind === "complete_unanswered"
+                ? "جاري التحميل..."
+                : "جاري بدء الامتحان..."
+            }
+            _hover={{
+              bg: studentCta.kind === "complete_unanswered" ? "orange.600" : "blue.600",
+            }}
           >
             {studentCta.label}
           </Button>
@@ -889,6 +1038,9 @@ const CourseExamsTab = ({
         answers_visible_at: fromDateTimeLocalValue(form.answers_visible_at),
         is_active: form.is_active,
         attempt_limit: form.attempt_limit,
+        points_enabled: form.points_enabled !== false,
+        points_attempt_mode: form.points_attempt_mode || "first",
+        allow_unanswered_completion: Boolean(form.allow_unanswered_completion),
       });
 
       const requestData = buildExamPayload({
@@ -965,6 +1117,12 @@ const CourseExamsTab = ({
       answers_visible_at: toDateTimeLocalValue(exam?.answers_visible_at),
       is_active: exam?.is_active ?? true,
       attempt_limit: exam?.attempt_limit?.toString() || "",
+      points_enabled: exam?.points_enabled !== false && exam?.pointsEnabled !== false,
+      points_attempt_mode:
+        exam?.points_attempt_mode || exam?.pointsAttemptMode || "first",
+      allow_unanswered_completion: Boolean(
+        exam?.allow_unanswered_completion ?? exam?.allowUnansweredCompletion,
+      ),
       notify_parents: true,
     });
 
@@ -1024,6 +1182,12 @@ const CourseExamsTab = ({
           answers_visible_at: toDateTimeLocalValue(exam.answers_visible_at),
           is_active: exam.is_active ?? true,
           attempt_limit: exam.attempt_limit?.toString() || "",
+          points_enabled: exam.points_enabled !== false && exam.pointsEnabled !== false,
+          points_attempt_mode:
+            exam.points_attempt_mode || exam.pointsAttemptMode || "first",
+          allow_unanswered_completion: Boolean(
+            exam.allow_unanswered_completion ?? exam.allowUnansweredCompletion,
+          ),
           notify_parents: prev.notify_parents !== false,
         }));
       }
@@ -1308,6 +1472,16 @@ const CourseExamsTab = ({
                         اتركه فارغاً للسماح بعدد غير محدود من المحاولات
                       </Text>
                     </FormControl>
+                    <Divider />
+                    <Heading size="xs" color="gray.500">
+                      نقاط الامتحان
+                    </Heading>
+                    <ExamPointsSettingsFields
+                      formData={formData}
+                      onPatch={(partial) =>
+                        setFormData((prev) => ({ ...prev, ...partial }))
+                      }
+                    />
                   </VStack>
                 </Box>
               </VStack>
@@ -1899,6 +2073,14 @@ const CourseExamsTab = ({
                         />
                       </NumberInput>
                     </FormControl>
+                    <Divider />
+                    <Text fontSize="sm" fontWeight="700" color="gray.600">
+                      نقاط الامتحان
+                    </Text>
+                    <ExamPointsSettingsFields
+                      formData={form}
+                      onPatch={(partial) => setForm((f) => ({ ...f, ...partial }))}
+                    />
                   </VStack>
                 </ExamModalSection>
               </VStack>

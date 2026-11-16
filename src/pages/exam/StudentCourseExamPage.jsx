@@ -21,8 +21,11 @@ import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import {
   fetchExamAttemptReport,
   startCourseExamAttempt,
+  startUnansweredCompletion,
   submitCourseExamAttempt,
+  submitUnansweredCompletion,
   autosaveCourseExamAnswers,
+  autosaveUnansweredCompletion,
   translateCourseExamStudentError,
 } from "../../api/courseExamsApi";
 import ExamAttemptResultScreen from "./components/ExamAttemptResultScreen";
@@ -43,11 +46,14 @@ import {
 import {
   clearExamProgress,
   clearPersistedAttemptId,
+  clearUnansweredCompletionFlag,
   countAnsweredQuestions,
   mergeTimerWithLocalProgress,
   persistAttemptId,
+  persistUnansweredCompletionFlag,
   readExamProgress,
   readPersistedAttemptId,
+  readUnansweredCompletionFlag,
   resolveResumeQuestionIndex,
   writeExamProgress,
 } from "../../utils/examAttemptProgress";
@@ -73,6 +79,10 @@ export default function StudentCourseExamPage() {
   const [examEndsAt, setExamEndsAt] = useState(null);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitResult, setSubmitResult] = useState(null);
+  const [completionMode, setCompletionMode] = useState(
+    Boolean(location.state?.completionMode || location.state?.session?.completionMode),
+  );
+  const completionModeRef = useRef(completionMode);
 
   useEffect(() => {
     if (!submitResult?.essayNotice || !examId) return undefined;
@@ -214,6 +224,14 @@ export default function StudentCourseExamPage() {
     setCurrent(resumeIndex);
     setExamEndsAt(endsAt);
     setRemainingSeconds(remaining);
+    const isCompletion = Boolean(
+      session.completionMode ?? session.completion_mode ?? location.state?.completionMode,
+    );
+    completionModeRef.current = isCompletion;
+    setCompletionMode(isCompletion);
+    if (isCompletion) persistUnansweredCompletionFlag(examId);
+    else clearUnansweredCompletionFlag(examId);
+
     setExamMeta({
       examTitle: session.examTitle || session.exam_title || "",
       durationMinutes,
@@ -228,6 +246,9 @@ export default function StudentCourseExamPage() {
         session.attempt_expires_at ||
         null,
       courseId: session.courseId || session.course_id || location.state?.courseId || null,
+      completionMode: isCompletion,
+      baseObtainedGrade:
+        session.baseObtainedGrade ?? session.base_obtained_grade ?? null,
     });
     writeExamProgress(examId, resolvedAttemptId, {
       answers: restoredAnswers,
@@ -236,7 +257,11 @@ export default function StudentCourseExamPage() {
       startedAt,
     });
     return { remaining, finished: false };
-  }, [examId, location.state?.courseId]);
+  }, [examId, location.state?.completionMode, location.state?.courseId]);
+
+  useEffect(() => {
+    completionModeRef.current = completionMode;
+  }, [completionMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -253,11 +278,25 @@ export default function StudentCourseExamPage() {
 
       try {
         const fromNav = location.state?.session;
+        const wantCompletion =
+          Boolean(location.state?.completionMode) ||
+          Boolean(fromNav?.completionMode || fromNav?.completion_mode) ||
+          readUnansweredCompletionFlag(examId);
+
         if (isCourseExamTakingSession(fromNav) || isCourseExamFinishedPayload(fromNav)) {
           if (cancelled) return;
           applySession({
             ...fromNav,
             courseId: location.state?.courseId || fromNav.courseId || fromNav.course_id,
+            completionMode: wantCompletion || fromNav.completionMode || fromNav.completion_mode,
+          });
+        } else if (wantCompletion) {
+          const session = await startUnansweredCompletion(examId, token);
+          if (cancelled) return;
+          applySession({
+            ...session,
+            courseId: location.state?.courseId || session.courseId || session.course_id,
+            completionMode: true,
           });
         } else if (readPersistedAttemptId(examId)) {
           const session = await startCourseExamAttempt(examId, token);
@@ -345,15 +384,22 @@ export default function StudentCourseExamPage() {
     submitInFlightRef.current = true;
     setSubmitLoading(true);
     try {
-      const result = await submitCourseExamAttempt(examId, token, {
-        attemptId: id,
-        answers: buildExamSubmitAnswers(answers),
-      });
+      const isCompletion = completionModeRef.current;
+      const result = isCompletion
+        ? await submitUnansweredCompletion(examId, token, {
+            attemptId: id,
+            answers: buildExamSubmitAnswers(answers),
+          })
+        : await submitCourseExamAttempt(examId, token, {
+            attemptId: id,
+            answers: buildExamSubmitAnswers(answers),
+          });
       setSubmitResult(result);
       setExamEndsAt(null);
       examEndsAtRef.current = null;
       clearExamProgress(examId, id);
       clearPersistedAttemptId(examId);
+      clearUnansweredCompletionFlag(examId);
       clearExamTakingFlag();
       if (autoSubmit || result?.timedOut) {
         toast({
@@ -363,7 +409,9 @@ export default function StudentCourseExamPage() {
         });
       } else {
         toast({
-          title: "تم تسليم الامتحان",
+          title: isCompletion
+            ? "تم استكمال الأسئلة المتروكة"
+            : "تم تسليم الامتحان",
           description: `الدرجة: ${result.totalGrade}/${result.maxGrade}`,
           status: "success",
         });
@@ -386,20 +434,32 @@ export default function StudentCourseExamPage() {
     const id = toPositiveAttemptId(attemptIdRef.current);
     if (!token || !id || !examId) return;
     try {
-      const result = await autosaveCourseExamAnswers(examId, token, {
-        attemptId: id,
-        answers: buildExamSubmitAnswers(studentAnswersRef.current),
-      });
+      const isCompletion = completionModeRef.current;
+      const result = isCompletion
+        ? await autosaveUnansweredCompletion(examId, token, {
+            attemptId: id,
+            answers: buildExamSubmitAnswers(studentAnswersRef.current),
+          })
+        : await autosaveCourseExamAnswers(examId, token, {
+            attemptId: id,
+            answers: buildExamSubmitAnswers(studentAnswersRef.current),
+          });
       if (isCourseExamFinishedPayload(result)) {
         setSubmitResult(result);
         setExamEndsAt(null);
         examEndsAtRef.current = null;
         clearExamProgress(examId, id);
         clearPersistedAttemptId(examId);
+        clearUnansweredCompletionFlag(examId);
         clearExamTakingFlag();
         return;
       }
-      if (result?.remainingSeconds != null || result?.attemptExpiresAt || result?.attempt_expires_at) {
+      if (
+        !isCompletion &&
+        (result?.remainingSeconds != null ||
+          result?.attemptExpiresAt ||
+          result?.attempt_expires_at)
+      ) {
         const { endsAt, remaining } = resolveCourseExamServerTimer(result);
         examEndsAtRef.current = endsAt;
         setExamEndsAt(endsAt);
@@ -531,13 +591,17 @@ export default function StudentCourseExamPage() {
       flexDirection="column"
     >
       <ExamStudentSessionHeader
-        examTitle={examMeta?.examTitle || "امتحان شامل"}
+        examTitle={
+          completionMode
+            ? `استكمال الأسئلة المتروكة — ${examMeta?.examTitle || "امتحان شامل"}`
+            : examMeta?.examTitle || "امتحان شامل"
+        }
         currentIndex={current}
         totalQuestions={questions.length}
         answeredCount={answeredCount}
-        remainingSeconds={remainingSeconds}
-        timingMode={examMeta?.timingMode || null}
-        scheduleEndAt={examMeta?.scheduleEndAt || examEndsAt}
+        remainingSeconds={completionMode ? null : remainingSeconds}
+        timingMode={completionMode ? null : examMeta?.timingMode || null}
+        scheduleEndAt={completionMode ? null : examMeta?.scheduleEndAt || examEndsAt}
         questions={questions}
         studentAnswers={studentAnswers}
         onBack={goToCourseExams}

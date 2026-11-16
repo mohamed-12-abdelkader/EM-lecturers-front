@@ -342,6 +342,13 @@ export function buildPublicExamPayload(form = {}) {
     payload.attemptLimit = null;
   }
 
+  payload.pointsEnabled = form.points_enabled !== false && form.pointsEnabled !== false;
+  payload.pointsAttemptMode =
+    form.points_attempt_mode || form.pointsAttemptMode || "first";
+  payload.allowUnansweredCompletion = Boolean(
+    form.allow_unanswered_completion ?? form.allowUnansweredCompletion,
+  );
+
   if (form.available_from) payload.availableFrom = form.available_from;
   if (form.visibility_end_date) payload.visibilityEndDate = form.visibility_end_date;
   if (form.answers_visible_at) payload.answersVisibleAt = form.answers_visible_at;
