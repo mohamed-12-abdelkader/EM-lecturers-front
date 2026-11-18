@@ -158,9 +158,8 @@ import CourseFormModal, {
 } from "../../components/CourseFormModal";
 import VideoPlayer from "./components/VideoPlayer";
 import dayjs from "dayjs";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 import ScrollToTop from "../../components/scollToTop/ScrollToTop";
+import { exportActivationCodesPdf } from "./utils/exportActivationCodesPdf";
 import BrandLoadingScreen from "../../components/loading/BrandLoadingScreen";
 import TeacherCoursePageTour from "../../components/onboarding/TeacherCoursePageTour";
 import {
@@ -194,7 +193,7 @@ import {
 } from "../../utils/tenantBrandLogo";
 import { resolveActivationCardTheme } from "../../utils/activationCodeCardTheme";
 
-/** يحوّل صورة (رابط خارجي) إلى Data URL حتى لا يفشل html2canvas بسبب CORS */
+/** يحوّل صورة (رابط خارجي) إلى Data URL لتجنب مشاكل CORS عند الرسم في Canvas */
 async function fetchImageAsDataUrl(url) {
   const response = await fetch(url, { mode: "cors" });
   if (!response.ok) throw new Error(`فشل تحميل اللوجو: ${response.status}`);
@@ -945,10 +944,13 @@ const CourseDetailsPage = () => {
   const [activationCodes, setActivationCodes] = useState([]);
   const [codesError, setCodesError] = useState(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [exportProgress, setExportProgress] = useState(null);
   const [exportStartIndex, setExportStartIndex] = useState(1);
   const [exportEndIndex, setExportEndIndex] = useState(50);
   const [searchCode, setSearchCode] = useState("");
   const [filteredCodes, setFilteredCodes] = useState([]);
+  const [codesPage, setCodesPage] = useState(1);
+  const CODES_PAGE_SIZE = 12;
 
   // State للفيديو
   const [videoPlayer, setVideoPlayer] = useState({
@@ -974,7 +976,21 @@ const CourseDetailsPage = () => {
       );
       setFilteredCodes(filtered);
     }
+    setCodesPage(1);
   }, [searchCode, activationCodes]);
+
+  const codesTotalPages = Math.max(
+    1,
+    Math.ceil((filteredCodes.length || 0) / CODES_PAGE_SIZE),
+  );
+  const pagedCodes = useMemo(() => {
+    const start = (codesPage - 1) * CODES_PAGE_SIZE;
+    return filteredCodes.slice(start, start + CODES_PAGE_SIZE);
+  }, [filteredCodes, codesPage, CODES_PAGE_SIZE]);
+
+  useEffect(() => {
+    if (codesPage > codesTotalPages) setCodesPage(codesTotalPages);
+  }, [codesPage, codesTotalPages]);
 
   // 2. جلب الامتحانات الشاملة
   useEffect(() => {
@@ -2887,7 +2903,7 @@ D) has made`}
     }
   };
 
-  // دالة تصدير الأكواد كـ PDF مع معالجة أخطاء واضحة
+  // تصدير سريع عبر Canvas (بدون html2canvas)
   const handleExportCodesPdf = async () => {
     if (!activationCodes || activationCodes.length === 0) {
       toast({
@@ -2899,7 +2915,6 @@ D) has made`}
       return;
     }
 
-    // التحقق من صحة النطاق المحدد
     if (exportStartIndex > exportEndIndex) {
       toast({
         title: "خطأ في تحديد النطاق!",
@@ -2911,8 +2926,7 @@ D) has made`}
       return;
     }
 
-    // تحديد الأكواد المراد تصديرها
-    const startIndex = Math.max(0, exportStartIndex - 1); // تحويل إلى index
+    const startIndex = Math.max(0, exportStartIndex - 1);
     const endIndex = Math.min(activationCodes.length, exportEndIndex);
     const codesToExport = activationCodes.slice(startIndex, endIndex);
 
@@ -2927,17 +2941,13 @@ D) has made`}
     }
 
     setIsExportingPdf(true);
+    setExportProgress({ page: 0, totalPages: 0, done: 0, total: codesToExport.length });
     try {
-      const codesPerPage = 12; // 3 columns × 4 rows
-      const pageWidth = 297; // mm
-      const pageHeight = 210; // mm
       const defaultLogoUrl = eduPlatformLogo.startsWith("http")
         ? eduPlatformLogo
         : `${window.location.origin}${eduPlatformLogo}`;
 
-      // لوجو المدرس + ثيم كروت PDF حسب تصميم لاندينج المنصة (navy / ember / sky)
       let logoUrl = defaultLogoUrl;
-      let usesDefaultLogo = true;
       let cardTheme = resolveActivationCardTheme("sky");
       const tenantSubdomain =
         resolveTenantSubdomain() ||
@@ -2945,6 +2955,7 @@ D) has made`}
         user?.tenant_subdomain ||
         user?.subdomain ||
         null;
+
       if (tenantSubdomain) {
         try {
           let publicPayload = readCachedTenantPublic(tenantSubdomain);
@@ -2964,248 +2975,22 @@ D) has made`}
             logoUrl = teacherLogo.startsWith("data:")
               ? teacherLogo
               : await fetchImageAsDataUrl(teacherLogo);
-            usesDefaultLogo = false;
           }
         } catch {
           logoUrl = defaultLogoUrl;
         }
       }
 
-      const headerFontSize = usesDefaultLogo ? "9px" : "11px";
-      const courseNameFontSize = usesDefaultLogo ? "8px" : "10px";
-      const teacherNameFontSize = usesDefaultLogo ? "10px" : "12px";
-      const activationLabelFontSize = usesDefaultLogo ? "9px" : "11px";
-      const activationCodeFontSize = usesDefaultLogo ? "13px" : "16px";
-      const footerFontSize = usesDefaultLogo ? "10px" : "12px";
-      const logoHeight = usesDefaultLogo ? "36px" : "48px";
+      await exportActivationCodesPdf({
+        codes: codesToExport,
+        courseName: courseData?.course?.title || "الكورس",
+        teacherName: user?.name || "المدرس",
+        logoUrl,
+        theme: cardTheme,
+        fileName: "activation-codes.pdf",
+        onProgress: setExportProgress,
+      });
 
-      const courseName = courseData?.course?.title || "الكورس";
-      const teacherName = user?.name || "المدرس";
-      const pdf = new jsPDF("l", "mm", "a4");
-      for (let i = 0; i < codesToExport.length; i += codesPerPage) {
-        const tempDiv = document.createElement("div");
-        tempDiv.style.display = "block";
-        tempDiv.style.width = `${pageWidth}mm`;
-        tempDiv.style.height = `${pageHeight}mm`;
-        tempDiv.style.background = "#fff";
-        document.body.appendChild(tempDiv);
-        tempDiv.innerHTML = `
-        <div style="display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(4,1fr); gap:3mm; width:100%; height:100%; align-content:start;">
-${codesToExport
-  .slice(i, i + codesPerPage)
-  .map(
-    (code, index) => `
-
-<div style="
-width:100%;
-height:100%;
-border-radius:14px;
-overflow:hidden;
-background:${cardTheme.cardBg};
-display:flex;
-flex-direction:column;
-border:1px solid ${cardTheme.border};
-box-shadow:0 4px 10px rgba(0,0,0,0.08);
-position:relative;
-direction:rtl;
-min-height:36mm;
-">
-
-<!-- Header -->
-<div style="
-background:${cardTheme.headerGradient};
-color:#fff;
-padding:8px 10px;
-display:flex;
-justify-content:space-between;
-align-items:center;
-font-size:${headerFontSize};
-font-weight:700;
-">
-
-<span>${code.grade_name || "الصف الثالث الثانوي"}</span>
-
-<span style="
-font-size:${courseNameFontSize};
-background:${cardTheme.chipBg};
-padding:3px 8px;
-border-radius:6px;
-">
-${courseName}
-</span>
-
-<span style="
-font-weight:800;
-font-size:${teacherNameFontSize};
-">
-${teacherName}
-</span>
-
-</div>
-
-<!-- Accent strip -->
-<div style="height:3.5px;width:100%;background:${cardTheme.accentBar};flex-shrink:0;"></div>
-
-<!-- Content -->
-<div style="
-flex:1;
-display:flex;
-align-items:center;
-justify-content:space-between;
-padding:10px 14px;
-gap:10px;
-position:relative;
-flex-direction:row;
-">
-
-<!-- QR -->
-<div style="
-flex-shrink:0;
-margin-left:14px;
-">
-${
-  code.qr_code
-    ? `<img src="${code.qr_code}" style="
-width:90px;
-height:90px;
-background:#fff;
-border-radius:10px;
-border:2px solid ${cardTheme.qrBorder};
-padding:3px;
-object-fit:contain;
-"/>`
-    : `<div style="
-width:90px;
-height:90px;
-border:2px dashed ${cardTheme.qrDashed};
-border-radius:10px;
-display:flex;
-align-items:center;
-justify-content:center;
-font-size:10px;
-color:${cardTheme.qrDashed};
-">QR</div>`
-}
-</div>
-
-<!-- Logo -->
-<div style="
-flex:1;
-display:flex;
-align-items:center;
-justify-content:center;
-">
-<span style="
-display:inline-flex;
-align-items:center;
-justify-content:center;
-background:#fff;
-border:1px solid ${cardTheme.logoBorder};
-border-radius:10px;
-padding:6px 10px;
-">
-<img src="${logoUrl}" alt="لوجو المنصة" style="
-height:${logoHeight};
-width:auto;
-max-width:150px;
-object-fit:contain;
-opacity:1;
-"/>
-</span>
-</div>
-
-<!-- Activation Code -->
-<div style="
-flex-shrink:0;
-display:flex;
-flex-direction:column;
-align-items:center;
-justify-content:center;
-text-align:center;
-margin-right:10px;
-">
-
-<div style="
-font-size:${activationLabelFontSize};
-font-weight:700;
-color:${cardTheme.codeLabelColor};
-margin-bottom:6px;
-">
-كود التفعيل
-</div>
-
-<div style="
-font-size:${activationCodeFontSize};
-font-weight:800;
-font-family:monospace;
-letter-spacing:2px;
-color:${cardTheme.codeColor};
-">
-${code.code}
-</div>
-
-</div>
-
-</div>
-
-<!-- Footer -->
-<div style="
-background:${cardTheme.footerGradient};
-padding:6px 8px;
-text-align:center;
-">
-
-<span style="
-color:#fff;
-font-size:${footerFontSize};
-font-weight:800;
-letter-spacing:0.3px;
-display:block;
-">
- 01111272393 & 01132176865 & 01132176849 
-</span>
-
-</div>
-
-</div>
-
-`,
-  )
-  .join("")}
-</div>
-        `;
-        await new Promise((resolve) => setTimeout(resolve, 350));
-        try {
-          const pxPerMm = 3.78;
-          const canvas = await html2canvas(tempDiv, {
-            scale: 1.5,
-            useCORS: true,
-            allowTaint: true,
-            logging: false,
-            width: pageWidth * pxPerMm,
-            height: pageHeight * pxPerMm,
-          });
-          pdf.addImage(
-            canvas.toDataURL("image/jpeg", 0.8),
-            "JPEG",
-            0,
-            0,
-            pageWidth,
-            pageHeight,
-          );
-        } catch (err) {
-          console.error("PDF Export Error (canvas):", err);
-          toast({
-            title: "خطأ أثناء إنشاء صورة الصفحة!",
-            status: "error",
-            duration: 4000,
-            isClosable: true,
-          });
-        }
-        if (i + codesPerPage < codesToExport.length) pdf.addPage();
-        document.body.removeChild(tempDiv);
-      }
-      pdf.save("activation-codes.pdf");
       toast({
         title: "تم التصدير بنجاح!",
         description: `تم تصدير ${codesToExport.length} كود من ${exportStartIndex} إلى ${exportEndIndex}`,
@@ -3224,6 +3009,7 @@ display:block;
       });
     } finally {
       setIsExportingPdf(false);
+      setExportProgress(null);
     }
   };
 
@@ -3804,7 +3590,9 @@ display:block;
                   disabled={isExportingPdf || exportStartIndex > exportEndIndex}
                 >
                   {isExportingPdf ? <Spinner size="sm" mr={2} /> : null}
-                  تصدير الأكواد من {exportStartIndex} إلى {exportEndIndex}
+                  {isExportingPdf && exportProgress?.totalPages
+                    ? `جاري التصدير… صفحة ${exportProgress.page}/${exportProgress.totalPages}`
+                    : `تصدير الأكواد من ${exportStartIndex} إلى ${exportEndIndex}`}
                 </Button>
               </Box>
             )}
@@ -3841,27 +3629,63 @@ display:block;
               </Box>
             ) : (
               <>
+                <Flex
+                  mb={3}
+                  align="center"
+                  justify="space-between"
+                  gap={2}
+                  flexWrap="wrap"
+                >
+                  <Text fontSize="sm" color="gray.500">
+                    عرض {(codesPage - 1) * CODES_PAGE_SIZE + 1}
+                    {" – "}
+                    {Math.min(codesPage * CODES_PAGE_SIZE, filteredCodes.length)}
+                    {" من "}
+                    {filteredCodes.length.toLocaleString("ar-EG")} كود
+                  </Text>
+                  {codesTotalPages > 1 ? (
+                    <HStack spacing={2}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        colorScheme="blue"
+                        isDisabled={codesPage <= 1}
+                        onClick={() => setCodesPage((p) => Math.max(1, p - 1))}
+                      >
+                        السابق
+                      </Button>
+                      <Text fontSize="sm" fontWeight="700" minW="72px" textAlign="center">
+                        {codesPage} / {codesTotalPages}
+                      </Text>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        colorScheme="blue"
+                        isDisabled={codesPage >= codesTotalPages}
+                        onClick={() =>
+                          setCodesPage((p) => Math.min(codesTotalPages, p + 1))
+                        }
+                      >
+                        التالي
+                      </Button>
+                    </HStack>
+                  ) : null}
+                </Flex>
+
                 <SimpleGrid
                   columns={{ base: 1, md: 2, lg: 3 }}
-                  spacing={{ base: 3, md: 6 }}
+                  spacing={{ base: 3, md: 4 }}
                 >
-                  {filteredCodes.map((code) => (
+                  {pagedCodes.map((code) => (
                     <Box
                       key={code.id}
                       bg="white"
                       _dark={{ bg: "gray.800", borderColor: "whiteAlpha.200" }}
                       borderRadius="2xl"
-                      p={5}
-                      boxShadow="lg"
+                      p={4}
+                      boxShadow="md"
                       border="1px solid"
                       borderColor="blue.100"
-                      _hover={{
-                        transform: "translateY(-2px)",
-                        boxShadow: "xl",
-                        borderColor: "blue.300",
-                        _dark: { borderColor: "blue.500" },
-                      }}
-                      transition="all 0.3s ease"
                       position="relative"
                       overflow="hidden"
                     >
@@ -3878,9 +3702,8 @@ display:block;
                         direction={{ base: "column", sm: "row" }}
                         align="center"
                         justify="space-between"
-                        gap={4}
+                        gap={3}
                       >
-                        {/* كود التفعيل - عرض صغير وشكل واضح */}
                         <Box flex="1" minW={0} textAlign="center">
                           <Text
                             fontSize="xs"
@@ -3920,7 +3743,7 @@ display:block;
                             <Tooltip label="نسخ الكود" hasArrow>
                               <IconButton
                                 aria-label="نسخ الكود"
-                                icon={<FaCopy />}
+                                icon={<Icon as={FaCopy} />}
                                 size="sm"
                                 colorScheme="blue"
                                 variant="solid"
@@ -3930,13 +3753,12 @@ display:block;
                             </Tooltip>
                           </HStack>
                         </Box>
-                        {/* QR */}
                         {code.qr_code ? (
                           <Image
                             src={code.qr_code}
                             alt={`QR ${code.code}`}
-                            w="80px"
-                            h="80px"
+                            w="72px"
+                            h="72px"
                             flexShrink={0}
                             borderRadius="xl"
                             border="2px solid"
@@ -3944,11 +3766,12 @@ display:block;
                             _dark={{ borderColor: "blue.600", bg: "gray.700" }}
                             bg="white"
                             p={1}
+                            loading="lazy"
                           />
                         ) : (
                           <Box
-                            w="80px"
-                            h="80px"
+                            w="72px"
+                            h="72px"
                             flexShrink={0}
                             borderRadius="xl"
                             border="2px dashed"
@@ -3966,36 +3789,17 @@ display:block;
                           </Box>
                         )}
                       </Flex>
-                      {/* الحالة فقط */}
-                      <Box textAlign="center" mt={4}>
+                      <Box textAlign="center" mt={3}>
                         {code.is_expired ? (
-                          <Badge
-                            colorScheme="red"
-                            fontSize="sm"
-                            px={3}
-                            py={1}
-                            borderRadius="full"
-                          >
+                          <Badge colorScheme="red" fontSize="sm" px={3} py={1} borderRadius="full">
                             منتهي الصلاحية
                           </Badge>
                         ) : code.is_fully_used ? (
-                          <Badge
-                            colorScheme="orange"
-                            fontSize="sm"
-                            px={3}
-                            py={1}
-                            borderRadius="full"
-                          >
+                          <Badge colorScheme="orange" fontSize="sm" px={3} py={1} borderRadius="full">
                             مستخدم بالكامل
                           </Badge>
                         ) : (
-                          <Badge
-                            colorScheme="green"
-                            fontSize="sm"
-                            px={3}
-                            py={1}
-                            borderRadius="full"
-                          >
+                          <Badge colorScheme="green" fontSize="sm" px={3} py={1} borderRadius="full">
                             فعال
                           </Badge>
                         )}
@@ -4003,209 +3807,34 @@ display:block;
                     </Box>
                   ))}
                 </SimpleGrid>
-                {/* عنصر مخفي لتصدير الأكواد ككروت PDF */}
-                <Box
-                  id="codes-pdf-export"
-                  style={{
-                    display: "none",
-                    width: "297mm",
-                    height: "210mm",
-                    background: "#fff",
-                    position: "absolute",
-                    top: 0,
-                    left: 0,
-                    zIndex: -1,
-                    direction: "rtl",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(3, 1fr)",
-                      gridTemplateRows: "repeat(4, 1fr)",
-                      gap: "5mm",
-                      width: "100%",
-                      height: "100%",
-                      alignContent: "start",
-                    }}
-                  >
-                    {activationCodes
-                      .slice(exportStartIndex - 1, exportEndIndex)
-                      .map((code, index) => (
-                        <div
-                          key={code.id}
-                          style={{
-                            margin: "3px",
-                            padding: "0",
-                            width: "100%",
-                            height: "100%",
-                            border: "1px solid rgba(49,130,206,0.25)",
-                            borderRadius: "12px",
-                            boxShadow: "0 2px 12px rgba(49,130,206,0.18)",
-                            position: "relative",
-                            overflow: "hidden",
-                            background: "#f8fafc",
-                            display: "flex",
-                            flexDirection: "column",
-                            justifyContent: "space-between",
-                            minHeight: "40mm",
-                            direction: "rtl",
-                          }}
-                        >
-                          <div
-                            style={{
-                              background: "#3182ce",
-                              padding: "6px 8px",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "space-between",
-                              flexWrap: "wrap",
-                              gap: "4px",
-                            }}
-                          >
-                            <h2
-                              style={{
-                                fontSize: "13px",
-                                fontWeight: "800",
-                                color: "#fff",
-                                margin: "0",
-                                textAlign: "right",
-                                flex: "1",
-                                minWidth: "0",
-                              }}
-                            >
-                              {user.name || "عمرو علي"}
-                            </h2>
-                            <span
-                              style={{
-                                fontSize: "9px",
-                                color: "#fff",
-                                fontWeight: "700",
-                                background: "rgba(0,0,0,0.15)",
-                                padding: "3px 6px",
-                                borderRadius: "8px",
-                              }}
-                            >
-                              {code.grade_name || "الصف الثاني الثانوي"}
-                            </span>
-                          </div>
-                          <div
-                            style={{
-                              padding: "3px 8px",
-                              background: "#bee3f8",
-                              borderBottom: "1px solid rgba(49,130,206,0.25)",
-                            }}
-                          >
-                            <p
-                              style={{
-                                fontSize: "10px",
-                                fontWeight: "800",
-                                color: "#1a365d",
-                                margin: "0",
-                                textAlign: "right",
-                              }}
-                            >
-                              {course?.title || "الكورس"}
-                            </p>
-                          </div>
-                          <div
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                              padding: "6px 8px",
-                              flex: "1",
-                              gap: "8px",
-                            }}
-                          >
-                            <div style={{ flex: "1", textAlign: "center" }}>
-                              <div
-                                style={{
-                                  fontSize: "8px",
-                                  color: "#2b6cb0",
-                                  fontWeight: "700",
-                                }}
-                              >
-                                كود التفعيل
-                              </div>
-                              <div style={{ marginTop: "8px" }}>
-                                <span
-                                  style={{
-                                    display: "inline-block",
-                                    fontSize: "14px",
-                                    color: "#1a365d",
-                                    fontWeight: "800",
-                                    letterSpacing: "1px",
-                                    fontFamily: "monospace",
-                                    padding: "4px 10px",
-                                    background: "#fff",
-                                    borderLeft: "4px solid #3182ce",
-                                    borderRadius: "6px",
-                                    boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-                                  }}
-                                >
-                                  {code.code}
-                                </span>
-                              </div>
-                            </div>
-                            <div style={{ flexShrink: "0" }}>
-                              {code.qr_code ? (
-                                <img
-                                  src={code.qr_code}
-                                  alt="QR"
-                                  style={{
-                                    width: "60px",
-                                    height: "60px",
-                                    border: "2px solid #3182ce",
-                                    borderRadius: "10px",
-                                    background: "#fff",
-                                    padding: "2px",
-                                    display: "block",
-                                  }}
-                                />
-                              ) : (
-                                <div
-                                  style={{
-                                    width: "60px",
-                                    height: "60px",
-                                    border: "2px dashed #3182ce",
-                                    borderRadius: "10px",
-                                    background: "#ebf8ff",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    fontSize: "8px",
-                                    color: "#3182ce",
-                                    fontWeight: "bold",
-                                  }}
-                                >
-                                  QR
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div
-                            style={{
-                              padding: "6px 8px",
-                              background: "#3182ce",
-                            }}
-                          >
-                            <p
-                              style={{
-                                fontSize: "8px",
-                                fontWeight: "700",
-                                color: "#fff",
-                                textAlign: "center",
-                                margin: "0",
-                              }}
-                            >
-                              01111272393 | 01288781012 | 01278284806
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                  </div>
-                </Box>
+
+                {codesTotalPages > 1 ? (
+                  <Flex mt={4} justify="center" align="center" gap={2} flexWrap="wrap">
+                    <Button
+                      size="sm"
+                      variant="solid"
+                      colorScheme="blue"
+                      isDisabled={codesPage <= 1}
+                      onClick={() => setCodesPage((p) => Math.max(1, p - 1))}
+                    >
+                      السابق
+                    </Button>
+                    <Text fontSize="sm" fontWeight="700">
+                      صفحة {codesPage} من {codesTotalPages}
+                    </Text>
+                    <Button
+                      size="sm"
+                      variant="solid"
+                      colorScheme="blue"
+                      isDisabled={codesPage >= codesTotalPages}
+                      onClick={() =>
+                        setCodesPage((p) => Math.min(codesTotalPages, p + 1))
+                      }
+                    >
+                      التالي
+                    </Button>
+                  </Flex>
+                ) : null}
               </>
             )}
           </ModalBody>
@@ -4219,6 +3848,7 @@ display:block;
               onClick={() => {
                 setShowCodesModal(false);
                 setSearchCode("");
+                setCodesPage(1);
               }}
               bg="blue.500"
               color="white"
