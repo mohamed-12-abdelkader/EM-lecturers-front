@@ -80,18 +80,53 @@ function fitText(ctx, text, maxWidth) {
   return `${out}…`;
 }
 
+function drawHeaderCell(ctx, text, cellX, cellW, centerY, align, fontSize, maxLines = 2) {
+  const value = String(text || "").trim();
+  if (!value || cellW < 8) return;
+  ctx.font = `800 ${fontSize}px ${FONT}`;
+  ctx.fillStyle = "#fff";
+  ctx.textBaseline = "middle";
+  ctx.textAlign = align;
+
+  const words = value.split(/\s+/);
+  const lines = [];
+  let current = "";
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (ctx.measureText(next).width <= cellW) {
+      current = next;
+    } else {
+      if (current) lines.push(current);
+      current = word;
+      if (lines.length >= maxLines - 1) break;
+    }
+  }
+  if (current && lines.length < maxLines) lines.push(fitText(ctx, current, cellW));
+  if (!lines.length) lines.push(fitText(ctx, value, cellW));
+
+  const lineH = fontSize + 2;
+  const startY = centerY - ((lines.length - 1) * lineH) / 2;
+  const tx =
+    align === "right" ? cellX + cellW : align === "left" ? cellX : cellX + cellW / 2;
+  lines.forEach((line, i) => {
+    ctx.fillText(line, tx, startY + i * lineH);
+  });
+}
+
 function drawCard(ctx, card, theme, meta) {
   const { x, y, w, h, code, qrImg } = card;
   const { courseName, teacherName, logoImg } = meta;
   const radius = 14;
-  const headerH = Math.round(h * 0.22);
-  const footerH = Math.round(h * 0.16);
-  const accentH = Math.round(3.5 * PX_PER_MM);
+  const headerH = Math.round(h * 0.26);
+  const footerH = Math.round(h * 0.15);
+  const accentH = Math.round(3.2 * PX_PER_MM);
   const headerFrom = firstHex(theme.headerGradient, "#0B1B3A");
   const headerTo = lastHex(theme.headerGradient, "#1E40AF");
   const accentFrom = firstHex(theme.accentBar, theme.codeColor || "#EA580C");
   const accentTo = lastHex(theme.accentBar, accentFrom);
   const footerColor = firstHex(theme.footerGradient, headerFrom);
+  const codeColor = theme.codeColor || accentFrom;
+  const codeLabelColor = theme.codeLabelColor || codeColor;
 
   // بطاقة
   ctx.save();
@@ -103,44 +138,50 @@ function drawCard(ctx, card, theme, meta) {
   ctx.stroke();
   ctx.clip();
 
-  // هيدر
+  // ===== هيدر: مدرس | كورس | صف =====
   const headerGrad = ctx.createLinearGradient(x, y, x + w, y);
   headerGrad.addColorStop(0, headerFrom);
   headerGrad.addColorStop(1, headerTo);
   ctx.fillStyle = headerGrad;
   ctx.fillRect(x, y, w, headerH);
 
-  ctx.fillStyle = "#fff";
-  ctx.textAlign = "right";
-  ctx.textBaseline = "middle";
   const headerPad = 10;
+  const headerGap = 8;
+  const usableHeaderW = w - headerPad * 2 - headerGap * 2;
+  const sideW = Math.floor(usableHeaderW * 0.3);
+  const midW = usableHeaderW - sideW * 2;
+  // RTL بصري: المدرس يسار، الكورس وسط، الصف يمين
+  const teacherX = x + headerPad;
+  const courseX = teacherX + sideW + headerGap;
+  const gradeCellX = courseX + midW + headerGap;
   const headerY = y + headerH / 2;
-  ctx.font = `700 ${Math.max(11, Math.round(h * 0.07))}px ${FONT}`;
-  ctx.fillText(
-    fitText(ctx, code.grade_name || "الصف", w * 0.28),
-    x + w - headerPad,
+  const headerFont = Math.max(12, Math.min(16, Math.round(h * 0.095)));
+  const chipFont = Math.max(11, Math.min(14, Math.round(h * 0.085)));
+
+  drawHeaderCell(ctx, teacherName, teacherX, sideW, headerY, "left", headerFont, 2);
+  drawHeaderCell(
+    ctx,
+    code.grade_name || "الصف",
+    gradeCellX,
+    sideW,
     headerY,
+    "right",
+    headerFont,
+    2,
   );
 
-  ctx.font = `800 ${Math.max(12, Math.round(h * 0.085))}px ${FONT}`;
-  ctx.textAlign = "left";
-  ctx.fillText(
-    fitText(ctx, teacherName, w * 0.28),
-    x + headerPad,
-    headerY,
-  );
-
-  // شريحة اسم الكورس في المنتصف
-  const chipText = fitText(ctx, courseName, w * 0.34);
-  ctx.font = `700 ${Math.max(10, Math.round(h * 0.065))}px ${FONT}`;
-  const chipW = Math.min(w * 0.4, ctx.measureText(chipText).width + 18);
-  const chipH = Math.max(18, Math.round(h * 0.11));
-  const chipX = x + (w - chipW) / 2;
+  // شريحة الكورس في المنتصف
+  ctx.font = `800 ${chipFont}px ${FONT}`;
+  const chipLabel = fitText(ctx, courseName || "الكورس", midW - 16);
+  const chipW = Math.min(midW, Math.max(56, ctx.measureText(chipLabel).width + 20));
+  const chipH = Math.max(22, Math.round(headerH * 0.55));
+  const chipX = courseX + (midW - chipW) / 2;
   const chipY = y + (headerH - chipH) / 2;
   fillRoundRect(ctx, chipX, chipY, chipW, chipH, 8, "rgba(255,255,255,0.22)");
   ctx.fillStyle = "#fff";
   ctx.textAlign = "center";
-  ctx.fillText(chipText, x + w / 2, headerY);
+  ctx.textBaseline = "middle";
+  ctx.fillText(chipLabel, chipX + chipW / 2, chipY + chipH / 2);
 
   // شريط تمييز
   const accentGrad = ctx.createLinearGradient(x, 0, x + w, 0);
@@ -149,19 +190,39 @@ function drawCard(ctx, card, theme, meta) {
   ctx.fillStyle = accentGrad;
   ctx.fillRect(x, y + headerH, w, accentH);
 
-  // محتوى
+  // ===== محتوى: 3 أعمدة ثابتة — كود | لوجو | QR =====
   const contentTop = y + headerH + accentH;
   const contentBottom = y + h - footerH;
   const contentH = contentBottom - contentTop;
-  const contentPad = 12;
-  const qrSize = Math.min(Math.round(h * 0.42), Math.round(w * 0.28), contentH - 16);
-  const qrX = x + w - contentPad - qrSize;
-  const qrY = contentTop + (contentH - qrSize) / 2;
+  const contentPad = 10;
+  const colGap = 10;
+  const innerW = w - contentPad * 2 - colGap * 2;
 
-  // QR يمين (RTL: على يمين البطاقة)
+  // نسب الأعمدة: كود 30% | لوجو 38% | QR 32%
+  const codeColW = Math.floor(innerW * 0.3);
+  const qrColW = Math.floor(innerW * 0.32);
+  const logoColW = innerW - codeColW - qrColW;
+
+  const codeColX = x + contentPad;
+  const logoColX = codeColX + codeColW + colGap;
+  const qrColX = logoColX + logoColW + colGap;
+
+  // QR (يمين)
+  const qrSize = Math.min(qrColW - 4, contentH - 14, Math.round(h * 0.48));
+  const qrX = qrColX + (qrColW - qrSize) / 2;
+  const qrY = contentTop + (contentH - qrSize) / 2;
   if (qrImg) {
-    fillRoundRect(ctx, qrX - 4, qrY - 4, qrSize + 8, qrSize + 8, 10, "#fff");
-    strokeRoundRect(ctx, qrX - 4, qrY - 4, qrSize + 8, qrSize + 8, 10, theme.qrBorder || accentFrom, 3);
+    fillRoundRect(ctx, qrX - 3, qrY - 3, qrSize + 6, qrSize + 6, 10, "#fff");
+    strokeRoundRect(
+      ctx,
+      qrX - 3,
+      qrY - 3,
+      qrSize + 6,
+      qrSize + 6,
+      10,
+      theme.qrBorder || accentFrom,
+      3,
+    );
     ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
   } else {
     strokeRoundRect(ctx, qrX, qrY, qrSize, qrSize, 10, theme.qrDashed || accentFrom, 2);
@@ -172,10 +233,10 @@ function drawCard(ctx, card, theme, meta) {
     ctx.fillText("QR", qrX + qrSize / 2, qrY + qrSize / 2);
   }
 
-  // لوجو في الوسط
-  const logoMaxH = Math.round(h * 0.28);
-  const logoMaxW = Math.round(w * 0.28);
+  // لوجو (وسط فقط — داخل عموده)
   if (logoImg) {
+    const logoMaxH = contentH - 16;
+    const logoMaxW = logoColW - 8;
     const ratio = logoImg.width / Math.max(1, logoImg.height);
     let lw = logoMaxW;
     let lh = lw / ratio;
@@ -183,34 +244,39 @@ function drawCard(ctx, card, theme, meta) {
       lh = logoMaxH;
       lw = lh * ratio;
     }
-    const lx = x + (w - lw) / 2;
+    const lx = logoColX + (logoColW - lw) / 2;
     const ly = contentTop + (contentH - lh) / 2;
-    fillRoundRect(ctx, lx - 8, ly - 6, lw + 16, lh + 12, 10, "#fff");
-    strokeRoundRect(ctx, lx - 8, ly - 6, lw + 16, lh + 12, 10, theme.logoBorder || "#E2E8F0", 1.5);
+    fillRoundRect(ctx, lx - 6, ly - 4, lw + 12, lh + 8, 10, "#fff");
+    strokeRoundRect(
+      ctx,
+      lx - 6,
+      ly - 4,
+      lw + 12,
+      lh + 8,
+      10,
+      theme.logoBorder || "#E2E8F0",
+      1.5,
+    );
     ctx.drawImage(logoImg, lx, ly, lw, lh);
   }
 
-  // الكود يسار
-  const codeBlockX = x + contentPad;
-  const codeBlockW = Math.max(40, qrX - 16 - codeBlockX);
+  // كود التفعيل (يسار فقط — داخل عموده)
+  const codeCx = codeColX + codeColW / 2;
+  const codeCy = contentTop + contentH / 2;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillStyle = theme.codeLabelColor || accentFrom;
-  ctx.font = `700 ${Math.max(11, Math.round(h * 0.07))}px ${FONT}`;
-  ctx.fillText("كود التفعيل", codeBlockX + codeBlockW / 2, contentTop + contentH * 0.35);
-  ctx.fillStyle = theme.codeColor || accentFrom;
-  ctx.font = `800 ${Math.max(16, Math.round(h * 0.12))}px monospace, ${FONT}`;
-  ctx.fillText(
-    fitText(ctx, code.code || "", codeBlockW),
-    codeBlockX + codeBlockW / 2,
-    contentTop + contentH * 0.62,
-  );
+  ctx.fillStyle = codeLabelColor;
+  ctx.font = `700 ${Math.max(11, Math.round(h * 0.075))}px ${FONT}`;
+  ctx.fillText("كود التفعيل", codeCx, codeCy - Math.round(h * 0.1));
+  ctx.fillStyle = codeColor;
+  ctx.font = `800 ${Math.max(15, Math.round(h * 0.115))}px monospace, ${FONT}`;
+  ctx.fillText(fitText(ctx, code.code || "", codeColW - 4), codeCx, codeCy + Math.round(h * 0.06));
 
   // فوتر
   ctx.fillStyle = footerColor;
   ctx.fillRect(x, y + h - footerH, w, footerH);
   ctx.fillStyle = "#fff";
-  ctx.font = `800 ${Math.max(11, Math.round(h * 0.065))}px ${FONT}`;
+  ctx.font = `800 ${Math.max(10, Math.round(h * 0.06))}px ${FONT}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(PHONES, x + w / 2, y + h - footerH / 2);
