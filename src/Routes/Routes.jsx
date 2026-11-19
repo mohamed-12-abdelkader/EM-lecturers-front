@@ -213,6 +213,9 @@ const WhatsAppMonitorPage = lazyPage(() => import("../pages/Admin/whatsapp/Whats
 const WhatsAppInboxPage = lazyPage(() => import("../pages/Admin/whatsapp/WhatsAppInboxPage"));
 const WhatsAppPolicyPage = lazyPage(() => import("../pages/Admin/whatsapp/WhatsAppPolicyPage"));
 const ParentsExamNotifyPage = lazyPage(() => import("../pages/Admin/whatsapp/ParentsExamNotifyPage"));
+const TeachersManagementPage = lazyPage(() => import("../pages/Admin/whatsapp/TeachersManagementPage"));
+const TeacherSchedulesPage = lazyPage(() => import("../pages/Admin/teacherSchedules/TeacherSchedulesPage"));
+const TeacherScheduleCalendarPage = lazyPage(() => import("../pages/Admin/teacherSchedules/TeacherScheduleCalendarPage"));
 const TeacherInvoicesPage = lazyPage(() => import("../pages/teacher/TeacherInvoicesPage"));
 const AdminDashboardHome = lazyPage(() => import("../pages/home/AdminDashboardHome"));
 const TeacherDashboardHome = lazyPage(() => import("../pages/home/TeacherDashboardHome"));
@@ -502,6 +505,9 @@ const AppRouter = () => {
             <Route path="cridet" element={<AdminTeacherBalances />} />
             <Route path="open_phone" element={<OpenPhone />} />
             <Route path="whatsapp/parents-exam" element={<ParentsExamNotifyPage />} />
+            <Route path="whatsapp/teachers-management" element={<TeachersManagementPage />} />
+            <Route path="teacher-schedules" element={<TeacherSchedulesPage />} />
+            <Route path="teacher-schedules/:teacherId" element={<TeacherScheduleCalendarPage />} />
 
           </Route>
 

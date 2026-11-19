@@ -298,3 +298,75 @@ export async function sendSupportPolicyChat(message) {
   );
   return data?.data || data;
 }
+
+export async function fetchTeachersManagementSettings() {
+  const { data } = await baseUrl.get(`${API}/teachers-management/settings`, {
+    headers: authHeaders(getToken()),
+  });
+  return data?.data || data;
+}
+
+export async function saveTeachersManagementSettings(payload) {
+  const { data } = await baseUrl.put(`${API}/teachers-management/settings`, payload, {
+    headers: authHeaders(getToken(), "application/json"),
+  });
+  return data?.data || data;
+}
+
+export async function fetchTeachersManagementLogs(params = {}) {
+  const { data } = await baseUrl.get(`${API}/teachers-management/logs`, {
+    headers: authHeaders(getToken()),
+    params,
+  });
+  return data?.data || data;
+}
+
+export async function retryTeachersManagementLogs(logIds) {
+  const { data } = await baseUrl.post(
+    `${API}/teachers-management/retry`,
+    { logIds },
+    { headers: authHeaders(getToken(), "application/json") },
+  );
+  return data?.data || data;
+}
+
+export async function testTeachersManagementSend(teacherId) {
+  const { data } = await baseUrl.post(
+    `${API}/teachers-management/test`,
+    { teacherId },
+    { headers: authHeaders(getToken(), "application/json") },
+  );
+  return data?.data || data;
+}
+
+export async function uploadTeachersManagementMedia(file) {
+  const form = new FormData();
+  form.append("file", file);
+  const { data } = await baseUrl.post(`${API}/teachers-management/media`, form, {
+    headers: authHeaders(getToken()),
+  });
+  return data?.data || data;
+}
+
+export async function sendTeachersManagementBroadcast(payload) {
+  const { data } = await baseUrl.post(`${API}/teachers-management/broadcast`, payload, {
+    headers: authHeaders(getToken(), "application/json"),
+  });
+  return data?.data || data;
+}
+
+export async function fetchTeachersManagementBroadcasts(params = {}) {
+  const { data } = await baseUrl.get(`${API}/teachers-management/broadcasts`, {
+    headers: authHeaders(getToken()),
+    params,
+  });
+  return data?.data || data;
+}
+
+export async function fetchTeachersManagementSubscriptionLogs(params = {}) {
+  const { data } = await baseUrl.get(`${API}/teachers-management/subscription-logs`, {
+    headers: authHeaders(getToken()),
+    params,
+  });
+  return data?.data || data;
+}

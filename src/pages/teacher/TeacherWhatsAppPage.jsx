@@ -287,7 +287,7 @@ export default function TeacherWhatsAppPage() {
                 </Heading>
               </HStack>
               <Text fontSize="sm" color={muted}>
-                اربط أرقامك وأرسل إشعارات الطلاب وتقارير أولياء الأمور
+                اربط أرقامك، فعّل الدعم العلمي للرد على أسئلة الطلاب، وأرسل الإشعارات وتقارير أولياء الأمور
               </Text>
             </Box>
             <IconButton
@@ -389,7 +389,7 @@ export default function TeacherWhatsAppPage() {
               الخدمات
             </Heading>
             <Text fontSize="sm" color={muted} mb={4}>
-              عيّن أرقامك الجاهزة لكل خدمة
+              عيّن أرقامك الجاهزة لكل خدمة. خدمة «الدعم العلمي» ترد تلقائيًا على أسئلة طلابك من موادك فقط.
             </Text>
             <VStack align="stretch" spacing={4}>
               {services.map((svc) => {

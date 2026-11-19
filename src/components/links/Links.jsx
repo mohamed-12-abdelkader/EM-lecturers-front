@@ -198,6 +198,8 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
         { to: "/admin/finance", Icon: MdAccountBalanceWallet, label: "الحسابات والمالية" },
         { to: "/admin/whatsapp/inbox", Icon: FaWhatsapp, label: "واتساب" },
         { to: "/admin/whatsapp/parents-exam", Icon: FaWhatsapp, label: "إشعارات أولياء الأمور" },
+        { to: "/admin/whatsapp/teachers-management", Icon: FaWhatsapp, label: "إدارة المدرسين واتساب" },
+        { to: "/admin/teacher-schedules", Icon: MdSchool, label: "جداول المدرسين" },
         { to: "/admin/whatsapp/policy", Icon: FaWhatsapp, label: "تخصيص الدعم" },
         { to: "/teacher-points", Icon: MdEmojiEvents, label: "النقاط والترتيب" },
         { to: "/essay-reviews", Icon: MdGrading, label: "مراجعة الأسئلة المقالية" },

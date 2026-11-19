@@ -30,6 +30,7 @@ const ADMIN_SECTIONS = [
     title: "المنصة",
     items: [
       { label: "إدارة المدرسين", path: "/admin/management", icon: MdDashboard },
+      { label: "جداول المدرسين", path: "/admin/teacher-schedules", icon: MdSchool },
       { label: "إضافة مدرس", path: "/admin/addteacher", icon: MdPersonAdd },
       { label: "الصفوف الدراسية", path: "/admin/grades", icon: MdSchool },
       { label: "كل الطلاب", path: "/admin/students", icon: MdPeople },
@@ -49,6 +50,7 @@ const ADMIN_SECTIONS = [
     items: [
       { label: "واتساب", path: "/admin/whatsapp/inbox", icon: FaWhatsapp },
       { label: "أولياء الأمور", path: "/admin/whatsapp/parents-exam", icon: FaWhatsapp },
+      { label: "إدارة المدرسين واتساب", path: "/admin/whatsapp/teachers-management", icon: FaWhatsapp },
       { label: "تخصيص الدعم", path: "/admin/whatsapp/policy", icon: MdSupportAgent },
     ],
   },
