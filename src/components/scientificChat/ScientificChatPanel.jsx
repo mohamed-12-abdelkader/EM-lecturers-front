@@ -510,8 +510,8 @@ export default function ScientificChatPanel({
   const defaultSubtitle = useMemo(
     () =>
       mode === "course"
-        ? "اسأل عن محتوى هذا الكورس — الإجابة من المواد المرفوعة فقط (RAG)"
-        : "اسأل عن كل مواد المدرس — كورسات + ملفات عامة",
+        ? "مساعد شخصي: المنهج + المحاضرات + الامتحانات + النقاط + المتراكم"
+        : "مساعد شخصي لكل مواد المدرس ونظام المنصة وسجلك التعليمي",
     [mode]
   );
 
@@ -704,7 +704,7 @@ export default function ScientificChatPanel({
             ref={inputRef}
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            placeholder="اكتب سؤالك عن المحتوى العلمي..."
+            placeholder="اسأل عن المنهج أو النقاط أو المتراكم أو أي مشكلة في المنصة..."
             rows={compact ? 2 : 2}
             resize="none"
             border="none"
