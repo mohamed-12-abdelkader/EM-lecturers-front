@@ -1,5 +1,5 @@
 import { Switch } from "@chakra-ui/react";
-import { FaPlay, FaClipboardCheck, FaPen, FaStar, FaTasks } from "react-icons/fa";
+import { FaPlay, FaPen, FaStar, FaTasks } from "react-icons/fa";
 
 const ROWS = [
   {
@@ -9,15 +9,6 @@ const ROWS = [
     hint: "تُمنح مرة واحدة عند أول مشاهدة لكل فيديو",
     enabledKey: "video_watch_enabled",
     pointsKey: "video_watch_points",
-    hasPoints: true,
-  },
-  {
-    key: "examStart",
-    icon: FaClipboardCheck,
-    title: "نقاط بدء الامتحان",
-    hint: "عند إنشاء محاولة امتحان جديدة فقط",
-    enabledKey: "exam_start_enabled",
-    pointsKey: "exam_start_points",
     hasPoints: true,
   },
   {
@@ -33,7 +24,7 @@ const ROWS = [
     key: "examScore",
     icon: FaStar,
     title: "نقاط درجة الامتحان",
-    hint: "يُضاف عدد درجات الطالب كالنقاط عند التسليم (مثال: 15/20 → +15)",
+    hint: "من درجة الامتحان فقط (مثال: 15/20 → +15) — بدون نقاط لبدء الامتحان",
     enabledKey: "exam_score_enabled",
     hasPoints: false,
   },

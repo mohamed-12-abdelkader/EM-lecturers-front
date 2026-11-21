@@ -57,6 +57,11 @@ import {
 } from "react-icons/fa";
 import baseUrl from "../../api/baseUrl";
 import MeetingRecordingPlayerModal from "../../components/stream/MeetingRecordingPlayerModal";
+import {
+  formatMeetingDateTime,
+  fromDatetimeLocalValue,
+  isScheduledInFuture,
+} from "../../utils/meetingSchedule";
 
 const STREAM_REDIRECT_URL = import.meta.env.VITE_STREAM_REDIRECT_URL || "";
 
@@ -64,6 +69,7 @@ const STREAM_REDIRECT_URL = import.meta.env.VITE_STREAM_REDIRECT_URL || "";
 const MEETING_STATUS_LABEL = {
   started: "مباشر الآن",
   idle: "قيد الانتظار",
+  scheduled: "مجدولة",
   created: "قيد الانتظار",
   ended: "منتهي",
 };
@@ -124,6 +130,7 @@ export default function GeneralCourseGroupPage() {
 
   const [addMeetingOpen, setAddMeetingOpen] = useState(false);
   const [meetingTitle, setMeetingTitle] = useState("");
+  const [meetingScheduledLocal, setMeetingScheduledLocal] = useState("");
   const [meetingSaving, setMeetingSaving] = useState(false);
   const [editMeetingId, setEditMeetingId] = useState(null);
   const [editMeetingTitle, setEditMeetingTitle] = useState("");
@@ -420,17 +427,31 @@ export default function GeneralCourseGroupPage() {
       });
       return;
     }
+    const scheduled_start_at = fromDatetimeLocalValue(meetingScheduledLocal);
+    if (meetingScheduledLocal && !scheduled_start_at) {
+      toast({
+        title: "تنبيه",
+        description: "موعد البداية غير صالح",
+        status: "warning",
+        isClosable: true,
+      });
+      return;
+    }
     setMeetingSaving(true);
     try {
       const res = await baseUrl.post(
         `/api/general-courses/groups/${groupId}/meeting`,
-        { title: meetingTitle.trim() },
+        {
+          title: meetingTitle.trim(),
+          ...(scheduled_start_at ? { scheduled_start_at } : {}),
+        },
         { headers: { Authorization: `Bearer ${getToken()}` } },
       );
       const msg = res.data?.message || "تم إنشاء جلسة البث بنجاح";
       toast({ title: "تم", description: msg, status: "success", isClosable: true });
       setAddMeetingOpen(false);
       setMeetingTitle("");
+      setMeetingScheduledLocal("");
       fetchMeetings(true);
     } catch (err) {
       toast({
@@ -1035,6 +1056,7 @@ export default function GeneralCourseGroupPage() {
                     _hover={{ bg: "#dd6b20" }}
                     onClick={() => {
                       setMeetingTitle("");
+                      setMeetingScheduledLocal("");
                       setAddMeetingOpen(true);
                     }}
                   >
@@ -1063,7 +1085,15 @@ export default function GeneralCourseGroupPage() {
                 <VStack align="stretch" spacing={4}>
                   {meetings.map((m) => {
                     const status = m.status || "idle";
-                    const canJoin = status === "started" || status === "idle" || status === "created";
+                    const isScheduled = isScheduledInFuture(m.scheduled_start_at, status);
+                    const displayStatus = isScheduled ? "scheduled" : status;
+                    const canJoin =
+                      isTeacherOrAdmin
+                        ? status === "started" || status === "idle" || status === "created"
+                        : status === "started" ||
+                          (status === "idle" &&
+                            m.scheduled_start_at &&
+                            !isScheduled);
                     const canClose = isTeacherOrAdmin && (status === "started" || status === "created");
                     return (
                       <Card
@@ -1090,20 +1120,30 @@ export default function GeneralCourseGroupPage() {
                               </Text>
                               <HStack>
                                 <Badge
-                                  bg={status === "started" ? brandOrange : status === "ended" ? "gray.400" : brandBlue}
+                                  bg={
+                                    displayStatus === "started"
+                                      ? brandOrange
+                                      : displayStatus === "ended"
+                                        ? "gray.400"
+                                        : displayStatus === "scheduled"
+                                          ? brandBlue
+                                          : brandBlue
+                                  }
                                   color="white"
                                   fontSize="xs"
                                   px={2}
                                   py={0.5}
                                   borderRadius="full"
                                 >
-                                  {MEETING_STATUS_LABEL[status] || status}
+                                  {MEETING_STATUS_LABEL[displayStatus] || displayStatus}
                                 </Badge>
-                                {m.created_at && (
-                                  <Text fontSize="xs" color={subTextColor}>
-                                    {new Date(m.created_at).toLocaleDateString("ar-EG")}
-                                  </Text>
-                                )}
+                                <Text fontSize="xs" color={subTextColor}>
+                                  {m.scheduled_start_at
+                                    ? `تبدأ: ${formatMeetingDateTime(m.scheduled_start_at)}`
+                                    : m.created_at
+                                      ? new Date(m.created_at).toLocaleDateString("ar-EG")
+                                      : ""}
+                                </Text>
                               </HStack>
                             </VStack>
                             <HStack flexWrap="wrap" gap={2}>
@@ -1381,7 +1421,10 @@ export default function GeneralCourseGroupPage() {
 
       <Modal
         isOpen={addMeetingOpen}
-        onClose={() => setAddMeetingOpen(false)}
+        onClose={() => {
+          setAddMeetingOpen(false);
+          setMeetingScheduledLocal("");
+        }}
         isCentered
       >
         <ModalOverlay />
@@ -1389,20 +1432,36 @@ export default function GeneralCourseGroupPage() {
           <ModalHeader>إنشاء جلسة بث مباشر</ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            <FormControl>
-              <FormLabel>عنوان الجلسة (3 أحرف على الأقل)</FormLabel>
-              <Input
-                value={meetingTitle}
-                onChange={(e) => setMeetingTitle(e.target.value)}
-                placeholder="عنوان الجلسة"
-              />
-            </FormControl>
+            <VStack spacing={4} align="stretch">
+              <FormControl>
+                <FormLabel>عنوان الجلسة (3 أحرف على الأقل)</FormLabel>
+                <Input
+                  value={meetingTitle}
+                  onChange={(e) => setMeetingTitle(e.target.value)}
+                  placeholder="عنوان الجلسة"
+                />
+              </FormControl>
+              <FormControl>
+                <FormLabel>موعد البداية (اختياري)</FormLabel>
+                <Input
+                  type="datetime-local"
+                  value={meetingScheduledLocal}
+                  onChange={(e) => setMeetingScheduledLocal(e.target.value)}
+                />
+                <Text mt={1} fontSize="xs" color={subTextColor}>
+                  يظهر الموعد للمحاضر والطلاب، وتُفتح المحاضرة فيه
+                </Text>
+              </FormControl>
+            </VStack>
           </ModalBody>
           <ModalFooter>
             <Button
               variant="ghost"
               mr={3}
-              onClick={() => setAddMeetingOpen(false)}
+              onClick={() => {
+                setAddMeetingOpen(false);
+                setMeetingScheduledLocal("");
+              }}
             >
               إلغاء
             </Button>
@@ -1413,7 +1472,7 @@ export default function GeneralCourseGroupPage() {
               onClick={handleCreateMeeting}
               isLoading={meetingSaving}
             >
-              إنشاء
+              {meetingScheduledLocal ? "جدولة" : "إنشاء"}
             </Button>
           </ModalFooter>
         </ModalContent>

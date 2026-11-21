@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import {
   Avatar,
+  Badge,
   Box,
   Button,
   Flex,
@@ -12,10 +13,11 @@ import {
   useToast,
   VStack,
 } from "@chakra-ui/react";
-import { FaMedal, FaTrophy, FaUsers } from "react-icons/fa";
+import { FaHistory, FaMedal, FaTrophy, FaUsers } from "react-icons/fa";
 import {
   fetchStudentPointsLeaderboard,
   fetchStudentPointsSummary,
+  fetchStudentPointsTransactions,
   pointsApiError,
 } from "../../api/teacherPointsApi";
 import { readStoredUser } from "../../utils/authStorage";
@@ -25,7 +27,14 @@ import {
   DailyQuizSurface,
   useDailyQuizTheme,
 } from "../dailyQuiz/DailyQuizChrome";
-import { rankMedal } from "./pointsUtils";
+import {
+  eventTypeLabel,
+  eventTypeTone,
+  formatPointsDate,
+  rankMedal,
+  transactionCalculationHint,
+  transactionDetail,
+} from "./pointsUtils";
 
 function StatCard({ label, value, hint, icon: IconComp, accent = "blue" }) {
   const theme = useDailyQuizTheme();
@@ -135,6 +144,7 @@ export default function StudentPointsPage() {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [board, setBoard] = useState({ topStudents: [] });
+  const [transactions, setTransactions] = useState([]);
   const [error, setError] = useState("");
   const meId = readStoredUser()?.id ?? readStoredUser()?.user_id ?? null;
 
@@ -142,12 +152,14 @@ export default function StudentPointsPage() {
     setLoading(true);
     setError("");
     try {
-      const [summaryData, boardData] = await Promise.all([
+      const [summaryData, boardData, txData] = await Promise.all([
         fetchStudentPointsSummary(),
         fetchStudentPointsLeaderboard(10),
+        fetchStudentPointsTransactions(100),
       ]);
       setSummary(summaryData);
       setBoard(boardData);
+      setTransactions(txData.transactions || []);
     } catch (err) {
       const message = pointsApiError(err, "تعذر تحديد المدرس أو الصف للطالب");
       setError(message);
@@ -169,7 +181,7 @@ export default function StudentPointsPage() {
         icon={FaTrophy}
         eyebrow="My Points"
         title="نقاطي"
-        subtitle="النقاط تُحسب تلقائيًا من مشاهدة الفيديوهات وبدء الامتحانات والواجبات ودرجاتك. قائمة المتفوقين تعرض أعلى 10 في صفك فقط."
+        subtitle="النقاط تُحسب من درجات الامتحانات ومشاهدة الفيديوهات والواجبات. قائمة المتفوقين تعرض أعلى 10 في صفك فقط."
         actions={
           <Button
             as={RouterLink}
@@ -272,6 +284,87 @@ export default function StudentPointsPage() {
           )}
         </DailyQuizSurface>
       ) : null}
+
+      <DailyQuizSurface overflow="hidden" mt={5}>
+        <Flex
+          px={4}
+          py={3}
+          align="center"
+          justify="space-between"
+          borderBottomWidth="1px"
+          borderColor={theme.cardBorder}
+        >
+          <Flex align="center" gap={2}>
+            <FaHistory color="#DD6B20" />
+            <Text fontWeight="800" color={theme.heading}>
+              سجل احتساب نقاطي
+            </Text>
+          </Flex>
+          <Text fontSize="xs" color={theme.muted}>
+            {transactions.length} عملية
+          </Text>
+        </Flex>
+
+        {loading ? (
+          <VStack p={4} spacing={3} align="stretch">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} h="64px" borderRadius="xl" />
+            ))}
+          </VStack>
+        ) : !transactions.length ? (
+          <Box p={8} textAlign="center">
+            <Text color={theme.muted}>
+              لا يوجد سجل بعد. بعد تسليم امتحان أو مشاهدة فيديو ستظهر تفاصيل الاحتساب هنا.
+            </Text>
+          </Box>
+        ) : (
+          transactions.map((tx) => {
+            const detail = transactionDetail(tx);
+            const hint = transactionCalculationHint(tx);
+            return (
+              <Flex
+                key={tx.id}
+                px={4}
+                py={3}
+                align={{ base: "stretch", sm: "center" }}
+                direction={{ base: "column", sm: "row" }}
+                gap={3}
+                borderBottomWidth="1px"
+                borderColor={theme.cardBorder}
+              >
+                <Box flex="1" minW={0}>
+                  <Flex align="center" gap={2} flexWrap="wrap" mb={1}>
+                    <Badge colorScheme={eventTypeTone(tx.eventType)} borderRadius="full">
+                      {eventTypeLabel(tx.eventType)}
+                    </Badge>
+                    <Text fontSize="xs" color={theme.muted}>
+                      {formatPointsDate(tx.createdAt)}
+                    </Text>
+                  </Flex>
+                  {detail ? (
+                    <Text fontWeight="700" fontSize="sm" color={theme.heading} noOfLines={2}>
+                      {detail}
+                    </Text>
+                  ) : null}
+                  {hint ? (
+                    <Text mt={1} fontSize="xs" color={theme.muted}>
+                      {hint}
+                    </Text>
+                  ) : null}
+                </Box>
+                <Text
+                  fontWeight="800"
+                  color={tx.points >= 0 ? "green.500" : "red.500"}
+                  fontSize="sm"
+                  whiteSpace="nowrap"
+                >
+                  {tx.points >= 0 ? `+${tx.points}` : tx.points} نقطة
+                </Text>
+              </Flex>
+            );
+          })
+        )}
+      </DailyQuizSurface>
     </DailyQuizPageShell>
   );
 }

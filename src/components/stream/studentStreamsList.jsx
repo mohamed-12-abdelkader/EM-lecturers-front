@@ -21,16 +21,22 @@ import {
   FaBroadcastTower,
   FaHourglassHalf,
   FaCheckCircle,
+  FaCalendarAlt,
 } from "react-icons/fa";
 import { useState } from "react";
 import baseUrl from "../../api/baseUrl";
 import MeetingRecordingPlayerModal from "./MeetingRecordingPlayerModal";
+import {
+  formatMeetingDateTime,
+  isScheduledInFuture,
+} from "../../utils/meetingSchedule";
 
 const STREAM_REDIRECT_URL = import.meta.env.VITE_STREAM_REDIRECT_URL;
 
 const STATUS_META = {
   started: { label: "مباشر", scheme: "red", icon: FaBroadcastTower },
   idle: { label: "انتظار", scheme: "orange", icon: FaHourglassHalf },
+  scheduled: { label: "مجدولة", scheme: "blue", icon: FaCalendarAlt },
   ended: { label: "منتهي", scheme: "gray", icon: FaCheckCircle },
 };
 
@@ -62,10 +68,17 @@ const fetchCourseStreams = async (courseId) => {
 };
 
 function StudentStreamRow({ stream, onWatchRecording }) {
-  const meta = STATUS_META[stream.status] || STATUS_META.ended;
   const isLive = stream.status === "started";
   const isIdle = stream.status === "idle";
   const isEnded = stream.status === "ended";
+  const isScheduled = isScheduledInFuture(stream.scheduled_start_at, stream.status);
+  const meta = isScheduled
+    ? STATUS_META.scheduled
+    : STATUS_META[stream.status] || STATUS_META.ended;
+  const canJoinIdleAfterSchedule =
+    isIdle &&
+    stream.scheduled_start_at &&
+    !isScheduledInFuture(stream.scheduled_start_at, stream.status);
 
   const rowBg = useColorModeValue("white", "gray.800");
   const border = useColorModeValue("gray.200", "gray.700");
@@ -94,11 +107,39 @@ function StudentStreamRow({ stream, onWatchRecording }) {
             w={9}
             h={9}
             borderRadius="lg"
-            bg={isLive ? "red.500" : isIdle ? "orange.100" : "gray.100"}
-            color={isLive ? "white" : isIdle ? "orange.600" : "gray.500"}
+            bg={
+              isLive
+                ? "red.500"
+                : isScheduled
+                  ? "blue.100"
+                  : isIdle
+                    ? "orange.100"
+                    : "gray.100"
+            }
+            color={
+              isLive
+                ? "white"
+                : isScheduled
+                  ? "blue.600"
+                  : isIdle
+                    ? "orange.600"
+                    : "gray.500"
+            }
             _dark={{
-              bg: isLive ? "red.500" : isIdle ? "orange.900" : "whiteAlpha.200",
-              color: isLive ? "white" : isIdle ? "orange.300" : "gray.400",
+              bg: isLive
+                ? "red.500"
+                : isScheduled
+                  ? "blue.900"
+                  : isIdle
+                    ? "orange.900"
+                    : "whiteAlpha.200",
+              color: isLive
+                ? "white"
+                : isScheduled
+                  ? "blue.200"
+                  : isIdle
+                    ? "orange.300"
+                    : "gray.400",
             }}
             flexShrink={0}
           >
@@ -125,34 +166,49 @@ function StudentStreamRow({ stream, onWatchRecording }) {
                 </Badge>
               </HStack>
             </HStack>
-            <HStack color={muted} spacing={1.5} fontSize="xs">
-              <Icon as={FaClock} boxSize={2.5} />
+            <HStack color={muted} spacing={1.5} fontSize="xs" flexWrap="wrap">
+              <Icon as={stream.scheduled_start_at ? FaCalendarAlt : FaClock} boxSize={2.5} />
               <Text>
-                {new Date(stream.created_at || Date.now()).toLocaleDateString(
-                  "ar-EG",
-                  { year: "numeric", month: "short", day: "numeric" },
-                )}
+                {stream.scheduled_start_at
+                  ? `تبدأ: ${formatMeetingDateTime(stream.scheduled_start_at)}`
+                  : new Date(stream.created_at || Date.now()).toLocaleDateString(
+                      "ar-EG",
+                      { year: "numeric", month: "short", day: "numeric" },
+                    )}
               </Text>
             </HStack>
           </Box>
         </HStack>
 
         <Flex gap={2}>
-          {isLive ? (
+          {isLive || canJoinIdleAfterSchedule ? (
             <Button
               as="a"
               href={`${STREAM_REDIRECT_URL}/${stream.id}?t=${localStorage.getItem("token")}`}
               target="_blank"
               rel="noopener noreferrer"
               leftIcon={<Icon as={FaPlay} boxSize={3} />}
-              colorScheme="red"
+              colorScheme={isLive ? "red" : "blue"}
               size="sm"
               borderRadius="lg"
               fontWeight="700"
               w={{ base: "full", md: "auto" }}
             >
-              دخول المحاضرة
+              {isLive ? "دخول المحاضرة" : "فتح المحاضرة"}
             </Button>
+          ) : isScheduled ? (
+            <Badge
+              colorScheme="blue"
+              variant="subtle"
+              borderRadius="lg"
+              px={3}
+              py={2}
+              fontSize="xs"
+              fontWeight="700"
+              alignSelf="center"
+            >
+              تفتح في الموعد
+            </Badge>
           ) : null}
 
           {isEnded && stream.egress_url ? (

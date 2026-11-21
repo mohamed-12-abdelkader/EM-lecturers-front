@@ -50,8 +50,8 @@ export const DEFAULT_POINTS_SETTINGS = {
   teacher_id: null,
   video_watch_enabled: true,
   video_watch_points: 5,
-  exam_start_enabled: true,
-  exam_start_points: 5,
+  exam_start_enabled: false,
+  exam_start_points: 0,
   assignment_start_enabled: true,
   assignment_start_points: 3,
   exam_score_enabled: true,
@@ -76,8 +76,8 @@ export function normalizePointsSettings(raw = {}) {
     teacher_id: src.teacher_id ?? src.teacherId ?? null,
     video_watch_enabled: toBool(src.video_watch_enabled ?? src.videoWatchEnabled, true),
     video_watch_points: toInt(src.video_watch_points ?? src.videoWatchPoints, 5),
-    exam_start_enabled: toBool(src.exam_start_enabled ?? src.examStartEnabled, true),
-    exam_start_points: toInt(src.exam_start_points ?? src.examStartPoints, 5),
+    exam_start_enabled: toBool(src.exam_start_enabled ?? src.examStartEnabled, false),
+    exam_start_points: toInt(src.exam_start_points ?? src.examStartPoints, 0),
     assignment_start_enabled: toBool(
       src.assignment_start_enabled ?? src.assignmentStartEnabled,
       true,
@@ -100,8 +100,9 @@ export function settingsToPayload(settings) {
   return {
     video_watch_enabled: Boolean(settings.video_watch_enabled),
     video_watch_points: Math.max(0, toInt(settings.video_watch_points, 0)),
-    exam_start_enabled: Boolean(settings.exam_start_enabled),
-    exam_start_points: Math.max(0, toInt(settings.exam_start_points, 0)),
+    // Exam start bonus removed — score-only.
+    exam_start_enabled: false,
+    exam_start_points: 0,
     assignment_start_enabled: Boolean(settings.assignment_start_enabled),
     assignment_start_points: Math.max(0, toInt(settings.assignment_start_points, 0)),
     exam_score_enabled: Boolean(settings.exam_score_enabled),
@@ -632,5 +633,33 @@ export async function fetchStudentPointsLeaderboard(limit = 10) {
     classId: payload?.classId ?? payload?.gradeId ?? payload?.grade_id ?? null,
     teacherId: payload?.teacherId ?? payload?.teacher_id ?? null,
     topStudents: list.map(normalizeLeaderboardStudent),
+  };
+}
+
+export async function fetchStudentPointsTransactions(limit = 100) {
+  const { data } = await baseUrl.get(
+    `${STUDENT_API}/transactions${buildQuery({ limit })}`,
+  );
+  const payload = unwrap(data, "فشل تحميل سجل النقاط");
+  const list = Array.isArray(payload?.transactions)
+    ? payload.transactions
+    : Array.isArray(payload)
+      ? payload
+      : [];
+  return {
+    studentId: payload?.studentId ?? payload?.student_id ?? null,
+    teacherId: payload?.teacherId ?? payload?.teacher_id ?? null,
+    gradeId: payload?.gradeId ?? payload?.grade_id ?? null,
+    transactions: list.map((tx) => ({
+      id: tx.id,
+      points: Number(tx.points) || 0,
+      eventType: tx.eventType || tx.event_type,
+      referenceType: tx.referenceType || tx.reference_type || null,
+      referenceId: tx.referenceId ?? tx.reference_id ?? null,
+      referenceKey: tx.referenceKey || tx.reference_key || null,
+      metadata: tx.metadata || {},
+      gradeId: tx.gradeId ?? tx.grade_id ?? null,
+      createdAt: tx.createdAt || tx.created_at || null,
+    })),
   };
 }

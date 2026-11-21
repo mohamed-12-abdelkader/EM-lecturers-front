@@ -155,6 +155,9 @@ function ExamPointsSettingsFields({ formData, onPatch, isDisabled = false }) {
               ))}
             </VStack>
           </RadioGroup>
+          <Text mt={2} fontSize="xs" color="purple.600">
+            عند الحفظ يتم إعادة احتساب نقاط الطلاب على هذا الامتحان حسب الطريقة المختارة
+          </Text>
         </FormControl>
       ) : null}
       <ExamSwitchRow

@@ -42,6 +42,12 @@ import CourseFormModal, {
   CourseModalFieldLabel,
   useCourseModalInputProps,
 } from "../CourseFormModal";
+import {
+  formatMeetingDateTime,
+  fromDatetimeLocalValue,
+  isScheduledInFuture,
+  toDatetimeLocalValue,
+} from "../../utils/meetingSchedule";
 
 const STREAM_REDIRECT_URL = import.meta.env.VITE_STREAM_REDIRECT_URL;
 
@@ -64,6 +70,11 @@ const STATUS_META = {
     scheme: "orange",
     icon: FaHourglassHalf,
   },
+  scheduled: {
+    label: "مجدولة",
+    scheme: "blue",
+    icon: FaCalendarAlt,
+  },
   ended: {
     label: "منتهي",
     scheme: "gray",
@@ -79,6 +90,13 @@ function formatStreamDate(value) {
   });
 }
 
+function resolveStatusMeta(stream) {
+  if (isScheduledInFuture(stream.scheduled_start_at, stream.status)) {
+    return STATUS_META.scheduled;
+  }
+  return STATUS_META[stream.status] || STATUS_META.ended;
+}
+
 function StreamRow({
   stream,
   downloadingId,
@@ -89,10 +107,11 @@ function StreamRow({
   onDownload,
   onWatchRecording,
 }) {
-  const meta = STATUS_META[stream.status] || STATUS_META.ended;
   const isLive = stream.status === "started";
   const isIdle = stream.status === "idle";
   const isEnded = stream.status === "ended";
+  const isScheduled = isScheduledInFuture(stream.scheduled_start_at, stream.status);
+  const meta = resolveStatusMeta(stream);
 
   const rowBg = useColorModeValue("white", "gray.800");
   const border = useColorModeValue("gray.200", "gray.700");
@@ -122,11 +141,39 @@ function StreamRow({
             w={9}
             h={9}
             borderRadius="lg"
-            bg={isLive ? "red.500" : isIdle ? "orange.100" : "gray.100"}
-            color={isLive ? "white" : isIdle ? "orange.600" : "gray.500"}
+            bg={
+              isLive
+                ? "red.500"
+                : isScheduled
+                  ? "blue.100"
+                  : isIdle
+                    ? "orange.100"
+                    : "gray.100"
+            }
+            color={
+              isLive
+                ? "white"
+                : isScheduled
+                  ? "blue.600"
+                  : isIdle
+                    ? "orange.600"
+                    : "gray.500"
+            }
             _dark={{
-              bg: isLive ? "red.500" : isIdle ? "orange.900" : "whiteAlpha.200",
-              color: isLive ? "white" : isIdle ? "orange.300" : "gray.400",
+              bg: isLive
+                ? "red.500"
+                : isScheduled
+                  ? "blue.900"
+                  : isIdle
+                    ? "orange.900"
+                    : "whiteAlpha.200",
+              color: isLive
+                ? "white"
+                : isScheduled
+                  ? "blue.200"
+                  : isIdle
+                    ? "orange.300"
+                    : "gray.400",
             }}
             flexShrink={0}
           >
@@ -155,9 +202,13 @@ function StreamRow({
                 {meta.label}
               </Badge>
             </HStack>
-            <HStack color={muted} spacing={2} fontSize="xs">
+            <HStack color={muted} spacing={2} fontSize="xs" flexWrap="wrap">
               <Icon as={FaCalendarAlt} boxSize={2.5} />
-              <Text>{formatStreamDate(stream.created_at)}</Text>
+              <Text>
+                {stream.scheduled_start_at
+                  ? `تبدأ: ${formatMeetingDateTime(stream.scheduled_start_at)}`
+                  : formatStreamDate(stream.created_at)}
+              </Text>
             </HStack>
           </Box>
         </HStack>
@@ -277,6 +328,7 @@ const CourseStreamsList = ({ courseId, onCreateClick }) => {
 
   const [editingStream, setEditingStream] = useState(null);
   const [newTitle, setNewTitle] = useState("");
+  const [editScheduledLocal, setEditScheduledLocal] = useState("");
   const [deletingStream, setDeletingStream] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
   const [recordingModal, setRecordingModal] = useState({
@@ -290,21 +342,30 @@ const CourseStreamsList = ({ courseId, onCreateClick }) => {
   const handleUpdateTitle = async (e) => {
     e?.preventDefault?.();
     if (!editingStream || !newTitle.trim()) return;
+    const scheduled_start_at =
+      editingStream.status === "idle"
+        ? fromDatetimeLocalValue(editScheduledLocal)
+        : undefined;
+    if (editingStream.status === "idle" && editScheduledLocal && !scheduled_start_at) {
+      toast.error("موعد البداية غير صالح");
+      return;
+    }
     setSavingEdit(true);
     try {
-      await baseUrl.put(
-        `/api/meeting/${editingStream.id}`,
-        { title: newTitle.trim() },
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        },
-      );
-      toast.success("تم تحديث العنوان");
+      const payload = { title: newTitle.trim() };
+      if (editingStream.status === "idle") {
+        payload.scheduled_start_at = scheduled_start_at;
+      }
+      await baseUrl.put(`/api/meeting/${editingStream.id}`, payload, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      toast.success("تم تحديث المحاضرة");
       setEditingStream(null);
       setNewTitle("");
+      setEditScheduledLocal("");
       refetch();
-    } catch {
-      toast.error("فشل في تحديث العنوان");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "فشل في تحديث المحاضرة");
     } finally {
       setSavingEdit(false);
     }
@@ -436,6 +497,7 @@ const CourseStreamsList = ({ courseId, onCreateClick }) => {
                 onEdit={(s) => {
                   setEditingStream(s);
                   setNewTitle(s.title);
+                  setEditScheduledLocal(toDatetimeLocalValue(s.scheduled_start_at));
                 }}
                 onDelete={setDeletingStream}
                 onDownload={handleDownload}
@@ -479,30 +541,53 @@ const CourseStreamsList = ({ courseId, onCreateClick }) => {
 
       <CourseFormModal
         isOpen={!!editingStream}
-        onClose={() => setEditingStream(null)}
+        onClose={() => {
+          setEditingStream(null);
+          setEditScheduledLocal("");
+        }}
         loading={savingEdit}
         size={{ base: "sm", md: "md" }}
         icon={FaEdit}
         accent="blue"
-        title="تعديل عنوان المحاضرة"
-        subtitle="حدّث العنوان ليظهر للطلاب بشكل أوضح"
+        title="تعديل المحاضرة"
+        subtitle="حدّث العنوان أو موعد البداية"
         onSubmit={handleUpdateTitle}
         submitLabel="حفظ التغييرات"
         loadingText="جاري الحفظ..."
       >
-        <CourseModalFieldCard>
-          <FormControl isRequired>
-            <CourseModalFieldLabel icon={FaBroadcastTower}>
-              عنوان الجلسة
-            </CourseModalFieldLabel>
-            <Input
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              placeholder="عنوان الجلسة"
-              {...inputProps}
-            />
-          </FormControl>
-        </CourseModalFieldCard>
+        <VStack spacing={3} align="stretch">
+          <CourseModalFieldCard>
+            <FormControl isRequired>
+              <CourseModalFieldLabel icon={FaBroadcastTower}>
+                عنوان الجلسة
+              </CourseModalFieldLabel>
+              <Input
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                placeholder="عنوان الجلسة"
+                {...inputProps}
+              />
+            </FormControl>
+          </CourseModalFieldCard>
+          {editingStream?.status === "idle" ? (
+            <CourseModalFieldCard>
+              <FormControl>
+                <CourseModalFieldLabel icon={FaCalendarAlt}>
+                  موعد البداية
+                </CourseModalFieldLabel>
+                <Input
+                  type="datetime-local"
+                  value={editScheduledLocal}
+                  onChange={(e) => setEditScheduledLocal(e.target.value)}
+                  {...inputProps}
+                />
+                <Text mt={2} fontSize="xs" color="gray.500">
+                  اتركه فارغاً لإزالة الموعد المجدول
+                </Text>
+              </FormControl>
+            </CourseModalFieldCard>
+          ) : null}
+        </VStack>
       </CourseFormModal>
 
       <CourseFormModal

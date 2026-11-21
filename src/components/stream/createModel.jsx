@@ -25,6 +25,10 @@ import CourseFormModal, {
   CourseModalFieldLabel,
   useCourseModalInputProps,
 } from "../CourseFormModal";
+import {
+  formatMeetingDateTime,
+  fromDatetimeLocalValue,
+} from "../../utils/meetingSchedule";
 
 const STREAM_REDIRECT_URL = import.meta.env.VITE_STREAM_REDIRECT_URL;
 
@@ -41,6 +45,7 @@ function resolveCreatedMeeting(payload) {
 
 const CreateStreamModal = ({ isOpen, onClose, onSuccess, courseId }) => {
   const [title, setTitle] = useState("");
+  const [scheduledStartLocal, setScheduledStartLocal] = useState("");
   const [loading, setLoading] = useState(false);
   const [createdMeeting, setCreatedMeeting] = useState(null);
   const inputProps = useCourseModalInputProps("blue");
@@ -50,6 +55,7 @@ const CreateStreamModal = ({ isOpen, onClose, onSuccess, courseId }) => {
   useEffect(() => {
     if (isOpen) {
       setTitle("");
+      setScheduledStartLocal("");
       setCreatedMeeting(null);
     }
   }, [isOpen]);
@@ -61,11 +67,25 @@ const CreateStreamModal = ({ isOpen, onClose, onSuccess, courseId }) => {
       return;
     }
 
+    const scheduled_start_at = fromDatetimeLocalValue(scheduledStartLocal);
+    if (scheduledStartLocal && !scheduled_start_at) {
+      toast.error("موعد البداية غير صالح");
+      return;
+    }
+    if (scheduled_start_at && new Date(scheduled_start_at).getTime() < Date.now() - 60_000) {
+      toast.error("موعد البداية يجب أن يكون في المستقبل");
+      return;
+    }
+
     setLoading(true);
     try {
       const { data } = await baseUrl.post(
         "/api/meeting",
-        { title: title.trim(), course_id: courseId },
+        {
+          title: title.trim(),
+          course_id: courseId,
+          ...(scheduled_start_at ? { scheduled_start_at } : {}),
+        },
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -74,12 +94,17 @@ const CreateStreamModal = ({ isOpen, onClose, onSuccess, courseId }) => {
         },
       );
       const meeting = resolveCreatedMeeting(data);
-      toast.success("تم إنشاء المحاضرة المباشرة بنجاح");
+      toast.success(
+        scheduled_start_at
+          ? "تم جدولة المحاضرة المباشرة بنجاح"
+          : "تم إنشاء المحاضرة المباشرة بنجاح",
+      );
       setTitle("");
+      setScheduledStartLocal("");
       setCreatedMeeting(meeting);
       onSuccess?.(data);
-    } catch {
-      toast.error("فشل في إنشاء المحاضرة المباشرة");
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "فشل في إنشاء المحاضرة المباشرة");
     } finally {
       setLoading(false);
     }
@@ -116,9 +141,9 @@ const CreateStreamModal = ({ isOpen, onClose, onSuccess, courseId }) => {
         accent="orange"
         tourTargetId="course-create-stream-modal"
         title="إنشاء محاضرة مباشرة"
-        subtitle="أنشئ محاضرة بث مباشر للطلاب داخل هذا الكورس"
+        subtitle="أنشئ الآن أو جدولها بموعد بداية يظهر لك وللطلاب"
         onSubmit={handleSubmit}
-        submitLabel="إنشاء المحاضرة"
+        submitLabel={scheduledStartLocal ? "جدولة المحاضرة" : "إنشاء المحاضرة"}
         loadingText="جاري الإنشاء..."
         submitColorScheme="orange"
       >
@@ -139,6 +164,25 @@ const CreateStreamModal = ({ isOpen, onClose, onSuccess, courseId }) => {
               />
               <Text mt={2} fontSize="xs" color="gray.500">
                 سيظهر العنوان للطلاب في قائمة المحاضرات المباشرة
+              </Text>
+            </FormControl>
+          </CourseModalFieldCard>
+
+          <CourseModalFieldCard>
+            <FormControl>
+              <CourseModalFieldLabel icon={FaClock}>
+                موعد البداية (اختياري)
+              </CourseModalFieldLabel>
+              <Input
+                type="datetime-local"
+                name="scheduled_start_at"
+                value={scheduledStartLocal}
+                onChange={(e) => setScheduledStartLocal(e.target.value)}
+                isDisabled={loading}
+                {...inputProps}
+              />
+              <Text mt={2} fontSize="xs" color="gray.500">
+                لو حددته، تظهر المحاضرة للمحاضر والطلاب بهذا الموعد وتُفتح فيه
               </Text>
             </FormControl>
           </CourseModalFieldCard>
@@ -181,9 +225,30 @@ const CreateStreamModal = ({ isOpen, onClose, onSuccess, courseId }) => {
           </ModalHeader>
           <ModalCloseButton onClick={handleLater} />
           <ModalBody pb={2}>
-            <Text fontSize="sm" color={muted} textAlign="center">
-              هل تريد الانتقال إلى غرفة البث الآن أم لاحقاً؟
-            </Text>
+            {createdMeeting?.scheduled_start_at ? (
+              <VStack spacing={2}>
+                <Text fontSize="sm" color={muted} textAlign="center">
+                  تم جدولة المحاضرة وستظهر للطلاب بموعد البداية
+                </Text>
+                <HStack
+                  spacing={2}
+                  px={3}
+                  py={2}
+                  borderRadius="lg"
+                  bg="orange.50"
+                  _dark={{ bg: "whiteAlpha.100" }}
+                >
+                  <Icon as={FaClock} color="orange.500" />
+                  <Text fontSize="sm" fontWeight="700">
+                    {formatMeetingDateTime(createdMeeting.scheduled_start_at)}
+                  </Text>
+                </HStack>
+              </VStack>
+            ) : (
+              <Text fontSize="sm" color={muted} textAlign="center">
+                هل تريد الانتقال إلى غرفة البث الآن أم لاحقاً؟
+              </Text>
+            )}
           </ModalBody>
           <ModalFooter flexDir="column" gap={2} pb={5} pt={3}>
             <Button
@@ -195,7 +260,9 @@ const CreateStreamModal = ({ isOpen, onClose, onSuccess, courseId }) => {
               leftIcon={<Icon as={FaExternalLinkAlt} />}
               onClick={handleGoNow}
             >
-              انتقل للمحاضرة الآن
+              {createdMeeting?.scheduled_start_at
+                ? "الدخول للتحضير الآن"
+                : "انتقل للمحاضرة الآن"}
             </Button>
             <Button
               w="full"

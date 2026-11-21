@@ -1,6 +1,6 @@
 export const EVENT_TYPE_META = {
   VIDEO_WATCH: { label: "مشاهدة فيديو", tone: "blue" },
-  EXAM_START: { label: "بدء امتحان", tone: "orange" },
+  EXAM_START: { label: "بدء امتحان (ملغى)", tone: "orange" },
   ASSIGNMENT_START: { label: "بدء واجب", tone: "orange" },
   EXAM_SCORE: { label: "درجة امتحان", tone: "green" },
   ASSIGNMENT_SCORE: { label: "درجة واجب", tone: "green" },
@@ -40,6 +40,26 @@ export function transactionDetail(tx) {
     meta.exam_title ||
     ""
   );
+}
+
+/** Extra calculation hint for student ledger rows. */
+export function transactionCalculationHint(tx) {
+  const meta = tx?.metadata || {};
+  const eventType = tx?.eventType || tx?.event_type;
+  if (
+    (eventType === "EXAM_SCORE" || eventType === "ASSIGNMENT_SCORE") &&
+    meta.obtainedGrade != null
+  ) {
+    const total =
+      meta.totalGrade != null && meta.totalGrade !== ""
+        ? `/${meta.totalGrade}`
+        : "";
+    return `الدرجة المحتسبة: ${meta.obtainedGrade}${total}`;
+  }
+  if (meta.attemptId != null) {
+    return `المحاولة #${meta.attemptId}`;
+  }
+  return "";
 }
 
 export function rankMedal(rank) {
