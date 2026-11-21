@@ -1589,11 +1589,15 @@ const CourseExamsTab = ({
                             isClosable: true,
                           });
                         } catch (err) {
+                          const apiMsg =
+                            err?.response?.data?.message ||
+                            err?.response?.data?.error ||
+                            err.message;
                           toast({
                             title: "تعذّر إعادة احتساب النقاط",
-                            description:
-                              err?.response?.data?.message || err.message,
+                            description: apiMsg,
                             status: "error",
+                            duration: 7000,
                             isClosable: true,
                           });
                         } finally {
