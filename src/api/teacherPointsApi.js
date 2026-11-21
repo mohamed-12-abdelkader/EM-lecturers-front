@@ -217,15 +217,23 @@ export async function fetchStudentPointTransactions(studentId, params = {}) {
   const { data } = await baseUrl.get(
     `${TEACHER_API}/students/${studentId}/transactions${buildQuery({
       gradeId: params.gradeId,
-      limit: params.limit || 100,
+      limit: params.limit || 200,
       teacherId: params.teacherId,
     })}`,
   );
   const payload = unwrap(data, "فشل تحميل سجل النقاط");
   const list = Array.isArray(payload?.transactions) ? payload.transactions : [];
+  const transactions = list.map(normalizeTransaction);
+  const transactionsSum = toInt(
+    payload?.transactionsSum ?? payload?.transactions_sum,
+    transactions.reduce((acc, tx) => acc + toInt(tx.points, 0), 0),
+  );
   return {
     studentId: payload?.studentId ?? payload?.student_id ?? studentId,
-    transactions: list.map(normalizeTransaction),
+    transactions,
+    totalPoints: toInt(payload?.totalPoints ?? payload?.total_points, transactionsSum),
+    transactionsSum,
+    gradeId: payload?.gradeId ?? payload?.grade_id ?? params.gradeId ?? null,
   };
 }
 

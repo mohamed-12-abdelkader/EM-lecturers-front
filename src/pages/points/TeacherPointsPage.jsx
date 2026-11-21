@@ -291,6 +291,21 @@ export default function TeacherPointsPage() {
         teacherId: scopedTeacherId || undefined,
       });
       setTransactions(data.transactions);
+      const syncedPoints = Number(data.totalPoints ?? data.transactionsSum ?? 0);
+      // Keep the ranking card in sync with the ledger total.
+      setBoard((prev) => ({
+        ...prev,
+        students: (prev.students || []).map((row) =>
+          row.studentId === student.studentId
+            ? { ...row, points: syncedPoints }
+            : row,
+        ),
+      }));
+      setSelectedStudent((prev) =>
+        prev && prev.studentId === student.studentId
+          ? { ...prev, points: syncedPoints }
+          : prev,
+      );
     } catch (err) {
       setTransactions([]);
       toast({
@@ -1065,7 +1080,12 @@ export default function TeacherPointsPage() {
         <DrawerContent>
           <DrawerCloseButton />
           <DrawerHeader borderBottomWidth="1px">
-            سجل نقاط {selectedStudent?.name || ""}
+            <Text>سجل نقاط {selectedStudent?.name || ""}</Text>
+            {selectedStudent?.points != null ? (
+              <Text mt={1} fontSize="sm" fontWeight="700" color="orange.500">
+                المجموع: {selectedStudent.points}
+              </Text>
+            ) : null}
           </DrawerHeader>
           <DrawerBody py={4}>
             <Button
