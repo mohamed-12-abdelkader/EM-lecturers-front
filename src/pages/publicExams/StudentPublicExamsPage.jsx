@@ -25,6 +25,7 @@ import {
   translateCourseExamStudentError,
 } from "../../api/courseExamsApi";
 import {
+  clearPersistedAttemptId,
   persistAttemptId,
   persistUnansweredCompletionFlag,
 } from "../../utils/examAttemptProgress";
@@ -107,6 +108,8 @@ export default function StudentPublicExamsPage() {
     } catch (err) {
       const previous = err?.response?.data?.previousAttempt;
       if (previous) {
+        clearPersistedAttemptId(exam.id);
+        loadExams();
         navigate(`/exam/${exam.id}/report`, {
           state: { fromPublic: true, previousAttempt: previous },
         });

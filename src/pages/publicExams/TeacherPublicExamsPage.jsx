@@ -277,8 +277,29 @@ export default function TeacherPublicExamsPage() {
         answers_visible_at: fromDateTimeLocalValue(form.answers_visible_at),
       });
       if (editingExam?.id) {
-        await updatePublicExam(editingExam.id, payload, token);
-        toast({ title: "تم تحديث الامتحان", status: "success", isClosable: true });
+        const updated = await updatePublicExam(editingExam.id, payload, token);
+        const recalc =
+          updated?.pointsRecalculation ||
+          updated?.points_recalculation ||
+          updated?.exam?.pointsRecalculation ||
+          null;
+        if (recalc) {
+          const synced = Number(recalc.scoresSynced || 0);
+          const removed = Number(recalc.scoresRemoved || 0);
+          const processed = Number(recalc.studentsProcessed || 0);
+          toast({
+            title: "تم تحديث الامتحان وإعادة احتساب النقاط",
+            description:
+              removed > 0
+                ? `تم إلغاء نقاط ${removed} طالب لهذا الامتحان.`
+                : `تم تحديث نقاط ${synced} من ${processed} طالب.`,
+            status: "success",
+            isClosable: true,
+            duration: 5000,
+          });
+        } else {
+          toast({ title: "تم تحديث الامتحان", status: "success", isClosable: true });
+        }
       } else {
         await createPublicExam(payload, token);
         toast({

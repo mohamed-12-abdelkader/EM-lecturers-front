@@ -1,7 +1,5 @@
 /** توحيد حقول امتحان الكورس (camelCase + snake_case) حسب course-level-exams.md */
 
-import { hasInProgressExamAttempt } from "./examAttemptProgress";
-
 /** يحوّل أرقامًا عربية/فارسية إلى 0-9 ثم يبقي الأرقام فقط. */
 export function normalizeStudentCodeInput(value) {
   const mapped = String(value ?? "")
@@ -105,10 +103,8 @@ export function normalizeCourseLevelExam(raw = {}) {
     attempt_expires_at:
       raw.attempt_expires_at ?? raw.attemptExpiresAt ?? null,
     remaining_seconds: raw.remaining_seconds ?? raw.remainingSeconds ?? null,
-    can_resume:
-      raw.can_resume ??
-      raw.canResume ??
-      Boolean(raw.has_in_progress_attempt ?? raw.hasInProgressAttempt),
+    // Never infer resume from a stale/expired in-progress flag alone.
+    can_resume: Boolean(raw.can_resume ?? raw.canResume ?? false),
     show_answers: raw.show_answers ?? raw.showAnswers ?? null,
     release_reason: raw.release_reason ?? raw.releaseReason ?? null,
     attempt_report: raw.attempt_report ?? raw.attemptReport ?? null,
@@ -342,10 +338,9 @@ export function getStudentExamCta(exam) {
   const ended = isCourseExamEnded(exam);
   const hasAttempt = hasCompletedCourseExamAttempt(exam);
   const answersOpen = areCourseExamAnswersReleased(exam);
-  const inProgress =
-    Boolean(data.can_resume) ||
-    Boolean(data.has_in_progress_attempt) ||
-    hasInProgressExamAttempt(data.id);
+  // Resume only when the server says the attempt is still resumable.
+  // Do not trust localStorage or a bare has_in_progress flag (expired/stale list).
+  const inProgress = Boolean(data.can_resume);
   const remaining = getStudentAttemptsRemaining(data);
   const canStartNew = remaining === Infinity || remaining > 0;
   const examOpen = Boolean(data.is_active) && !ended && data.availability_status !== "expired";

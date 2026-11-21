@@ -46,6 +46,7 @@ import {
   setTeacherParentExamEnabled,
 } from "../../../api/whatsappTeacherApi";
 import {
+  clearPersistedAttemptId,
   persistAttemptId,
   persistUnansweredCompletionFlag,
 } from "../../../utils/examAttemptProgress";
@@ -397,6 +398,7 @@ const ExamCard = ({
   onDelete,
   onLateAccess,
   onAddEssay,
+  onRefresh,
 }) => {
   const exam = normalizeCourseLevelExam(rawExam) || rawExam;
   const navigate = useNavigate();
@@ -477,6 +479,20 @@ const ExamCard = ({
         },
       });
     } catch (err) {
+      const previous = err?.response?.data?.previousAttempt;
+      // Attempt already finished — clear stale local resume markers and refresh CTA.
+      clearPersistedAttemptId(exam.id);
+      if (typeof onRefresh === "function") onRefresh();
+      if (previous && !completionMode) {
+        navigate(`/exam/${exam.id}/take`, {
+          state: {
+            session: previous,
+            courseId: courseId || exam.course_id || exam.courseId || null,
+            alreadyFinished: true,
+          },
+        });
+        return;
+      }
       toast({
         title: completionMode
           ? "تعذر استكمال الأسئلة المتروكة"
@@ -967,8 +983,52 @@ const CourseExamsTab = ({
         },
       };
 
-      await baseUrl.patch(`/api/exams/${examId}`, payload, config);
-      toast({ title: 'تم تعديل الامتحان بنجاح', status: 'success', duration: 3000, isClosable: true });
+      const { data } = await baseUrl.patch(`/api/exams/${examId}`, payload, config);
+      const recalc =
+        data?.exam?.pointsRecalculation ||
+        data?.exam?.points_recalculation ||
+        data?.pointsRecalculation ||
+        null;
+      const pointsTouched =
+        payload?.pointsEnabled !== undefined ||
+        payload?.pointsAttemptMode !== undefined ||
+        payload?.points_enabled !== undefined ||
+        payload?.points_attempt_mode !== undefined;
+
+      if (pointsTouched && recalc) {
+        const created = Number(recalc.scoresCreated || 0);
+        const adjusted = Number(recalc.scoresAdjusted || 0);
+        const synced = Number(recalc.scoresSynced || 0);
+        const removed = Number(recalc.scoresRemoved || 0);
+        const processed = Number(recalc.studentsProcessed || 0);
+        const missing = Number(recalc.skippedMissingGrade || 0);
+        toast({
+          title: "تم تعديل الامتحان وإعادة احتساب النقاط",
+          description:
+            removed > 0
+              ? `تم إلغاء نقاط ${removed} طالب لهذا الامتحان.`
+              : `تم تحديث نقاط ${synced || created + adjusted} من ${processed} طالب` +
+                (missing ? ` (تخطّي ${missing} بدون صف دراسي).` : "."),
+          status: "success",
+          duration: 5000,
+          isClosable: true,
+        });
+      } else if (pointsTouched && data?.exam?.pointsRecalculationError) {
+        toast({
+          title: "تم حفظ الإعدادات لكن تعذّر إعادة احتساب النقاط",
+          description: data.exam.pointsRecalculationError,
+          status: "warning",
+          duration: 6000,
+          isClosable: true,
+        });
+      } else {
+        toast({
+          title: "تم تعديل الامتحان بنجاح",
+          status: "success",
+          duration: 3000,
+          isClosable: true,
+        });
+      }
       setEditModal({ isOpen: false, exam: null });
       refreshExams && refreshExams();
     } catch (error) {
@@ -2178,6 +2238,7 @@ const CourseExamsTab = ({
               onDelete={() => setDeleteDialog({ isOpen: true, exam })}
               onLateAccess={() => setLateAccessExam(exam)}
               onAddEssay={() => setEssayExam(exam)}
+              onRefresh={refreshExams}
             />
           ))}
         </SimpleGrid>

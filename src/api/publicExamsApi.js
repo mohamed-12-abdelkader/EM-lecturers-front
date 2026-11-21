@@ -127,7 +127,17 @@ export async function updatePublicExam(examId, payload, token) {
       "Content-Type": "application/json",
     },
   });
-  return normalizePublicExam(unwrapExam(data));
+  const exam = unwrapExam(data);
+  const normalized = normalizePublicExam(exam);
+  const recalc = exam?.pointsRecalculation || exam?.points_recalculation || null;
+  if (recalc) {
+    normalized.pointsRecalculation = recalc;
+    normalized.points_recalculation = recalc;
+  }
+  if (exam?.pointsRecalculationError) {
+    normalized.pointsRecalculationError = exam.pointsRecalculationError;
+  }
+  return normalized;
 }
 
 /** POST /api/public-exams/:examId/publish */

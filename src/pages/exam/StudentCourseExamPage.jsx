@@ -314,6 +314,9 @@ export default function StudentCourseExamPage() {
         if (cancelled) return;
         const previous = err?.response?.data?.previousAttempt;
         if (previous) {
+          clearPersistedAttemptId(examId);
+          clearUnansweredCompletionFlag(examId);
+          clearExamTakingFlag();
           setSubmitResult(previous);
           setError(null);
         } else {
