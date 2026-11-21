@@ -90,6 +90,7 @@ import {
   TOUR_OPEN_CREATE_COURSE,
   TOUR_CLOSE_CREATE_COURSE,
 } from "../../utils/teacherDashboardTour";
+import useTeacherPlatformBrand from "../../Hooks/teacher/useTeacherPlatformBrand";
 
 function KpiCard({ icon, label, value, accent = "blue" }) {
   const bg = useColorModeValue("white", "gray.800");
@@ -203,36 +204,56 @@ function QuickLinkCard({ link }) {
 
 function QuickLinksGrid({ links }) {
   return (
-    <Box
-      display="flex"
-      overflowX="auto"
-      gap={{ base: 2, md: 2.5 }}
-      pb={1}
-      mx={-1}
-      px={1}
-      role="navigation"
-      aria-label="الوصول السريع"
-      sx={{
-        WebkitOverflowScrolling: "touch",
-        scrollbarWidth: "none",
-        msOverflowStyle: "none",
-        "&::-webkit-scrollbar": { display: "none" },
-      }}
-    >
-      {links.map((link) => (
-        <Box
-          key={link.id}
-          flex="0 0 auto"
-          w={{ base: "88px", sm: "96px", md: "104px" }}
-        >
+    <Box role="navigation" aria-label="الوصول السريع">
+      {/* موبايل: سلايدر أفقي */}
+      <Box
+        display={{ base: "flex", md: "none" }}
+        overflowX="auto"
+        gap={2.5}
+        pb={1}
+        mx={-1}
+        px={1}
+        sx={{
+          WebkitOverflowScrolling: "touch",
+          scrollSnapType: "x mandatory",
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+          "&::-webkit-scrollbar": { display: "none" },
+        }}
+      >
+        {links.map((link) => (
+          <Box
+            key={link.id}
+            flex="0 0 auto"
+            w="104px"
+            scrollSnapAlign="start"
+          >
+            <Link
+              to={link.link}
+              style={{ textDecoration: "none", display: "block", height: "100%" }}
+            >
+              <QuickLinkCard link={link} />
+            </Link>
+          </Box>
+        ))}
+      </Box>
+
+      {/* تابلت/ديسكتوب: شبكة */}
+      <SimpleGrid
+        display={{ base: "none", md: "grid" }}
+        columns={{ md: 4, lg: 6 }}
+        spacing={3}
+      >
+        {links.map((link) => (
           <Link
+            key={link.id}
             to={link.link}
             style={{ textDecoration: "none", display: "block", height: "100%" }}
           >
             <QuickLinkCard link={link} />
           </Link>
-        </Box>
-      ))}
+        ))}
+      </SimpleGrid>
     </Box>
   );
 }
@@ -348,6 +369,7 @@ const TeacherDashboardHome = () => {
   const user = JSON.parse(localStorage.getItem("user")) || {};
   const token = localStorage.getItem("token");
   const queryClient = useQueryClient();
+  const platformBrand = useTeacherPlatformBrand();
 
   // States
   const [selectedGrade, setSelectedGrade] = useState("");
@@ -583,6 +605,14 @@ const TeacherDashboardHome = () => {
     (sum, s) => sum + (s.groups_count || 0),
     0,
   );
+  const totalStudents = useMemo(
+    () =>
+      courses.reduce(
+        (sum, c) => sum + (Number(c.students_count) || Number(c.enrolled_count) || 0),
+        0,
+      ),
+    [courses],
+  );
 
   // Color mode values
   const pageBg = useColorModeValue(
@@ -593,14 +623,12 @@ const TeacherDashboardHome = () => {
   const headingColor = useColorModeValue("gray.900", "white");
   const textColor = useColorModeValue("gray.600", "gray.300");
   const borderColor = useColorModeValue("gray.200", "gray.600");
-  const heroBg = useColorModeValue(
-    "linear(to-l, blue.600, blue.500)",
-    "linear(to-l, blue.700, blue.600)",
-  );
+  const heroBg = platformBrand.heroGradient;
   const heroShadow = useColorModeValue(
-    "0 28px 60px -28px rgba(10, 50, 102, 0.55)",
+    platformBrand.heroShadow,
     "0 28px 60px -28px rgba(0,0,0,0.7)",
   );
+  const brandAccent = platformBrand.accent || "#3182CE";
   const sectionCardBg = useColorModeValue("white", "gray.800");
   const sectionBorder = useColorModeValue("gray.200", "gray.700");
   const courseImageBg = useColorModeValue("gray.100", "gray.700");
@@ -962,7 +990,7 @@ const TeacherDashboardHome = () => {
     >
       <Container maxW="8xl" py={{ base: 4, md: 6 }} px={{ base: 3, md: 4 }}>
         <VStack spacing={{ base: 5, md: 6 }} align="stretch">
-          {/* Hero */}
+          {/* Hero — لون منصة المدرس */}
           <Box
             data-tour-id="teacher-hero"
             color="white"
@@ -970,24 +998,24 @@ const TeacherDashboardHome = () => {
             overflow="hidden"
             position="relative"
             boxShadow={heroShadow}
-            bg="linear-gradient(125deg, #082B57 0%, #0E4C92 46%, #1A6BB8 100%)"
+            bg={heroBg}
           >
             <Box
               position="absolute"
               inset={0}
               pointerEvents="none"
-              bgImage="radial-gradient(ellipse 80% 70% at 0% 0%, rgba(237,137,54,0.28), transparent 42%), radial-gradient(ellipse 70% 80% at 100% 100%, rgba(255,255,255,0.16), transparent 50%), linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)"
-              bgSize="auto, auto, 28px 28px, 28px 28px"
+              opacity={0.9}
+              bgImage={`radial-gradient(ellipse 70% 80% at 100% 0%, ${brandAccent}55, transparent 50%), radial-gradient(ellipse 60% 70% at 0% 100%, rgba(255,255,255,0.14), transparent 55%)`}
             />
             <Box
               position="absolute"
-              top="-80px"
-              insetInlineEnd="-60px"
-              w="240px"
-              h="240px"
+              top="-70px"
+              insetInlineStart="-40px"
+              w="220px"
+              h="220px"
               borderRadius="full"
               bg="whiteAlpha.200"
-              filter="blur(8px)"
+              filter="blur(6px)"
               pointerEvents="none"
             />
             <Box
@@ -995,7 +1023,7 @@ const TeacherDashboardHome = () => {
               bottom={0}
               insetInline={0}
               h="3px"
-              bg="linear-gradient(90deg, #F6AD55, #DD6B20, transparent)"
+              bg={`linear-gradient(90deg, ${platformBrand.accentSoft || brandAccent}, ${brandAccent}, transparent)`}
             />
 
             <Flex
@@ -1007,75 +1035,104 @@ const TeacherDashboardHome = () => {
               px={{ base: 5, md: 7 }}
               py={{ base: 6, md: 8 }}
             >
-              <HStack spacing={{ base: 4, md: 5 }} align="center" minW={0}>
+              <HStack spacing={{ base: 4, md: 5 }} align="center" minW={0} flex="1">
                 <Box position="relative" flexShrink={0}>
                   <Box
                     position="absolute"
                     inset="-5px"
-                    borderRadius="full"
-                    bg="linear-gradient(135deg, #F6AD55, transparent 62%)"
-                    opacity={0.9}
+                    borderRadius="2xl"
+                    bg={`linear-gradient(135deg, ${platformBrand.accentSoft || "#fff"}, transparent 65%)`}
+                    opacity={0.85}
                   />
                   <Image
-                    src={user.avatar || "https://placehold.co/100x100?text=User"}
+                    src={user.avatar || platformBrand.logoUrl || "https://placehold.co/100x100?text=User"}
                     alt={teacherDisplayName}
-                    w={{ base: "72px", md: "88px" }}
-                    h={{ base: "72px", md: "88px" }}
-                    borderRadius="full"
+                    w={{ base: "84px", md: "104px" }}
+                    h={{ base: "84px", md: "104px" }}
+                    borderRadius="2xl"
                     border="3px solid"
                     borderColor="white"
                     boxShadow="0 12px 30px -12px rgba(0,0,0,0.45)"
                     objectFit="cover"
                     position="relative"
                     zIndex={1}
-                  />
-                  <Box
-                    position="absolute"
-                    bottom="3px"
-                    insetInlineEnd="3px"
-                    w={3.5}
-                    h={3.5}
-                    bg="green.400"
-                    borderRadius="full"
-                    border="2px solid white"
-                    zIndex={2}
+                    bg="whiteAlpha.300"
                   />
                 </Box>
                 <Box minW={0}>
-                  <HStack spacing={2} mb={2} flexWrap="wrap">
-                    <Badge
-                      borderRadius="full"
-                      px={3}
-                      py={0.5}
-                      bg="whiteAlpha.200"
-                      color="white"
-                      fontWeight="800"
-                      fontSize="xs"
-                      letterSpacing="0.02em"
-                    >
-                      مساحة المدرس
-                    </Badge>
-                    <Text fontSize="xs" color="whiteAlpha.800" fontWeight="600">
-                      {todayLabel}
-                    </Text>
-                  </HStack>
+                  <Badge
+                    borderRadius="full"
+                    px={3}
+                    py={1}
+                    mb={2}
+                    bg="blackAlpha.350"
+                    color="white"
+                    fontWeight="800"
+                    fontSize="xs"
+                  >
+                    {todayLabel}
+                  </Badge>
                   <Heading
                     as="h1"
                     fontSize={{ base: "xl", md: "3xl" }}
                     fontWeight="900"
                     color="white"
-                    noOfLines={1}
-                    fontFamily="'Noto Naskh Arabic', 'Noto Sans Arabic', serif"
+                    noOfLines={2}
                     letterSpacing="-0.03em"
-                    lineHeight="1.25"
+                    lineHeight="1.3"
                   >
                     {teacherGreeting}، {teacherDisplayName}
                   </Heading>
-                 
+                  <Text
+                    mt={2}
+                    fontSize={{ base: "sm", md: "md" }}
+                    color="whiteAlpha.900"
+                    fontWeight="600"
+                    noOfLines={2}
+                  >
+                    {platformBrand.specialty
+                      ? `مرحباً بك في مساحة تدريس ${platformBrand.specialty}`
+                      : "مرحباً بك في لوحة تحكم منصتك التعليمية"}
+                  </Text>
                 </Box>
               </HStack>
 
-             
+              <HStack
+                spacing={2}
+                flexWrap="wrap"
+                justify={{ base: "stretch", lg: "flex-end" }}
+                w={{ base: "full", lg: "auto" }}
+              >
+                <Button
+                  as={Link}
+                  to="/teacher-daily-quizzes"
+                  size="sm"
+                  bg="white"
+                  color={platformBrand.accent2 || "#0B1B3A"}
+                  borderRadius="xl"
+                  fontWeight="800"
+                  leftIcon={<Icon as={FaFire} />}
+                  _hover={{ bg: "whiteAlpha.900" }}
+                  flex={{ base: 1, sm: "unset" }}
+                >
+                  مسابقة يومية
+                </Button>
+                <Button
+                  as={Link}
+                  to="/teacher-analytics"
+                  size="sm"
+                  variant="outline"
+                  borderColor="whiteAlpha.700"
+                  color="white"
+                  borderRadius="xl"
+                  fontWeight="800"
+                  leftIcon={<Icon as={FaChartLine} />}
+                  _hover={{ bg: "whiteAlpha.200" }}
+                  flex={{ base: 1, sm: "unset" }}
+                >
+                  تقرير النشاط
+                </Button>
+              </HStack>
             </Flex>
           </Box>
 
@@ -1088,7 +1145,32 @@ const TeacherDashboardHome = () => {
           </Box>
 
           {/* KPIs */}
-        
+          <SimpleGrid columns={{ base: 2, md: 4 }} spacing={3} data-tour-id="teacher-kpis">
+            <KpiCard
+              icon={FaUsers}
+              label="إجمالي الطلاب"
+              value={totalStudents.toLocaleString("ar-EG")}
+              accent="blue"
+            />
+            <KpiCard
+              icon={FaBookOpen}
+              label="الكورسات النشطة"
+              value={courses.length.toLocaleString("ar-EG")}
+              accent="blue"
+            />
+            <KpiCard
+              icon={MdQuiz}
+              label="المواد / المجموعات"
+              value={`${subjects.length} / ${totalGroups}`}
+              accent="orange"
+            />
+            <KpiCard
+              icon={FaChartLine}
+              label="الصفوف المتاحة"
+              value={grades.length.toLocaleString("ar-EG")}
+              accent="green"
+            />
+          </SimpleGrid>
 
           {/* Quick Links */}
           <Box
@@ -1097,11 +1179,14 @@ const TeacherDashboardHome = () => {
             borderWidth="1px"
             borderColor={sectionBorder}
             borderRadius={{ base: "xl", md: "2xl" }}
-            p={{ base: 3, md: 4 }}
+            p={{ base: 3, md: 5 }}
             overflow="hidden"
           >
-            <Box mb={{ base: 2.5, md: 3 }}>
+            <Box mb={{ base: 3, md: 4 }}>
               <SectionTitle>الوصول السريع</SectionTitle>
+              <Text fontSize="xs" color={mutedTextColor} mt={1}>
+                اختصارات لأهم أدوات المنصة
+              </Text>
             </Box>
 
             <QuickLinksGrid links={quickLinks} />
@@ -1392,7 +1477,7 @@ const TeacherDashboardHome = () => {
           maxH={{ base: "100vh", md: "92vh" }}
         >
           <Box
-            bgGradient={heroBg}
+            bg={heroBg}
             px={{ base: 4, md: 6 }}
             py={{ base: 4, md: 5 }}
             position="relative"

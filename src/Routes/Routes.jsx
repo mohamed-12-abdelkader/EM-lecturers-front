@@ -214,6 +214,7 @@ const WhatsAppInboxPage = lazyPage(() => import("../pages/Admin/whatsapp/WhatsAp
 const WhatsAppPolicyPage = lazyPage(() => import("../pages/Admin/whatsapp/WhatsAppPolicyPage"));
 const ParentsExamNotifyPage = lazyPage(() => import("../pages/Admin/whatsapp/ParentsExamNotifyPage"));
 const TeachersManagementPage = lazyPage(() => import("../pages/Admin/whatsapp/TeachersManagementPage"));
+const ExamAssistantAdminPage = lazyPage(() => import("../pages/Admin/whatsapp/ExamAssistantAdminPage"));
 const TeacherSchedulesPage = lazyPage(() => import("../pages/Admin/teacherSchedules/TeacherSchedulesPage"));
 const TeacherScheduleCalendarPage = lazyPage(() => import("../pages/Admin/teacherSchedules/TeacherScheduleCalendarPage"));
 const TeacherInvoicesPage = lazyPage(() => import("../pages/teacher/TeacherInvoicesPage"));
@@ -506,6 +507,7 @@ const AppRouter = () => {
             <Route path="open_phone" element={<OpenPhone />} />
             <Route path="whatsapp/parents-exam" element={<ParentsExamNotifyPage />} />
             <Route path="whatsapp/teachers-management" element={<TeachersManagementPage />} />
+            <Route path="whatsapp/exam-assistant" element={<ExamAssistantAdminPage />} />
             <Route path="teacher-schedules" element={<TeacherSchedulesPage />} />
             <Route path="teacher-schedules/:teacherId" element={<TeacherScheduleCalendarPage />} />
 

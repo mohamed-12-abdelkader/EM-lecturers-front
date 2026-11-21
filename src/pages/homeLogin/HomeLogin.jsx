@@ -17,11 +17,11 @@ import { MdVerified } from "react-icons/md";
 import Links from "../../components/links/Links";
 import { getRoleLabel } from "../../utils/authRoles";
 import UserType from "../../Hooks/auth/userType";
-import { SHELL_DESKTOP_BP } from "../../theme/chakraTheme";
+import useTeacherPlatformBrand from "../../Hooks/teacher/useTeacherPlatformBrand";
 
-const BRAND_BLUE = "#3182CE";
-const BRAND_BLUE_DARK = "#2B6CB0";
-const BRAND_ORANGE = "#DD6B20";
+const DEFAULT_BLUE = "#3182CE";
+const DEFAULT_BLUE_DARK = "#2B6CB0";
+const DEFAULT_ORANGE = "#DD6B20";
 
 function getUserDisplayName(user) {
   if (!user) return "مستخدم";
@@ -38,7 +38,7 @@ function getRoleMeta(user, isAdmin, isTeacher, isAcademy, isAcademyTeacher) {
   return { label: getRoleLabel(user?.role) || "طالب" };
 }
 
-function SidebarBrandHeader() {
+function SidebarBrandHeader({ brandName, accent = DEFAULT_BLUE, accent2 = DEFAULT_BLUE_DARK }) {
   return (
     <Box px={4} pt={5} pb={3} flexShrink={0}>
       <HStack spacing={3} align="center">
@@ -48,17 +48,17 @@ function SidebarBrandHeader() {
           borderRadius="14px"
           align="center"
           justify="center"
-          bgGradient={`linear(135deg, ${BRAND_BLUE}, ${BRAND_BLUE_DARK})`}
+          bgGradient={`linear(135deg, ${accent}, ${accent2})`}
           color="white"
           fontWeight="black"
           fontSize="sm"
-          boxShadow="0 10px 24px rgba(49,130,206,0.35)"
+          boxShadow={`0 10px 24px ${accent}59`}
         >
           EM
         </Flex>
         <Box minW={0}>
-          <Text fontSize="md" fontWeight="extrabold" color="gray.900" letterSpacing="-0.02em" _dark={{ color: "white" }}>
-            EM Academy
+          <Text fontSize="md" fontWeight="extrabold" color="gray.900" letterSpacing="-0.02em" _dark={{ color: "white" }} noOfLines={1}>
+            {brandName || "EM Academy"}
           </Text>
           <Text fontSize="11px" fontWeight="medium" color="gray.500">
             منصة التعلم الذكية
@@ -69,7 +69,16 @@ function SidebarBrandHeader() {
   );
 }
 
-function SidebarUserCard({ user, isAdmin, isTeacher, isAcademy, isAcademyTeacher }) {
+function SidebarUserCard({
+  user,
+  isAdmin,
+  isTeacher,
+  isAcademy,
+  isAcademyTeacher,
+  accent = DEFAULT_BLUE,
+  accent2 = DEFAULT_BLUE_DARK,
+  accentSoft = DEFAULT_ORANGE,
+}) {
   const role = getRoleMeta(user, isAdmin, isTeacher, isAcademy, isAcademyTeacher);
   const displayName = getUserDisplayName(user);
 
@@ -80,9 +89,9 @@ function SidebarUserCard({ user, isAdmin, isTeacher, isAcademy, isAcademyTeacher
         overflow="hidden"
         borderRadius="2xl"
         p={3.5}
-        bgGradient={`linear(135deg, ${BRAND_BLUE} 0%, ${BRAND_BLUE_DARK} 55%, #1A365D 100%)`}
+        bgGradient={`linear(135deg, ${accent} 0%, ${accent2} 55%, #1A365D 100%)`}
         color="white"
-        boxShadow="0 14px 32px rgba(49,130,206,0.28)"
+        boxShadow={`0 14px 32px ${accent}47`}
       >
         <Box
           position="absolute"
@@ -101,7 +110,7 @@ function SidebarUserCard({ user, isAdmin, isTeacher, isAcademy, isAcademyTeacher
           w="110px"
           h="110px"
           borderRadius="full"
-          bg={`${BRAND_ORANGE}33`}
+          bg={`${accentSoft}33`}
           pointerEvents="none"
         />
 
@@ -109,7 +118,8 @@ function SidebarUserCard({ user, isAdmin, isTeacher, isAcademy, isAcademyTeacher
           <Avatar
             size="md"
             name={displayName}
-            bg={BRAND_ORANGE}
+            src={user?.avatar}
+            bg={accentSoft}
             color="white"
             fontWeight="bold"
             borderWidth="2px"
@@ -158,6 +168,11 @@ const HomeLogin = () => {
   }, []);
   const [, isAdmin, isTeacher, student, isAcademy, isAcademyTeacher] = UserType();
   const location = useLocation();
+  const platformBrand = useTeacherPlatformBrand();
+  const brandAccent = platformBrand.accent || DEFAULT_BLUE;
+  const brandAccent2 = platformBrand.accent2 || DEFAULT_BLUE_DARK;
+  const brandAccentSoft = platformBrand.accentSoft || DEFAULT_ORANGE;
+  const brandName = platformBrand.brandName || "EM Academy";
 
   const sidebarBg = useColorModeValue("#F8FAFC", "gray.900");
   const sidebarBorder = useColorModeValue("blackAlpha.100", "whiteAlpha.100");
@@ -192,7 +207,7 @@ const HomeLogin = () => {
       {!shouldHideSidebar && (
         <Box
           data-tour-id="student-sidebar"
-          display={{ base: "none", [SHELL_DESKTOP_BP]: "flex" }}
+          display={{ base: "none", lg: "flex" }}
           flexDirection="column"
           width={sidebarWidth}
           height="100vh"
@@ -215,11 +230,15 @@ const HomeLogin = () => {
             inset={0}
             pointerEvents="none"
             opacity={0.55}
-            backgroundImage={`radial-gradient(circle at 12% 18%, ${BRAND_BLUE}18 0, transparent 42%), radial-gradient(circle at 88% 82%, ${BRAND_ORANGE}14 0, transparent 40%)`}
+            backgroundImage={`radial-gradient(circle at 12% 18%, ${brandAccent}18 0, transparent 42%), radial-gradient(circle at 88% 82%, ${brandAccentSoft}14 0, transparent 40%)`}
           />
 
           <Box position="relative" zIndex={1} display="flex" flexDirection="column" h="full">
-            <SidebarBrandHeader />
+            <SidebarBrandHeader
+              brandName={brandName}
+              accent={brandAccent}
+              accent2={brandAccent2}
+            />
 
             <SidebarUserCard
               user={user}
@@ -227,6 +246,9 @@ const HomeLogin = () => {
               isTeacher={isTeacher}
               isAcademy={isAcademy}
               isAcademyTeacher={isAcademyTeacher}
+              accent={brandAccent}
+              accent2={brandAccent2}
+              accentSoft={brandAccentSoft}
             />
 
             <Box
@@ -251,8 +273,8 @@ const HomeLogin = () => {
               <Box
                 borderRadius="2xl"
                 overflow="hidden"
-                bgGradient={`linear(135deg, ${BRAND_ORANGE}, #C05621)`}
-                boxShadow="0 12px 28px rgba(221,107,32,0.28)"
+                bgGradient={`linear(135deg, ${brandAccentSoft}, ${brandAccent})`}
+                boxShadow={`0 12px 28px ${brandAccent}47`}
               >
                 <Button
                   as="a"
@@ -285,7 +307,7 @@ const HomeLogin = () => {
 
       <Box
         flex={1}
-        mr={{ base: 0, [SHELL_DESKTOP_BP]: shouldHideSidebar ? 0 : sidebarWidth }}
+        mr={{ base: 0, lg: shouldHideSidebar ? 0 : sidebarWidth }}
         mt="72px"
         w="full"
         maxW="100%"

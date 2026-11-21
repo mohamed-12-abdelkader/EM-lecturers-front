@@ -370,3 +370,43 @@ export async function fetchTeachersManagementSubscriptionLogs(params = {}) {
   });
   return data?.data || data;
 }
+
+export async function fetchExamAssistantOverview() {
+  const { data } = await baseUrl.get(`${API}/exam-assistant/overview`, {
+    headers: authHeaders(getToken()),
+  });
+  return data?.data || data;
+}
+
+export async function fetchExamAssistantSessions(params = {}) {
+  const { data } = await baseUrl.get(`${API}/exam-assistant/sessions`, {
+    headers: authHeaders(getToken()),
+    params,
+  });
+  return data?.data || data;
+}
+
+export async function fetchExamAssistantSession(id) {
+  const { data } = await baseUrl.get(`${API}/exam-assistant/sessions/${id}`, {
+    headers: authHeaders(getToken()),
+  });
+  return data?.data || data;
+}
+
+export async function cancelExamAssistantSession(id) {
+  const { data } = await baseUrl.post(
+    `${API}/exam-assistant/sessions/${id}/cancel`,
+    {},
+    { headers: authHeaders(getToken(), "application/json") },
+  );
+  return data?.data || data;
+}
+
+export async function reopenExamAssistantSession(id) {
+  const { data } = await baseUrl.post(
+    `${API}/exam-assistant/sessions/${id}/reopen`,
+    {},
+    { headers: authHeaders(getToken(), "application/json") },
+  );
+  return data?.data || data;
+}

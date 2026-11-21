@@ -50,6 +50,7 @@ import { SiTiktok } from "react-icons/si";
 import { motion } from "framer-motion";
 import baseUrl from "../../api/baseUrl";
 import ScrollToTop from "../../components/scollToTop/ScrollToTop";
+import SocialPublishingHub from "./SocialPublishingHub";
 
 const MotionBox = motion(Box);
 
@@ -177,6 +178,30 @@ const Social = () => {
       Authorization: /^Bearer\s+/i.test(token) ? token : `Bearer ${token}`,
     };
   }, [token]);
+
+  const [mainTab, setMainTab] = useState(() => {
+    try {
+      const tab = new URLSearchParams(window.location.search).get("tab");
+      if (
+        tab &&
+        ["assistant", "connections", "calendar", "posts", "approval", "settings"].includes(tab)
+      ) {
+        return tab === "assistant" ? "assistant" : "publishing";
+      }
+    } catch {
+      /* ignore */
+    }
+    return "assistant";
+  });
+  const [publishingSection, setPublishingSection] = useState(() => {
+    try {
+      const tab = new URLSearchParams(window.location.search).get("tab");
+      if (tab && tab !== "assistant") return tab;
+    } catch {
+      /* ignore */
+    }
+    return "connections";
+  });
 
   const [options, setOptions] = useState(FALLBACK_OPTIONS);
   const [optionsLoading, setOptionsLoading] = useState(true);
@@ -569,12 +594,52 @@ const Social = () => {
     }
   };
 
+  const switchMainTab = (tab, section) => {
+    setMainTab(tab);
+    if (section) setPublishingSection(section);
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (tab === "assistant") params.set("tab", "assistant");
+      else params.set("tab", section || publishingSection || "connections");
+      const qs = params.toString();
+      window.history.replaceState({}, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const queueGenerationForPublish = async (generationId) => {
+    try {
+      await baseUrl.post(
+        `/api/teacher/social-publishing/posts/from-generation/${generationId}`,
+        {},
+        { headers: authHeaders },
+      );
+      toast({
+        title: "تمت إضافة البوست لطابور النشر",
+        description: "راجعه من تبويب النشر التلقائي",
+        status: "success",
+        duration: 3500,
+        isClosable: true,
+      });
+      switchMainTab("publishing", "posts");
+    } catch (error) {
+      toast({
+        title: "تعذر إضافة البوست",
+        description: getErrorMessage(error),
+        status: "error",
+        isClosable: true,
+      });
+    }
+  };
+
   const sidebarProps = {
     history,
     loading: historyLoading,
     onRefresh: loadHistory,
     onSelect: applyHistoryItem,
     onNewSession: startNewSession,
+    onQueuePublish: queueGenerationForPublish,
     platformOptions: options.platforms,
     activeId: activeHistoryId,
     sidebarBg,
@@ -595,6 +660,46 @@ const Social = () => {
       dir="rtl"
       overflow="hidden"
     >
+      <HStack
+        px={{ base: 3, md: 4 }}
+        py={2}
+        spacing={2}
+        borderBottomWidth="1px"
+        borderColor={borderColor}
+        bg={composerShellBg}
+        flexShrink={0}
+        overflowX="auto"
+      >
+        <Button
+          size="sm"
+          variant={mainTab === "assistant" ? "solid" : "ghost"}
+          colorScheme={mainTab === "assistant" ? "blue" : "gray"}
+          borderRadius="lg"
+          onClick={() => switchMainTab("assistant")}
+        >
+          المساعد الذكي
+        </Button>
+        <Button
+          size="sm"
+          variant={mainTab === "publishing" ? "solid" : "ghost"}
+          colorScheme={mainTab === "publishing" ? "blue" : "gray"}
+          borderRadius="lg"
+          leftIcon={<FaFacebookF />}
+          onClick={() => switchMainTab("publishing", publishingSection || "connections")}
+        >
+          النشر التلقائي
+        </Button>
+      </HStack>
+
+      {mainTab === "publishing" ? (
+        <Box flex={1} minH={0} overflow="hidden">
+          <SocialPublishingHub
+            authHeaders={authHeaders}
+            initialSection={publishingSection}
+          />
+        </Box>
+      ) : (
+      <>
       <Flex flex={1} minH={0} overflow="hidden">
         {/* Sidebar — يمين في RTL */}
         <Box
@@ -814,6 +919,8 @@ const Social = () => {
       </Drawer>
 
       <ScrollToTop />
+      </>
+      )}
     </Box>
   );
 };
@@ -824,6 +931,7 @@ const ChatSidebar = ({
   onRefresh,
   onSelect,
   onNewSession,
+  onQueuePublish,
   platformOptions,
   activeId,
   sidebarBg,
@@ -904,6 +1012,7 @@ const ChatSidebar = ({
         history={history}
         loading={loading}
         onSelect={onSelect}
+        onQueuePublish={onQueuePublish}
         platformOptions={platformOptions}
         muted={muted}
         activeId={activeId}
@@ -917,6 +1026,7 @@ const HistoryList = ({
   history,
   loading,
   onSelect,
+  onQueuePublish,
   platformOptions,
   muted,
   activeId,
@@ -954,6 +1064,7 @@ const HistoryList = ({
           isActive={activeId === item.id}
           platformLabel={getItemLabel(platformOptions, item.platform)}
           onClick={() => onSelect(item)}
+          onQueuePublish={onQueuePublish}
           muted={muted}
           sidebarBorder={sidebarBorder}
         />
@@ -1704,48 +1815,76 @@ const ComposerMenuChip = ({ label, borderColor, chipHover, children }) => (
   </Menu>
 );
 
-const HistoryItem = ({ item, isActive, platformLabel, onClick, muted, sidebarBorder }) => {
+const HistoryItem = ({ item, isActive, platformLabel, onClick, onQueuePublish, muted }) => {
   const isImage = item.request_type === "image";
   const hoverBg = useColorModeValue("gray.200", "gray.700");
   const activeBg = useColorModeValue("gray.200", "gray.700");
   const ink = useColorModeValue("gray.800", "gray.100");
 
   return (
-    <Button
-      variant="ghost"
-      justifyContent="start"
-      h="auto"
-      py={2.5}
-      px={3}
+    <Box
       borderRadius="lg"
       bg={isActive ? activeBg : "transparent"}
       _hover={{ bg: isActive ? activeBg : hoverBg }}
-      whiteSpace="normal"
-      textAlign="right"
-      onClick={onClick}
       w="full"
-      fontWeight="normal"
     >
-      <HStack align="start" spacing={2.5} w="full">
-        <Icon
-          as={isImage ? FaImage : FaPenNib}
-          boxSize={3.5}
-          color={muted}
-          mt={0.5}
-          flexShrink={0}
-        />
-        <Box minW={0} flex={1}>
-          <Text fontSize="sm" fontWeight={isActive ? "semibold" : "medium"} color={ink} noOfLines={1} lineHeight="1.4">
-            {item.prompt || item.generated_text || "توليد محتوى"}
-          </Text>
-          <HStack spacing={2} mt={0.5}>
-            <Text fontSize="10px" color={muted}>
-              {isImage ? "صورة" : "نص"} · {platformLabel}
+      <Button
+        variant="ghost"
+        justifyContent="start"
+        h="auto"
+        py={2.5}
+        px={3}
+        borderRadius="lg"
+        bg="transparent"
+        _hover={{ bg: "transparent" }}
+        whiteSpace="normal"
+        textAlign="right"
+        onClick={onClick}
+        w="full"
+        fontWeight="normal"
+      >
+        <HStack align="start" spacing={2.5} w="full">
+          <Icon
+            as={isImage ? FaImage : FaPenNib}
+            boxSize={3.5}
+            color={muted}
+            mt={0.5}
+            flexShrink={0}
+          />
+          <Box minW={0} flex={1}>
+            <Text
+              fontSize="sm"
+              fontWeight={isActive ? "semibold" : "medium"}
+              color={ink}
+              noOfLines={1}
+              lineHeight="1.4"
+            >
+              {item.prompt || item.generated_text || "توليد محتوى"}
             </Text>
-          </HStack>
-        </Box>
-      </HStack>
-    </Button>
+            <HStack spacing={2} mt={0.5}>
+              <Text fontSize="10px" color={muted}>
+                {isImage ? "صورة" : "نص"} · {platformLabel}
+              </Text>
+            </HStack>
+          </Box>
+        </HStack>
+      </Button>
+      {isImage && item.generated_image_url && onQueuePublish && (
+        <Button
+          size="xs"
+          variant="link"
+          colorScheme="blue"
+          px={3}
+          pb={2}
+          onClick={(e) => {
+            e.stopPropagation();
+            onQueuePublish(item.id);
+          }}
+        >
+          أضف للنشر التلقائي
+        </Button>
+      )}
+    </Box>
   );
 };
 
