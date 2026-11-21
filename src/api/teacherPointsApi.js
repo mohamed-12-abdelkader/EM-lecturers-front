@@ -422,6 +422,27 @@ export async function resetAndRebuildLastExam({
   };
 }
 
+/**
+ * POST /api/teacher/points/recalculate-course-exam-scores
+ * @param {{ examId?: number, teacherId?: number }} [opts]
+ */
+export async function recalculateCourseExamScores(opts = {}) {
+  const body = {};
+  if (opts.examId) body.examId = Number(opts.examId);
+  if (opts.teacherId) body.teacherId = Number(opts.teacherId);
+  const { data } = await baseUrl.post(
+    `${TEACHER_API}/recalculate-course-exam-scores`,
+    body,
+  );
+  const result = unwrap(data, "فشل إعادة احتساب نقاط الامتحان");
+  return {
+    ...(result || {}),
+    message:
+      data?.message ||
+      "تم إعادة احتساب نقاط الامتحان للطلاب الذين سلّموا",
+  };
+}
+
 /** POST /api/teacher/points/consolidate-legacy */
 export async function consolidateLegacyExamPoints(teacherId) {
   const body = { confirm: CONSOLIDATE_EXAM_POINTS_CONFIRM };

@@ -50,6 +50,7 @@ import {
   persistAttemptId,
   persistUnansweredCompletionFlag,
 } from "../../../utils/examAttemptProgress";
+import { recalculateCourseExamScores } from "../../../api/teacherPointsApi";
 import LateAccessGrantModal from "../../exam/components/LateAccessGrantModal";
 
 const initialExamFormState = {
@@ -99,7 +100,13 @@ const POINTS_ATTEMPT_MODE_OPTIONS = [
   },
 ];
 
-function ExamPointsSettingsFields({ formData, onPatch, isDisabled = false }) {
+function ExamPointsSettingsFields({
+  formData,
+  onPatch,
+  isDisabled = false,
+  onRecalculateNow,
+  recalculating = false,
+}) {
   const enabled = formData.points_enabled !== false;
   return (
     <VStack spacing={3} align="stretch">
@@ -159,6 +166,20 @@ function ExamPointsSettingsFields({ formData, onPatch, isDisabled = false }) {
           <Text mt={2} fontSize="xs" color="purple.600">
             عند الحفظ يتم إعادة احتساب نقاط الطلاب على هذا الامتحان حسب الطريقة المختارة
           </Text>
+          {typeof onRecalculateNow === "function" ? (
+            <Button
+              mt={2}
+              size="sm"
+              colorScheme="purple"
+              variant="outline"
+              onClick={onRecalculateNow}
+              isLoading={recalculating}
+              loadingText="جاري إعادة الاحتساب..."
+              isDisabled={isDisabled}
+            >
+              إعادة احتساب نقاط الطلاب الآن
+            </Button>
+          ) : null}
         </FormControl>
       ) : null}
       <ExamSwitchRow
@@ -1146,6 +1167,7 @@ const CourseExamsTab = ({
   const EditExamModal = ({ isOpen, onClose, exam, onSubmit, loading }) => {
     const sectionBg = useColorModeValue("white", "gray.700");
     const sectionBorder = useColorModeValue("gray.200", "gray.600");
+    const [recalculatingPoints, setRecalculatingPoints] = useState(false);
     const [formData, setFormData] = useState({
       title: exam?.title || "",
       questions_count: exam?.questions_count?.toString() || "",
@@ -1544,6 +1566,40 @@ const CourseExamsTab = ({
                       onPatch={(partial) =>
                         setFormData((prev) => ({ ...prev, ...partial }))
                       }
+                      recalculating={recalculatingPoints}
+                      onRecalculateNow={async () => {
+                        if (!exam?.id) return;
+                        setRecalculatingPoints(true);
+                        try {
+                          const result = await recalculateCourseExamScores({
+                            examId: exam.id,
+                          });
+                          const synced = Number(result.scoresSynced || 0);
+                          const created = Number(result.scoresCreated || 0);
+                          const removed = Number(result.scoresRemoved || 0);
+                          const processed = Number(result.studentsProcessed || 0);
+                          toast({
+                            title: "تم إعادة احتساب النقاط",
+                            description:
+                              removed > 0
+                                ? `تم إلغاء نقاط ${removed} طالب.`
+                                : `تم تحديث ${synced || created} من ${processed} طالب.`,
+                            status: "success",
+                            duration: 5000,
+                            isClosable: true,
+                          });
+                        } catch (err) {
+                          toast({
+                            title: "تعذّر إعادة احتساب النقاط",
+                            description:
+                              err?.response?.data?.message || err.message,
+                            status: "error",
+                            isClosable: true,
+                          });
+                        } finally {
+                          setRecalculatingPoints(false);
+                        }
+                      }}
                     />
                   </VStack>
                 </Box>
