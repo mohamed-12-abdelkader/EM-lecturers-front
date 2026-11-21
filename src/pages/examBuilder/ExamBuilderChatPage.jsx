@@ -44,6 +44,10 @@ import UserType from "../../Hooks/auth/userType";
   fetchExamBuilderHistory,
   fetchExamBuilderSession,
   sendExamBuilderChat,
+  sendExamIntakeMessage,
+  uploadExamIntakeFiles,
+  resetExamIntakeSession,
+  fetchExamIntakeSession,
   regenerateExamBuilderSession,
   adjustExamBuilderSession,
   normalizeChatResponse,
@@ -212,6 +216,10 @@ export default function ExamBuilderChatPage() {
   const [adjusting, setAdjusting] = useState(false);
   const [focusQuestionIndex, setFocusQuestionIndex] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [chatTurns, setChatTurns] = useState([]);
+  const [intakeChoices, setIntakeChoices] = useState([]);
+  const [intakeState, setIntakeState] = useState(null);
+  const [intakeReviewUrl, setIntakeReviewUrl] = useState(null);
 
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -257,12 +265,34 @@ export default function ExamBuilderChatPage() {
   const loadInitial = useCallback(async () => {
     try {
       setLoading(true);
-      const [info, catalogData] = await Promise.all([
+      const [info, catalogData, intake] = await Promise.all([
         fetchExamBuilderInfo(),
         fetchExamBuilderCatalog().catch(() => []),
+        fetchExamIntakeSession().catch(() => null),
       ]);
-      setBotInfo(info);
+      setBotInfo({
+        ...info,
+        name: info?.name || "مساعد الامتحانات",
+        description:
+          "هسألك عن الصف والكورس ونوع الامتحان والإعدادات، وبعدين بنك الأسئلة أو رفع ملف/صور — نفس تدفق واتساب.",
+        welcome_message:
+          "اكتب «اعمل امتحان» عشان نبدأ مع بعض خطوة بخطوة.",
+        quick_examples: [
+          { label: "اعمل امتحان", message: "اعمل امتحان" },
+          { label: "إيه اللي تقدر تعمله؟", message: "ايه اللي تقدر تعمله؟" },
+        ],
+      });
       setCatalog(catalogData);
+      if (intake?.recent_turns?.length) {
+        setChatTurns(
+          intake.recent_turns.map((t) => ({
+            role: t.role === "assistant" ? "assistant" : "teacher",
+            text: t.text,
+          })),
+        );
+        setIntakeState(intake.state || null);
+        setIntakeReviewUrl(intake.context?.review_url || null);
+      }
     } catch (err) {
       toast({
         title: "تعذر تحميل مساعد الامتحانات",
@@ -360,6 +390,47 @@ export default function ExamBuilderChatPage() {
     }
   };
 
+  const appendIntakeTurn = (teacherText, assistantText) => {
+    setChatTurns((prev) => [
+      ...prev,
+      ...(teacherText ? [{ role: "teacher", text: teacherText }] : []),
+      ...(assistantText ? [{ role: "assistant", text: assistantText }] : []),
+    ]);
+  };
+
+  const applyIntakeResponse = async (data, teacherText) => {
+    const reply = data?.reply || "";
+    setSessionReply(reply);
+    setIntakeChoices(Array.isArray(data?.choices) ? data.choices : []);
+    setIntakeState(data?.state || data?.session?.state || null);
+    setIntakeReviewUrl(data?.review_url || null);
+    appendIntakeTurn(teacherText, reply);
+
+    const builderSid = data?.exam_builder_session_id;
+    if (builderSid) {
+      try {
+        const { item, questions } = await fetchExamBuilderSession(builderSid);
+        if (item && questions?.length) {
+          applyProposalState({
+            session: mapHistoryItemToSession(item),
+            questions,
+            reply,
+            actions: {
+              can_approve: item.status === "proposed",
+              can_regenerate: item.status === "proposed",
+              can_adjust: item.status === "proposed",
+            },
+            readOnly: item.status !== "proposed",
+            requestText: teacherText,
+          });
+        }
+      } catch {
+        /* optional panel */
+      }
+      loadHistory({ offset: 0 });
+    }
+  };
+
   const handleSend = async (text) => {
     const trimmed = String(text).trim();
     if (!trimmed) return;
@@ -370,28 +441,16 @@ export default function ExamBuilderChatPage() {
       /(سؤال|أسئلة|اسئلة|question)/i.test(trimmed);
 
     setCurrentRequest(trimmed);
-    setSessionReply("");
     setChatError("");
-    if (!isAdjustFollowUp) {
-      clearProposal();
-    }
     setThinking(true);
 
     try {
-      const data = await sendExamBuilderChat(
-        trimmed,
-        isAdjustFollowUp ? session?.id : undefined,
-      );
-      applyChatResponse(data, trimmed);
-
-      if (data.status === "message_only" && !data.session) {
-        toast({
-          title: "لم يُنشأ مقترح",
-          description: data.reply?.replace(/\*\*/g, "").slice(0, 140) || "تحقق من بنك الأسئلة",
-          status: "info",
-          duration: 5000,
-          isClosable: true,
-        });
+      if (isAdjustFollowUp) {
+        const data = await sendExamBuilderChat(trimmed, session?.id);
+        applyChatResponse(data, trimmed);
+      } else {
+        const data = await sendExamIntakeMessage(trimmed);
+        await applyIntakeResponse(data, trimmed);
       }
     } catch (err) {
       const message = apiErrorMessage(err, "فشل إرسال الطلب");
@@ -401,6 +460,43 @@ export default function ExamBuilderChatPage() {
         description: message,
         status: "error",
         duration: 8000,
+        isClosable: true,
+      });
+    } finally {
+      setThinking(false);
+    }
+  };
+
+  const handleUploadFiles = async (files) => {
+    if (!files?.length) return;
+    setThinking(true);
+    setChatError("");
+    try {
+      const data = await uploadExamIntakeFiles(files, "ملف أسئلة");
+      await applyIntakeResponse(data, `📎 أرسلت ${files.length} ملف`);
+    } catch (err) {
+      const message = apiErrorMessage(err, "فشل رفع الملفات");
+      setChatError(message);
+      toast({ title: "فشل الرفع", description: message, status: "error", isClosable: true });
+    } finally {
+      setThinking(false);
+    }
+  };
+
+  const handleResetIntake = async () => {
+    setThinking(true);
+    try {
+      const data = await resetExamIntakeSession();
+      setChatTurns([]);
+      setIntakeChoices([]);
+      clearProposal();
+      setIntakeState(data?.state || "IDLE");
+      appendIntakeTurn(null, data?.reply || "بدأنا من جديد.");
+    } catch (err) {
+      toast({
+        title: "تعذر إعادة المحادثة",
+        description: apiErrorMessage(err),
+        status: "error",
         isClosable: true,
       });
     } finally {
@@ -594,6 +690,11 @@ export default function ExamBuilderChatPage() {
             error={chatError}
             thinking={thinking}
             onSend={handleSend}
+            turns={chatTurns}
+            choices={intakeChoices}
+            onPickFiles={handleUploadFiles}
+            onReset={handleResetIntake}
+            intakeState={intakeState}
           >
             {hasProposal && (
               <ExamProposalPanel

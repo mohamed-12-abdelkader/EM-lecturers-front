@@ -15,7 +15,7 @@ import {
   VStack,
   HStack,
 } from "@chakra-ui/react";
-import { FiSend, FiMessageSquare } from "react-icons/fi";
+import { FiSend, FiMessageSquare, FiPaperclip, FiRefreshCw } from "react-icons/fi";
 import { MdQuiz } from "react-icons/md";
 import { renderMarkdownInline } from "../examBuilderUtils";
 import { ACCENT, ACCENT_LIGHT } from "../examBuilderTheme";
@@ -83,14 +83,14 @@ function AssistantBlock({ children }) {
   );
 }
 
-function ThinkingRow() {
+function ThinkingRow({ label }) {
   const muted = useColorModeValue("gray.500", "gray.400");
   const bg = useColorModeValue("gray.50", "whiteAlpha.50");
   return (
     <HStack spacing={3} px={3} py={2.5} borderRadius="xl" bg={bg}>
       <Spinner size="sm" color={ACCENT} thickness="2px" />
       <Text fontSize="sm" color={muted}>
-        جاري تحليل الطلب واختيار الأسئلة…
+        {label || "جاري فهم الطلب ومتابعة الخطوات…"}
       </Text>
     </HStack>
   );
@@ -111,6 +111,11 @@ function ChatComposer({
   quickExamples,
   showQuickExamples,
   maxQuestions = 100,
+  choices = [],
+  onPickChoice,
+  onPickFiles,
+  onReset,
+  fileInputRef,
 }) {
   const composerShadow = useColorModeValue(
     "0 2px 12px rgba(15, 23, 42, 0.06)",
@@ -129,7 +134,7 @@ function ChatComposer({
       sx={{ pb: "max(10px, env(safe-area-inset-bottom, 10px))" }}
     >
       <Box maxW="48rem" mx="auto" w="full">
-        {showQuickExamples && quickExamples?.length > 0 && (
+        {(choices?.length > 0 || (showQuickExamples && quickExamples?.length > 0)) && (
           <Flex
             gap={1.5}
             mb={2}
@@ -141,30 +146,47 @@ function ChatComposer({
               scrollbarWidth: "none",
             }}
           >
-            {quickExamples.slice(0, 4).map((ex) => (
-              <Button
-                key={ex.label}
-                size="xs"
-                variant="outline"
-                borderRadius="full"
-                borderColor={border}
-                bg={chipBg}
-                fontWeight="normal"
-                fontSize="11px"
-                px={3}
-                h="30px"
-                minH="30px"
-                flexShrink={0}
-                whiteSpace="nowrap"
-                onClick={() => onSend(ex.message)}
-                isDisabled={thinking}
-                _hover={{ borderColor: ACCENT, color: ACCENT }}
-              >
-                {ex.label}
-              </Button>
-            ))}
+            {(choices?.length ? choices : quickExamples.slice(0, 4)).map((ex) => {
+              const label = typeof ex === "string" ? ex : ex.label;
+              const message = typeof ex === "string" ? ex : ex.message;
+              return (
+                <Button
+                  key={label}
+                  size="xs"
+                  variant="outline"
+                  borderRadius="full"
+                  borderColor={border}
+                  bg={chipBg}
+                  fontWeight="normal"
+                  fontSize="11px"
+                  px={3}
+                  h="30px"
+                  minH="30px"
+                  flexShrink={0}
+                  whiteSpace="nowrap"
+                  onClick={() => (onPickChoice ? onPickChoice(message) : onSend(message))}
+                  isDisabled={thinking}
+                  _hover={{ borderColor: ACCENT, color: ACCENT }}
+                >
+                  {label}
+                </Button>
+              );
+            })}
           </Flex>
         )}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,application/pdf"
+          multiple
+          hidden
+          onChange={(e) => {
+            const list = Array.from(e.target.files || []);
+            if (list.length && onPickFiles) onPickFiles(list);
+            e.target.value = "";
+          }}
+        />
 
         <Box
           borderRadius="2xl"
@@ -179,11 +201,25 @@ function ChatComposer({
           }}
         >
           <Flex align="flex-end" gap={1.5} py={1.5} px={1.5} pl={2.5}>
+            {onPickFiles && (
+              <IconButton
+                aria-label="إرفاق ملف"
+                icon={<FiPaperclip />}
+                size="md"
+                variant="ghost"
+                borderRadius="full"
+                onClick={() => fileInputRef?.current?.click()}
+                isDisabled={thinking}
+                flexShrink={0}
+                minW="40px"
+                h="40px"
+              />
+            )}
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKeyDown}
-              placeholder="صف الامتحان: عدد الأسئلة، الفصل، الدرس…"
+              placeholder="اكتب ردك… أو ابدأ بـ «اعمل امتحان»"
               rows={1}
               minH="40px"
               maxH="120px"
@@ -198,6 +234,20 @@ function ChatComposer({
               _focus={{ boxShadow: "none" }}
               _placeholder={{ color: "gray.400", fontSize: "sm" }}
             />
+            {onReset && (
+              <IconButton
+                aria-label="محادثة جديدة"
+                icon={<FiRefreshCw />}
+                size="md"
+                variant="ghost"
+                borderRadius="full"
+                onClick={onReset}
+                isDisabled={thinking}
+                flexShrink={0}
+                minW="40px"
+                h="40px"
+              />
+            )}
             <IconButton
               aria-label="إرسال"
               icon={<FiSend />}
@@ -223,7 +273,7 @@ function ChatComposer({
           fontSize="10px"
           color={muted}
         >
-          Enter إرسال · Shift+Enter سطر · حتى {maxQuestions} سؤال
+          نفس خطوات واتساب: صف → كورس → نوع → إعدادات → بنك أو ملفات · حتى {maxQuestions} سؤال
         </Text>
       </Box>
     </Box>
@@ -238,9 +288,15 @@ export default function ExamBuilderChatWorkspace({
   thinking,
   onSend,
   children,
+  turns = [],
+  choices = [],
+  onPickFiles,
+  onReset,
+  intakeState,
 }) {
   const [input, setInput] = useState("");
   const bottomRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const pageBg = useColorModeValue("white", "gray.800");
   const border = useColorModeValue("gray.200", "gray.700");
@@ -253,12 +309,14 @@ export default function ExamBuilderChatWorkspace({
   const ink = useColorModeValue("gray.900", "white");
   const proposalShellBg = useColorModeValue("gray.50", "gray.900");
 
-  const isEmpty = !currentRequest && !reply && !error && !thinking && !children;
-  const showWelcome = isEmpty && botInfo?.welcome_message;
+  const hasTurns = Array.isArray(turns) && turns.length > 0;
+  const isEmpty =
+    !hasTurns && !currentRequest && !reply && !error && !thinking && !children;
+  const showWelcome = isEmpty;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [currentRequest, reply, error, thinking]);
+  }, [turns, currentRequest, reply, error, thinking, choices]);
 
   const handleSend = (preset) => {
     const text = (typeof preset === "string" ? preset : input).trim();
@@ -304,45 +362,74 @@ export default function ExamBuilderChatWorkspace({
               </Flex>
               <Box>
                 <Text fontSize={{ base: "md", md: "lg" }} fontWeight="800" color={ink} mb={2}>
-                  {botInfo?.name || "مساعد إنشاء الامتحانات"}
+                  {botInfo?.name || "مساعد الامتحانات"}
                 </Text>
                 <Text fontSize="sm" color={muted} lineHeight="1.8">
-                  {botInfo?.description ||
-                    "صف الامتحان بالعربية وسيتم اختيار أسئلة عشوائية من بنك أسئلتك"}
+                  نفس تجربة واتساب: هسألك عن الصف والكورس ونوع الامتحان والإعدادات،
+                  وبعدين تختار بنك الأسئلة أو ترفع ملف/صور وهستخرج الأسئلة بـ AI.
                 </Text>
+                {intakeState ? (
+                  <Text fontSize="xs" color={muted} mt={2}>
+                    الخطوة الحالية: {intakeState}
+                  </Text>
+                ) : null}
               </Box>
-              {botInfo?.quick_examples?.length > 0 && (
-                <VStack w="full" spacing={2} align="stretch">
-                  {botInfo.quick_examples.map((ex) => (
-                    <Button
-                      key={ex.label}
-                      size="md"
-                      variant="outline"
-                      borderRadius="xl"
-                      borderColor={border}
-                      bg={chipBg}
-                      fontWeight="600"
-                      fontSize="sm"
-                      h="auto"
-                      minH="48px"
-                      py={3}
-                      whiteSpace="normal"
-                      onClick={() => handleSend(ex.message)}
-                      isDisabled={thinking}
-                      _hover={{ borderColor: ACCENT, color: ACCENT }}
-                    >
-                      {ex.label}
-                    </Button>
-                  ))}
-                </VStack>
-              )}
+              <VStack w="full" spacing={2} align="stretch">
+                <Button
+                  size="md"
+                  colorScheme="blue"
+                  bg={ACCENT}
+                  borderRadius="xl"
+                  fontWeight="700"
+                  onClick={() => handleSend("اعمل امتحان")}
+                  isDisabled={thinking}
+                  _hover={{ bg: "#004494" }}
+                >
+                  ابدأ امتحان جديد
+                </Button>
+                {(botInfo?.quick_examples || []).slice(0, 2).map((ex) => (
+                  <Button
+                    key={ex.label}
+                    size="md"
+                    variant="outline"
+                    borderRadius="xl"
+                    borderColor={border}
+                    bg={chipBg}
+                    fontWeight="600"
+                    fontSize="sm"
+                    h="auto"
+                    minH="44px"
+                    py={3}
+                    whiteSpace="normal"
+                    onClick={() => handleSend(ex.message)}
+                    isDisabled={thinking}
+                    _hover={{ borderColor: ACCENT, color: ACCENT }}
+                  >
+                    {ex.label}
+                  </Button>
+                ))}
+              </VStack>
             </VStack>
           </Flex>
         )}
 
         {!showWelcome && (
           <Box flex={1} w="full" maxW="48rem" mx="auto" pb={2}>
-            {currentRequest && (
+            {hasTurns
+              ? turns.map((turn, idx) =>
+                  turn.role === "teacher" ? (
+                    <UserBubble key={`t-${idx}`}>
+                      <MarkdownText text={turn.text} />
+                    </UserBubble>
+                  ) : (
+                    <AssistantBlock key={`a-${idx}`}>
+                      <MarkdownText text={turn.text} />
+                    </AssistantBlock>
+                  ),
+                )
+              : null}
+
+            {!hasTurns && currentRequest && (
               <UserBubble>
                 <MarkdownText text={currentRequest} />
               </UserBubble>
@@ -370,7 +457,7 @@ export default function ExamBuilderChatWorkspace({
               </AssistantBlock>
             )}
 
-            {!thinking && !error && reply && (
+            {!hasTurns && !thinking && !error && reply && (
               <AssistantBlock>
                 <MarkdownText text={reply} />
               </AssistantBlock>
@@ -408,8 +495,13 @@ export default function ExamBuilderChatWorkspace({
         muted={muted}
         chipBg={chipBg}
         quickExamples={botInfo?.quick_examples}
-        showQuickExamples={!isEmpty}
+        showQuickExamples={!choices?.length}
         maxQuestions={botInfo?.max_questions || 100}
+        choices={choices}
+        onPickChoice={handleSend}
+        onPickFiles={onPickFiles}
+        onReset={onReset}
+        fileInputRef={fileInputRef}
       />
     </Flex>
   );

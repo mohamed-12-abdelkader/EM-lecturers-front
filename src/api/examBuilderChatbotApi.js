@@ -123,6 +123,44 @@ export async function sendExamBuilderChat(message, sessionId) {
   return data;
 }
 
+/** Guided intake — same flow as WhatsApp exam assistant */
+export async function fetchExamIntakeSession() {
+  const { data } = await baseUrl.get(`${API}/intake/session`, { headers: authHeaders() });
+  if (data?.success === false) throw rejectApiResponse(data, "فشل تحميل جلسة المساعد");
+  return data?.session ?? null;
+}
+
+export async function resetExamIntakeSession() {
+  const { data } = await baseUrl.post(
+    `${API}/intake/reset`,
+    {},
+    { headers: authHeaders("application/json") },
+  );
+  if (data?.success === false) throw rejectApiResponse(data, "فشل إعادة المحادثة");
+  return data;
+}
+
+export async function sendExamIntakeMessage(message) {
+  const { data } = await baseUrl.post(
+    `${API}/intake/message`,
+    { message: String(message).trim() },
+    { headers: authHeaders("application/json") },
+  );
+  if (data?.success === false) throw rejectApiResponse(data, "فشل إرسال الرسالة");
+  return data;
+}
+
+export async function uploadExamIntakeFiles(files, caption = "") {
+  const form = new FormData();
+  (files || []).forEach((file) => form.append("files", file));
+  if (caption) form.append("caption", caption);
+  const { data } = await baseUrl.post(`${API}/intake/upload`, form, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (data?.success === false) throw rejectApiResponse(data, "فشل رفع الملفات");
+  return data;
+}
+
 export async function fetchExamBuilderSession(sessionId) {
   const { data } = await baseUrl.get(`${API}/sessions/${sessionId}`, {
     headers: authHeaders(),
