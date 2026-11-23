@@ -200,6 +200,7 @@ const Links = ({ isSidebarOpen = true, setIsSidebarOpen, onClose }) => {
         { to: "/admin/whatsapp/parents-exam", Icon: FaWhatsapp, label: "إشعارات أولياء الأمور" },
         { to: "/admin/whatsapp/teachers-management", Icon: FaWhatsapp, label: "إدارة المدرسين واتساب" },
         { to: "/admin/whatsapp/exam-assistant", Icon: FaWhatsapp, label: "مساعد الامتحانات واتساب" },
+        { to: "/admin/whatsapp/sales-agent", Icon: FaWhatsapp, label: "وكيل المبيعات الذكي" },
         { to: "/admin/teacher-schedules", Icon: MdSchool, label: "جداول المدرسين" },
         { to: "/admin/whatsapp/policy", Icon: FaWhatsapp, label: "تخصيص الدعم" },
         { to: "/teacher-points", Icon: MdEmojiEvents, label: "النقاط والترتيب" },

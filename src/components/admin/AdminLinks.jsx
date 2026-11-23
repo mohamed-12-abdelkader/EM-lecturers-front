@@ -49,6 +49,7 @@ const ADMIN_SECTIONS = [
     title: "التواصل",
     items: [
       { label: "واتساب", path: "/admin/whatsapp/inbox", icon: FaWhatsapp },
+      { label: "وكيل المبيعات", path: "/admin/whatsapp/sales-agent", icon: FaWhatsapp },
       { label: "أولياء الأمور", path: "/admin/whatsapp/parents-exam", icon: FaWhatsapp },
       { label: "إدارة المدرسين واتساب", path: "/admin/whatsapp/teachers-management", icon: FaWhatsapp },
       { label: "تخصيص الدعم", path: "/admin/whatsapp/policy", icon: MdSupportAgent },

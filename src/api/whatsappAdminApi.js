@@ -410,3 +410,116 @@ export async function reopenExamAssistantSession(id) {
   );
   return data?.data || data;
 }
+
+// ─── AI Sales Agent ─────────────────────────────────────────────────────────
+export async function fetchSalesAgentOverview() {
+  const { data } = await baseUrl.get(`${API}/sales-agent/overview`, {
+    headers: authHeaders(getToken()),
+  });
+  return data?.data || data;
+}
+
+export async function fetchSalesAgentSessions(params = {}) {
+  const { data } = await baseUrl.get(`${API}/sales-agent/sessions`, {
+    headers: authHeaders(getToken()),
+    params,
+  });
+  return data?.data || data;
+}
+
+export async function createSalesAgentSession(payload) {
+  const { data } = await baseUrl.post(`${API}/sales-agent/sessions`, payload, {
+    headers: authHeaders(getToken(), "application/json"),
+  });
+  return data?.data || data;
+}
+
+export async function fetchSalesAgentSession(id) {
+  const { data } = await baseUrl.get(`${API}/sales-agent/sessions/${id}`, {
+    headers: authHeaders(getToken()),
+  });
+  return data?.data || data;
+}
+
+export async function updateSalesAgentSession(id, payload) {
+  const { data } = await baseUrl.patch(`${API}/sales-agent/sessions/${id}`, payload, {
+    headers: authHeaders(getToken(), "application/json"),
+  });
+  return data?.data || data;
+}
+
+export async function setSalesAgentSessionStatus(id, status) {
+  const { data } = await baseUrl.post(
+    `${API}/sales-agent/sessions/${id}/status`,
+    { status },
+    { headers: authHeaders(getToken(), "application/json") },
+  );
+  return data?.data || data;
+}
+
+export async function fetchSalesAgentKnowledge(sessionId) {
+  const { data } = await baseUrl.get(`${API}/sales-agent/sessions/${sessionId}/knowledge`, {
+    headers: authHeaders(getToken()),
+  });
+  return data?.data || data;
+}
+
+export async function addSalesAgentKnowledge(sessionId, payload) {
+  const { data } = await baseUrl.post(
+    `${API}/sales-agent/sessions/${sessionId}/knowledge`,
+    payload,
+    { headers: authHeaders(getToken(), "application/json") },
+  );
+  return data?.data || data;
+}
+
+export async function deleteSalesAgentKnowledge(sessionId, docId) {
+  const { data } = await baseUrl.delete(
+    `${API}/sales-agent/sessions/${sessionId}/knowledge/${docId}`,
+    { headers: authHeaders(getToken()) },
+  );
+  return data?.data || data;
+}
+
+export async function fetchSalesAgentLeads(sessionId, params = {}) {
+  const { data } = await baseUrl.get(`${API}/sales-agent/sessions/${sessionId}/leads`, {
+    headers: authHeaders(getToken()),
+    params,
+  });
+  return data?.data || data;
+}
+
+export async function fetchSalesAgentLead(sessionId, leadId) {
+  const { data } = await baseUrl.get(
+    `${API}/sales-agent/sessions/${sessionId}/leads/${leadId}`,
+    { headers: authHeaders(getToken()) },
+  );
+  return data?.data || data;
+}
+
+export async function updateSalesAgentLead(sessionId, leadId, payload) {
+  const { data } = await baseUrl.patch(
+    `${API}/sales-agent/sessions/${sessionId}/leads/${leadId}`,
+    payload,
+    { headers: authHeaders(getToken(), "application/json") },
+  );
+  return data?.data || data;
+}
+
+export async function setSalesAgentLeadAi(sessionId, leadId, enabled) {
+  const { data } = await baseUrl.post(
+    `${API}/sales-agent/sessions/${sessionId}/leads/${leadId}/ai`,
+    { enabled },
+    { headers: authHeaders(getToken(), "application/json") },
+  );
+  return data?.data || data;
+}
+
+export async function createSalesAgentFollowup(sessionId, leadId, payload) {
+  const { data } = await baseUrl.post(
+    `${API}/sales-agent/sessions/${sessionId}/leads/${leadId}/followups`,
+    payload,
+    { headers: authHeaders(getToken(), "application/json") },
+  );
+  return data?.data || data;
+}

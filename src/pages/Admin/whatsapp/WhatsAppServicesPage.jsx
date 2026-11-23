@@ -207,6 +207,9 @@ export default function WhatsAppServicesPage() {
               <Button as={RouterLink} to="/admin/whatsapp/policy" size="sm" variant="outline">
                 تخصيص الدعم
               </Button>
+              <Button as={RouterLink} to="/admin/whatsapp/sales-agent" size="sm" variant="outline" me={2}>
+                وكيل المبيعات
+              </Button>
               <Button as={RouterLink} to="/admin/whatsapp/exam-assistant" size="sm" variant="outline">
                 مساعد الامتحانات
               </Button>
