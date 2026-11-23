@@ -84,6 +84,18 @@ function formatWhen(value) {
   }
 }
 
+/** WhatsApp gateway sessions use `id` as the slug (not `slug`). */
+function waSessionId(s) {
+  return String(s?.id || s?.slug || "").trim();
+}
+
+function waSessionLabel(s) {
+  const id = waSessionId(s);
+  const phone = s?.phone_number ? ` (${s.phone_number})` : "";
+  const status = s?.status ? ` — ${s.status}` : "";
+  return `${id}${phone}${status}`;
+}
+
 const emptyCreate = {
   name: "",
   product_name: "",
@@ -436,11 +448,15 @@ export default function SalesAgentAdminPage() {
                     setCreateForm((f) => ({ ...f, wa_session_slug: e.target.value }))
                   }
                 >
-                  {waSessions.map((s) => (
-                    <option key={s.slug || s.id} value={s.slug}>
-                      {s.slug} {s.phone_number ? `(${s.phone_number})` : ""} — {s.status}
-                    </option>
-                  ))}
+                  {waSessions.map((s) => {
+                    const id = waSessionId(s);
+                    if (!id) return null;
+                    return (
+                      <option key={id} value={id}>
+                        {waSessionLabel(s)}
+                      </option>
+                    );
+                  })}
                 </Select>
               </FormControl>
               <FormControl>
@@ -581,11 +597,15 @@ export default function SalesAgentAdminPage() {
                         }
                       >
                         <option value="">—</option>
-                        {waSessions.map((s) => (
-                          <option key={s.slug || s.id} value={s.slug}>
-                            {s.slug} {s.phone_number ? `(${s.phone_number})` : ""}
-                          </option>
-                        ))}
+                        {waSessions.map((s) => {
+                          const id = waSessionId(s);
+                          if (!id) return null;
+                          return (
+                            <option key={id} value={id}>
+                              {waSessionLabel(s)}
+                            </option>
+                          );
+                        })}
                       </Select>
                     </FormControl>
                   </SimpleGrid>
