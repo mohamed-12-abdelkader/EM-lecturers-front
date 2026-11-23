@@ -514,6 +514,11 @@ export default function SalesAgentAdminPage() {
                         <Text fontSize="xs" color={muted}>
                           {s.product_name}
                         </Text>
+                        {s.last_error ? (
+                          <Text fontSize="xs" color="red.500" noOfLines={2} mt={1}>
+                            {s.last_error}
+                          </Text>
+                        ) : null}
                       </Td>
                       <Td>
                         <Badge colorScheme={STATUS_COLOR[s.status] || "gray"}>
@@ -545,6 +550,17 @@ export default function SalesAgentAdminPage() {
                   تحويل {detail.stats?.conversion_rate ?? 0}% · عملاء {detail.stats?.total_leads ?? 0} ·
                   متابعات مستحقة {detail.stats?.followups_due ?? 0}
                 </Text>
+                {detail.session.last_error ? (
+                  <Alert status="error" mt={2} borderRadius="md" py={2}>
+                    <AlertIcon />
+                    <Box>
+                      <Text fontWeight="semibold" fontSize="sm">
+                        آخر خطأ
+                      </Text>
+                      <Text fontSize="sm">{detail.session.last_error}</Text>
+                    </Box>
+                  </Alert>
+                ) : null}
               </VStack>
               <HStack>
                 <Button size="sm" colorScheme="green" onClick={() => onStatus("active")} isLoading={acting}>
