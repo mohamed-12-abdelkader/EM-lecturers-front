@@ -5,7 +5,6 @@ import {
   Badge,
   Box,
   Button,
-  Container,
   Divider,
   Flex,
   Heading,
@@ -25,8 +24,6 @@ import {
   useColorModeValue,
   useToast,
 } from "@chakra-ui/react";
-import { Link as RouterLink } from "react-router-dom";
-import { FaWhatsapp } from "react-icons/fa";
 import { MdRefresh } from "react-icons/md";
 import {
   cancelExamAssistantSession,
@@ -37,6 +34,7 @@ import {
   patchWhatsAppService,
   reopenExamAssistantSession,
 } from "../../../api/whatsappAdminApi";
+import { WaPageShell, WaCard, WaLoading, WaStatRow } from "../../../components/whatsapp/ui";
 
 const STATUS_AR = {
   active: "نشطة",
@@ -259,45 +257,27 @@ export default function ExamAssistantAdminPage() {
   const files = detail?.files || [];
 
   return (
-    <Box minH="100vh" bg={pageBg} dir="rtl" py={6}>
-      <Container maxW="7xl">
-        <Flex justify="space-between" align="start" gap={4} mb={6} wrap="wrap">
-          <Box>
-            <HStack spacing={2} mb={1}>
-              <Box as={FaWhatsapp} color="green.500" />
-              <Heading size="md" color={title}>
-                مساعد الامتحانات — واتساب
-              </Heading>
-            </HStack>
-            <Text fontSize="sm" color={muted}>
-              متابعة جلسات إنشاء الامتحانات من بنك الأسئلة أو الملفات، وحالات الفشل والنشر.
-            </Text>
-          </Box>
-          <HStack spacing={2}>
-            <Button
-              as={RouterLink}
-              to="/admin/whatsapp/services"
-              size="sm"
-              variant="outline"
-            >
-              الخدمات
-            </Button>
-            <Button
-              leftIcon={<MdRefresh />}
-              size="sm"
-              onClick={load}
-              isLoading={loading}
-            >
-              تحديث
-            </Button>
-          </HStack>
-        </Flex>
-
-        {service && (
+    <WaPageShell
+      title="مساعد الامتحانات — واتساب"
+      description="متابعة جلسات إنشاء الامتحانات من بنك الأسئلة أو الملفات، وحالات الفشل والنشر."
+      showAdminNav
+      maxW="7xl"
+      actions={
+        <Button
+          leftIcon={<MdRefresh />}
+          size="sm"
+          variant="outline"
+          onClick={load}
+          isLoading={loading}
+        >
+          تحديث
+        </Button>
+      }
+      alert={
+        service ? (
           <Alert
             status={service.is_enabled ? "success" : "warning"}
             borderRadius="lg"
-            mb={4}
             bg={cardBg}
             borderWidth="1px"
             borderColor={border}
@@ -313,81 +293,64 @@ export default function ExamAssistantAdminPage() {
               </Button>
             </Flex>
           </Alert>
-        )}
-
-        <SimpleGrid columns={{ base: 2, md: 3, lg: 6 }} spacing={3} mb={5}>
-          {stats.map((s) => (
-            <Box
-              key={s.label}
-              bg={cardBg}
-              borderWidth="1px"
-              borderColor={border}
-              borderRadius="xl"
-              p={4}
-            >
-              <Text fontSize="xs" color={muted}>
-                {s.label}
-              </Text>
-              <Text fontSize="2xl" fontWeight="bold" color={title}>
-                {s.value}
-              </Text>
-            </Box>
-          ))}
-        </SimpleGrid>
+        ) : null
+      }
+    >
+        <Box mb={5}>
+          <WaStatRow
+            items={stats.map((s) => ({ label: s.label, value: s.value }))}
+            columns={{ base: 2, md: 3, lg: 6 }}
+          />
+        </Box>
 
         <Flex gap={4} direction={{ base: "column", lg: "row" }} align="start">
-          <Box
+          <WaCard
             flex={1}
             w="full"
-            bg={cardBg}
-            borderWidth="1px"
-            borderColor={border}
-            borderRadius="xl"
-            p={4}
+            title="الجلسات"
+            actions={
+              <HStack spacing={2} wrap="wrap">
+                <Input
+                  placeholder="بحث: مدرس / رقم / معرف"
+                  value={filters.search}
+                  onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+                  maxW="220px"
+                  size="sm"
+                />
+                <Select
+                  size="sm"
+                  maxW="160px"
+                  value={filters.status}
+                  onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
+                >
+                  <option value="">كل الحالات</option>
+                  {Object.entries(STATUS_AR).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </Select>
+                <Select
+                  size="sm"
+                  maxW="200px"
+                  value={filters.state}
+                  onChange={(e) => setFilters((f) => ({ ...f, state: e.target.value }))}
+                >
+                  <option value="">كل المراحل</option>
+                  {Object.entries(STATE_AR).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </Select>
+                <Button size="sm" colorScheme="blue" onClick={load} isLoading={loading}>
+                  تطبيق
+                </Button>
+              </HStack>
+            }
           >
-            <HStack spacing={2} mb={3} wrap="wrap">
-              <Input
-                placeholder="بحث: مدرس / رقم / معرف"
-                value={filters.search}
-                onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-                maxW="220px"
-                size="sm"
-              />
-              <Select
-                size="sm"
-                maxW="160px"
-                value={filters.status}
-                onChange={(e) => setFilters((f) => ({ ...f, status: e.target.value }))}
-              >
-                <option value="">كل الحالات</option>
-                {Object.entries(STATUS_AR).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </Select>
-              <Select
-                size="sm"
-                maxW="200px"
-                value={filters.state}
-                onChange={(e) => setFilters((f) => ({ ...f, state: e.target.value }))}
-              >
-                <option value="">كل المراحل</option>
-                {Object.entries(STATE_AR).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v}
-                  </option>
-                ))}
-              </Select>
-              <Button size="sm" colorScheme="blue" onClick={load} isLoading={loading}>
-                تطبيق
-              </Button>
-            </HStack>
-
             {loading ? (
-              <Flex justify="center" py={10}>
-                <Spinner />
-              </Flex>
+              <WaLoading label="جارٍ تحميل الجلسات…" />
             ) : !sessions.length ? (
               <Text color={muted} textAlign="center" py={10}>
                 لا توجد جلسات بعد.
@@ -442,25 +405,16 @@ export default function ExamAssistantAdminPage() {
                 </Text>
               </Box>
             )}
-          </Box>
+          </WaCard>
 
-          <Box
+          <WaCard
             w={{ base: "full", lg: "380px" }}
-            bg={cardBg}
-            borderWidth="1px"
-            borderColor={border}
-            borderRadius="xl"
-            p={4}
+            title="تفاصيل الجلسة"
             position={{ lg: "sticky" }}
             top={4}
           >
-            <Heading size="sm" mb={3}>
-              تفاصيل الجلسة
-            </Heading>
             {detailLoading ? (
-              <Flex justify="center" py={8}>
-                <Spinner size="sm" />
-              </Flex>
+              <WaLoading label="جارٍ التحميل…" />
             ) : !session ? (
               <Text color={muted} fontSize="sm">
                 اختر جلسة من القائمة.
@@ -576,9 +530,8 @@ export default function ExamAssistantAdminPage() {
                 </HStack>
               </VStack>
             )}
-          </Box>
+          </WaCard>
         </Flex>
-      </Container>
-    </Box>
+    </WaPageShell>
   );
 }

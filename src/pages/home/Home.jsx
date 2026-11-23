@@ -1,13 +1,10 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import SectionOne from "../../components/home/SectionOne";
 import UserType from "../../Hooks/auth/userType";
 import ScrollToTop from "../../components/scollToTop/ScrollToTop";
 import HomeLogin from "../homeLogin/HomeLogin";
 import Footer from "../../components/home/Footer";
-import SectionTwo from "../../components/home/SectionTwo";
-import SectionThree from "../../components/home/SectionThree";
-import AboutUsSection from "../../components/home/AboutUsSection";
+import EmStoryLanding from "../../components/home/emStory/EmStoryLanding";
 
 const Home = () => {
   const [userData] = UserType();
@@ -20,23 +17,17 @@ const Home = () => {
   }, [userData, navigate]);
 
   return (
-    <div>
+    <div style={!userData ? { background: "#070B14", colorScheme: "dark" } : undefined}>
       {userData ? (
-        <div>
-          <HomeLogin />
-        </div>
+        <HomeLogin />
       ) : (
-        <div className="">
-          <SectionOne />
-          <SectionTwo />
-          <AboutUsSection />
-          <SectionThree />
-        </div>
+        <EmStoryLanding />
       )}
 
-      <Footer />
+      <Footer forceDark={!userData} />
       <ScrollToTop />
     </div>
   );
 };
+
 export default Home;

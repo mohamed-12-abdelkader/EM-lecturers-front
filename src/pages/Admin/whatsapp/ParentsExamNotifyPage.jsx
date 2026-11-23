@@ -4,7 +4,6 @@ import {
   AlertIcon,
   Box,
   Button,
-  Container,
   Flex,
   FormControl,
   FormLabel,
@@ -29,7 +28,6 @@ import {
   useToast,
   VStack,
 } from "@chakra-ui/react";
-import { FaWhatsapp } from "react-icons/fa";
 import { MdRefresh, MdSave } from "react-icons/md";
 import {
   controlParentsExamQueue,
@@ -37,6 +35,7 @@ import {
   fetchParentsExamSettings,
   saveParentsExamSettings,
 } from "../../../api/whatsappAdminApi";
+import { WaPageShell, WaCard, WaLoading } from "../../../components/whatsapp/ui";
 
 const PAGE_SIZE = 500;
 
@@ -214,30 +213,22 @@ export default function ParentsExamNotifyPage() {
   };
 
   if (!draft) {
-    return (
-      <Flex minH="40vh" align="center" justify="center">
-        <Spinner />
-      </Flex>
-    );
+    return <WaLoading label="جارٍ تحميل حدود الإرسال…" />;
   }
 
   return (
-    <Box bg={pageBg} minH="40vh" py={4}>
-      <Container maxW="7xl">
-        <Flex justify="space-between" align="center" mb={4}>
-          <HStack>
-            <FaWhatsapp color="#25D366" />
-            <Heading size="md">حدود إرسال أولياء الأمور</Heading>
-          </HStack>
-          <Button leftIcon={<MdRefresh />} size="sm" isLoading={loading} onClick={() => void load(filters)}>
-            تحديث
-          </Button>
-        </Flex>
-        <Alert status="info" borderRadius="lg" mb={4}>
-          <AlertIcon />
-          المدرس يربط رقمه من إشعارات الطلاب ويختار الامتحانات. هنا تضبط سرعة الإرسال لكل المدرسين.
-        </Alert>
-        <Box bg={cardBg} border="1px solid" borderColor={border} borderRadius="xl" p={4} mb={4}>
+    <WaPageShell
+      title="حدود إرسال أولياء الأمور"
+      description="المدرس يربط رقمه من إشعارات الطلاب ويختار الامتحانات. هنا تضبط سرعة الإرسال لكل المدرسين."
+      showAdminNav
+      maxW="7xl"
+      actions={
+        <Button leftIcon={<MdRefresh />} size="sm" variant="outline" isLoading={loading} onClick={() => void load(filters)}>
+          تحديث
+        </Button>
+      }
+    >
+        <WaCard title="إعدادات السرعة والحدود">
           <VStack align="stretch" spacing={3}>
             <HStack>
               <FormControl>
@@ -302,7 +293,7 @@ export default function ParentsExamNotifyPage() {
               حفظ
             </Button>
           </VStack>
-        </Box>
+        </WaCard>
         <Text color={muted} mb={2}>
           اتبعتت النهاردة على كل المدرسين: {settings?.sentToday ?? 0}. الحد اليومي لكل مدرس: {draft.daily_cap ? draft.daily_cap : "غير محدود"}.
           أقرب رسالة في الطابور: {monitor?.nextAt ? formatWhen(monitor.nextAt) : "مفيش"}.
@@ -319,8 +310,7 @@ export default function ParentsExamNotifyPage() {
             </Badge>
           ))}
         </HStack>
-        <Box bg={cardBg} border="1px solid" borderColor={border} borderRadius="xl" p={4} mb={4}>
-          <Heading size="sm" mb={3}>أرقام المدرسين</Heading>
+        <WaCard title="أرقام المدرسين" mb={4}>
           {(monitor?.teachers?.missing || []).length ? (
             <Alert status="warning" borderRadius="lg" mb={3}>
               <AlertIcon />
@@ -364,7 +354,8 @@ export default function ParentsExamNotifyPage() {
               </Tbody>
             </Table>
           </Box>
-        </Box>
+        </WaCard>
+        <WaCard title="طابور الإشعارات" mb={0}>
         <HStack mb={3} wrap="wrap">
           <Input
             placeholder="اسم المدرس أو الامتحان أو الطالب"
@@ -523,7 +514,7 @@ export default function ParentsExamNotifyPage() {
             </HStack>
           </Flex>
         </Box>
-      </Container>
-    </Box>
+        </WaCard>
+    </WaPageShell>
   );
 }

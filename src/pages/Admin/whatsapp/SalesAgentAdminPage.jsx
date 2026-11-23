@@ -5,7 +5,6 @@ import {
   Badge,
   Box,
   Button,
-  Container,
   Divider,
   Flex,
   FormControl,
@@ -33,8 +32,6 @@ import {
   useColorModeValue,
   useToast,
 } from "@chakra-ui/react";
-import { Link as RouterLink } from "react-router-dom";
-import { FaWhatsapp } from "react-icons/fa";
 import { MdRefresh } from "react-icons/md";
 import {
   addSalesAgentKnowledge,
@@ -55,6 +52,7 @@ import {
   updateSalesAgentLead,
   updateSalesAgentSession,
 } from "../../../api/whatsappAdminApi";
+import { WaPageShell, WaCard, WaLoading, WaStatRow } from "../../../components/whatsapp/ui";
 
 const STATUS_AR = {
   draft: "مسودة",
@@ -348,81 +346,58 @@ export default function SalesAgentAdminPage() {
   }, [settingsForm]);
 
   if (loading) {
-    return (
-      <Flex minH="60vh" align="center" justify="center" bg={pageBg}>
-        <Spinner size="lg" />
-      </Flex>
-    );
+    return <WaLoading label="جارٍ تحميل وكيل المبيعات…" />;
   }
 
   return (
-    <Box bg={pageBg} minH="100vh" py={6}>
-      <Container maxW="7xl">
-        <Flex justify="space-between" align={{ base: "start", md: "center" }} gap={4} mb={6} wrap="wrap">
-          <VStack align="start" spacing={1}>
-            <HStack>
-              <Box as={FaWhatsapp} color="green.500" />
-              <Heading size="md" color={title}>
-                وكيل المبيعات الذكي — AI Sales Agent
-              </Heading>
-            </HStack>
-            <Text color={muted} fontSize="sm">
-              جلسات متعددة مستقلة — كل Session لها رقم واتساب ومعرفة وعملاء ومتابعات خاصة
-            </Text>
-          </VStack>
-          <HStack>
-            <Button as={RouterLink} to="/admin/whatsapp/services" size="sm" variant="outline">
-              ربط الأرقام
+    <WaPageShell
+      title="وكيل المبيعات الذكي — AI Sales Agent"
+      description="جلسات متعددة مستقلة — كل Session لها رقم واتساب ومعرفة وعملاء ومتابعات خاصة"
+      showAdminNav
+      maxW="7xl"
+      actions={
+        <HStack wrap="wrap">
+          <Button leftIcon={<MdRefresh />} size="sm" variant="outline" onClick={load} isLoading={acting}>
+            تحديث
+          </Button>
+          {service && (
+            <Button
+              size="sm"
+              colorScheme={service.is_enabled ? "red" : "green"}
+              onClick={toggleService}
+              isLoading={acting}
+            >
+              {service.is_enabled ? "إيقاف الخدمة" : "تشغيل الخدمة"}
             </Button>
-            <Button leftIcon={<MdRefresh />} size="sm" onClick={load} isLoading={acting}>
-              تحديث
-            </Button>
-            {service && (
-              <Button
-                size="sm"
-                colorScheme={service.is_enabled ? "red" : "green"}
-                onClick={toggleService}
-                isLoading={acting}
-              >
-                {service.is_enabled ? "إيقاف الخدمة" : "تشغيل الخدمة"}
-              </Button>
-            )}
-          </HStack>
-        </Flex>
-
-        {!service?.is_enabled && (
-          <Alert status="warning" mb={4} borderRadius="md">
+          )}
+        </HStack>
+      }
+      alert={
+        !service?.is_enabled ? (
+          <Alert status="warning" borderRadius="md">
             <AlertIcon />
             خدمة <b>ai_sales_agent</b> غير مفعّلة. فعّلها واربط لها أرقام واتساب من صفحة الخدمات، ثم فعّل كل
             Session.
           </Alert>
-        )}
-
-        <SimpleGrid columns={{ base: 2, md: 4, lg: 6 }} spacing={3} mb={6}>
-          {[
-            ["Sessions", overview?.sessions?.total],
-            ["نشطة", overview?.sessions?.active],
-            ["عملاء", overview?.leads?.total_leads],
-            ["مهتمون", overview?.leads?.interested],
-            ["مبيعات", overview?.leads?.won],
-            ["تحويل %", overview?.conversion_rate],
-          ].map(([label, value]) => (
-            <Box key={label} bg={cardBg} borderWidth="1px" borderColor={border} borderRadius="lg" p={3}>
-              <Text fontSize="xs" color={muted}>
-                {label}
-              </Text>
-              <Text fontWeight="bold" fontSize="xl">
-                {value ?? 0}
-              </Text>
-            </Box>
-          ))}
-        </SimpleGrid>
+        ) : null
+      }
+    >
+        <Box mb={6}>
+          <WaStatRow
+            columns={{ base: 2, md: 4, lg: 6 }}
+            items={[
+              { label: "Sessions", value: overview?.sessions?.total ?? 0 },
+              { label: "نشطة", value: overview?.sessions?.active ?? 0 },
+              { label: "عملاء", value: overview?.leads?.total_leads ?? 0 },
+              { label: "مهتمون", value: overview?.leads?.interested ?? 0 },
+              { label: "مبيعات", value: overview?.leads?.won ?? 0 },
+              { label: "تحويل %", value: overview?.conversion_rate ?? 0 },
+            ]}
+          />
+        </Box>
 
         <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={4} mb={4}>
-          <Box bg={cardBg} borderWidth="1px" borderColor={border} borderRadius="lg" p={4}>
-            <Heading size="sm" mb={3}>
-              إنشاء Session جديدة
-            </Heading>
+          <WaCard title="إنشاء Session جديدة">
             <VStack align="stretch" spacing={3}>
               <FormControl>
                 <FormLabel fontSize="sm">اسم الجلسة</FormLabel>
@@ -473,11 +448,11 @@ export default function SalesAgentAdminPage() {
                 إنشاء
               </Button>
             </VStack>
-          </Box>
+          </WaCard>
 
-          <Box bg={cardBg} borderWidth="1px" borderColor={border} borderRadius="lg" p={4}>
-            <Flex justify="space-between" mb={3} align="center">
-              <Heading size="sm">الجلسات</Heading>
+          <WaCard
+            title="الجلسات"
+            actions={
               <Select
                 size="sm"
                 maxW="160px"
@@ -491,7 +466,8 @@ export default function SalesAgentAdminPage() {
                   </option>
                 ))}
               </Select>
-            </Flex>
+            }
+          >
             <Box maxH="360px" overflowY="auto">
               <Table size="sm">
                 <Thead>
@@ -538,11 +514,11 @@ export default function SalesAgentAdminPage() {
                 </Tbody>
               </Table>
             </Box>
-          </Box>
+          </WaCard>
         </SimpleGrid>
 
         {detail?.session && settingsForm && (
-          <Box bg={cardBg} borderWidth="1px" borderColor={border} borderRadius="lg" p={4}>
+          <WaCard>
             <Flex justify="space-between" align="center" mb={3} wrap="wrap" gap={2}>
               <VStack align="start" spacing={0}>
                 <Heading size="sm">{detail.session.name}</Heading>
@@ -905,9 +881,8 @@ export default function SalesAgentAdminPage() {
                 </TabPanel>
               </TabPanels>
             </Tabs>
-          </Box>
+          </WaCard>
         )}
-      </Container>
-    </Box>
+    </WaPageShell>
   );
 }

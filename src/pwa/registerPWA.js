@@ -1,10 +1,10 @@
 /**
- * تسجيل Service Worker + كشف التحديثات بدون ريلود تلقائي أثناء الاستخدام.
+ * تسجيل Service Worker + كشف التحديثات بدون أي ريلود تلقائي.
  *
  * القواعد:
- * - أثناء فتح المنصة: لا نعمل location.reload ولا SKIP_WAITING
+ * - أثناء فتح المنصة: لا location.reload ولا SKIP_WAITING
  * - التحديث الجديد ينتظر في الخلفية فقط
- * - عند فتح المنصة من جديد أو ريلود يدوي: نفعّل الـ SW المنتظر مرة واحدة فقط (بحارس session)
+ * - التعديلات تظهر فقط بعد ريلود يدوي من المستخدم
  */
 
 import applicationActivityManager from "../utils/applicationActivityManager";
@@ -27,7 +27,6 @@ export {
 
 const BUILD_ID_STORAGE_KEY = "em-app-build-id";
 const PENDING_UPDATE_KEY = "em-app-update-pending";
-const BOOT_ACTIVATE_KEY = "em-app-sw-boot-activate";
 const DISMISSED_SESSION_KEY = "em-app-update-dismissed";
 const VERSION_CHECK_INTERVAL_MS = 5 * 60_000;
 const SW_UPDATE_CHECK_INTERVAL_MS = 10 * 60_000;
@@ -72,7 +71,6 @@ function notifyUpdateAvailable(detail = {}) {
           criticalActive: applicationActivityManager.isCriticalActivityActive(),
           dismissed: isDismissedThisSession(),
           silent: true,
-          // لا تطبيق تلقائي — المستخدم يحدّث عند الريلود/الفتح من جديد
           deferUntilNextVisit: true,
         },
       }),
@@ -125,9 +123,7 @@ async function checkVersionManifest() {
   if (!remote?.buildId) return false;
   remoteBuildId = remote.buildId;
   if (isNewerBuild(remote.buildId)) {
-    // نسجّل فقط — بدون ريلود
     notifyUpdateAvailable({ remoteBuildId: remote.buildId, source: "version.json" });
-    // نطلب من الـ SW التحقق من وجود نسخة جديدة في الانتظار
     registrationRef?.update?.().catch(() => undefined);
     return true;
   }
@@ -139,7 +135,6 @@ function scheduleVersionChecks() {
   const run = () => {
     void checkVersionManifest();
   };
-  // تأخير أول فحص قليلاً حتى لا يتعارض مع إقلاع الصفحة
   window.setTimeout(run, 15_000);
   versionCheckTimer = window.setInterval(run, VERSION_CHECK_INTERVAL_MS);
 
@@ -164,8 +159,8 @@ function reloadSafely() {
 }
 
 /**
- * تطبيق التحديث يدويًا فقط (إن وُجد زر لاحقًا).
- * لا يُستدعى تلقائيًا أثناء الجلسة.
+ * تطبيق التحديث يدوياً فقط (زر صريح من المستخدم).
+ * لا يُستدعى تلقائياً أثناء الجلسة.
  */
 export async function applyPWAUpdate() {
   if (updateInProgress) return { ok: true, reason: "in_progress" };
@@ -204,7 +199,7 @@ export async function applyPWAUpdate() {
   }
 }
 
-/** لم نعد نفعّل التحديث بعد انتهاء النشاط — ينتظر الزيارة التالية */
+/** لا تفعيل تلقائي بعد انتهاء النشاط */
 export function flushDeferredPWAUpdate() {
   return false;
 }
@@ -225,49 +220,10 @@ export function shouldShowUpdatePrompt() {
 }
 
 function onControllerChange() {
-  // ريلود فقط إذا طلب هذا التبويب التفعيل صراحةً (إقلاع/يدوي)
+  // ريلود فقط إذا طلب هذا التبويب التفعيل صراحةً (زر تحديث يدوي)
   if (!pendingUserReload) return;
   clearPendingUpdateFlag();
   reloadSafely();
-}
-
-/**
- * عند فتح الصفحة / ريلود يدوي: إن وُجد SW منتظر نفعّله مرة واحدة بحارس
- * حتى لا يحدث ريلود لا نهائي.
- */
-async function activateWaitingWorkerOnBoot(registration) {
-  if (!registration?.waiting) return false;
-
-  const token =
-    remoteBuildId ||
-    readPendingUpdate()?.remoteBuildId ||
-    registration.waiting.scriptURL ||
-    "waiting";
-
-  let already = false;
-  try {
-    already = sessionStorage.getItem(BOOT_ACTIVATE_KEY) === String(token);
-  } catch {
-    already = false;
-  }
-  if (already) return false;
-
-  try {
-    sessionStorage.setItem(BOOT_ACTIVATE_KEY, String(token));
-  } catch {
-    /* ignore */
-  }
-
-  pendingUserReload = true;
-  updateInProgress = true;
-  registration.waiting.postMessage({ type: "SKIP_WAITING" });
-
-  // احتياطي إن لم يصل controllerchange
-  window.setTimeout(() => {
-    if (pendingUserReload) reloadSafely();
-  }, 2000);
-
-  return true;
 }
 
 /** يُستدعى مرة واحدة من main.jsx */
@@ -278,7 +234,6 @@ export async function initPWA() {
 
   storeRunningBuildId();
 
-  // نسجّل وجود تحديث معلّق بدون تطبيقه الآن
   if (readPendingUpdate()) {
     updateAvailable = true;
   }
@@ -296,7 +251,7 @@ export async function initPWA() {
       immediate: true,
       onNeedRefresh() {
         updateServiceWorker = update;
-        // تحديث متاح — بدون ريلود أثناء الجلسة
+        // متاح في الخلفية فقط — بدون SKIP_WAITING وبدون ريلود
         notifyUpdateAvailable({ remoteBuildId, source: "service-worker" });
       },
       onOfflineReady() {
@@ -308,8 +263,7 @@ export async function initPWA() {
 
         if (registration?.waiting) {
           notifyUpdateAvailable({ remoteBuildId, source: "service-worker-waiting" });
-          // فتح جديد أو ريلود يدوي فقط
-          void activateWaitingWorkerOnBoot(registration);
+          // لا نفعّل الـ SW المنتظر تلقائياً — ينتظر ريلود/فتح يدوي لاحقاً
         }
 
         scheduleSwUpdateChecks(registration);

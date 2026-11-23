@@ -5,7 +5,6 @@ import {
   Badge,
   Box,
   Button,
-  Container,
   Flex,
   FormControl,
   FormLabel,
@@ -35,7 +34,6 @@ import {
   Image,
 } from "@chakra-ui/react";
 import { Link as RouterLink } from "react-router-dom";
-import { FaWhatsapp } from "react-icons/fa";
 import { MdRefresh, MdSave, MdSend } from "react-icons/md";
 import {
   createWhatsAppSession,
@@ -57,6 +55,7 @@ import {
   uploadTeachersManagementMedia,
 } from "../../../api/whatsappAdminApi";
 import { fetchScheduleTeachers } from "../../../api/teacherScheduleApi";
+import { WaPageShell, WaCard, WaLoading } from "../../../components/whatsapp/ui";
 
 const STATUS_AR = {
   pending: "قيد الإرسال",
@@ -436,45 +435,35 @@ export default function TeachersManagementPage() {
   );
 
   return (
-    <Box dir="rtl" bg={pageBg} minH="100vh" py={8}>
-      <Container maxW="6xl">
-        <Flex justify="space-between" align={{ base: "stretch", md: "center" }} gap={3} mb={6} wrap="wrap">
-          <Box>
-            <HStack mb={1}>
-              <FaWhatsapp />
-              <Heading size="lg">إدارة المدرسين</Heading>
-            </HStack>
-            <Text color={muted}>
-              تذكيرات واتساب يومية مستقلة لكل مدرس حسب جدوله.
-            </Text>
-          </Box>
-          <HStack>
-            <Button as={RouterLink} to="/admin/teacher-schedules" variant="outline">
-              جداول المدرسين
-            </Button>
-            <Button leftIcon={<MdRefresh />} onClick={() => load()} isLoading={loading}>
-              تحديث
-            </Button>
-          </HStack>
-        </Flex>
-
-        {!configured && (
-          <Alert status="warning" mb={4} borderRadius="lg">
+    <WaPageShell
+      title="إدارة المدرسين"
+      description="تذكيرات واتساب يومية مستقلة لكل مدرس حسب جدوله."
+      showAdminNav
+      maxW="6xl"
+      actions={
+        <HStack>
+          <Button as={RouterLink} to="/admin/teacher-schedules" size="sm" variant="outline">
+            جداول المدرسين
+          </Button>
+          <Button leftIcon={<MdRefresh />} size="sm" variant="outline" onClick={() => load()} isLoading={loading}>
+            تحديث
+          </Button>
+        </HStack>
+      }
+      alert={
+        !configured ? (
+          <Alert status="warning" borderRadius="lg">
             <AlertIcon />
             بوابة واتساب غير مهيأة حاليًا. يمكن ضبط الإعدادات لكن الإرسال لن يعمل حتى يتم الربط.
           </Alert>
-        )}
-
+        ) : null
+      }
+    >
         {loading && !draft ? (
-          <Flex justify="center" py={16}>
-            <Spinner size="lg" />
-          </Flex>
+          <WaLoading label="جارٍ تحميل إعدادات إدارة المدرسين…" />
         ) : (
           <VStack align="stretch" spacing={4}>
-            <Box bg={cardBg} borderWidth="1px" borderColor={border} borderRadius="xl" p={5}>
-              <Heading size="md" mb={4}>
-                جلسة واتساب الخاصة بالخدمة
-              </Heading>
+            <WaCard title="جلسة واتساب الخاصة بالخدمة">
               <HStack mb={3} wrap="wrap">
                 <Badge colorScheme={sessionColor(sessionStatus)}>
                   {SESSION_AR[sessionStatus] || sessionStatus || "غير مربوطة"}
@@ -552,12 +541,9 @@ export default function TeachersManagementPage() {
                   </Stack>
                 </CheckboxGroup>
               </FormControl>
-            </Box>
+            </WaCard>
 
-            <Box bg={cardBg} borderWidth="1px" borderColor={border} borderRadius="xl" p={5}>
-              <Heading size="md" mb={4}>
-                إعدادات التذكير اليومي
-              </Heading>
+            <WaCard title="إعدادات التذكير اليومي">
               <FormControl display="flex" alignItems="center" mb={4}>
                 <FormLabel mb={0}>تفعيل التذكيرات التلقائية</FormLabel>
                 <Switch
@@ -631,12 +617,9 @@ export default function TeachersManagementPage() {
               <Button leftIcon={<MdSave />} colorScheme="blue" onClick={save} isLoading={saving}>
                 حفظ الإعدادات
               </Button>
-            </Box>
+            </WaCard>
 
-            <Box bg={cardBg} borderWidth="1px" borderColor={border} borderRadius="xl" p={5}>
-              <Heading size="md" mb={4}>
-                تذكير تجريبي
-              </Heading>
+            <WaCard title="تذكير تجريبي">
               <HStack align="end" wrap="wrap">
                 <FormControl maxW="sm">
                   <FormLabel>المدرس</FormLabel>
@@ -661,15 +644,12 @@ export default function TeachersManagementPage() {
                   إرسال تجريبي
                 </Button>
               </HStack>
-            </Box>
+            </WaCard>
 
-            <Box bg={cardBg} borderWidth="1px" borderColor={border} borderRadius="xl" p={5}>
-              <Heading size="md" mb={2}>
-                إرسال رسالة للجميع
-              </Heading>
-              <Text fontSize="sm" color={muted} mb={4}>
-                اكتب الرسالة مرة واحدة وأرسل نصًا أو صورة أو فيديو أو أي دمج بينهم مثل واتساب.
-              </Text>
+            <WaCard
+              title="إرسال رسالة للجميع"
+              description="اكتب الرسالة مرة واحدة وأرسل نصًا أو صورة أو فيديو أو أي دمج بينهم مثل واتساب."
+            >
               <FormControl mb={3}>
                 <FormLabel>نص الرسالة</FormLabel>
                 <Textarea
@@ -768,12 +748,9 @@ export default function TeachersManagementPage() {
                   </Table>
                 </Box>
               )}
-            </Box>
+            </WaCard>
 
-            <Box bg={cardBg} borderWidth="1px" borderColor={border} borderRadius="xl" p={5}>
-              <Heading size="md" mb={4}>
-                تنبيه انتهاء الاشتراك
-              </Heading>
+            <WaCard title="تنبيه انتهاء الاشتراك">
               <FormControl display="flex" alignItems="center" mb={4}>
                 <FormLabel mb={0}>تفعيل تنبيه المدرسين منتهي الاشتراك</FormLabel>
                 <Switch
@@ -858,12 +835,12 @@ export default function TeachersManagementPage() {
                   </Table>
                 </Box>
               )}
-            </Box>
+            </WaCard>
 
-            <Box bg={cardBg} borderWidth="1px" borderColor={border} borderRadius="xl" p={5}>
-              <Flex justify="space-between" align="center" mb={4} wrap="wrap" gap={3}>
-                <Heading size="md">سجل الرسائل</Heading>
-                <HStack>
+            <WaCard
+              title="سجل الرسائل"
+              actions={
+                <HStack wrap="wrap">
                   <Input
                     placeholder="بحث..."
                     value={query}
@@ -897,7 +874,8 @@ export default function TeachersManagementPage() {
                     إعادة الفاشل
                   </Button>
                 </HStack>
-              </Flex>
+              }
+            >
               <Box overflowX="auto">
                 <Table size="sm">
                   <Thead>
@@ -963,10 +941,9 @@ export default function TeachersManagementPage() {
                   </Button>
                 </HStack>
               </HStack>
-            </Box>
+            </WaCard>
           </VStack>
         )}
-      </Container>
-    </Box>
+    </WaPageShell>
   );
 }

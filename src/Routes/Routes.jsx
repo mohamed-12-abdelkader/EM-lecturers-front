@@ -16,7 +16,7 @@ import RouteChunkLoader from "../components/loading/RouteChunkLoader";
 
 /*
  * كل الصفحات lazy — تُحمَّل عند فتحها فقط.
- * lazyWithRetry: إعادة محاولة + reload تلقائي عند فشل chunk (PWA/كاش قديم).
+ * lazyWithRetry: إعادة محاولة عند فشل chunk — بدون reload تلقائي.
  */
 const lazyPage = lazyWithRetry;
 

@@ -1,16 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
-  Heading,
   Text,
   VStack,
   HStack,
   Button,
   Badge,
-  Spinner,
   useToast,
   useColorModeValue,
-  Container,
   Flex,
   Modal,
   ModalOverlay,
@@ -31,10 +28,14 @@ import {
   Checkbox,
   CheckboxGroup,
   Input,
-  Divider,
+  Spinner,
+  Tabs,
+  TabList,
+  TabPanels,
+  Tab,
+  TabPanel,
 } from "@chakra-ui/react";
 import { MdRefresh, MdAdd, MdQrCode, MdDelete, MdSync, MdSend } from "react-icons/md";
-import { FaWhatsapp } from "react-icons/fa";
 import TeacherParentExamPanel from "./TeacherParentExamPanel";
 import {
   fetchTeacherWaStatus,
@@ -49,23 +50,14 @@ import {
   sendTeacherWaParentReports,
   fetchTeacherCourseStudents,
 } from "../../api/whatsappTeacherApi";
-
-const STATUS_META = {
-  ready: { label: "متصلة", color: "green" },
-  qr: { label: "بانتظار المسح", color: "orange" },
-  pending: { label: "قيد التحضير", color: "gray" },
-  authenticated: { label: "جارٍ الربط", color: "blue" },
-  disconnected: { label: "غير متصلة", color: "red" },
-};
-
-function StatusBadge({ status }) {
-  const meta = STATUS_META[status] || { label: status || "غير معروف", color: "gray" };
-  return (
-    <Badge colorScheme={meta.color} borderRadius="md" px={2} py={0.5}>
-      {meta.label}
-    </Badge>
-  );
-}
+import {
+  WaPageShell,
+  WaCard,
+  WaLoading,
+  WaEmptyState,
+  WaStatusBadge,
+  WaStatRow,
+} from "../../components/whatsapp/ui";
 
 function summarizeResult(result) {
   const sent = result?.sent?.length || 0;
@@ -92,11 +84,9 @@ export default function TeacherWhatsAppPage() {
   const [sendingReports, setSendingReports] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
 
-  const pageBg = useColorModeValue("gray.50", "gray.900");
-  const cardBg = useColorModeValue("white", "gray.800");
   const border = useColorModeValue("gray.200", "gray.700");
   const muted = useColorModeValue("gray.500", "gray.400");
-  const title = useColorModeValue("gray.900", "white");
+  const cardBg = useColorModeValue("white", "gray.800");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -138,24 +128,6 @@ export default function TeacherWhatsAppPage() {
     );
   }, [students, studentSearch]);
 
-  const handleCreate = async () => {
-    setCreating(true);
-    try {
-      const session = await createTeacherWaSession();
-      toast({ title: "تم إنشاء الجلسة — امسح رمز QR", status: "success" });
-      await load();
-      if (session?.id) openQr(session.id);
-    } catch (err) {
-      toast({
-        title: "تعذّر إنشاء الجلسة",
-        description: err?.response?.data?.message || err.message,
-        status: "error",
-      });
-    } finally {
-      setCreating(false);
-    }
-  };
-
   const openQr = async (slug) => {
     setQrModal({ open: true, session: null, loading: true });
     try {
@@ -174,6 +146,24 @@ export default function TeacherWhatsAppPage() {
         duration: 8000,
         isClosable: true,
       });
+    }
+  };
+
+  const handleCreate = async () => {
+    setCreating(true);
+    try {
+      const session = await createTeacherWaSession();
+      toast({ title: "تم إنشاء الجلسة — امسح رمز QR", status: "success" });
+      await load();
+      if (session?.id) openQr(session.id);
+    } catch (err) {
+      toast({
+        title: "تعذّر إنشاء الجلسة",
+        description: err?.response?.data?.message || err.message,
+        status: "error",
+      });
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -273,277 +263,308 @@ export default function TeacherWhatsAppPage() {
   };
 
   const canAddMore = (status?.total || sessions.length) < (status?.max_sessions || 2);
+  const readyCount = sessions.filter((s) => s.status === "ready").length;
 
   return (
-    <Box minH="100vh" bg={pageBg} dir="rtl" pb={10} pt={4}>
-      <Container maxW="1100px" px={{ base: 3, md: 6 }}>
-        <VStack spacing={5} align="stretch">
-          <Flex justify="space-between" align="center" wrap="wrap" gap={3}>
-            <Box>
-              <HStack spacing={2} mb={1}>
-                <Box as={FaWhatsapp} color="green.500" boxSize={7} />
-                <Heading size="lg" color={title}>
-                  واتساب المدرس
-                </Heading>
-              </HStack>
-              <Text fontSize="sm" color={muted}>
-                اربط أرقامك، فعّل الدعم العلمي للرد على أسئلة الطلاب، وأرسل الإشعارات وتقارير أولياء الأمور
-              </Text>
-            </Box>
-            <IconButton
-              aria-label="تحديث"
-              icon={<MdRefresh />}
-              size="sm"
-              onClick={load}
-              isLoading={loading}
-            />
-          </Flex>
+    <WaPageShell
+      title="واتساب المدرس"
+      description="اربط أرقامك، فعّل الدعم العلمي، وأرسل الإشعارات وتقارير أولياء الأمور"
+      maxW="1100px"
+      actions={
+        <IconButton
+          aria-label="تحديث"
+          icon={<MdRefresh />}
+          size="sm"
+          variant="outline"
+          onClick={load}
+          isLoading={loading}
+        />
+      }
+      alert={
+        !configured ? (
+          <Alert status="warning" borderRadius="xl">
+            <AlertIcon />
+            بوابة واتساب غير مُعدّة حالياً. تواصل مع إدارة المنصة.
+          </Alert>
+        ) : null
+      }
+    >
+      {!loading && (
+        <WaStatRow
+          columns={{ base: 2, md: 3 }}
+          items={[
+            { label: "أرقامي", value: `${sessions.length}/${status?.max_sessions || 2}` },
+            { label: "متصلة", value: readyCount, accent: "green.500" },
+            { label: "الخدمات", value: services.length },
+          ]}
+        />
+      )}
 
-          {!configured && (
-            <Alert status="warning" borderRadius="lg">
-              <AlertIcon />
-              بوابة واتساب غير مُعدّة حالياً. تواصل مع إدارة المنصة.
-            </Alert>
-          )}
-
-          {/* Numbers */}
-          <Box bg={cardBg} border="1px solid" borderColor={border} borderRadius="xl" p={5}>
-            <Flex justify="space-between" align="center" mb={4} wrap="wrap" gap={2}>
-              <Heading size="sm">أرقامي</Heading>
-              <Button
-                size="sm"
-                colorScheme="green"
-                leftIcon={<MdAdd />}
-                onClick={handleCreate}
-                isLoading={creating}
-                isDisabled={!configured || !canAddMore}
-              >
-                ربط رقم
-              </Button>
-            </Flex>
-            <Text fontSize="sm" color={muted} mb={4}>
-              حد أقصى رقمين. الإرسال يتم فقط عبر أرقامك المتصلة المعيّنة للخدمات.
-            </Text>
-            {loading ? (
-              <Flex justify="center" py={8}>
-                <Spinner />
-              </Flex>
-            ) : sessions.length === 0 ? (
-              <Text color={muted} textAlign="center" py={6}>
-                لا توجد أرقام بعد — ابدأ بربط رقمك
-              </Text>
-            ) : (
-              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
-                {sessions.map((s) => (
-                  <Box key={s.id} border="1px solid" borderColor={border} borderRadius="lg" p={4}>
-                    <Flex justify="space-between" mb={2}>
-                      <Box>
-                        <Text fontWeight="700" dir="ltr" textAlign="right">
-                          {s.id}
-                        </Text>
-                        <Text fontSize="sm" color={muted} dir="ltr">
-                          {s.phone_number || "—"}
-                        </Text>
-                      </Box>
-                      <StatusBadge status={s.status} />
-                    </Flex>
-                    <HStack spacing={2}>
-                      <Tooltip label="عرض QR">
-                        <IconButton
-                          aria-label="QR"
-                          icon={<MdQrCode />}
-                          size="sm"
-                          onClick={() => openQr(s.id)}
-                        />
-                      </Tooltip>
-                      <Tooltip label="إعادة ربط">
-                        <IconButton
-                          aria-label="reconnect"
-                          icon={<MdSync />}
-                          size="sm"
-                          onClick={() => handleReconnect(s.id)}
-                        />
-                      </Tooltip>
-                      <Tooltip label="حذف">
-                        <IconButton
-                          aria-label="delete"
-                          icon={<MdDelete />}
-                          size="sm"
-                          colorScheme="red"
-                          variant="ghost"
-                          onClick={() => handleDelete(s.id)}
-                        />
-                      </Tooltip>
-                    </HStack>
-                  </Box>
-                ))}
-              </SimpleGrid>
-            )}
+      {loading ? (
+        <WaLoading />
+      ) : (
+        <Tabs colorScheme="green" variant="soft-rounded" size="sm" isLazy>
+          <Box overflowX="auto" pb={1}>
+            <TabList minW="max-content" gap={1}>
+              <Tab fontWeight="700">أرقامي</Tab>
+              <Tab fontWeight="700">الخدمات</Tab>
+              <Tab fontWeight="700">إشعار الطلاب</Tab>
+              <Tab fontWeight="700">تقارير أولياء</Tab>
+              <Tab fontWeight="700">امتحانات أولياء</Tab>
+            </TabList>
           </Box>
 
-          <TeacherParentExamPanel cardBg={cardBg} border={border} muted={muted} />
-
-          {/* Services */}
-          <Box bg={cardBg} border="1px solid" borderColor={border} borderRadius="xl" p={5}>
-            <Heading size="sm" mb={2}>
-              الخدمات
-            </Heading>
-            <Text fontSize="sm" color={muted} mb={4}>
-              عيّن أرقامك الجاهزة لكل خدمة. خدمة «الدعم العلمي» ترد تلقائيًا على أسئلة طلابك من موادك فقط.
-            </Text>
-            <VStack align="stretch" spacing={4}>
-              {services.map((svc) => {
-                const assigned = new Set(
-                  (svc.assigned_sessions || []).map((a) => a.session_slug),
-                );
-                return (
-                  <Box key={svc.key} border="1px solid" borderColor={border} borderRadius="lg" p={4}>
-                    <Flex justify="space-between" mb={3} wrap="wrap" gap={2}>
-                      <Box>
-                        <Text fontWeight="700">{svc.name}</Text>
-                        <Text fontSize="xs" color={muted}>
-                          {svc.description}
-                        </Text>
-                      </Box>
-                      <Badge colorScheme={svc.is_enabled ? "green" : "gray"}>
-                        {svc.is_enabled ? "مفعّل" : "معطّل"}
-                      </Badge>
-                    </Flex>
-                    {sessions.length === 0 ? (
-                      <Text fontSize="sm" color={muted}>
-                        اربط رقماً أولاً
-                      </Text>
-                    ) : (
-                      <VStack align="stretch" spacing={2}>
-                        {sessions.map((s) => (
-                          <FormControl
-                            key={`${svc.key}-${s.id}`}
-                            display="flex"
-                            alignItems="center"
-                          >
-                            <Switch
-                              me={3}
-                              isChecked={assigned.has(s.id)}
-                              isDisabled={savingServiceKey === svc.key}
-                              onChange={(e) =>
-                                toggleServiceSession(svc.key, s.id, e.target.checked)
-                              }
-                              colorScheme="green"
+          <TabPanels>
+            <TabPanel px={0} pt={4}>
+              <WaCard
+                title="أرقامي"
+                description="حد أقصى رقمين. الإرسال يتم فقط عبر أرقامك المتصلة المعيّنة للخدمات."
+                actions={
+                  <Button
+                    size="sm"
+                    colorScheme="green"
+                    leftIcon={<MdAdd />}
+                    onClick={handleCreate}
+                    isLoading={creating}
+                    isDisabled={!configured || !canAddMore}
+                  >
+                    ربط رقم
+                  </Button>
+                }
+              >
+                {sessions.length === 0 ? (
+                  <WaEmptyState
+                    title="لا توجد أرقام بعد"
+                    description="ابدأ بربط رقم واتساب عبر زر «ربط رقم»."
+                  />
+                ) : (
+                  <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
+                    {sessions.map((s) => (
+                      <Box key={s.id} border="1px solid" borderColor={border} borderRadius="lg" p={4}>
+                        <Flex justify="space-between" mb={3} gap={2}>
+                          <Box minW={0}>
+                            <Text fontWeight="700" dir="ltr" noOfLines={1}>
+                              {s.id}
+                            </Text>
+                            <Text fontSize="sm" color={muted} dir="ltr">
+                              {s.phone_number || "—"}
+                            </Text>
+                          </Box>
+                          <WaStatusBadge status={s.status} />
+                        </Flex>
+                        <HStack spacing={2}>
+                          <Tooltip label="عرض QR">
+                            <IconButton
+                              aria-label="QR"
+                              icon={<MdQrCode />}
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openQr(s.id)}
                             />
-                            <FormLabel mb={0} fontSize="sm">
-                              <HStack spacing={2}>
-                                <Text dir="ltr">{s.id}</Text>
-                                <StatusBadge status={s.status} />
-                              </HStack>
-                            </FormLabel>
-                          </FormControl>
-                        ))}
-                      </VStack>
-                    )}
-                  </Box>
-                );
-              })}
-            </VStack>
-          </Box>
+                          </Tooltip>
+                          <Tooltip label="إعادة ربط">
+                            <IconButton
+                              aria-label="reconnect"
+                              icon={<MdSync />}
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleReconnect(s.id)}
+                            />
+                          </Tooltip>
+                          <Tooltip label="حذف">
+                            <IconButton
+                              aria-label="delete"
+                              icon={<MdDelete />}
+                              size="sm"
+                              colorScheme="red"
+                              variant="ghost"
+                              onClick={() => handleDelete(s.id)}
+                            />
+                          </Tooltip>
+                        </HStack>
+                      </Box>
+                    ))}
+                  </SimpleGrid>
+                )}
+              </WaCard>
+            </TabPanel>
 
-          {/* Notify */}
-          <Box bg={cardBg} border="1px solid" borderColor={border} borderRadius="xl" p={5}>
-            <Heading size="sm" mb={2}>
-              إرسال إشعار
-            </Heading>
-            <Text fontSize="sm" color={muted} mb={3}>
-              رسالة نصية لطلاب كورساتك (حد 50 طالباً)
-            </Text>
-            <Textarea
-              value={notifyMessage}
-              onChange={(e) => setNotifyMessage(e.target.value.slice(0, 1000))}
-              placeholder="اكتب رسالة الإشعار..."
-              mb={3}
-              rows={4}
-            />
-            <Text fontSize="xs" color={muted} mb={3}>
-              {notifyMessage.length}/1000
-            </Text>
-            <Input
-              placeholder="بحث عن طالب..."
-              value={studentSearch}
-              onChange={(e) => setStudentSearch(e.target.value)}
-              mb={3}
-              maxW="360px"
-            />
-            <Box maxH="220px" overflowY="auto" border="1px solid" borderColor={border} borderRadius="md" p={3} mb={3}>
-              <CheckboxGroup
-                value={notifyIds.map(String)}
-                onChange={(vals) => setNotifyIds(vals.slice(0, 50))}
+            <TabPanel px={0} pt={4}>
+              <WaCard
+                title="ربط الخدمات"
+                description="عيّن أرقامك الجاهزة لكل خدمة. «الدعم العلمي» يرد تلقائيًا على أسئلة طلابك من موادك فقط."
               >
-                <VStack align="stretch" spacing={2}>
-                  {filteredStudents.map((s) => (
-                    <Checkbox key={`n-${s.id}`} value={String(s.id)}>
-                      {s.name}{" "}
-                      <Text as="span" color={muted} fontSize="sm" dir="ltr">
-                        {s.phone || "بدون هاتف"}
-                      </Text>
-                    </Checkbox>
-                  ))}
-                  {filteredStudents.length === 0 && (
-                    <Text color={muted} fontSize="sm">
-                      لا يوجد طلاب
-                    </Text>
+                <VStack align="stretch" spacing={3}>
+                  {services.map((svc) => {
+                    const assigned = new Set(
+                      (svc.assigned_sessions || []).map((a) => a.session_slug),
+                    );
+                    return (
+                      <Box key={svc.key} border="1px solid" borderColor={border} borderRadius="lg" p={4}>
+                        <Flex justify="space-between" mb={3} wrap="wrap" gap={2}>
+                          <Box>
+                            <Text fontWeight="700">{svc.name}</Text>
+                            <Text fontSize="xs" color={muted}>
+                              {svc.description}
+                            </Text>
+                          </Box>
+                          <Badge colorScheme={svc.is_enabled ? "green" : "gray"} borderRadius="full">
+                            {svc.is_enabled ? "مفعّل" : "معطّل"}
+                          </Badge>
+                        </Flex>
+                        {sessions.length === 0 ? (
+                          <Text fontSize="sm" color={muted}>
+                            اربط رقماً أولاً
+                          </Text>
+                        ) : (
+                          <VStack align="stretch" spacing={2}>
+                            {sessions.map((s) => (
+                              <FormControl key={`${svc.key}-${s.id}`} display="flex" alignItems="center">
+                                <Switch
+                                  me={3}
+                                  isChecked={assigned.has(s.id)}
+                                  isDisabled={savingServiceKey === svc.key}
+                                  onChange={(e) =>
+                                    toggleServiceSession(svc.key, s.id, e.target.checked)
+                                  }
+                                  colorScheme="green"
+                                />
+                                <FormLabel mb={0} fontSize="sm">
+                                  <HStack spacing={2}>
+                                    <Text dir="ltr">{s.id}</Text>
+                                    <WaStatusBadge status={s.status} />
+                                  </HStack>
+                                </FormLabel>
+                              </FormControl>
+                            ))}
+                          </VStack>
+                        )}
+                      </Box>
+                    );
+                  })}
+                  {services.length === 0 && (
+                    <WaEmptyState title="لا توجد خدمات متاحة" />
                   )}
                 </VStack>
-              </CheckboxGroup>
-            </Box>
-            <Button
-              colorScheme="green"
-              leftIcon={<MdSend />}
-              onClick={handleNotify}
-              isLoading={sendingNotify}
-              isDisabled={!configured}
-            >
-              إرسال الإشعار ({notifyIds.length})
-            </Button>
-          </Box>
+              </WaCard>
+            </TabPanel>
 
-          {/* Parent reports */}
-          <Box bg={cardBg} border="1px solid" borderColor={border} borderRadius="xl" p={5}>
-            <Heading size="sm" mb={2}>
-              تقرير ولي الأمر
-            </Heading>
-            <Text fontSize="sm" color={muted} mb={3}>
-              يُرسل ملخص التقدم لرقم ولي الأمر (أو رقم الطالب إن لم يتوفر)
-            </Text>
-            <Divider mb={3} />
-            <Box maxH="220px" overflowY="auto" border="1px solid" borderColor={border} borderRadius="md" p={3} mb={3}>
-              <CheckboxGroup
-                value={reportIds.map(String)}
-                onChange={(vals) => setReportIds(vals.slice(0, 50))}
+            <TabPanel px={0} pt={4}>
+              <WaCard
+                title="إرسال إشعار"
+                description="رسالة نصية لطلاب كورساتك (حد 50 طالباً)"
               >
-                <VStack align="stretch" spacing={2}>
-                  {students.map((s) => (
-                    <Checkbox key={`r-${s.id}`} value={String(s.id)}>
-                      {s.name}
-                    </Checkbox>
-                  ))}
-                  {students.length === 0 && (
-                    <Text color={muted} fontSize="sm">
-                      لا يوجد طلاب
-                    </Text>
-                  )}
-                </VStack>
-              </CheckboxGroup>
-            </Box>
-            <Button
-              colorScheme="teal"
-              leftIcon={<MdSend />}
-              onClick={handleReports}
-              isLoading={sendingReports}
-              isDisabled={!configured}
-            >
-              إرسال التقارير ({reportIds.length})
-            </Button>
-          </Box>
-        </VStack>
-      </Container>
+                <Textarea
+                  value={notifyMessage}
+                  onChange={(e) => setNotifyMessage(e.target.value.slice(0, 1000))}
+                  placeholder="اكتب رسالة الإشعار..."
+                  mb={2}
+                  rows={4}
+                />
+                <Text fontSize="xs" color={muted} mb={3}>
+                  {notifyMessage.length}/1000
+                </Text>
+                <Input
+                  placeholder="بحث عن طالب..."
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  mb={3}
+                  maxW={{ md: "360px" }}
+                />
+                <Box
+                  maxH="220px"
+                  overflowY="auto"
+                  border="1px solid"
+                  borderColor={border}
+                  borderRadius="lg"
+                  p={3}
+                  mb={3}
+                >
+                  <CheckboxGroup
+                    value={notifyIds.map(String)}
+                    onChange={(vals) => setNotifyIds(vals.slice(0, 50))}
+                  >
+                    <VStack align="stretch" spacing={2}>
+                      {filteredStudents.map((s) => (
+                        <Checkbox key={`n-${s.id}`} value={String(s.id)} colorScheme="green">
+                          {s.name}{" "}
+                          <Text as="span" color={muted} fontSize="sm" dir="ltr">
+                            {s.phone || "بدون هاتف"}
+                          </Text>
+                        </Checkbox>
+                      ))}
+                      {filteredStudents.length === 0 && (
+                        <Text color={muted} fontSize="sm">
+                          لا يوجد طلاب
+                        </Text>
+                      )}
+                    </VStack>
+                  </CheckboxGroup>
+                </Box>
+                <Button
+                  colorScheme="green"
+                  leftIcon={<MdSend />}
+                  onClick={handleNotify}
+                  isLoading={sendingNotify}
+                  isDisabled={!configured}
+                  w={{ base: "100%", sm: "auto" }}
+                >
+                  إرسال الإشعار ({notifyIds.length})
+                </Button>
+              </WaCard>
+            </TabPanel>
+
+            <TabPanel px={0} pt={4}>
+              <WaCard
+                title="تقرير ولي الأمر"
+                description="يُرسل ملخص التقدم لرقم ولي الأمر (أو رقم الطالب إن لم يتوفر)"
+              >
+                <Box
+                  maxH="260px"
+                  overflowY="auto"
+                  border="1px solid"
+                  borderColor={border}
+                  borderRadius="lg"
+                  p={3}
+                  mb={3}
+                >
+                  <CheckboxGroup
+                    value={reportIds.map(String)}
+                    onChange={(vals) => setReportIds(vals.slice(0, 50))}
+                  >
+                    <VStack align="stretch" spacing={2}>
+                      {students.map((s) => (
+                        <Checkbox key={`r-${s.id}`} value={String(s.id)} colorScheme="teal">
+                          {s.name}
+                        </Checkbox>
+                      ))}
+                      {students.length === 0 && (
+                        <Text color={muted} fontSize="sm">
+                          لا يوجد طلاب
+                        </Text>
+                      )}
+                    </VStack>
+                  </CheckboxGroup>
+                </Box>
+                <Button
+                  colorScheme="teal"
+                  leftIcon={<MdSend />}
+                  onClick={handleReports}
+                  isLoading={sendingReports}
+                  isDisabled={!configured}
+                  w={{ base: "100%", sm: "auto" }}
+                >
+                  إرسال التقارير ({reportIds.length})
+                </Button>
+              </WaCard>
+            </TabPanel>
+
+            <TabPanel px={0} pt={4}>
+              <TeacherParentExamPanel cardBg={cardBg} border={border} muted={muted} />
+            </TabPanel>
+          </TabPanels>
+        </Tabs>
+      )}
 
       <Modal
         isOpen={qrModal.open}
@@ -552,17 +573,17 @@ export default function TeacherWhatsAppPage() {
         size="md"
       >
         <ModalOverlay />
-        <ModalContent dir="rtl">
+        <ModalContent dir="rtl" borderRadius="xl">
           <ModalHeader>مسح رمز QR</ModalHeader>
           <ModalCloseButton />
           <ModalBody pb={6}>
             {qrModal.loading ? (
               <Flex justify="center" py={10}>
-                <Spinner />
+                <Spinner color="green.400" />
               </Flex>
             ) : qrModal.session?.qr ? (
               <VStack>
-                <Image src={qrModal.session.qr} alt="QR" maxW="260px" />
+                <Image src={qrModal.session.qr} alt="QR" maxW="260px" borderRadius="md" />
                 <Text fontSize="sm" color={muted} textAlign="center">
                   واتساب ← الأجهزة المرتبطة ← ربط جهاز
                 </Text>
@@ -571,7 +592,7 @@ export default function TeacherWhatsAppPage() {
                 </Button>
               </VStack>
             ) : (
-              <Alert status="info" borderRadius="md">
+              <Alert status="info" borderRadius="lg">
                 <AlertIcon />
                 {qrModal.session?.status === "ready"
                   ? "الجلسة متصلة بالفعل"
@@ -581,6 +602,6 @@ export default function TeacherWhatsAppPage() {
           </ModalBody>
         </ModalContent>
       </Modal>
-    </Box>
+    </WaPageShell>
   );
 }

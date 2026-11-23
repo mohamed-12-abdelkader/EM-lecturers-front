@@ -10,21 +10,17 @@ import {
   Spinner,
   useToast,
   useColorModeValue,
-  Container,
   Flex,
   Textarea,
   IconButton,
-  Alert,
-  AlertIcon,
 } from "@chakra-ui/react";
-import { Link as RouterLink } from "react-router-dom";
 import { MdRefresh, MdSend } from "react-icons/md";
-import { FaWhatsapp } from "react-icons/fa";
 import {
   fetchSupportPolicyPack,
   fetchSupportPolicyMessages,
   sendSupportPolicyChat,
 } from "../../../api/whatsappAdminApi";
+import { WaPageShell } from "../../../components/whatsapp/ui";
 
 const STYLE_AR = {
   normal: "عادي",
@@ -41,11 +37,9 @@ export default function WhatsAppPolicyPage() {
   const [draft, setDraft] = useState("");
   const threadEndRef = useRef(null);
 
-  const pageBg = useColorModeValue("gray.50", "gray.900");
   const cardBg = useColorModeValue("white", "gray.800");
   const border = useColorModeValue("gray.200", "gray.700");
   const muted = useColorModeValue("gray.500", "gray.400");
-  const title = useColorModeValue("gray.900", "white");
   const inboundBg = useColorModeValue("gray.100", "whiteAlpha.100");
   const outboundBg = useColorModeValue("green.50", "green.900");
 
@@ -114,41 +108,22 @@ export default function WhatsAppPolicyPage() {
     : "لا توجد تعليمات بعد — اكتب في الشات لتحديث سياسة الرد.";
 
   return (
-    <Box minH="100vh" bg={pageBg} dir="rtl" pb={10} pt={4}>
-      <Container maxW="1100px" px={{ base: 3, md: 6 }}>
-        <VStack spacing={5} align="stretch">
-          <Flex justify="space-between" align="center" wrap="wrap" gap={3}>
-            <Box>
-              <HStack spacing={2} mb={1}>
-                <Box as={FaWhatsapp} color="green.500" boxSize={7} />
-                <Heading size="lg" color={title}>
-                  تخصيص الدعم
-                </Heading>
-              </HStack>
-              <Text fontSize="sm" color={muted}>
-                شات مع المساعد لتحديث تعليمات إعادة صياغة ردود الدعم الفني للطلاب
-              </Text>
-            </Box>
-            <HStack wrap="wrap">
-              <Button as={RouterLink} to="/admin/whatsapp/inbox" size="sm" variant="outline">
-                صندوق الوارد
-              </Button>
-              <Button as={RouterLink} to="/admin/whatsapp/sessions" size="sm" variant="outline">
-                الجلسات
-              </Button>
-              <Button as={RouterLink} to="/admin/whatsapp/services" size="sm" variant="outline">
-                الخدمات
-              </Button>
-              <IconButton
-                aria-label="تحديث"
-                icon={<MdRefresh />}
-                size="sm"
-                onClick={load}
-                isLoading={loading}
-              />
-            </HStack>
-          </Flex>
-
+    <WaPageShell
+      title="تخصيص الدعم"
+      description="شات مع المساعد لتحديث تعليمات إعادة صياغة ردود الدعم الفني للطلاب"
+      showAdminNav
+      maxW="1100px"
+      actions={
+        <IconButton
+          aria-label="تحديث"
+          icon={<MdRefresh />}
+          size="sm"
+          variant="outline"
+          onClick={load}
+          isLoading={loading}
+        />
+      }
+    >
           <Flex gap={4} align="stretch" direction={{ base: "column", lg: "row" }} minH={{ lg: "70vh" }}>
             <Box
               bg={cardBg}
@@ -272,8 +247,6 @@ export default function WhatsAppPolicyPage() {
               </Box>
             </Box>
           </Flex>
-        </VStack>
-      </Container>
-    </Box>
+    </WaPageShell>
   );
 }

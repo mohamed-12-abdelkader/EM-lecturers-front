@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
-  Heading,
   Text,
   VStack,
   HStack,
@@ -10,7 +9,6 @@ import {
   Spinner,
   useToast,
   useColorModeValue,
-  Container,
   Flex,
   Input,
   Textarea,
@@ -19,9 +17,8 @@ import {
   Alert,
   AlertIcon,
 } from "@chakra-ui/react";
-import { Link as RouterLink, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { MdRefresh, MdSend } from "react-icons/md";
-import { FaWhatsapp } from "react-icons/fa";
 import {
   fetchWhatsAppStatus,
   fetchWhatsAppConversations,
@@ -31,13 +28,7 @@ import {
   patchWhatsAppConversation,
   sendWhatsAppConversationMessage,
 } from "../../../api/whatsappAdminApi";
-
-const STATUS_META = {
-  bot: { label: "بوت", color: "blue" },
-  waiting_human: { label: "بانتظار بشر", color: "orange" },
-  human: { label: "بشري", color: "purple" },
-  closed: { label: "مغلقة", color: "gray" },
-};
+import { WaPageShell, WaStatusBadge } from "../../../components/whatsapp/ui";
 
 const OUTBOUND_STATUS = {
   pending: { label: "قيد الانتظار", color: "orange" },
@@ -48,12 +39,7 @@ const OUTBOUND_STATUS = {
 };
 
 function StatusBadge({ status }) {
-  const meta = STATUS_META[status] || { label: status || "—", color: "gray" };
-  return (
-    <Badge colorScheme={meta.color} borderRadius="md" px={2} py={0.5} fontSize="xs">
-      {meta.label}
-    </Badge>
-  );
+  return <WaStatusBadge status={status} kind="convo" />;
 }
 
 export default function WhatsAppInboxPage() {
@@ -80,11 +66,9 @@ export default function WhatsAppInboxPage() {
   const threadEndRef = useRef(null);
   const initialListLoad = useRef(true);
 
-  const pageBg = useColorModeValue("gray.50", "gray.900");
   const cardBg = useColorModeValue("white", "gray.800");
   const border = useColorModeValue("gray.200", "gray.700");
   const muted = useColorModeValue("gray.500", "gray.400");
-  const title = useColorModeValue("gray.900", "white");
   const listHover = useColorModeValue("gray.50", "gray.700");
   const listActive = useColorModeValue("green.50", "whiteAlpha.100");
   const inboundBg = useColorModeValue("gray.100", "gray.700");
@@ -242,54 +226,33 @@ export default function WhatsAppInboxPage() {
   };
 
   return (
-    <Box minH="100vh" bg={pageBg} dir="rtl" pb={6} pt={4}>
-      <Container maxW="1400px" px={{ base: 3, md: 6 }}>
-        <VStack spacing={4} align="stretch">
-          <Flex justify="space-between" align="center" wrap="wrap" gap={3}>
-            <Box>
-              <HStack spacing={2} mb={1}>
-                <Box as={FaWhatsapp} color="green.500" boxSize={7} />
-                <Heading size="lg" color={title}>
-                  صندوق وارد واتساب
-                </Heading>
-              </HStack>
-              <Text fontSize="sm" color={muted}>
-                استعرض المحادثات، أرسل ردوداً، واستلم من البوت أو أعدها له
-              </Text>
-            </Box>
-            <HStack wrap="wrap">
-              <Button as={RouterLink} to="/admin/whatsapp/policy" size="sm" variant="outline">
-                تخصيص الدعم
-              </Button>
-              <Button as={RouterLink} to="/admin/whatsapp/sessions" size="sm" variant="outline">
-                الجلسات
-              </Button>
-              <Button as={RouterLink} to="/admin/whatsapp/services" size="sm" variant="outline">
-                الخدمات
-              </Button>
-              <Button as={RouterLink} to="/admin/whatsapp/monitor" size="sm" variant="outline">
-                المراقبة
-              </Button>
-              <IconButton
-                aria-label="تحديث"
-                icon={<MdRefresh />}
-                size="sm"
-                onClick={() => {
-                  loadList();
-                  if (selectedId) loadThread(selectedId);
-                }}
-                isLoading={listLoading || threadLoading}
-              />
-            </HStack>
-          </Flex>
-
-          {!configured && (
-            <Alert status="warning" borderRadius="lg">
-              <AlertIcon />
-              بوابة واتساب غير مُعدّة — لن تُرسل الرسائل حتى يتم الإعداد.
-            </Alert>
-          )}
-
+    <WaPageShell
+      title="صندوق وارد واتساب"
+      description="استعرض المحادثات، أرسل ردوداً، واستلم من البوت أو أعدها له"
+      showAdminNav
+      maxW="1400px"
+      actions={
+        <IconButton
+          aria-label="تحديث"
+          icon={<MdRefresh />}
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            loadList();
+            if (selectedId) loadThread(selectedId);
+          }}
+          isLoading={listLoading || threadLoading}
+        />
+      }
+      alert={
+        !configured ? (
+          <Alert status="warning" borderRadius="xl">
+            <AlertIcon />
+            بوابة واتساب غير مُعدّة — لن تُرسل الرسائل حتى يتم الإعداد.
+          </Alert>
+        ) : null
+      }
+    >
           <Flex
             gap={4}
             align="stretch"
@@ -325,17 +288,26 @@ export default function WhatsAppInboxPage() {
                       </option>
                     ))}
                   </Select>
-                  <Select
-                    size="sm"
-                    placeholder="كل الحالات"
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                  >
-                    <option value="bot">بوت</option>
-                    <option value="waiting_human">بانتظار بشر</option>
-                    <option value="human">بشري</option>
-                    <option value="closed">مغلقة</option>
-                  </Select>
+                  <HStack spacing={1.5} flexWrap="wrap">
+                    {[
+                      { value: "", label: "الكل" },
+                      { value: "bot", label: "بوت" },
+                      { value: "waiting_human", label: "بانتظار موظف" },
+                      { value: "human", label: "موظف" },
+                      { value: "closed", label: "مغلقة" },
+                    ].map((opt) => (
+                      <Button
+                        key={opt.value || "all"}
+                        size="xs"
+                        borderRadius="full"
+                        variant={statusFilter === opt.value ? "solid" : "outline"}
+                        colorScheme={statusFilter === opt.value ? "green" : "gray"}
+                        onClick={() => setStatusFilter(opt.value)}
+                      >
+                        {opt.label}
+                      </Button>
+                    ))}
+                  </HStack>
                   <HStack>
                     <Input
                       size="sm"
@@ -347,7 +319,7 @@ export default function WhatsAppInboxPage() {
                         if (e.key === "Enter") loadList();
                       }}
                     />
-                    <Button size="sm" onClick={() => loadList()}>
+                    <Button size="sm" onClick={() => loadList()} flexShrink={0}>
                       بحث
                     </Button>
                   </HStack>
@@ -572,8 +544,6 @@ export default function WhatsAppInboxPage() {
               )}
             </Box>
           </Flex>
-        </VStack>
-      </Container>
-    </Box>
+    </WaPageShell>
   );
 }

@@ -10,9 +10,9 @@ const BLUE = "#3182CE";
 const ORANGE = "#DD6B20";
 
 const quickLinks = [
-  { label: "المزايا", href: "#teacher-features" },
-  { label: "بناء البراند", href: "#about-service" },
-  { label: "الباقات", href: "#pricing" },
+  { label: "المشاكل اللي بنحلها", href: "#problems" },
+  { label: "يومك بعد EM", href: "#day-after" },
+  { label: "المنصة", href: "#ecosystem" },
   { label: "إنشاء حساب", to: "/signup" },
   { label: "تسجيل الدخول", to: "/login" },
 ];
@@ -35,16 +35,26 @@ const socialLinks = [
   },
 ];
 
-const Footer = () => {
-  const pageBg = useColorModeValue("#FFFFFF", "#0a1628");
-  const titleColor = useColorModeValue("#0f172a", "#ffffff");
-  const muted = useColorModeValue("#64748b", "#94a3b8");
-  const softMuted = useColorModeValue("#94a3b8", "#64748b");
-  const border = useColorModeValue("rgba(15,23,42,0.08)", "rgba(255,255,255,0.1)");
-  const logoBg = useColorModeValue("rgba(15,23,42,0.04)", "rgba(255,255,255,0.05)");
-  const socialBg = useColorModeValue("rgba(15,23,42,0.04)", "rgba(255,255,255,0.05)");
-  const socialHover = useColorModeValue(`${BLUE}14`, `${BLUE}22`);
-  const isLight = useColorModeValue(true, false);
+const Footer = ({ forceDark = false }) => {
+  const pageBgMode = useColorModeValue("#FFFFFF", "#0a1628");
+  const titleColorMode = useColorModeValue("#0f172a", "#ffffff");
+  const mutedMode = useColorModeValue("#64748b", "#94a3b8");
+  const softMutedMode = useColorModeValue("#94a3b8", "#64748b");
+  const borderMode = useColorModeValue("rgba(15,23,42,0.08)", "rgba(255,255,255,0.1)");
+  const logoBgMode = useColorModeValue("rgba(15,23,42,0.04)", "rgba(255,255,255,0.05)");
+  const socialBgMode = useColorModeValue("rgba(15,23,42,0.04)", "rgba(255,255,255,0.05)");
+  const socialHoverMode = useColorModeValue(`${BLUE}14`, `${BLUE}22`);
+  const isLightMode = useColorModeValue(true, false);
+
+  const pageBg = forceDark ? "#070B14" : pageBgMode;
+  const titleColor = forceDark ? "#ffffff" : titleColorMode;
+  const muted = forceDark ? "#94a3b8" : mutedMode;
+  const softMuted = forceDark ? "#64748b" : softMutedMode;
+  const border = forceDark ? "rgba(255,255,255,0.1)" : borderMode;
+  const logoBg = forceDark ? "rgba(255,255,255,0.05)" : logoBgMode;
+  const socialBg = forceDark ? "rgba(255,255,255,0.05)" : socialBgMode;
+  const socialHover = forceDark ? `${BLUE}22` : socialHoverMode;
+  const isLight = forceDark ? false : isLightMode;
 
   return (
     <footer

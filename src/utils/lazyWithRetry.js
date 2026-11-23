@@ -11,7 +11,8 @@ function wait(ms) {
 }
 
 /**
- * lazy() مع إعادة محاولة — يقلّل شاشة «تعذّر فتح الصفحة» بعد نشر تحديث أو SW قديم.
+ * lazy() مع إعادة محاولة — بدون ريلود تلقائي بعد فشل الـ chunk.
+ * الخطأ يُمرَّر لـ ErrorBoundary ليعرض زر تحديث يدوي.
  */
 export function lazyWithRetry(importer, retries = DEFAULT_RETRIES) {
   return lazy(async () => {
@@ -35,10 +36,7 @@ export function lazyWithRetry(importer, retries = DEFAULT_RETRIES) {
       }
     }
 
-    if (recoverFromChunkError(lastError)) {
-      return new Promise(() => {});
-    }
-
+    recoverFromChunkError(lastError);
     throw lastError;
   });
 }

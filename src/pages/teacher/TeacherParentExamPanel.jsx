@@ -6,7 +6,6 @@ import {
   Checkbox,
   FormControl,
   FormLabel,
-  Heading,
   HStack,
   NumberInput,
   NumberInputField,
@@ -24,6 +23,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { MdSave } from "react-icons/md";
+import { WaCard, WaLoading } from "../../components/whatsapp/ui";
 import {
   fetchTeacherParentExamPreview,
   fetchTeacherParentExamSettings,
@@ -110,25 +110,24 @@ export default function TeacherParentExamPanel({ cardBg, border, muted }) {
     }
   };
 
-  if (!prefs) return <Spinner />;
+  if (!prefs) return <WaLoading label="جارٍ تحميل إعدادات أولياء الأمور…" />;
 
   return (
-    <Box bg={cardBg} border="1px solid" borderColor={border} borderRadius="xl" p={5}>
-      <Heading size="sm" mb={2}>
-        إشعارات أولياء الأمور — الامتحانات الشاملة
-      </Heading>
-      <Text fontSize="sm" color={muted} mb={4}>
-        الرسائل تطلع من نفس أرقام إشعارات الطلاب. سرعة الإرسال والحد اليومي من إدارة المنصة.
-      </Text>
+    <WaCard
+      title="إشعارات أولياء الأمور — الامتحانات الشاملة"
+      description="الرسائل تطلع من نفس أرقام إشعارات الطلاب. سرعة الإرسال والحد اليومي من إدارة المنصة."
+    >
       <VStack align="stretch" spacing={2} mb={4}>
         <FormControl display="flex" alignItems="center">
           <FormLabel mb={0}>الإرسال التلقائي</FormLabel>
           <Switch
+            colorScheme="green"
             isChecked={Boolean(prefs.auto_send)}
             onChange={(e) => setPrefs({ ...prefs, auto_send: e.target.checked })}
           />
         </FormControl>
         <Checkbox
+          colorScheme="green"
           isChecked={Boolean(prefs.notify_passed)}
           onChange={(e) => setPrefs({ ...prefs, notify_passed: e.target.checked })}
         >
@@ -304,6 +303,6 @@ export default function TeacherParentExamPanel({ cardBg, border, muted }) {
           ))}
         </Tbody>
       </Table>
-    </Box>
+    </WaCard>
   );
 }

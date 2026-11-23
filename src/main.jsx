@@ -61,16 +61,19 @@ const RootContent = () => {
   const [userData, isAdmin, isTeacher, student] = UserType();
   const tenantSubdomain = getTenantSubdomain();
 
+  const hasUser = Boolean(userData);
+  const path = location.pathname.toLowerCase();
+  const isGuestMarketingHome = path === "/" && !hasUser && !tenantSubdomain;
   const showSidebarForTenantUser =
     Boolean(tenantSubdomain) && (Boolean(student) || Boolean(isTeacher));
   const showSidebar =
     (!tenantSubdomain || showSidebarForTenantUser) &&
-    location.pathname !== "/landing" &&
+    path !== "/landing" &&
+    !isGuestMarketingHome &&
     !location.pathname.startsWith("/video/");
-  const hasUser = Boolean(userData);
-  const path = location.pathname.toLowerCase();
   const hideStudentBottomNav =
     path === "/landing" ||
+    isGuestMarketingHome ||
     path === "/login" ||
     path === "/signup" ||
     path === "/teacherchat" ||

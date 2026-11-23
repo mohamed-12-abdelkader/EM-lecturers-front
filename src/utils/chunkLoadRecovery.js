@@ -1,8 +1,4 @@
-import applicationActivityManager from "./applicationActivityManager";
 import { notifyChunkMismatchUpdate } from "../pwa/chunkMismatchBridge";
-
-const RELOAD_GUARD_KEY = "em_chunk_reload_ts";
-const RELOAD_COOLDOWN_MS = 12_000;
 
 export function isChunkLoadError(error) {
   const message = String(error?.message || error || "");
@@ -21,37 +17,21 @@ export function isChunkLoadError(error) {
 
 /**
  * عند فشل تحميل chunk بعد نشر جديد:
- * - أثناء نشاط حرج: لا نعيد التحميل — نعلّم بوجود تحديث فقط
- * - خارج النشاط الحرج: إعادة تحميل واحدة محمية بـ cooldown
+ * نعلّم بوجود تحديث فقط — بدون location.reload تلقائي.
+ * المستخدم يحدّث الصفحة بنفسه عندما يريد.
  */
 export function recoverFromChunkError(error) {
   if (typeof window === "undefined" || !isChunkLoadError(error)) return false;
-
-  if (applicationActivityManager.isLocalCriticalActivityActive()) {
-    notifyChunkMismatchUpdate();
-    return true;
-  }
-
-  try {
-    const lastReload = Number(sessionStorage.getItem(RELOAD_GUARD_KEY) || 0);
-    const now = Date.now();
-    if (now - lastReload < RELOAD_COOLDOWN_MS) return false;
-    sessionStorage.setItem(RELOAD_GUARD_KEY, String(now));
-  } catch {
-    /* ignore storage errors */
-  }
-
-  window.location.reload();
-  return true;
+  notifyChunkMismatchUpdate();
+  return false;
 }
 
 export function registerChunkLoadRecovery() {
   if (typeof window === "undefined") return;
 
   window.addEventListener("unhandledrejection", (event) => {
-    if (recoverFromChunkError(event.reason)) {
-      event.preventDefault();
-    }
+    if (!isChunkLoadError(event.reason)) return;
+    notifyChunkMismatchUpdate();
   });
 
   window.addEventListener(
@@ -60,9 +40,8 @@ export function registerChunkLoadRecovery() {
       const target = event.target;
       if (!(target instanceof HTMLScriptElement)) return;
       if (!target.src) return;
-      if (recoverFromChunkError(new Error(`Script load failed: ${target.src}`))) {
-        event.preventDefault();
-      }
+      if (!isChunkLoadError(new Error(`Script load failed: ${target.src}`))) return;
+      notifyChunkMismatchUpdate();
     },
     true,
   );
