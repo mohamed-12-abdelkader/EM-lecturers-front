@@ -2,16 +2,16 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
 const LETTERS = ["أ", "ب", "ج", "د", "هـ", "و"];
-const PDF_SCALE = 1.5;
+const PDF_SCALE = 1.45;
 const PAGE_W_MM = 210;
 const PAGE_H_MM = 297;
-const MARGIN_MM = 12;
-/** عرض صفحة التصدير بالبكسل (A4 تقريباً عند 96dpi) */
+const MARGIN_MM = 10;
 const PAGE_WIDTH_PX = 794;
-/** ارتفاع المحتوى القابل للطباعة داخل الصفحة */
-const PAGE_CONTENT_HEIGHT_PX = 1040;
-/** أقل طول لنعتبر النص المشترك «قطعة» مكررة داخل نص السؤال */
-const MIN_EMBEDDED_PASSAGE_LEN = 100;
+/** ارتفاع المحتوى داخل الصفحة — أعلى قليلاً لتقليل الصفحات */
+const PAGE_CONTENT_HEIGHT_PX = 1080;
+/** أقل طول لنص ليُعتبر قطعة قراءة مكررة */
+const MIN_PASSAGE_LEN = 180;
+const PASSAGE_HEAD_LEN = 160;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -37,6 +37,21 @@ function stripHtmlToText(raw) {
     .trim();
 }
 
+/** تطبيع للمقارنة بين نسخ القطعة (اختلافات بسيطة في الهمزات/التشكيل) */
+function normalizeForMatch(text) {
+  return stripHtmlToText(text)
+    .replace(/[\u064B-\u065F\u0670]/g, "") // تشكيل
+    .replace(/\u0640/g, "") // تطويل
+    .replace(/[أإآٱ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
+    .replace(/ؤ/g, "و")
+    .replace(/ئ/g, "ي")
+    .replace(/[^\u0600-\u06FFa-zA-Z0-9()\s.]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function formatQuestionHtml(raw) {
   const text = String(raw ?? "").trim();
   if (!text) return "";
@@ -57,29 +72,78 @@ function choiceLetter(idx, choice) {
   return LETTERS[idx] || `${idx + 1}`;
 }
 
-function passageFingerprint(text) {
-  return stripHtmlToText(text)
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 280);
+function passageHeadKey(plain) {
+  const n = normalizeForMatch(plain);
+  if (n.length < MIN_PASSAGE_LEN) return null;
+  return n.slice(0, PASSAGE_HEAD_LEN);
 }
 
-function commonPrefix(strings) {
-  if (!strings.length) return "";
-  let prefix = strings[0] || "";
-  for (let i = 1; i < strings.length; i += 1) {
-    const s = strings[i] || "";
-    let j = 0;
-    while (j < prefix.length && j < s.length && prefix[j] === s[j]) j += 1;
-    prefix = prefix.slice(0, j);
-    if (!prefix) break;
+function sharedPrefixLen(a, b) {
+  const max = Math.min(a.length, b.length);
+  let i = 0;
+  while (i < max && a[i] === b[i]) i += 1;
+  while (i > 0 && a[i] && a[i] !== " ") i -= 1;
+  return i;
+}
+
+/**
+ * يستخرج أطول بادئة مشتركة من نصوص المجموعة (بعد التطبيع)،
+ * ثم يقطع النص الأصلي للسؤال الأول بنفس النسبة تقريباً.
+ */
+function extractSharedPassagePlain(plains) {
+  if (plains.length < 2) return null;
+  const norms = plains.map(normalizeForMatch);
+  let minLen = norms[0].length;
+  for (let i = 1; i < norms.length; i += 1) {
+    minLen = Math.min(minLen, sharedPrefixLen(norms[0], norms[i]));
   }
-  // اقطع عند آخر مسافة حتى لا نفصل كلمة
-  const lastSpace = prefix.lastIndexOf(" ");
-  if (lastSpace > MIN_EMBEDDED_PASSAGE_LEN) {
-    prefix = prefix.slice(0, lastSpace);
+  if (minLen < MIN_PASSAGE_LEN) return null;
+
+  // ارجع للنص الأصلي: خذ من plain[0] حتى نغطي نفس البادئة المطبّعة
+  const target = norms[0].slice(0, minLen);
+  const original = plains[0];
+  let built = "";
+  let cut = 0;
+  for (let i = 0; i < original.length && built.length < target.length; i += 1) {
+    const ch = original[i];
+    const nextBuilt = normalizeForMatch(original.slice(0, i + 1));
+    if (nextBuilt.length > built.length) {
+      built = nextBuilt;
+      cut = i + 1;
+    }
+    if (built.startsWith(target) || built.length >= target.length) {
+      cut = i + 1;
+      break;
+    }
   }
-  return prefix.trim();
+  // اقطع عند آخر فاصل فقرات إن أمكن
+  const slice = original.slice(0, cut);
+  const paraBreak = slice.lastIndexOf("\n\n");
+  if (paraBreak > MIN_PASSAGE_LEN * 0.6) {
+    return slice.slice(0, paraBreak).trim();
+  }
+  return slice.trim();
+}
+
+function removePassagePrefix(plain, passagePlain) {
+  if (!passagePlain) return plain;
+  const nPlain = normalizeForMatch(plain);
+  const nPass = normalizeForMatch(passagePlain);
+  if (!nPlain.startsWith(nPass)) {
+    // محاولة بادئة أقصر
+    const len = sharedPrefixLen(nPlain, nPass);
+    if (len < MIN_PASSAGE_LEN) return plain;
+  }
+  // احذف من الأصلي بمطابقة التطبيع
+  let built = "";
+  let cut = 0;
+  const targetLen = normalizeForMatch(passagePlain).length;
+  for (let i = 0; i < plain.length; i += 1) {
+    built = normalizeForMatch(plain.slice(0, i + 1));
+    cut = i + 1;
+    if (built.length >= targetLen) break;
+  }
+  return plain.slice(cut).replace(/^\s+/, "");
 }
 
 function getStructuredPassage(q) {
@@ -91,7 +155,7 @@ function getStructuredPassage(q) {
       q.passage?.passageText ||
       q.passageText ||
       "";
-    const key = String(q.passage?.id || passageFingerprint(text));
+    const key = String(q.passage?.id || passageHeadKey(text) || "");
     return { text: String(text || "").trim(), key };
   }
   const text =
@@ -100,7 +164,7 @@ function getStructuredPassage(q) {
     q.passage?.text ||
     q.passage?.passageText ||
     "";
-  const key = String(q.passageId || q.passage_id || q.passage?.id || passageFingerprint(text));
+  const key = String(q.passageId || q.passage_id || q.passage?.id || passageHeadKey(text) || "");
   return { text: String(text || "").trim(), key };
 }
 
@@ -115,103 +179,120 @@ function getQuestionPayload(q) {
     };
   }
   return {
-    text: q?.text || "",
-    image: q?.image || null,
-    choices: Array.isArray(q?.choices) ? q.choices : [],
+    text: q?.text || q?.questionText || "",
+    image: q?.image || q?.questionImage || null,
+    choices: Array.isArray(q?.choices)
+      ? q.choices
+      : [
+          q?.optionA && { letter: "A", text: q.optionA },
+          q?.optionB && { letter: "B", text: q.optionB },
+          q?.optionC && { letter: "C", text: q.optionC },
+          q?.optionD && { letter: "D", text: q.optionD },
+        ].filter(Boolean),
     isEssay: String(q?.type || "").toUpperCase() === "ESSAY",
   };
 }
 
 /**
- * تطبيع الأسئلة للتصدير:
- * - القطعة المنظمة تظهر مرة واحدة لكل مجموعة
- * - لو القطعة مكررة داخل نص كل سؤال → تُستخرج مرة وتُحذف من بقية الأسئلة
+ * تطبيع الأسئلة للتصدير مع دمج القطعة المكررة داخل questionText.
+ * مثال: أسئلة 18–24 بنفس نص النانو → القطعة مرة + أسئلة قصيرة بعدها.
  */
 export function normalizeQuestionsForExport(questions = []) {
   const list = (questions || []).filter(Boolean);
-  const rows = [];
-  let lastStructuredKey = null;
-
-  // 1) أولاً: جمّع حسب passage المنظم
   const prepared = list.map((q) => {
     const structured = getStructuredPassage(q);
     const payload = getQuestionPayload(q);
-    return { q, structured, payload, plain: stripHtmlToText(payload.text) };
+    const plain = stripHtmlToText(payload.text);
+    return {
+      structured,
+      payload,
+      plain,
+      headKey: structured.text ? null : passageHeadKey(plain),
+    };
   });
 
-  // 2) اكتشف قطع مضمّنة في نص السؤال بين أسئلة متتالية بدون passage منظم
-  const embeddedKeys = new Array(prepared.length).fill("");
-  const embeddedPassages = new Array(prepared.length).fill("");
+  const rows = [];
+  let lastStructuredKey = null;
   let i = 0;
+
   while (i < prepared.length) {
-    if (prepared[i].structured.text) {
+    const item = prepared[i];
+
+    // قطعة منظمة من الـ API
+    if (item.structured.text) {
+      if (item.structured.key !== lastStructuredKey) {
+        rows.push({ kind: "passage", text: item.structured.text });
+        lastStructuredKey = item.structured.key;
+      }
+      rows.push({
+        kind: "question",
+        text: item.payload.text,
+        image: item.payload.image,
+        choices: item.payload.choices,
+        isEssay: item.payload.isEssay,
+      });
       i += 1;
       continue;
     }
-    let j = i + 1;
-    while (j < prepared.length && !prepared[j].structured.text) j += 1;
-    const group = prepared.slice(i, j);
-    if (group.length >= 2) {
-      const prefix = commonPrefix(group.map((g) => g.plain));
-      if (prefix.length >= MIN_EMBEDDED_PASSAGE_LEN) {
-        const key = passageFingerprint(prefix);
-        for (let k = i; k < j; k += 1) {
-          embeddedPassages[k] = prefix;
-          embeddedKeys[k] = key;
-        }
-      }
-    }
-    i = j;
-  }
 
-  let lastEmbeddedKey = null;
-  prepared.forEach((item, idx) => {
-    const { structured, payload } = item;
+    lastStructuredKey = null;
+    const key = item.headKey;
 
-    if (structured.text) {
-      if (structured.key !== lastStructuredKey) {
-        rows.push({ kind: "passage", text: structured.text });
-        lastStructuredKey = structured.key;
-      }
-      lastEmbeddedKey = null;
+    // سؤال قصير عادي
+    if (!key) {
       rows.push({
         kind: "question",
-        text: payload.text,
-        image: payload.image,
-        choices: payload.choices,
-        isEssay: payload.isEssay,
+        text: item.payload.text,
+        image: item.payload.image,
+        choices: item.payload.choices,
+        isEssay: item.payload.isEssay,
       });
-      return;
+      i += 1;
+      continue;
     }
 
-    const embedded = embeddedPassages[idx];
-    const embeddedKey = embeddedKeys[idx];
-    let questionText = payload.text;
-
-    if (embedded && embeddedKey) {
-      if (embeddedKey !== lastEmbeddedKey) {
-        rows.push({ kind: "passage", text: embedded });
-        lastEmbeddedKey = embeddedKey;
-      }
-      // احذف القطعة من نص السؤال
-      const plain = item.plain;
-      if (plain.startsWith(embedded)) {
-        const restPlain = plain.slice(embedded.length).replace(/^\s+/, "");
-        // لو النص الأصلي HTML وبدأ بنفس المحتوى تقريباً، استخدم الباقي كنص عادي
-        questionText = restPlain;
-      }
-    } else {
-      lastEmbeddedKey = null;
+    // مجموعة أسئلة متتالية بنفس رأس القطعة
+    let j = i + 1;
+    while (
+      j < prepared.length &&
+      !prepared[j].structured.text &&
+      prepared[j].headKey === key
+    ) {
+      j += 1;
     }
 
-    rows.push({
-      kind: "question",
-      text: questionText,
-      image: payload.image,
-      choices: payload.choices,
-      isEssay: payload.isEssay,
+    const group = prepared.slice(i, j);
+    if (group.length === 1) {
+      rows.push({
+        kind: "question",
+        text: group[0].payload.text,
+        image: group[0].payload.image,
+        choices: group[0].payload.choices,
+        isEssay: group[0].payload.isEssay,
+      });
+      i = j;
+      continue;
+    }
+
+    const passagePlain =
+      extractSharedPassagePlain(group.map((g) => g.plain)) ||
+      group[0].plain.slice(0, Math.min(group[0].plain.length, 2500));
+
+    rows.push({ kind: "passage", text: passagePlain });
+
+    group.forEach((g) => {
+      const rest = removePassagePrefix(g.plain, passagePlain);
+      rows.push({
+        kind: "question",
+        text: rest || g.payload.text,
+        image: g.payload.image,
+        choices: g.payload.choices,
+        isEssay: g.payload.isEssay,
+      });
     });
-  });
+
+    i = j;
+  }
 
   return rows;
 }
@@ -256,7 +337,7 @@ function waitForImages(root) {
 
 function renderPassageHtml(text) {
   return `
-    <div class="passage export-block">
+    <div class="passage">
       <div class="passage-label">قطعة القراءة</div>
       <div class="passage-body">${formatQuestionHtml(text)}</div>
     </div>`;
@@ -279,13 +360,11 @@ function renderQuestionHtml(row, qIndex) {
     : "";
 
   const essayHint = row.isEssay
-    ? `<div class="essay-lines">
-        <div class="line"></div><div class="line"></div><div class="line"></div>
-      </div>`
+    ? `<div class="essay-lines"><div class="line"></div><div class="line"></div><div class="line"></div></div>`
     : "";
 
   return `
-    <div class="question export-block">
+    <div class="question">
       <div class="q-head">
         <span class="q-num">${qIndex}.</span>
         <div class="q-text">${formatQuestionHtml(row.text) || (row.image ? "" : "—")}</div>
@@ -308,97 +387,73 @@ function renderQuestionsHtml(rows) {
 }
 
 const EXAM_DOC_CSS = `
-  @page { size: A4; margin: 12mm; }
+  @page { size: A4; margin: 10mm; }
   * { box-sizing: border-box; }
   .exam-export-root, .exam-pdf-page {
     margin: 0;
-    padding: 16px 20px;
+    padding: 10px 14px;
     font-family: "Noto Sans Arabic", "Segoe UI", Tahoma, Arial, sans-serif;
     color: #111;
     background: #fff;
     direction: rtl;
-    line-height: 1.65;
-    font-size: 14px;
+    line-height: 1.45;
+    font-size: 13px;
   }
   .sheet { max-width: 800px; margin: 0 auto; width: 100%; }
   .header {
     border: 1.5px solid #222;
-    border-radius: 10px;
-    padding: 14px 16px;
-    margin-bottom: 16px;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
   }
   .exam-title {
     text-align: center;
-    font-size: 22px;
+    font-size: 18px;
     font-weight: 800;
-    margin: 0 0 8px;
+    margin: 0 0 4px;
   }
   .meta {
     text-align: center;
     color: #444;
-    font-size: 12px;
-    margin-bottom: 12px;
+    font-size: 11px;
+    margin-bottom: 8px;
   }
-  .fields {
+  .fields { display: grid; grid-template-columns: 1fr; gap: 8px; }
+  .field { display: flex; align-items: center; gap: 8px; min-height: 22px; }
+  .field-label { font-weight: 700; white-space: nowrap; font-size: 12px; }
+  .field-line { flex: 1; border-bottom: 1.5px solid #333; min-height: 18px; }
+  .export-block { break-inside: avoid; page-break-inside: avoid; }
+  .question {
+    padding: 6px 0 7px;
+    border-bottom: 1px dashed #ccc;
+  }
+  .q-head { display: flex; gap: 6px; align-items: flex-start; }
+  .q-num { font-weight: 800; min-width: 22px; font-size: 13px; }
+  .q-text { flex: 1; font-size: 13px; font-weight: 600; white-space: pre-wrap; }
+  .q-image { text-align: center; margin: 4px 0; }
+  .q-image img { max-height: 120px; max-width: 100%; object-fit: contain; }
+  .choices {
+    margin-top: 4px;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px 18px;
+    gap: 3px 10px;
+    padding-right: 22px;
   }
-  .field {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 28px;
-  }
-  .field-label {
-    font-weight: 700;
-    white-space: nowrap;
-    font-size: 13px;
-  }
-  .field-value { font-size: 13px; }
-  .field-line {
-    flex: 1;
-    border-bottom: 1.5px solid #333;
-    min-height: 22px;
-  }
-  .export-block {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-  .question {
-    padding: 10px 0 12px;
-    border-bottom: 1px dashed #bbb;
-  }
-  .q-head { display: flex; gap: 8px; align-items: flex-start; }
-  .q-num { font-weight: 800; min-width: 28px; }
-  .q-text { flex: 1; font-size: 15px; font-weight: 600; white-space: pre-wrap; }
-  .q-image { text-align: center; margin: 8px 0; }
-  .q-image img { max-height: 160px; max-width: 100%; object-fit: contain; }
-  .choices { margin-top: 8px; display: grid; gap: 6px; padding-right: 28px; }
-  .choice { display: flex; gap: 6px; align-items: flex-start; }
-  .choice-letter { font-weight: 700; min-width: 22px; }
-  .choice-text { flex: 1; }
-  .choice-img { max-height: 70px; max-width: 180px; object-fit: contain; }
+  .choice { display: flex; gap: 4px; align-items: flex-start; }
+  .choice-letter { font-weight: 700; min-width: 18px; font-size: 12px; }
+  .choice-text { flex: 1; font-size: 12px; }
+  .choice-img { max-height: 56px; max-width: 140px; object-fit: contain; }
   .passage {
-    background: #f7f7f7;
+    background: #f6f6f6;
     border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 10px 12px;
-    margin: 10px 0 6px;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin: 6px 0 4px;
   }
-  .passage-label { font-size: 12px; font-weight: 800; color: #555; margin-bottom: 4px; }
-  .passage-body { font-size: 14px; white-space: pre-wrap; }
-  .essay-lines { margin: 10px 28px 0; }
-  .essay-lines .line {
-    border-bottom: 1px solid #999;
-    height: 26px;
-    margin-bottom: 4px;
-  }
-  .pdf-page-shell {
-    width: ${PAGE_WIDTH_PX}px;
-    min-height: ${PAGE_CONTENT_HEIGHT_PX + 32}px;
-    background: #fff;
-  }
+  .passage-label { font-size: 11px; font-weight: 800; color: #555; margin-bottom: 3px; }
+  .passage-body { font-size: 12px; white-space: pre-wrap; line-height: 1.5; }
+  .essay-lines { margin: 6px 22px 0; }
+  .essay-lines .line { border-bottom: 1px solid #999; height: 20px; margin-bottom: 3px; }
 `;
 
 function buildHeaderHtml({ title, questionCount }) {
@@ -410,10 +465,10 @@ function buildHeaderHtml({ title, questionCount }) {
   const safeTitle = escapeHtml(title || "امتحان شامل");
 
   return `
-    <div class="header export-block">
+    <div class="header">
       <h1 class="exam-title">${safeTitle}</h1>
       <div class="meta">${questionCount} سؤال · ${escapeHtml(dateStr)}</div>
-      <div class="fields" style="grid-template-columns: 1fr;">
+      <div class="fields">
         <div class="field">
           <span class="field-label">اسم الطالب:</span>
           <span class="field-line"></span>
@@ -432,11 +487,7 @@ function buildExamBodyHtml({ title, questionCount, rows }) {
   </div>`;
 }
 
-export function buildExamDocumentHtml({
-  title,
-  questionCount,
-  rows,
-}) {
+export function buildExamDocumentHtml({ title, questionCount, rows }) {
   const safeTitle = escapeHtml(title || "امتحان شامل");
   return `<!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -451,20 +502,12 @@ ${buildExamBodyHtml({ title, questionCount, rows })}
 </html>`;
 }
 
-export async function exportExamQuestionsAsWord({
-  title,
-  questions,
-}) {
+export async function exportExamQuestionsAsWord({ title, questions }) {
   const rows = normalizeQuestionsForExport(questions);
   const questionCount = rows.filter((r) => r.kind === "question").length;
   if (!questionCount) throw new Error("لا توجد أسئلة للتصدير");
 
-  const html = buildExamDocumentHtml({
-    title,
-    questionCount,
-    rows,
-  });
-
+  const html = buildExamDocumentHtml({ title, questionCount, rows });
   const blob = new Blob(["\ufeff", html], {
     type: "application/msword;charset=utf-8",
   });
@@ -473,29 +516,25 @@ export async function exportExamQuestionsAsWord({
 }
 
 /**
- * يقسّم البلوكات على صفحات ثابتة الارتفاع بدون قص منتصف السطر.
+ * يقسّم البلوكات على صفحات ويملأ كل صفحة بأكبر قدر ممكن.
+ * القطع الطويلة تُقسَّم لفقرات حتى لا تترك صفحة شبه فارغة بعدها.
  */
-function packBlocksIntoPages(blocks, firstPageBudget, nextPageBudget) {
+function packBlocksIntoPages(blocks, pageBudget) {
   const pages = [];
   let current = [];
   let used = 0;
-  let budget = firstPageBudget;
 
   const flush = () => {
     if (!current.length) return;
     pages.push(current);
     current = [];
     used = 0;
-    budget = nextPageBudget;
   };
 
   blocks.forEach((block) => {
     const h = Math.ceil(block.height);
-    if (current.length && used + h > budget) {
-      flush();
-    }
-    // بلوك أطول من الصفحة: يوضع لوحده (أفضل من القص العشوائي)
-    if (h > budget && current.length === 0) {
+    if (current.length && used + h > pageBudget) flush();
+    if (h > pageBudget && current.length === 0) {
       current.push(block);
       flush();
       return;
@@ -503,19 +542,52 @@ function packBlocksIntoPages(blocks, firstPageBudget, nextPageBudget) {
     current.push(block);
     used += h;
   });
-
   flush();
   return pages;
 }
 
-/**
- * تصدير PDF بدون تداخل:
- * قياس كل بلوك → تعبئة صفحات → التقاط كل صفحة كاملة.
- */
-export async function exportExamQuestionsAsPdf({
-  title,
-  questions,
-}) {
+/** قسّم قطعة طويلة إلى فقرات قابلة للتعبئة */
+function splitPassageIntoChunks(passageHtml, measureEl, maxChunkHeight) {
+  const temp = document.createElement("div");
+  temp.innerHTML = passageHtml;
+  const body = temp.querySelector(".passage-body");
+  if (!body) return [passageHtml];
+
+  const fullText = body.textContent || "";
+  const paragraphs = fullText.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+  if (paragraphs.length <= 1) return [passageHtml];
+
+  const chunks = [];
+  let buf = [];
+
+  const measureChunk = (parts, isContinuation) => {
+    const html = `
+      <div class="passage">
+        <div class="passage-label">${isContinuation ? "تتمة قطعة القراءة" : "قطعة القراءة"}</div>
+        <div class="passage-body">${parts.map((p) => escapeHtml(p)).join("<br/><br/>")}</div>
+      </div>`;
+    measureEl.innerHTML = html;
+    return {
+      html,
+      height: measureEl.getBoundingClientRect().height + 4,
+    };
+  };
+
+  paragraphs.forEach((p) => {
+    const trial = [...buf, p];
+    const measured = measureChunk(trial, chunks.length > 0);
+    if (buf.length && measured.height > maxChunkHeight) {
+      chunks.push(measureChunk(buf, chunks.length > 0));
+      buf = [p];
+    } else {
+      buf = trial;
+    }
+  });
+  if (buf.length) chunks.push(measureChunk(buf, chunks.length > 0));
+  return chunks;
+}
+
+export async function exportExamQuestionsAsPdf({ title, questions }) {
   const rows = normalizeQuestionsForExport(questions);
   const questionCount = rows.filter((r) => r.kind === "question").length;
   if (!questionCount) throw new Error("لا توجد أسئلة للتصدير");
@@ -523,51 +595,59 @@ export async function exportExamQuestionsAsPdf({
   const measureMount = document.createElement("div");
   measureMount.setAttribute("data-exam-export-measure", "true");
   measureMount.style.cssText = `position:fixed;left:-14000px;top:0;width:${PAGE_WIDTH_PX}px;background:#fff;z-index:-1;pointer-events:none;`;
-
-  let qIndex = 0;
-  const blockHtmlParts = [
-    `<div class="export-block" data-block="header">${buildHeaderHtml({
-      title,
-      questionCount,
-    })}</div>`,
-  ];
-  rows.forEach((row) => {
-    if (row.kind === "passage") {
-      blockHtmlParts.push(
-        `<div class="export-block" data-block="passage">${renderPassageHtml(row.text)}</div>`,
-      );
-      return;
-    }
-    qIndex += 1;
-    blockHtmlParts.push(
-      `<div class="export-block" data-block="question">${renderQuestionHtml(row, qIndex)}</div>`,
-    );
-  });
-
   measureMount.innerHTML = `<style>${EXAM_DOC_CSS}</style>
-    <div class="exam-export-root" dir="rtl" style="padding:0;">
-      <div class="sheet" style="max-width:none;">${blockHtmlParts.join("")}</div>
+    <div class="exam-export-root" dir="rtl" style="padding:10px 14px;">
+      <div class="sheet" style="max-width:none;"></div>
     </div>`;
   document.body.appendChild(measureMount);
 
   try {
     if (document.fonts?.ready) await document.fonts.ready;
-    await waitForImages(measureMount);
-    await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 60)));
 
-    const blockEls = Array.from(measureMount.querySelectorAll(":scope .sheet > .export-block"));
-    const measured = blockEls.map((el, index) => ({
-      index,
-      html: el.innerHTML,
-      height: el.getBoundingClientRect().height + 8,
-    }));
+    const sheet = measureMount.querySelector(".sheet");
+    const probe = document.createElement("div");
+    probe.className = "export-block";
+    sheet.appendChild(probe);
 
-    const pages = packBlocksIntoPages(
-      measured,
-      PAGE_CONTENT_HEIGHT_PX,
-      PAGE_CONTENT_HEIGHT_PX,
-    );
+    const measuredBlocks = [];
 
+    // Header
+    probe.innerHTML = buildHeaderHtml({ title, questionCount });
+    measuredBlocks.push({
+      html: probe.innerHTML,
+      height: probe.getBoundingClientRect().height + 4,
+    });
+
+    let qIndex = 0;
+    for (const row of rows) {
+      if (row.kind === "passage") {
+        const passageHtml = renderPassageHtml(row.text);
+        probe.innerHTML = passageHtml;
+        const h = probe.getBoundingClientRect().height + 4;
+        if (h > PAGE_CONTENT_HEIGHT_PX * 0.55) {
+          const chunks = splitPassageIntoChunks(
+            passageHtml,
+            probe,
+            PAGE_CONTENT_HEIGHT_PX * 0.5,
+          );
+          chunks.forEach((c) => measuredBlocks.push(c));
+        } else {
+          measuredBlocks.push({ html: passageHtml, height: h });
+        }
+        continue;
+      }
+      qIndex += 1;
+      const qHtml = renderQuestionHtml(row, qIndex);
+      probe.innerHTML = qHtml;
+      measuredBlocks.push({
+        html: qHtml,
+        height: probe.getBoundingClientRect().height + 3,
+      });
+    }
+
+    probe.remove();
+
+    const pages = packBlocksIntoPages(measuredBlocks, PAGE_CONTENT_HEIGHT_PX);
     const pdf = new jsPDF("p", "mm", "a4");
     const contentW = PAGE_W_MM - MARGIN_MM * 2;
     const contentH = PAGE_H_MM - MARGIN_MM * 2;
@@ -576,7 +656,7 @@ export async function exportExamQuestionsAsPdf({
       const pageMount = document.createElement("div");
       pageMount.style.cssText = `position:fixed;left:-14000px;top:0;width:${PAGE_WIDTH_PX}px;background:#fff;z-index:-1;pointer-events:none;`;
       pageMount.innerHTML = `<style>${EXAM_DOC_CSS}</style>
-        <div class="exam-pdf-page" dir="rtl" style="min-height:auto;padding:16px 20px;">
+        <div class="exam-pdf-page" dir="rtl">
           <div class="sheet" style="max-width:none;">
             ${pages[pageIndex].map((b) => `<div class="export-block">${b.html}</div>`).join("")}
           </div>
@@ -585,7 +665,7 @@ export async function exportExamQuestionsAsPdf({
 
       try {
         await waitForImages(pageMount);
-        await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 40)));
+        await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)));
         const target = pageMount.querySelector(".exam-pdf-page");
         const canvas = await html2canvas(target, {
           scale: PDF_SCALE,
@@ -597,7 +677,6 @@ export async function exportExamQuestionsAsPdf({
           windowWidth: PAGE_WIDTH_PX,
         });
 
-        // لا نقصّ منتصف سطر: نضع الصفحة كاملة ونصغّرها إن لزم لتدخل في A4
         let drawW = contentW;
         let drawH = (canvas.height * drawW) / canvas.width;
         if (drawH > contentH) {
@@ -606,8 +685,7 @@ export async function exportExamQuestionsAsPdf({
           drawW *= scale;
         }
         const offsetX = MARGIN_MM + (contentW - drawW) / 2;
-
-        const imgData = canvas.toDataURL("image/jpeg", 0.93);
+        const imgData = canvas.toDataURL("image/jpeg", 0.92);
         if (pageIndex > 0) pdf.addPage();
         pdf.addImage(imgData, "JPEG", offsetX, MARGIN_MM, drawW, drawH);
       } finally {
