@@ -25,6 +25,8 @@ import {
   FaSync,
   FaSearch,
   FaCompass,
+  FaFilePdf,
+  FaFileWord,
 } from "react-icons/fa";
 
 function HeaderBtn({ icon, label, onClick, isLoading, solid = false, tourId }) {
@@ -76,6 +78,10 @@ export default function TeacherExamShell({
   onSearchChange,
   filteredCount,
   onStartTour,
+  onExportPdf,
+  onExportWord,
+  exportingPdf = false,
+  exportingWord = false,
 }) {
   const pageBg = useColorModeValue("#F4F6F9", "gray.950");
   const border = useColorModeValue("gray.200", "gray.700");
@@ -208,6 +214,25 @@ export default function TeacherExamShell({
               )}
             </HStack>
             <HStack spacing={2} flexWrap="wrap">
+              {typeof onExportPdf === "function" && (
+                <HeaderBtn
+                  tourId="exam-teacher-export-pdf"
+                  icon={FaFilePdf}
+                  label="تصدير PDF"
+                  onClick={onExportPdf}
+                  isLoading={exportingPdf}
+                  solid
+                />
+              )}
+              {typeof onExportWord === "function" && (
+                <HeaderBtn
+                  tourId="exam-teacher-export-word"
+                  icon={FaFileWord}
+                  label="تصدير Word"
+                  onClick={onExportWord}
+                  isLoading={exportingWord}
+                />
+              )}
               <HeaderBtn tourId="exam-teacher-grades" icon={FaUsers} label="درجات الطلاب" onClick={onGrades} />
               <HeaderBtn
                 tourId="exam-teacher-report"

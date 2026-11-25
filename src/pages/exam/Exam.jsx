@@ -13,7 +13,11 @@ import UserType from "../../Hooks/auth/userType";
 import { useTeacherCourseGroups } from "../../Hooks/course/useCourseGroups";
 import { fetchExamGrades } from "../../api/courseAssignmentReportsApi";
 import { normalizeStudyGroups } from "./utils/examReportUtils";
-import { FaAlignLeft, FaBookOpen, FaUser, FaImage, FaChartBar, FaCompass, FaFilePdf, FaUserPlus } from "react-icons/fa";
+import { FaAlignLeft, FaBookOpen, FaUser, FaImage, FaChartBar, FaCompass, FaFilePdf, FaFileWord, FaUserPlus } from "react-icons/fa";
+import {
+  exportExamQuestionsAsPdf,
+  exportExamQuestionsAsWord,
+} from "./utils/exportExamQuestionsDocument";
 import { BiSearch } from "react-icons/bi";
 import { FiDownload } from "react-icons/fi";
 import { PlatformExamTeacherCard } from "./components/PlatformExamQuestionCard";
@@ -80,7 +84,7 @@ function applyCorrectLettersToQuestion(question, letters) {
 const Exam = () => {
   const { examId } = useParams();
   const navigate = useNavigate();
-  const [, isAdmin, isTeacher, student] = UserType();
+  const [userData, isAdmin, isTeacher, student] = UserType();
   const isStaff = Boolean(isTeacher || isAdmin);
   const { data: teacherGroupsRaw = [] } = useTeacherCourseGroups(undefined, {
     enabled: isStaff,
@@ -98,6 +102,8 @@ const Exam = () => {
   const [deleting, setDeleting] = useState(false);
   const [pendingCorrect, setPendingCorrect] = useState({});
   const [draftCorrectLetters, setDraftCorrectLetters] = useState({});
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
   const toast = useToast();
   const [showGrades, setShowGrades] = useState(false);
   const [gradesLoading, setGradesLoading] = useState(false);
@@ -600,6 +606,64 @@ const Exam = () => {
     );
   }
 
+  const resolveTeacherName = () =>
+    userData?.name ||
+    userData?.teacherName ||
+    userData?.teacher_name ||
+    userData?.full_name ||
+    userData?.fullName ||
+    examMeta?.teacherName ||
+    examMeta?.teacher_name ||
+    "";
+
+  const handleExportQuestionsPdf = async () => {
+    if (!questions.length) {
+      toast({ title: "لا توجد أسئلة للتصدير", status: "warning" });
+      return;
+    }
+    setExportingPdf(true);
+    try {
+      await exportExamQuestionsAsPdf({
+        title: examMeta?.examTitle || "امتحان شامل",
+        teacherName: resolveTeacherName(),
+        questions,
+      });
+      toast({ title: "تم تصدير PDF", status: "success", duration: 2500 });
+    } catch (err) {
+      toast({
+        title: "فشل تصدير PDF",
+        description: err?.message || "حاول مرة أخرى",
+        status: "error",
+      });
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
+  const handleExportQuestionsWord = async () => {
+    if (!questions.length) {
+      toast({ title: "لا توجد أسئلة للتصدير", status: "warning" });
+      return;
+    }
+    setExportingWord(true);
+    try {
+      await exportExamQuestionsAsWord({
+        title: examMeta?.examTitle || "امتحان شامل",
+        teacherName: resolveTeacherName(),
+        questions,
+      });
+      toast({ title: "تم تصدير Word", status: "success", duration: 2500 });
+    } catch (err) {
+      toast({
+        title: "فشل تصدير Word",
+        description: err?.message || "حاول مرة أخرى",
+        status: "error",
+      });
+    } finally {
+      setExportingWord(false);
+    }
+  };
+
   if (loading) {
     return <BrandLoadingScreen />;
   }
@@ -699,6 +763,34 @@ const Exam = () => {
             </Box>
 
             <HStack spacing={2} flexWrap="wrap" justify={{ base: "flex-start", md: "flex-end" }}>
+              <Button
+                data-tour-id="platform-exam-export-pdf"
+                size="sm"
+                bg="red.500"
+                color="white"
+                borderRadius="lg"
+                leftIcon={<FaFilePdf />}
+                onClick={handleExportQuestionsPdf}
+                isLoading={exportingPdf}
+                isDisabled={!questions.length}
+                _hover={{ bg: "red.600" }}
+              >
+                تصدير PDF
+              </Button>
+              <Button
+                data-tour-id="platform-exam-export-word"
+                size="sm"
+                bg="blue.500"
+                color="white"
+                borderRadius="lg"
+                leftIcon={<FaFileWord />}
+                onClick={handleExportQuestionsWord}
+                isLoading={exportingWord}
+                isDisabled={!questions.length}
+                _hover={{ bg: "blue.600" }}
+              >
+                تصدير Word
+              </Button>
               <Button
                 data-tour-id="platform-exam-tour-btn"
                 size="sm"

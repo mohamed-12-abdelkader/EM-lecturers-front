@@ -116,6 +116,10 @@ import {
 import useExamTakingProtection, {
   clearExamTakingFlag,
 } from "../../Hooks/exam/useExamTakingProtection";
+import {
+  exportExamQuestionsAsPdf,
+  exportExamQuestionsAsWord,
+} from "./utils/exportExamQuestionsDocument";
 
 function countLectureAnswered(questions, answers) {
   return (questions || []).filter((q) => {
@@ -207,6 +211,8 @@ const ComprehensiveExam = () => {
   const [startingAttempt, setStartingAttempt] = useState(false);
   const [questionsLoadError, setQuestionsLoadError] = useState(null);
   const [questionsReloading, setQuestionsReloading] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
   const [blockedAttemptResult, setBlockedAttemptResult] = useState(null);
   // State لإضافة الأسئلة كصور
   const [addImageModal, setAddImageModal] = useState({ open: false });
@@ -2073,6 +2079,65 @@ const ComprehensiveExam = () => {
     }
   };
 
+  const resolveTeacherName = () =>
+    userData?.name ||
+    userData?.teacherName ||
+    userData?.teacher_name ||
+    userData?.full_name ||
+    userData?.fullName ||
+    examData?.teacherName ||
+    examData?.teacher_name ||
+    examData?.teacher?.name ||
+    "";
+
+  const handleExportPdf = async () => {
+    if (!questions.length) {
+      toast({ title: "لا توجد أسئلة للتصدير", status: "warning" });
+      return;
+    }
+    setExportingPdf(true);
+    try {
+      await exportExamQuestionsAsPdf({
+        title: examData?.title || "امتحان شامل",
+        teacherName: resolveTeacherName(),
+        questions,
+      });
+      toast({ title: "تم تصدير PDF", status: "success", duration: 2500 });
+    } catch (err) {
+      toast({
+        title: "فشل تصدير PDF",
+        description: err?.message || "حاول مرة أخرى",
+        status: "error",
+      });
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
+  const handleExportWord = async () => {
+    if (!questions.length) {
+      toast({ title: "لا توجد أسئلة للتصدير", status: "warning" });
+      return;
+    }
+    setExportingWord(true);
+    try {
+      await exportExamQuestionsAsWord({
+        title: examData?.title || "امتحان شامل",
+        teacherName: resolveTeacherName(),
+        questions,
+      });
+      toast({ title: "تم تصدير Word", status: "success", duration: 2500 });
+    } catch (err) {
+      toast({
+        title: "فشل تصدير Word",
+        description: err?.message || "حاول مرة أخرى",
+        status: "error",
+      });
+    } finally {
+      setExportingWord(false);
+    }
+  };
+
   if (loading) {
     return <BrandLoadingScreen />;
   }
@@ -2393,6 +2458,10 @@ const ComprehensiveExam = () => {
           onAiExtract={() => setAiExtractionModalOpen(true)}
           onReload={fetchExamData}
           loading={loading}
+          onExportPdf={handleExportPdf}
+          onExportWord={handleExportWord}
+          exportingPdf={exportingPdf}
+          exportingWord={exportingWord}
           onStartTour={() => {
             setShowGrades(false);
             setExamTourOpen(true);
