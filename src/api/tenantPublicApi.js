@@ -154,3 +154,35 @@ export async function fetchPlatformPublicCourses(subdomain, gradeId) {
     { cacheKey: `platform-courses:${subdomain}:${gradeId || "all"}` },
   );
 }
+
+/**
+ * GET /api/tenants/search?q= — بحث عام عن منصات المدرسين النشطة.
+ * يدعم AbortSignal لإلغاء الطلب السابق أثناء الكتابة.
+ */
+export async function searchTeacherPlatforms(query, { limit = 10, signal } = {}) {
+  const q = String(query || "").trim();
+  if (!q) {
+    return { success: true, data: [], meta: { total: 0, query: "", limit } };
+  }
+  const params = new URLSearchParams({
+    q,
+    limit: String(Math.min(Math.max(Number(limit) || 10, 1), 10)),
+  });
+  const base = getApiOrigin();
+  const path = `/api/tenants/search?${params.toString()}`;
+  const url = base ? `${base}${path}` : path;
+  const res = await fetch(url, {
+    method: "GET",
+    cache: "no-store",
+    signal,
+    headers: { Accept: "application/json" },
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || json?.success === false) {
+    const err = new Error(json?.message || `HTTP ${res.status}`);
+    err.status = res.status;
+    err.body = json;
+    throw err;
+  }
+  return json;
+}

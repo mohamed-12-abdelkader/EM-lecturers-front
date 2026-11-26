@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { EM, emFont } from "./theme";
 import logoImg from "../../../img/next logo.png";
+import PlatformSearchBar from "./PlatformSearchBar";
 
 const LINKS = [
   { href: "#problems", label: "المشاكل" },
@@ -80,6 +81,10 @@ export default function StoryNav() {
           ))}
         </nav>
 
+        <div className="mx-2 hidden min-w-0 flex-1 justify-center md:flex lg:mx-4 lg:max-w-sm">
+          <PlatformSearchBar variant="nav" className="w-full max-w-sm" />
+        </div>
+
         <div className="flex shrink-0 items-center gap-2">
           <Link
             to="/login"
@@ -134,6 +139,9 @@ export default function StoryNav() {
                 backdropFilter: "blur(20px)",
               }}
             >
+              <div className="px-2 pb-2 pt-1">
+                <PlatformSearchBar variant="nav" />
+              </div>
               {LINKS.map((l) => (
                 <a
                   key={l.href}

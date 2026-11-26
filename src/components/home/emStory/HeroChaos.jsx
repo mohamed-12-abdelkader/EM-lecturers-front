@@ -6,6 +6,7 @@ import {
   useReducedMotion,
 } from "framer-motion";
 import { EM, emFont, easeOutExpo } from "./theme";
+import PlatformSearchBar from "./PlatformSearchBar";
 
 const CHAOS = [
   { id: "wa1", type: "wa", text: "موعد الامتحان امتى؟", x: "4%", y: "16%", rot: -6 },
@@ -141,6 +142,13 @@ export default function HeroChaos() {
                 {c}
               </span>
             ))}
+          </div>
+
+          <div className="relative z-30 mx-auto mt-5 w-full max-w-md text-right">
+            <p className="mb-2 text-[12px] font-bold" style={{ color: EM.textMuted }}>
+              ابحث عن منصة مدرّسك
+            </p>
+            <PlatformSearchBar variant="hero" />
           </div>
 
           <div className="mt-6 flex flex-col gap-2.5">
@@ -290,6 +298,18 @@ export default function HeroChaos() {
             >
               أنت هنا
             </motion.span>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.48, duration: 0.55, ease: easeOutExpo }}
+            className="relative z-30 mx-auto mt-8 w-full max-w-xl text-right"
+          >
+            <p className="mb-2 text-sm font-bold" style={{ color: EM.textMuted }}>
+              ابحث عن منصة أي مدرّس بالاسم
+            </p>
+            <PlatformSearchBar variant="hero" />
           </motion.div>
 
           <motion.div
